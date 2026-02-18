@@ -1,0 +1,86 @@
+services:
+  # ============== Backend Service ==============
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: usmsb/backend:latest
+    container_name: usmsb-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ID=backend_${HOSTNAME:-local}
+      - NODE_ADDRESS=${NODE_ADDRESS:-0.0.0.0}
+      - JWT_SECRET=${JWT_SECRET:-usmsb-production-secret-key-2026-secure-random-string}
+      - SESSION_SECRET=${SESSION_SECRET:-usmsb-session-secret-2026}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ZHIPU_API_KEY=${ZHIPU_API_KEY:-}
+      - ETH_RPC_URL=${ETH_RPC_URL:-}
+      - DATABASE_URL=sqlite:///data/usmsb.db
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - usmsb-data:/app/data
+      - usmsb-logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============== Frontend Service ==============
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: usmsb/frontend:latest
+    container_name: usmsb-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # ============== Redis (Caching & Message Broker) ==============
+  redis:
+    image: redis:7-alpine
+    container_name: usmsb-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  usmsb-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  usmsb-data:
+  usmsb-logs:
+  redis-data:

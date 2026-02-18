@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Primary gradient - brighter for dark background -->
+    <linearGradient id="primaryGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#a78bfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c084fc;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Secondary gradient - cyan accent -->
+    <linearGradient id="secondaryGradientDark" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Glow effect - stronger for dark mode -->
+    <filter id="glowDark" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Node glow -->
+    <filter id="nodeGlowDark" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle with subtle gradient -->
+  <circle cx="256" cy="256" r="240" fill="none" stroke="url(#primaryGradientDark)" stroke-width="2" opacity="0.4"/>
+
+  <!-- Outer connection ring - 9 nodes representing USMSB elements -->
+  <g filter="url(#glowDark)" opacity="0.9">
+    <!-- Connection lines from center to outer nodes -->
+    <line x1="256" y1="256" x2="256" y2="100" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="370" y2="137" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="412" y2="256" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="370" y2="375" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="256" y2="412" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="142" y2="375" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="100" y2="256" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+    <line x1="256" y1="256" x2="142" y2="137" stroke="url(#secondaryGradientDark)" stroke-width="2.5" opacity="0.7"/>
+
+    <!-- Circular connections between nodes -->
+    <circle cx="256" cy="256" r="156" fill="none" stroke="url(#primaryGradientDark)" stroke-width="2" stroke-dasharray="8 4" opacity="0.6"/>
+  </g>
+
+  <!-- Central hexagon core - AI brain -->
+  <g filter="url(#glowDark)">
+    <polygon points="256,180 320,218 320,294 256,332 192,294 192,218"
+             fill="url(#primaryGradientDark)" opacity="0.95"/>
+    <polygon points="256,200 300,228 300,284 256,312 212,284 212,228"
+             fill="none" stroke="white" stroke-width="2" opacity="0.9"/>
+  </g>
+
+  <!-- Inner neural network pattern -->
+  <g opacity="0.8">
+    <circle cx="256" cy="240" r="5" fill="white"/>
+    <circle cx="240" cy="265" r="4" fill="white"/>
+    <circle cx="272" cy="265" r="4" fill="white"/>
+    <circle cx="256" cy="280" r="4" fill="white"/>
+    <line x1="256" y1="240" x2="240" y2="265" stroke="white" stroke-width="1.5"/>
+    <line x1="256" y1="240" x2="272" y2="265" stroke="white" stroke-width="1.5"/>
+    <line x1="240" y1="265" x2="256" y2="280" stroke="white" stroke-width="1.5"/>
+    <line x1="272" y1="265" x2="256" y2="280" stroke="white" stroke-width="1.5"/>
+  </g>
+
+  <!-- 8 outer nodes representing USMSB elements (visible on dark) -->
+  <g filter="url(#nodeGlowDark)">
+    <!-- Node 1 - Top -->
+    <circle cx="256" cy="100" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="256" cy="100" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 2 - Top Right -->
+    <circle cx="370" cy="137" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="370" cy="137" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 3 - Right -->
+    <circle cx="412" cy="256" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="412" cy="256" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 4 - Bottom Right -->
+    <circle cx="370" cy="375" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="370" cy="375" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 5 - Bottom -->
+    <circle cx="256" cy="412" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="256" cy="412" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 6 - Bottom Left -->
+    <circle cx="142" cy="375" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="142" cy="375" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 7 - Left -->
+    <circle cx="100" cy="256" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="100" cy="256" r="9" fill="white" opacity="0.9"/>
+
+    <!-- Node 8 - Top Left -->
+    <circle cx="142" cy="137" r="18" fill="url(#secondaryGradientDark)"/>
+    <circle cx="142" cy="137" r="9" fill="white" opacity="0.9"/>
+  </g>
+
+  <!-- Text: USMSB -->
+  <text x="256" y="480" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="url(#primaryGradientDark)" letter-spacing="8">USMSB</text>
+</svg>
