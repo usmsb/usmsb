@@ -1,0 +1,2 @@
+[console_scripts]
+usmsb = usmsb_sdk.cli:main

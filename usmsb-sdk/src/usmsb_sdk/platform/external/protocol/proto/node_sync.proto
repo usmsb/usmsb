@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package usmsb.node;
+
+// 节点同步服务
+// 用于节点间的批量数据同步
+
+// 节点信息
+message NodeInfo {
+    string node_id = 1;
+    string address = 2;
+    int32 port = 3;
+    string version = 4;
+    int64 last_seen = 5;
+    double reputation = 6;
+    repeated string capabilities = 7;
+}
+
+// Agent 注册信息
+message AgentRegistration {
+    string agent_id = 1;
+    string name = 2;
+    string description = 3;
+    string protocol = 4;  // a2a, mcp, p2p, http, websocket, grpc
+    string endpoint = 5;
+    repeated SkillDefinition skills = 6;
+    repeated string capabilities = 7;
+    string status = 8;
+    double reputation = 9;
+    int64 registered_at = 10;
+    int64 last_seen = 11;
+    map<string, string> metadata = 12;
+}
+
+// 技能定义
+message SkillDefinition {
+    string skill_id = 1;
+    string name = 2;
+    string description = 3;
+    string category = 4;
+    map<string, string> input_schema = 5;
+    map<string, string> output_schema = 6;
+    repeated string keywords = 7;
+    repeated string prerequisites = 8;
+}
+
+// 同步请求
+message SyncRequest {
+    string source_node_id = 1;
+    int64 last_sync_timestamp = 2;  // 上次同步时间戳
+    repeated string requested_agent_ids = 3;  // 指定请求的Agent ID（可选）
+    bool full_sync = 4;  // 是否全量同步
+}
+
+// 同步响应
+message SyncResponse {
+    bool success = 1;
+    string error_message = 2;
+    int64 sync_timestamp = 3;
+    repeated AgentRegistration agents = 4;
+    repeated NodeInfo nodes = 5;
+    int32 total_agents = 6;
+    int32 total_nodes = 7;
+}
+
+// Agent 变更事件
+message AgentChangeEvent {
+    string event_type = 1;  // register, update, unregister
+    AgentRegistration agent = 2;
+    int64 timestamp = 3;
+    string source_node_id = 4;
+}
+
+// 批量事件同步请求
+message BatchEventRequest {
+    string source_node_id = 1;
+    int64 from_timestamp = 2;
+    int32 limit = 3;
+}
+
+// 批量事件同步响应
+message BatchEventResponse {
+    bool success = 1;
+    string error_message = 2;
+    repeated AgentChangeEvent events = 3;
+    bool has_more = 4;
+    int64 latest_timestamp = 5;
+}
+
+// 健康检查请求
+message HealthCheckRequest {
+    string node_id = 1;
+    int64 timestamp = 2;
+}
+
+// 健康检查响应
+message HealthCheckResponse {
+    bool healthy = 1;
+    string node_id = 2;
+    int64 timestamp = 3;
+    string version = 4;
+    int32 connected_peers = 5;
+    int32 registered_agents = 6;
+}
+
+// 节点发现请求
+message NodeDiscoveryRequest {
+    string requesting_node_id = 1;
+    repeated string known_node_ids = 2;  // 已知的节点ID
+    int32 limit = 3;
+}
+
+// 节点发现响应
+message NodeDiscoveryResponse {
+    bool success = 1;
+    repeated NodeInfo nodes = 2;
+    int32 total_known_nodes = 3;
+}
+
+// 数据分片信息（用于IPFS）
+message DataShard {
+    string cid = 1;  // IPFS CID
+    string data_type = 2;  // agent, transaction, log
+    int64 size = 3;
+    int64 created_at = 4;
+    string checksum = 5;
+}
+
+// IPFS 同步请求
+message IPFSSyncRequest {
+    string source_node_id = 1;
+    repeated string data_types = 2;  // 要同步的数据类型
+    int64 from_timestamp = 3;
+}
+
+// IPFS 同步响应
+message IPFSSyncResponse {
+    bool success = 1;
+    string error_message = 2;
+    repeated DataShard shards = 3;
+    int64 latest_timestamp = 4;
+}
+
+// 节点同步服务定义
+service NodeSyncService {
+    // 全量同步
+    rpc FullSync(SyncRequest) returns (SyncResponse);
+
+    // 增量同步
+    rpc IncrementalSync(SyncRequest) returns (SyncResponse);
+
+    // 批量事件同步（流式）
+    rpc StreamEvents(BatchEventRequest) returns (stream AgentChangeEvent);
+
+    // 健康检查
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+    // 节点发现
+    rpc DiscoverNodes(NodeDiscoveryRequest) returns (NodeDiscoveryResponse);
+
+    // IPFS 数据同步
+    rpc SyncFromIPFS(IPFSSyncRequest) returns (IPFSSyncResponse);
+
+    // 双向流式同步（实时）
+    rpc BidirectionalSync(stream AgentChangeEvent) returns (stream AgentChangeEvent);
+}

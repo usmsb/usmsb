@@ -1,0 +1,81 @@
+# USMSB SDK - Development Docker Compose
+# For local development with hot-reload support
+
+version: '3.8'
+
+services:
+  # ============== Frontend Development ==============
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: usmsb/frontend-dev:latest
+    container_name: usmsb-frontend-dev
+    ports:
+      - "5173:5173"  # Vite dev server
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+
+  # ============== Backend Development ==============
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: usmsb/backend-dev:latest
+    container_name: usmsb-backend-dev
+    ports:
+      - "8000:8000"  # REST API
+      - "8080:8080"  # P2P node
+    environment:
+      - NODE_ID=dev_${HOSTNAME:-local}
+      - NODE_ADDRESS=${NODE_ADDRESS:-0.0.0.0}
+      - NODE_PORT=8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ZHIPU_API_KEY=${ZHIPU_API_KEY:-}
+      - ETH_RPC_URL=${ETH_RPC_URL:-}
+      - DATABASE_URL=sqlite:///data/usmsb.db
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - usmsb-data:/app/data
+      - usmsb-logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+
+  # ============== Redis (Caching & Message Broker) ==============
+  redis:
+    image: redis:7-alpine
+    container_name: usmsb-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  usmsb-network:
+    driver: bridge
+
+volumes:
+  usmsb-data:
+  usmsb-logs:
+  redis-data:

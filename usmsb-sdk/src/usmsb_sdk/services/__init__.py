@@ -1,0 +1,166 @@
+"""USMSB SDK Services Module."""
+
+from usmsb_sdk.services.behavior_prediction_service import (
+    BehaviorPredictionService,
+    BehaviorPrediction,
+    SystemEvolutionPrediction,
+)
+from usmsb_sdk.services.agentic_workflow_service import (
+    AgenticWorkflowService,
+    Workflow,
+    WorkflowStep,
+    WorkflowStatus,
+    WorkflowResult,
+)
+from usmsb_sdk.services.decision_support_service import (
+    DecisionSupportService,
+    DecisionType,
+    DecisionStatus,
+    DecisionOption,
+    DecisionCriteria,
+    DecisionContext,
+    DecisionAnalysis,
+    DecisionRecommendation,
+)
+from usmsb_sdk.services.system_simulation_service import (
+    SystemSimulationService,
+    SimulationType,
+    SimulationStatus,
+    SimulationConfig,
+    SimulationResult,
+    SimulationStep,
+    SimulationEvent,
+    EventType,
+    AgentState,
+    EnvironmentState,
+)
+from usmsb_sdk.services.active_matching_service import (
+    ActiveMatchingService,
+    MatchScore,
+    Opportunity,
+    NegotiationSession,
+    NegotiationResult,
+    NegotiationProposal,
+    NegotiationRound,
+    SearchStrategy,
+    NegotiationStrategy,
+    NegotiationStatus,
+    OpportunityStatus,
+)
+from usmsb_sdk.services.supply_demand_matching_service import (
+    SupplyDemandMatchingService,
+    SupplyListing,
+    DemandListing,
+    Match,
+    MatchStatus,
+    MatchingMode,
+    MatchingStats,
+)
+from usmsb_sdk.services.agent_network_explorer import (
+    AgentNetworkExplorer,
+    AgentCapabilityInfo,
+    AgentRecommendation,
+    AgentRelationship,
+    ContactResult,
+    ContactRequest,
+    ExplorationRecord,
+    ExplorationStrategy,
+    TrustLevel,
+)
+from usmsb_sdk.services.collaborative_matching_service import (
+    CollaborativeMatchingService,
+    CollaborationSession,
+    CollaborationPlan,
+    CollaborationRole,
+    CollaborationMode,
+    CollaborationStatus,
+    RoleType,
+    ParticipantInvite,
+)
+from usmsb_sdk.services.proactive_learning_service import (
+    ProactiveLearningService,
+    LearningInsight,
+    OptimizedStrategy,
+    MarketInsight,
+    LearningType,
+    InsightCategory,
+)
+
+__all__ = [
+    # Behavior Prediction
+    "BehaviorPredictionService",
+    "BehaviorPrediction",
+    "SystemEvolutionPrediction",
+    # Agentic Workflow
+    "AgenticWorkflowService",
+    "Workflow",
+    "WorkflowStep",
+    "WorkflowStatus",
+    "WorkflowResult",
+    # Decision Support
+    "DecisionSupportService",
+    "DecisionType",
+    "DecisionStatus",
+    "DecisionOption",
+    "DecisionCriteria",
+    "DecisionContext",
+    "DecisionAnalysis",
+    "DecisionRecommendation",
+    # System Simulation
+    "SystemSimulationService",
+    "SimulationType",
+    "SimulationStatus",
+    "SimulationConfig",
+    "SimulationResult",
+    "SimulationStep",
+    "SimulationEvent",
+    "EventType",
+    "AgentState",
+    "EnvironmentState",
+    # Active Matching
+    "ActiveMatchingService",
+    "MatchScore",
+    "Opportunity",
+    "NegotiationSession",
+    "NegotiationResult",
+    "NegotiationProposal",
+    "NegotiationRound",
+    "SearchStrategy",
+    "NegotiationStrategy",
+    "NegotiationStatus",
+    "OpportunityStatus",
+    # Supply-Demand Matching
+    "SupplyDemandMatchingService",
+    "SupplyListing",
+    "DemandListing",
+    "Match",
+    "MatchStatus",
+    "MatchingMode",
+    "MatchingStats",
+    # Agent Network Explorer
+    "AgentNetworkExplorer",
+    "AgentCapabilityInfo",
+    "AgentRecommendation",
+    "AgentRelationship",
+    "ContactResult",
+    "ContactRequest",
+    "ExplorationRecord",
+    "ExplorationStrategy",
+    "TrustLevel",
+    # Collaborative Matching
+    "CollaborativeMatchingService",
+    "CollaborationSession",
+    "CollaborationPlan",
+    "CollaborationRole",
+    "CollaborationMode",
+    "CollaborationStatus",
+    "RoleType",
+    "ParticipantInvite",
+    # Proactive Learning
+    "ProactiveLearningService",
+    "LearningInsight",
+    "OptimizedStrategy",
+    "MarketInsight",
+    "LearningType",
+    "InsightCategory",
+]

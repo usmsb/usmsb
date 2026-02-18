@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(python:*)",
+      "Bash(npm run dev)",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(pip install -e .)",
+      "Bash(cmd /c:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "Bash(npm:*)",
+      "Bash(pip install:*)",
+      "Bash(cat:*)",
+      "Bash(if:*)",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(ss:*)",
+      "Bash(node:*)",
+      "Bash(wc:*)",
+      "Bash(npm run dev:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(npm run build)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(npm install mermaid @types/mermaid)",
+      "Bash(Select-String:*)",
+      "Bash(ping -n:*)",
+      "WebFetch(domain:localhost)"
+    ]
+  }
+}
