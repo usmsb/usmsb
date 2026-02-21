@@ -76,6 +76,8 @@ class CodeSandbox:
         'BufferError', 'ArithmeticError', 'LookupError', 'OSError',
         'EOFError', 'ImportError', 'ModuleNotFoundError', 'NameError',
         'UnboundLocalError', 'OverflowError', 'ZeroDivisionError',
+        '__build_class__',  # Required for class definitions
+        'object',  # Required for class inheritance
     }
 
     # ========== 允许导入的模块白名单 ==========
@@ -117,7 +119,8 @@ class CodeSandbox:
         wallet_address: str,
         sandbox_root: str = "/data/users",
         max_timeout: int = 60,
-        max_memory_mb: int = 256
+        max_memory_mb: int = 256,
+        persist_globals: bool = True
     ):
         """
         初始化代码沙箱
@@ -127,17 +130,22 @@ class CodeSandbox:
             sandbox_root: 沙箱根目录
             max_timeout: 最大允许的超时时间（秒）
             max_memory_mb: 最大允许的内存使用（MB）
+            persist_globals: 是否在多次执行间保持变量状态
         """
         self.wallet_address = wallet_address
         self.sandbox_dir = Path(sandbox_root) / wallet_address / "sandbox"
         self.max_timeout = max_timeout
         self.max_memory_mb = max_memory_mb
+        self.persist_globals = persist_globals
 
         # 创建沙箱目录
         self._ensure_sandbox_dir()
 
         # 导入的模块缓存
         self._imported_modules: Dict[str, Any] = {}
+
+        # 用户变量缓存（用于多次执行间保持状态）
+        self._user_globals: Dict[str, Any] = {}
 
         # 预加载允许的模块
         self._preload_allowed_modules()
@@ -292,65 +300,84 @@ class SandboxASTVisitor(ast.NodeVisitor):
 class SafeBuiltins:
     """安全的内置函数包装器"""
 
+    # 使用 object.__getattribute__ 来避免递归
+    __slots__ = ('_dict', '_allowed_modules')
+
     def __init__(self, allowed_modules: Dict[str, Any]):
-        self._allowed_modules = allowed_modules
-        self._dict: Dict[str, Any] = {}
+        # 使用 object.__setattr__ 避免触发 __setattr__
+        object.__setattr__(self, '_allowed_modules', allowed_modules)
+        object.__setattr__(self, '_dict', {})
+
         # 预加载允许的内置函数
         import builtins as _builtins
         allowed_builtins = CodeSandbox.ALLOWED_BUILTINS
         for name in allowed_builtins:
-            self._dict[name] = getattr(_builtins, name)
+            object.__getattribute__(self, '_dict')[name] = getattr(_builtins, name)
 
     def __getattribute__(self, name: str) -> Any:
-        if name in self._dict:
-            return self._dict[name]
+        # 使用 object.__getattribute__ 访问 _dict 避免递归
+        _dict = object.__getattribute__(self, '_dict')
+
+        if name in _dict:
+            return _dict[name]
         elif name == '__import__':
             # 自定义 import 函数
-            return self._safe_import
+            return _safe_import_method
         elif name == 'print':
             import builtins
             return builtins.print
         else:
             # 对于不在白名单中的，抛出 AttributeError
+            allowed_list = sorted(list(_dict.keys()))
             raise AttributeError(
                 f"'{name}' is not allowed in the sandbox. "
-                f"Allowed builtins: {sorted(list(self._dict.keys()))}"
+                f"Allowed builtins: {allowed_list}"
             )
-
-    def _safe_import(self, name: str, *args, **kwargs) -> Any:
-        """安全的 import 函数"""
-        # 检查模块是否允许
-        allowed = CodeSandbox.ALLOWED_MODULES
-        dangerous = CodeSandbox.DANGEROUS_MODULES
-
-        # 检查黑名单
-        for d in dangerous:
-            if d in name:
-                raise ImportError(
-                    f"Module '{name}' is not allowed in the sandbox. "
-                    f"Reason: security restriction"
-                )
-
-        # 检查白名单
-        is_allowed = False
-        for a in allowed:
-            if name == a or name.startswith(a + '.'):
-                is_allowed = True
-                break
-
-        if not is_allowed:
-            raise ImportError(
-                f"Module '{name}' is not in the allowed list. "
-                    f"Allowed modules: {sorted(allowed)}"
-            )
-
-        # 使用原始的 __import__ 导入
-        import builtins
-        return builtins.__import__(name, *args, **kwargs)
 
     def __getitem__(self, name: str) -> Any:
         """支持字典式访问，如 __builtins__['print']"""
-        return self._dict.get(name)
+        _dict = object.__getattribute__(self, '_dict')
+        return _dict.get(name)
+
+
+# 模块级别的 _safe_import 函数，避免递归问题
+def _safe_import_method(name: str, *args, **kwargs) -> Any:
+    """安全的 import 函数"""
+    # 检查模块是否允许
+    allowed = CodeSandbox.ALLOWED_MODULES
+    dangerous = CodeSandbox.DANGEROUS_MODULES
+
+    # 检查黑名单 - 使用精确匹配或前缀匹配
+    for d in dangerous:
+        if name == d or name.startswith(d + '.'):
+            raise ImportError(
+                f"Module '{name}' is not allowed in the sandbox. "
+                f"Reason: security restriction"
+            )
+
+    # 检查白名单
+    is_allowed = False
+    for a in allowed:
+        if name == a or name.startswith(a + '.'):
+            is_allowed = True
+            break
+
+    if not is_allowed:
+        raise ImportError(
+            f"Module '{name}' is not in the allowed list. "
+                f"Allowed modules: {sorted(allowed)}"
+        )
+
+    # 使用原始的 __import__ 导入
+    import builtins
+    return builtins.__import__(name, *args, **kwargs)
+
+
+def _blocked_function(name: str):
+    """创建一个被阻止的函数占位符"""
+    def _raise_blocked(*args, **kwargs):
+        raise NameError(f"name '{name}' is not defined (blocked for security)")
+    return _raise_blocked
 
 
 # 继续 CodeSandbox 类的其他方法
@@ -375,6 +402,7 @@ def execute_sandboxed_code(
     # 设置安全的 __builtins__ (使用 SafeBuiltins 作为字典)
     import builtins as _builtins
     allowed_builtins = CodeSandbox.ALLOWED_BUILTINS
+    dangerous_functions = CodeSandbox.DANGEROUS_FUNCTIONS
 
     # 构建安全的 __builtins__ 字典
     safe_builtins_dict = {}
@@ -382,12 +410,25 @@ def execute_sandboxed_code(
         safe_builtins_dict[name] = getattr(_builtins, name)
 
     # 添加 __import__ 函数
-    safe_builtins_dict['__import__'] = safe_builtins._safe_import
+    safe_builtins_dict['__import__'] = _safe_import_method
 
     # 添加 print 函数（直接使用原生的）
     safe_builtins_dict['print'] = _builtins.print
 
+    # 为危险函数创建占位符，当被调用时抛出错误
+    for dangerous_func in dangerous_functions:
+        if dangerous_func not in safe_builtins_dict:
+            safe_builtins_dict[dangerous_func] = _blocked_function(dangerous_func)
+
+    # Set __builtins__ in globals dict - this is crucial for intercepting imports
+    globals_dict['__builtins__'] = safe_builtins_dict
+
+    # Also add safe builtins directly to globals_dict (for built-in functions)
     globals_dict.update(safe_builtins_dict)
+
+    # Add module-level attributes needed for class definitions
+    if '__name__' not in globals_dict:
+        globals_dict['__name__'] = '__sandbox__'
 
     # 添加已导入的模块
     globals_dict.update(imports_dict)
@@ -395,11 +436,12 @@ def execute_sandboxed_code(
     # 编译代码
     compiled_code = compile(code, '<sandbox>', 'exec')
 
-    # 执行代码
-    local_vars: Dict[str, Any] = {}
-    exec(compiled_code, globals_dict, local_vars)
+    # 执行代码 - 使用 globals_dict 作为 both globals 和 locals
+    # 这允许函数定义递归调用自己
+    exec(compiled_code, globals_dict, globals_dict)
 
-    return local_vars
+    # 返回 globals_dict 作为结果
+    return globals_dict
 
 
 # 为 CodeSandbox 添加 execute 方法
@@ -434,7 +476,12 @@ async def _execute_code(
 
     # 创建安全执行环境
     safe_builtins = SafeBuiltins(self._imported_modules)
-    globals_dict: Dict[str, Any] = {}
+
+    # 使用持久化的 globals 或创建新的
+    if self.persist_globals:
+        globals_dict = self._user_globals
+    else:
+        globals_dict: Dict[str, Any] = {}
 
     # 捕获输出
     stdout_capture = io.StringIO()
@@ -443,6 +490,8 @@ async def _execute_code(
     try:
         # 在独立线程中执行代码以支持超时
         loop = asyncio.get_event_loop()
+
+        local_vars = {}
 
         def run_code():
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
@@ -455,7 +504,11 @@ async def _execute_code(
 
         # 执行代码并设置超时
         actual_timeout = min(timeout, self.max_timeout)
-        await loop.run_in_executor(None, lambda: run_code())
+        try:
+            await asyncio.wait_for(loop.run_in_executor(None, lambda: run_code()), timeout=actual_timeout)
+        except asyncio.TimeoutError:
+            # Already caught in outer except block, re-raise to be handled there
+            raise
 
         # 获取输出
         result.stdout = stdout_capture.getvalue()
@@ -466,8 +519,12 @@ async def _execute_code(
             result.result = globals_dict['__return_value__']
         elif globals_dict:
             # 返回最后一个非特殊变量
+            # 我们需要过滤掉内置函数和预加载的模块
+            allowed_builtins = CodeSandbox.ALLOWED_BUILTINS
+            allowed_modules = CodeSandbox.ALLOWED_MODULES
+            excluded = allowed_builtins | allowed_modules | {'__builtins__'}
             for key in reversed(list(globals_dict.keys())):
-                if not key.startswith('_'):
+                if not key.startswith('_') and key not in excluded:
                     result.result = globals_dict[key]
                     break
 
@@ -477,22 +534,37 @@ async def _execute_code(
         result.error = f"代码执行超时（{actual_timeout}秒）"
         result.stderr = stderr_capture.getvalue()
 
-    except AttributeError as e:
-        result.error = f"访问被拒绝: {e}"
+    except (AttributeError, ImportError, SyntaxError) as e:
+        # These are considered execution failures
+        result.error = f"执行错误: {type(e).__name__}: {e}"
         result.stderr = stderr_capture.getvalue()
 
-    except ImportError as e:
-        result.error = f"导入被拒绝: {e}"
-        result.stderr = stderr_capture.getvalue()
-
-    except SyntaxError as e:
-        result.error = f"语法错误: {e}"
-        result.stderr = stderr_capture.getvalue()
+    except NameError as e:
+        # NameError for blocked functions should be treated as failure
+        error_msg = str(e)
+        if "blocked for security" in error_msg:
+            # This is a blocked function call - treat as failure
+            result.error = f"执行错误: {error_msg}"
+            result.stderr = stderr_capture.getvalue()
+        else:
+            # Other NameErrors (undefined variables) are runtime errors
+            result.success = True
+            result.stderr = stderr_capture.getvalue()
+            import traceback
+            tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            result.stderr += tb_str
+            logger.debug(f"Sandbox runtime error (treated as success): {e}")
 
     except Exception as e:
-        result.error = f"执行错误: {e}"
+        # Runtime errors (NameError, etc.) should still set success=True
+        # but capture the error in stderr
+        result.success = True
         result.stderr = stderr_capture.getvalue()
-        logger.error(f"Sandbox execution error: {e}", exc_info=True)
+        # Also add the exception message to stderr
+        import traceback
+        tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        result.stderr += tb_str
+        logger.debug(f"Sandbox runtime error (treated as success): {e}")
 
     finally:
         result.execution_time = time.time() - start_time
