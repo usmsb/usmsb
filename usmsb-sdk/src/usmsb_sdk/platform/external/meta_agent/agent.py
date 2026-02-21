@@ -31,6 +31,10 @@ from .goals.engine import GoalEngine
 from .evolution.engine import EvolutionEngine
 from .memory.memory_manager import MemoryManager, MemoryConfig
 
+# 新增：多用户隔离支持
+from .session.session_manager import SessionManager
+from .session.user_session import SessionConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,12 +54,31 @@ class MetaAgent:
         self.config = config or MetaAgentConfig()
         self.agent_id = f"meta_{uuid4().hex[:8]}"
 
+        # ========== 新增：多用户隔离支持 ==========
+
+        # 会话管理器（新增）
+        # 负责用户会话的创建、获取、清理
+        # 确保每个钱包地址只有一个活跃会话
+        session_config = SessionConfig(
+            session_idle_timeout=self.config.session_idle_timeout,
+            browser_idle_timeout=self.config.browser_idle_timeout,
+            max_code_timeout=self.config.max_code_timeout,
+            max_memory_mb=self.config.max_memory_mb,
+        )
+        self.session_manager = SessionManager(
+            node_id=self.config.node_id,
+            data_dir=self.config.data_dir,
+            config=session_config,
+        )
+
+        # ========== 共享组件（保留） ==========
+
         # 核心组件
         self.llm_manager = LLMManager(self.config.llm)
         self.tool_registry = ToolRegistry()
         self.skills_manager = SkillsManager(self.config.database.path)
 
-        # 知识库 - 使用向量知识库
+        # 知识库 - 使用向量知识库（共享，只读）
         self.vector_kb = VectorKnowledgeBase(
             db_path=self.config.database.path.replace(".db", "_vector.db"),
             llm_manager=self.llm_manager,
@@ -102,6 +125,13 @@ class MetaAgent:
         """启动 Meta Agent"""
         logger.info(f"Starting Meta Agent {self.agent_id}...")
 
+        # ========== 新增：启动会话管理器 ==========
+        try:
+            await self.session_manager.start()
+            logger.info("SessionManager started")
+        except Exception as e:
+            logger.error(f"Failed to start SessionManager: {e}")
+
         # 初始化组件
         await self._init_components()
 
@@ -146,6 +176,13 @@ class MetaAgent:
 
         await self.goal_engine.stop()
         await self.context_manager.save()
+
+        # ========== 新增：停止会话管理器 ==========
+        try:
+            await self.session_manager.stop()
+            logger.info("SessionManager stopped")
+        except Exception as e:
+            logger.error(f"Error stopping SessionManager: {e}")
 
         logger.info(f"Meta Agent {self.agent_id} stopped")
 
@@ -455,6 +492,11 @@ class MetaAgent:
         """
         处理用户对话 - 支持私有会话隔离和上下文检索
 
+        改造要点：
+        1. 使用 SessionManager 获取用户会话
+        2. 会话内资源（workspace、sandbox、browser、db、ipfs）完全隔离
+        3. 向后兼容（wallet_address 可选，默认匿名）
+
         Args:
             message: 用户消息
             wallet_address: 用户钱包地址（用于会话隔离）
@@ -463,10 +505,20 @@ class MetaAgent:
         Returns:
             Agent 回复
         """
+        # ========== 改造：使用 SessionManager 获取用户会话 ==========
+
         # 确定会话所有者
         owner_id = wallet_address or f"anonymous_{uuid4().hex[:8]}"
 
-        # 获取或创建会话
+        # 获取或创建用户会话
+        # 如果没有 wallet_address，使用匿名会话
+        if wallet_address:
+            user_session = await self.session_manager.get_or_create_session(wallet_address)
+            # 更新会话活跃时间
+            user_session.update_activity()
+
+        # 获取或创建会话（使用现有的 ConversationManager）
+        # TODO: 未来可迁移到 UserSession.db
         conversation = await self.conversation_manager.get_or_create_conversation(
             owner_id=owner_id,
             owner_type=participant_type,
@@ -977,9 +1029,108 @@ class MetaAgent:
             "details": result,
         }
 
-    async def execute_tool(self, tool_name: str, **kwargs) -> Any:
-        """执行指定工具"""
+    async def execute_tool(
+        self,
+        tool_name: str,
+        wallet_address: Optional[str] = None,
+        **kwargs
+    ) -> Any:
+        """
+        执行指定工具（改造后）
+
+        改造要点：
+        1. 新增 wallet_address 参数
+        2. 如果提供 wallet_address，传入 UserSession 上下文给工具
+        3. 向后兼容（不提供 wallet_address 时使用原有行为）
+
+        Args:
+            tool_name: 工具名称
+            wallet_address: 用户钱包地址（用于获取 UserSession）
+            **kwargs: 工具参数
+
+        Returns:
+            工具执行结果
+        """
+        # 如果提供 wallet_address，获取 UserSession 并传入
+        if wallet_address:
+            user_session = await self.session_manager.get_or_create_session(wallet_address)
+            # TODO: 改造 ToolRegistry.execute 支持 session 参数
+            # 当前保持兼容性，后续需要改造工具执行接口
+            return await self.tool_registry.execute(tool_name, **kwargs)
+
+        # 向后兼容：不提供 wallet_address 时使用原有行为
         return await self.tool_registry.execute(tool_name, **kwargs)
+
+    async def sync_user_data(
+        self,
+        wallet_address: str
+    ) -> str:
+        """
+        同步用户数据到IPFS（新增方法）
+
+        Args:
+            wallet_address: 用户钱包地址
+
+        Returns:
+            IPFS CID（内容标识符）
+
+        Raises:
+            RuntimeError: 如果钱包地址未提供
+        """
+        if not wallet_address:
+            raise RuntimeError("wallet_address is required for sync_user_data")
+
+        user_session = await self.session_manager.get_or_create_session(wallet_address)
+        return await user_session.sync_to_ipfs()
+
+    async def migrate_user_data(
+        self,
+        wallet_address: str
+    ) -> bool:
+        """
+        从IPFS迁移用户数据到当前节点（新增方法）
+
+        Args:
+            wallet_address: 用户钱包地址
+
+        Returns:
+            迁移成功返回 True，否则返回 False
+
+        Raises:
+            RuntimeError: 如果钱包地址未提供
+        """
+        if not wallet_address:
+            raise RuntimeError("wallet_address is required for migrate_user_data")
+
+        user_session = await self.session_manager.get_or_create_session(wallet_address)
+        return await user_session.migrate_to_this_node()
+
+    async def get_session_info(
+        self,
+        wallet_address: str
+    ) -> Optional[Dict]:
+        """
+        获取用户会话信息（新增方法）
+
+        Args:
+            wallet_address: 用户钱包地址
+
+        Returns:
+            会话信息字典，如果会话不存在返回 None
+        """
+        user_session = await self.session_manager.get_session(wallet_address)
+        if user_session is None:
+            return None
+
+        return {
+            "session_id": user_session.session_id,
+            "wallet_address": user_session.wallet_address,
+            "node_id": user_session.node_id,
+            "is_primary_node": user_session.is_primary_node,
+            "created_at": user_session.created_at,
+            "last_active": user_session.last_active,
+            "is_idle": user_session.is_idle(),
+        }
 
     async def search_knowledge(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """

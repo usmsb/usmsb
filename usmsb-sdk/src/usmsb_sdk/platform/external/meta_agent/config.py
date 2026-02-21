@@ -44,6 +44,10 @@ class MetaAgentConfig:
     description: str = "超级 AI Agent - 自主运营新文明平台"
     version: str = "1.0.0"
 
+    # 节点配置（多用户隔离）
+    node_id: str = "node-001"
+    data_dir: str = "/data"
+
     # LLM 配置
     llm: LLMConfig = field(default_factory=LLMConfig)
 
@@ -67,10 +71,18 @@ class MetaAgentConfig:
     ipfs_gateway: str = "https://ipfs.io"
     ipfs_api_url: str = "http://localhost:5001"
 
+    # 会话配置
+    session_idle_timeout: int = 1800  # 30分钟
+    browser_idle_timeout: int = 600   # 10分钟
+    max_code_timeout: int = 30        # 代码执行超时
+    max_memory_mb: int = 256          # 最大内存
+
     @classmethod
     def from_env(cls) -> "MetaAgentConfig":
         """从环境变量加载配置"""
         return cls(
+            node_id=os.getenv("NODE_ID", "node-001"),
+            data_dir=os.getenv("META_DATA_DIR", "/data"),
             llm=LLMConfig(
                 provider=os.getenv("META_LLM_PROVIDER", "minimax"),
                 api_key=os.getenv("MINIMAX_API_KEY"),
@@ -86,4 +98,8 @@ class MetaAgentConfig:
             ),
             platform_url=os.getenv("PLATFORM_URL", "http://localhost:8000"),
             platform_api_key=os.getenv("PLATFORM_API_KEY"),
+            session_idle_timeout=int(os.getenv("SESSION_IDLE_TIMEOUT", "1800")),
+            browser_idle_timeout=int(os.getenv("BROWSER_IDLE_TIMEOUT", "600")),
+            max_code_timeout=int(os.getenv("MAX_CODE_TIMEOUT", "30")),
+            max_memory_mb=int(os.getenv("MAX_MEMORY_MB", "256")),
         )

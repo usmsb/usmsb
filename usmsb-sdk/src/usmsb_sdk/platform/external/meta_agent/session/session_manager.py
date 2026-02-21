@@ -123,7 +123,8 @@ class SessionManager:
             session = UserSession(
                 wallet_address=wallet_address,
                 node_id=self.node_id,
-                config=self.config
+                config=self.config,
+                data_dir=str(self.data_dir)
             )
 
             # 初始化会话
@@ -328,12 +329,87 @@ class SessionManager:
         """
         return len(self._sessions)
 
+    async def cleanup_idle_browsers(self) -> int:
+        """
+        清理空闲浏览器
+
+        关闭所有空闲浏览器上下文（不关闭会话）。
+
+        Returns:
+            int: 清理的浏览器数量
+
+        Note:
+            - 只关闭浏览器实例，会话保持活跃
+            - 浏览器可以按需重新打开
+        """
+        cleaned = 0
+
+        # 获取所有会话
+        async with self._lock:
+            sessions = list(self._sessions.values())
+
+        for session in sessions:
+            if not session._cleanup_done and session.is_browser_idle():
+                try:
+                    if session._browser_context is not None:
+                        await session._browser_context.close()
+                        session._browser_context = None
+                        cleaned += 1
+                        logger.info(f"Browser closed for session {session.wallet_address[:10]}...")
+                except Exception as e:
+                    logger.error(
+                        f"Error closing browser for {session.wallet_address[:10]}...: {e}"
+                    )
+
+        return cleaned
+
+    async def get_session_info(self, wallet_address: str) -> Optional[Dict]:
+        """
+        获取会话详细信息
+
+        Args:
+            wallet_address: 用户钱包地址
+
+        Returns:
+            Optional[Dict]: 会话信息字典，如果会话不存在则返回 None
+                - wallet_address: 钱包地址
+                - session_id: 会话 ID
+                - node_id: 节点 ID
+                - is_primary_node: 是否是主节点
+                - created_at: 创建时间
+                - last_active: 最后活跃时间
+                - idle_seconds: 空闲秒数
+                - is_browser_idle: 浏览器是否空闲
+        """
+        session = await self.get_session(wallet_address)
+        if not session:
+            return None
+
+        return {
+            "wallet_address": session.wallet_address,
+            "session_id": session.session_id,
+            "node_id": session.node_id,
+            "is_primary_node": session.is_primary_node,
+            "created_at": session.created_at,
+            "last_active": session.last_active,
+            "idle_seconds": time.time() - session.last_active,
+            "is_browser_idle": session.is_browser_idle(),
+        }
+
     async def get_session_stats(self) -> Dict:
         """
         获取会话统计信息
 
         Returns:
             Dict: 统计信息
+                - total_sessions: 总会话数
+                - active_sessions: 活跃会话数
+                - idle_sessions: 空闲会话数
+                - browser_active: 浏览器活跃数
+                - avg_idle_time: 平均空闲时间（秒）
+                - max_idle_time: 最大空闲时间（秒）
+                - node_id: 节点 ID
+                - running: 是否正在运行
         """
         async with self._lock:
             sessions = list(self._sessions.values())
@@ -342,10 +418,30 @@ class SessionManager:
         idle = sum(1 for s in sessions if s.is_idle())
         browser_idle = sum(1 for s in sessions if s.is_browser_idle())
 
+        # 计算空闲时间统计
+        if sessions:
+            idle_times = [time.time() - s.last_active for s in sessions]
+            avg_idle_time = sum(idle_times) / len(idle_times)
+            max_idle_time = max(idle_times)
+        else:
+            avg_idle_time = 0
+            max_idle_time = 0
+
         return {
             "total_sessions": total,
             "active_sessions": total - idle,
             "idle_sessions": idle,
             "browser_active": total - browser_idle,
+            "avg_idle_time": round(avg_idle_time, 2),
+            "max_idle_time": round(max_idle_time, 2),
             "node_id": self.node_id,
+            "running": self._running,
         }
+
+    def __repr__(self) -> str:
+        """返回会话管理器的字符串表示"""
+        return (
+            f"SessionManager(node_id={self.node_id}, "
+            f"sessions={len(self._sessions)}, "
+            f"running={self._running})"
+        )

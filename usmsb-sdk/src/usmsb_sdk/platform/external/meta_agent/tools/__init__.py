@@ -3,7 +3,7 @@ Tools 模块 - 所有工具注册
 """
 
 import logging
-from .registry import Tool
+from .registry import Tool, ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -54,4 +54,4 @@ def get_platform_tools():
     ]
 
 
-__all__ = ["register_tools", "Tool"]
+__all__ = ["register_tools", "Tool", "ToolRegistry"]

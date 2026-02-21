@@ -18,7 +18,7 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -103,7 +103,8 @@ class UserSession:
         self,
         wallet_address: str,
         node_id: str,
-        config: Optional[SessionConfig] = None
+        config: Optional[SessionConfig] = None,
+        data_dir: Optional[str] = None
     ):
         """
         初始化用户会话
@@ -112,11 +113,13 @@ class UserSession:
             wallet_address: 用户钱包地址，作为用户唯一标识
             node_id: 当前节点 ID
             config: 会话配置，不提供则使用默认配置
+            data_dir: 用户数据根目录，默认 /data/users
         """
         self.wallet_address: str = wallet_address
         self.node_id: str = node_id
         self.session_id: str = f"{wallet_address[:8]}_{uuid4().hex[:8]}"
         self.config: SessionConfig = config or SessionConfig()
+        self._data_dir: str = data_dir or "/data/users"
 
         # 主节点检查
         self.is_primary_node: bool = False
@@ -167,7 +170,7 @@ class UserSession:
 
             self._workspace = UserWorkspace(
                 wallet_address=self.wallet_address,
-                workspace_root=Path(f"/data/users/{self.wallet_address}/workspace")
+                workspace_root=Path(self._data_dir) / self.wallet_address / "workspace"
             )
         return self._workspace
 
@@ -193,9 +196,7 @@ class UserSession:
 
             self._sandbox = CodeSandbox(
                 wallet_address=self.wallet_address,
-                sandbox_dir=Path(f"/data/users/{self.wallet_address}/sandbox"),
-                max_timeout=self.config.max_code_timeout,
-                max_memory_mb=self.config.max_memory_mb
+                sandbox_root=self._data_dir
             )
         return self._sandbox
 
@@ -223,7 +224,7 @@ class UserSession:
 
             self._browser_context = BrowserContext(
                 wallet_address=self.wallet_address,
-                user_data_dir=Path(f"/data/users/{self.wallet_address}/browser/user_data")
+                user_data_dir=Path(self._data_dir) / self.wallet_address / "browser/user_data"
             )
         return self._browser_context
 
@@ -251,7 +252,7 @@ class UserSession:
 
             self._db = UserDatabase(
                 wallet_address=self.wallet_address,
-                db_dir=Path(f"/data/users/{self.wallet_address}")
+                data_dir=self._data_dir
             )
         return self._db
 
@@ -336,7 +337,7 @@ class UserSession:
         if self._initialized:
             return  # 已初始化，直接返回
 
-        user_dir = Path(f"/data/users/{self.wallet_address}")
+        user_dir = Path(self._data_dir) / self.wallet_address
         user_dir.mkdir(parents=True, exist_ok=True)
 
         # 创建子目录
@@ -412,6 +413,9 @@ class UserSession:
             if hasattr(self._ipfs_client, 'clear_key'):
                 self._ipfs_client.clear_key()
             self._ipfs_client = None
+
+        # 清除数据迁移服务
+        self._data_migration = None
 
         # 更新元数据
         await self._update_metadata()
@@ -570,15 +574,26 @@ class UserSession:
 
         return self.is_primary_node
 
-    async def migrate_to_this_node(self) -> bool:
+    async def migrate_to_this_node(
+        self,
+        progress_callback: Optional[Callable[[Dict], None]] = None,
+        force: bool = False,
+        verify: bool = True
+    ) -> bool:
         """
         从 IPFS 迁移数据到当前节点
 
         将用户数据从 IPFS 迁移到当前节点：
-        1. 从 IPNS 获取最新的 CID
+        1. 从 IPFS 获取最新的 CID
         2. 下载并解密用户数据
         3. 导入到本地数据库
         4. 更新元数据文件
+
+        Args:
+            progress_callback: 可选的进度回调函数
+                接收包含 stage, percentage, message 的字典
+            force: 强制迁移，即使本地已有数据（默认 False）
+            verify: 是否验证迁移数据（默认 True）
 
         Returns:
             bool: 迁移成功返回 True，否则返回 False
@@ -589,34 +604,24 @@ class UserSession:
         if not self._initialized:
             raise RuntimeError("Session not initialized. Call init() first.")
 
-        try:
-            # 获取最新 CID
-            cid = await self.ipfs_client.get_user_cid(self.wallet_address)
-            if not cid:
-                return False
-
-            # 下载数据
-            data = await self.ipfs_client.download_user_data(
-                self.wallet_address,
-                cid
+        # 添加进度回调
+        if progress_callback:
+            self.data_migration.add_progress_callback(
+                lambda p: progress_callback({
+                    "stage": p.stage,
+                    "percentage": p.percentage,
+                    "message": p.message,
+                    "elapsed_seconds": p.elapsed_seconds,
+                    "speed_mb_per_sec": p.speed_mb_per_sec,
+                    "total_items": p.total_items,
+                    "completed_items": p.completed_items
+                })
             )
-            if not data:
-                return False
 
-            # 导入数据
-            if "profile" in data:
-                await self.db.update_profile(UserProfile(**data["profile"]))
-            if "knowledge" in data:
-                await self.db.import_knowledge(data["knowledge"])
+        # 使用 DataMigration 服务导入数据
+        result = await self.data_migration.migrate_from_ipfs(force=force, verify=verify)
 
-            # 更新 CID
-            self._ipfs_cid = cid
-
-            return True
-
-        except Exception as e:
-            # 迁移失败
-            return False
+        return result.success
 
     def update_activity(self) -> None:
         """
@@ -663,7 +668,7 @@ class UserSession:
 
         私有方法，用于更新 meta.json 文件中的 last_active 和 ipfs_cid。
         """
-        user_dir = Path(f"/data/users/{self.wallet_address}")
+        user_dir = Path(self._data_dir) / self.wallet_address
         meta_file = user_dir / "meta.json"
 
         meta_data = {

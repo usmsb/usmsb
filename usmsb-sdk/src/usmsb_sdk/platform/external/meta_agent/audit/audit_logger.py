@@ -13,7 +13,7 @@ import hashlib
 import json
 import os
 import aiofiles
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Dict, List
 from dataclasses import dataclass, field
@@ -118,7 +118,7 @@ class AuditLogger:
 
         # 构建日志条目
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "event": event,
             "user_hash": user_hash,
             "result": result,
@@ -201,9 +201,8 @@ class AuditLogger:
                             continue
 
                         # 时间过滤
-                        entry_time = datetime.fromisoformat(
-                            entry.get("timestamp", "").replace("Z", "+00:00")
-                        ).timestamp()
+                        ts_str = entry.get("timestamp", "").replace("Z", "+00:00")
+                        entry_time = datetime.fromisoformat(ts_str).timestamp()
 
                         if start_time and entry_time < start_time:
                             continue
@@ -233,7 +232,7 @@ class AuditLogger:
 
         将超过归档天数的日志移动到归档目录
         """
-        cutoff_time = datetime.utcnow() - timedelta(days=self.config.archive_after_days)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(days=self.config.archive_after_days)
         archived_count = 0
 
         temp_file = self.log_file.with_suffix('.tmp')
@@ -243,7 +242,7 @@ class AuditLogger:
             async with aiofiles.open(self.log_file, mode='r', encoding='utf-8') as f:
                 async with aiofiles.open(temp_file, mode='w', encoding='utf-8') as new_f:
                     async with aiofiles.open(
-                        self.archive_dir / f"audit_{datetime.utcnow().strftime('%Y%m%d')}.log",
+                        self.archive_dir / f"audit_{datetime.now().strftime('%Y%m%d')}.log",
                         mode='a',
                         encoding='utf-8'
                     ) as archive_f:
@@ -255,9 +254,8 @@ class AuditLogger:
 
                             try:
                                 entry = json.loads(line)
-                                entry_time = datetime.fromisoformat(
-                                    entry.get("timestamp", "").replace("Z", "+00:00")
-                                )
+                                ts_str = entry.get("timestamp", "").replace("Z", "+00:00")
+                                entry_time = datetime.fromisoformat(ts_str)
 
                                 if entry_time < cutoff_time:
                                     # 归档旧日志
@@ -288,7 +286,7 @@ class AuditLogger:
 
         删除超过保留天数的归档日志文件
         """
-        cutoff_time = datetime.utcnow() - timedelta(days=self.config.retention_days)
+        cutoff_time = datetime.now() - timedelta(days=self.config.retention_days)
         deleted_count = 0
 
         try:
@@ -364,8 +362,9 @@ class AuditLogger:
         Returns:
             用户活动日志列表
         """
-        start_time = (datetime.utcnow() - timedelta(hours=hours)).timestamp()
-        end_time = datetime.utcnow().timestamp()
+        now = datetime.now(timezone.utc)
+        start_time = (now - timedelta(hours=hours)).timestamp()
+        end_time = now.timestamp()
 
         return await self.query_logs(
             user_hash=user_hash,
@@ -384,7 +383,8 @@ class AuditLogger:
         Returns:
             安全事件日志列表
         """
-        start_time = (datetime.utcnow() - timedelta(hours=hours)).timestamp()
+        now = datetime.now(timezone.utc)
+        start_time = (now - timedelta(hours=hours)).timestamp()
         security_events = [
             "auth_failed",
             "sandbox_violation",

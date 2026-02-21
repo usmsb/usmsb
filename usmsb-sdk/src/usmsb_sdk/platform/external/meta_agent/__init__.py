@@ -5,10 +5,14 @@ Meta Agent - 超级 Agent
 
 from .agent import MetaAgent
 from .config import MetaAgentConfig
+from .migrate.data_migration import DataMigration, MigrationProgress, MigrationResult
 
 __all__ = [
     "MetaAgent",
     "MetaAgentConfig",
+    "DataMigration",
+    "MigrationProgress",
+    "MigrationResult",
 ]
 
 __version__ = "1.0.0"

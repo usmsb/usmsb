@@ -294,24 +294,27 @@ class SafeBuiltins:
 
     def __init__(self, allowed_modules: Dict[str, Any]):
         self._allowed_modules = allowed_modules
+        self._dict: Dict[str, Any] = {}
+        # 预加载允许的内置函数
+        import builtins as _builtins
+        allowed_builtins = CodeSandbox.ALLOWED_BUILTINS
+        for name in allowed_builtins:
+            self._dict[name] = getattr(_builtins, name)
 
     def __getattribute__(self, name: str) -> Any:
-        # 获取原始 builtins
-        import builtins
-        allowed_builtins = CodeSandbox.ALLOWED_BUILTINS
-
-        if name in allowed_builtins:
-            return getattr(builtins, name)
+        if name in self._dict:
+            return self._dict[name]
         elif name == '__import__':
             # 自定义 import 函数
             return self._safe_import
         elif name == 'print':
-            return print
+            import builtins
+            return builtins.print
         else:
             # 对于不在白名单中的，抛出 AttributeError
             raise AttributeError(
                 f"'{name}' is not allowed in the sandbox. "
-                f"Allowed builtins: {sorted(allowed_builtins)}"
+                f"Allowed builtins: {sorted(list(self._dict.keys()))}"
             )
 
     def _safe_import(self, name: str, *args, **kwargs) -> Any:
@@ -338,12 +341,16 @@ class SafeBuiltins:
         if not is_allowed:
             raise ImportError(
                 f"Module '{name}' is not in the allowed list. "
-                f"Allowed modules: {sorted(allowed)}"
+                    f"Allowed modules: {sorted(allowed)}"
             )
 
         # 使用原始的 __import__ 导入
         import builtins
         return builtins.__import__(name, *args, **kwargs)
+
+    def __getitem__(self, name: str) -> Any:
+        """支持字典式访问，如 __builtins__['print']"""
+        return self._dict.get(name)
 
 
 # 继续 CodeSandbox 类的其他方法
@@ -365,8 +372,22 @@ def execute_sandboxed_code(
     Returns:
         执行结果
     """
-    # 设置安全的 __builtins__
-    globals_dict['__builtins__'] = safe_builtins
+    # 设置安全的 __builtins__ (使用 SafeBuiltins 作为字典)
+    import builtins as _builtins
+    allowed_builtins = CodeSandbox.ALLOWED_BUILTINS
+
+    # 构建安全的 __builtins__ 字典
+    safe_builtins_dict = {}
+    for name in allowed_builtins:
+        safe_builtins_dict[name] = getattr(_builtins, name)
+
+    # 添加 __import__ 函数
+    safe_builtins_dict['__import__'] = safe_builtins._safe_import
+
+    # 添加 print 函数（直接使用原生的）
+    safe_builtins_dict['print'] = _builtins.print
+
+    globals_dict.update(safe_builtins_dict)
 
     # 添加已导入的模块
     globals_dict.update(imports_dict)
@@ -381,7 +402,7 @@ def execute_sandboxed_code(
     return local_vars
 
 
-# 为 CodeSandbox 添加剩余方法
+# 为 CodeSandbox 添加 execute 方法
 async def _execute_code(
     self,
     code: str,
@@ -481,7 +502,3 @@ async def _execute_code(
 
 # 将方法添加到 CodeSandbox 类
 CodeSandbox.execute = _execute_code
-CodeSandbox._create_safe_globals = lambda self: {
-    '__builtins__': SafeBuiltins(self._imported_modules),
-    **self._imported_modules,
-}
