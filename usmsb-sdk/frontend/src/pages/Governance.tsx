@@ -249,7 +249,7 @@ export default function Governance() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900">{t('governance.title')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('governance.title')}</h1>
           <p className="text-sm md:text-base text-secondary-500">{t('governance.participate')}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ export default function Governance() {
               <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('governance.clickToLearnConcepts')}</p>
             </div>
           </div>
-          {showInfo ? <ChevronUp size={20} className="text-secondary-400" /> : <ChevronDown size={20} className="text-secondary-400" />}
+          {showInfo ? <ChevronUp size={20} className="text-secondary-400 dark:text-secondary-500" /> : <ChevronDown size={20} className="text-secondary-400 dark:text-secondary-500" />}
         </button>
 
         {showInfo && (
@@ -502,7 +502,7 @@ export default function Governance() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="create-proposal-title">
           <form onSubmit={handleCreateProposal} className="bg-white dark:bg-secondary-800 rounded-xl p-6 w-full max-w-lg">
-            <h2 id="create-proposal-title" className="text-xl font-bold text-secondary-900 mb-4">{t('governance.createNewProposal')}</h2>
+            <h2 id="create-proposal-title" className="text-xl font-bold text-secondary-900 dark:text-secondary-100 mb-4">{t('governance.createNewProposal')}</h2>
             <div className="space-y-4">
               <div>
                 <label className="label">{t('governance.proposalTitle')}</label>
@@ -533,7 +533,7 @@ export default function Governance() {
           <div className="bg-white dark:bg-secondary-800 rounded-xl p-6 w-full max-w-2xl relative">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 id="proposal-detail-title" className="text-xl font-bold text-secondary-900">{selectedProposal.title}</h2>
+                <h2 id="proposal-detail-title" className="text-xl font-bold text-secondary-900 dark:text-secondary-100">{selectedProposal.title}</h2>
                 <p className="text-sm text-secondary-500">Proposed by {selectedProposal.proposer_id}</p>
               </div>
               <span
@@ -551,7 +551,7 @@ export default function Governance() {
             {(selectedProposal.status === 'active' || selectedProposal.status === 'voting') && (
               <div className="mb-6">
                 <div className="flex justify-between mb-2">
-                  <span className="font-medium text-secondary-900">{t('governance.currentResults')}</span>
+                  <span className="font-medium text-secondary-900 dark:text-secondary-100">{t('governance.currentResults')}</span>
                   <span className="text-secondary-500">
                     {t('governance.quorum')}: {(selectedProposal.quorum * 100).toFixed(0)}%
                   </span>

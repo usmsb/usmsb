@@ -679,10 +679,10 @@ export default function ActiveMatching() {
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-secondary-900">
+                    <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">
                       {opp.counterpart_name}
                     </h3>
-                    <p className="text-xs text-secondary-500">
+                    <p className="text-xs text-secondary-500 dark:text-secondary-400">
                       {opp.opportunity_type === 'demand' ? 'Potential Customer' : 'Service Provider'}
                     </p>
                   </div>
@@ -801,10 +801,10 @@ export default function ActiveMatching() {
                       <MessageSquare className="text-purple-600 dark:text-purple-400" size={20} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-secondary-900">
+                      <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">
                         {(neg.context?.service as string) || 'Service Negotiation'}
                       </h3>
-                      <p className="text-xs text-secondary-500">
+                      <p className="text-xs text-secondary-500 dark:text-secondary-400">
                         with {neg.counterpart_id}
                       </p>
                     </div>
@@ -831,7 +831,7 @@ export default function ActiveMatching() {
           {/* Negotiation Detail */}
           {selectedNegotiation ? (
             <div className="card">
-              <h3 className="font-semibold text-secondary-900 mb-4">
+              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">
                 Negotiation Details
               </h3>
 
@@ -938,8 +938,8 @@ export default function ActiveMatching() {
 
       {/* Match History */}
       <div className="card">
-        <h3 className="font-semibold text-secondary-900 mb-4">Match History</h3>
-        <div className="text-center text-secondary-500 py-8">
+        <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Match History</h3>
+        <div className="text-center text-secondary-500 dark:text-secondary-400 py-8">
           <CheckCircle size={48} className="mx-auto mb-3 opacity-50" />
           <p>No completed matches yet.</p>
           <p className="text-sm mt-2">Complete negotiations to see your match history.</p>
