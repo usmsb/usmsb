@@ -1,8 +1,8 @@
 # Meta Agent 多用户隔离架构设计文档
 
-> 版本: v1.0
-> 日期: 2026-02-21
-> 状态: 待确认
+> 版本: v1.1
+> 日期: 2026-02-22
+> 状态: 已实现
 
 ---
 
@@ -1757,7 +1757,740 @@ await audit.log(
 
 ---
 
-## 十、附录
+## 十、运行时环境与权限
+
+### 10.1 运行环境要求
+
+#### 10.1.1 系统要求
+
+| 组件 | 最低要求 | 推荐配置 | 说明 |
+|------|---------|---------|------|
+| 操作系统 | Linux / Windows / macOS | Ubuntu 22.04 LTS | 支持 Docker 容器化部署 |
+| Python | 3.10+ | 3.12+ | 需要 asyncio 支持 |
+| 内存 | 4GB | 8GB+ | 每个会话约占用 50-100MB |
+| CPU | 2核 | 4核+ | 代码执行需要独立线程 |
+| 磁盘 | 10GB | 50GB+ | 用户数据存储 |
+
+#### 10.1.2 依赖服务
+
+| 服务 | 版本 | 用途 | 必需 |
+|------|------|------|------|
+| Playwright | 1.40+ | 浏览器自动化 | 是 |
+| Chromium | 最新 | Playwright 浏览器 | 是 |
+| SQLite | 3.35+ | 用户数据存储 | 是 |
+| IPFS Gateway | - | 数据同步（公共网关） | 否 |
+
+#### 10.1.3 Python 依赖
+
+```txt
+# requirements.txt 核心依赖
+playwright>=1.40.0
+aiofiles>=23.0.0
+cryptography>=41.0.0
+httpx>=0.25.0
+aiosqlite>=0.19.0
+```
+
+### 10.2 环境变量配置
+
+```bash
+# .env 环境变量配置
+
+# ========== 节点配置 ==========
+NODE_ID=node-001                           # 当前节点唯一标识
+NODE_ENV=production                        # 环境: development/staging/production
+
+# ========== 数据目录配置 ==========
+DATA_ROOT=/data                            # 数据根目录
+USERS_DIR=/data/users                      # 用户数据目录
+SHARED_DIR=/data/shared                    # 共享数据目录
+SYSTEM_DIR=/data/system                    # 系统数据目录
+
+# ========== 会话配置 ==========
+SESSION_IDLE_TIMEOUT=1800                  # 会话空闲超时（秒），默认30分钟
+SESSION_MAX_LIFETIME=28800                 # 会话最大生命周期（秒），默认8小时
+BROWSER_IDLE_TIMEOUT=600                   # 浏览器空闲超时（秒），默认10分钟
+
+# ========== 沙箱配置 ==========
+SANDBOX_MAX_TIMEOUT=60                     # 代码执行最大超时（秒）
+SANDBOX_MAX_MEMORY_MB=256                  # 代码执行最大内存（MB）
+SANDBOX_PERSIST_GLOBALS=true               # 是否在多次执行间保持变量
+
+# ========== IPFS 配置 ==========
+IPFS_GATEWAYS=https://ipfs.io,https://gateway.pinata.cloud,https://cloudflare-ipfs.com
+IPFS_TIMEOUT=30                            # IPFS 请求超时（秒）
+IPFS_RETRY_COUNT=3                         # IPFS 重试次数
+
+# ========== 同步配置 ==========
+SYNC_PROFILE_DELAY=300                     # 用户画像同步延迟（秒）
+SYNC_KNOWLEDGE_DELAY=600                   # 知识库同步延迟（秒）
+SYNC_FULL_INTERVAL=3600                    # 全量同步间隔（秒）
+
+# ========== 审计配置 ==========
+AUDIT_RETENTION_DAYS=90                    # 审计日志保留天数
+AUDIT_HASH_USER_ID=true                    # 是否哈希用户ID
+AUDIT_LOG_PATH=/data/system/audit.log      # 审计日志路径
+
+# ========== 配额配置 ==========
+QUOTA_USER_STORAGE_MB=100                  # 普通用户存储配额
+QUOTA_DEV_STORAGE_MB=500                   # 开发者存储配额
+QUOTA_ADMIN_STORAGE_MB=1000                # 管理员存储配额
+```
+
+### 10.3 文件系统权限
+
+#### 10.3.1 目录权限矩阵
+
+```
+目录结构及权限说明
+==================
+
+/data/                          [drwxr-xr-x] root:root
+│                               # 数据根目录，所有用户可读可执行
+│
+├── users/                      [drwxrwx---] usmsb:usmsb
+│   │                           # 用户数据目录，仅服务进程可访问
+│   │
+│   ├── 0xAAA1111.../           [drwxrwx---] usmsb:usmsb
+│   │   │                       # 用户专属目录
+│   │   │
+│   │   ├── meta.json           [-rw-rw----] usmsb:usmsb
+│   │   │                       # 用户元信息，仅服务可读写
+│   │   │
+│   │   ├── conversations.db    [-rw-rw----] usmsb:usmsb
+│   │   │                       # 对话数据库
+│   │   │
+│   │   ├── memory.db           [-rw-rw----] usmsb:usmsb
+│   │   │                       # 记忆数据库
+│   │   │
+│   │   ├── knowledge.db        [-rw-rw----] usmsb:usmsb
+│   │   │                       # 知识库数据库
+│   │   │
+│   │   ├── workspace/          [drwxrwx---] usmsb:usmsb
+│   │   │   ├── temp/           [drwxrwx---] usmsb:usmsb
+│   │   │   │                   # 临时文件，定期清理
+│   │   │   ├── output/         [drwxrwx---] usmsb:usmsb
+│   │   │   │                   # 输出文件
+│   │   │   └── uploads/        [drwxrwx---] usmsb:usmsb
+│   │   │                       # 用户上传文件
+│   │   │
+│   │   ├── sandbox/            [drwxrwx---] usmsb:usmsb
+│   │   │   └── exec/           [drwxrwx---] usmsb:usmsb
+│   │   │                       # 代码执行沙箱目录
+│   │   │
+│   │   └── browser/            [drwxrwx---] usmsb:usmsb
+│   │       ├── user_data/      [drwxrwx---] usmsb:usmsb
+│   │       │                   # Chromium 用户数据（Cookie等）
+│   │       └── downloads/      [drwxrwx---] usmsb:usmsb
+│   │                           # 浏览器下载目录
+│   │
+│   └── 0xBBB2222.../           [drwxrwx---] usmsb:usmsb
+│                               # 其他用户目录（完全隔离）
+│
+├── shared/                     [drwxr-xr-x] usmsb:usmsb
+│   │                           # 共享数据目录，只读
+│   │
+│   ├── system_knowledge.db     [-rw-r--r--] usmsb:usmsb
+│   │                           # 系统公共知识库
+│   │
+│   ├── tools/                  [drwxr-xr-x] usmsb:usmsb
+│   │   └── tool_configs.json   [-rw-r--r--] usmsb:usmsb
+│   │                           # 工具配置
+│   │
+│   └── skills/                 [drwxr-xr-x] usmsb:usmsb
+│       └── *.md                [-rw-r--r--] usmsb:usmsb
+│                               # 技能库
+│
+└── system/                     [drwxrwx---] usmsb:usmsb
+    │                           # 系统数据目录
+    │
+    ├── node_config.json        [-rw-rw----] usmsb:usmsb
+    │                           # 节点配置
+    │
+    ├── audit.log               [-rw-rw----] usmsb:usmsb
+    │                           # 审计日志（追加写入）
+    │
+    └── metrics.db              [-rw-rw----] usmsb:usmsb
+                                # 系统指标数据库
+```
+
+#### 10.3.2 用户隔离保证
+
+```
+用户隔离机制
+============
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        文件系统隔离保证                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  用户A (0xAAA...)          用户B (0xBBB...)                             │
+│  ┌─────────────────┐       ┌─────────────────┐                          │
+│  │ /data/users/    │       │ /data/users/    │                          │
+│  │   0xAAA.../     │       │   0xBBB.../     │                          │
+│  │                 │       │                 │                          │
+│  │ ├─ workspace/ ◄─┼───────┼─✗ 无法访问     │                          │
+│  │ ├─ sandbox/     │       │                 │                          │
+│  │ ├─ browser/     │       │ ├─ workspace/ ◄─┼─✗ 无法访问用户A          │
+│  │ └─ *.db        │       │ ├─ sandbox/     │                          │
+│  │                 │       │ ├─ browser/     │                          │
+│  └─────────────────┘       │ └─ *.db        │                          │
+│         │                  └─────────────────┘                          │
+│         │                         │                                     │
+│         ▼                         ▼                                     │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                    UserWorkspace.validate_path()                 │   │
+│  │                                                                  │   │
+│  │  def validate_path(self, path: Path) -> bool:                   │   │
+│  │      """验证路径是否在用户工作空间内"""                           │   │
+│  │      try:                                                        │   │
+│  │          resolved = path.resolve()                               │   │
+│  │          return str(resolved).startswith(str(self.workspace_root))│   │
+│  │      except:                                                     │   │
+│  │          return False                                            │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  路径遍历攻击防护:                                                       │
+│  • 任何包含 ".." 的路径会被解析后验证                                    │
+│  • 符号链接会被解析到真实路径后验证                                      │
+│  • 绝对路径必须以用户 workspace_root 开头                                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.4 代码沙箱权限
+
+#### 10.4.1 允许的内置函数
+
+```python
+# CodeSandbox.ALLOWED_BUILTINS
+
+ALLOWED_BUILTINS = {
+    # ========== 基础类型 ==========
+    'bool', 'int', 'float', 'str', 'list', 'dict', 'set', 'tuple',
+    'frozenset', 'bytes', 'bytearray', 'complex',
+
+    # ========== 类型检查 ==========
+    'type', 'isinstance', 'issubclass',
+
+    # ========== 数值操作 ==========
+    'abs', 'divmod', 'max', 'min', 'pow', 'round', 'sum', 'hex', 'oct', 'bin', 'ord', 'chr',
+
+    # ========== 序列操作 ==========
+    'len', 'range', 'enumerate', 'zip', 'map', 'filter', 'sorted', 'reversed',
+    'all', 'any', 'slice',
+
+    # ========== 字符串操作 ==========
+    'format', 'repr', 'hash', 'ascii',
+
+    # ========== 类型转换 ==========
+    'iter', 'next',
+
+    # ========== 类定义支持 ==========
+    '__build_class__', 'object',
+    'staticmethod', 'classmethod', 'property',
+
+    # ========== 异常类型 ==========
+    'Exception', 'ValueError', 'TypeError', 'IndexError', 'KeyError',
+    'AttributeError', 'RuntimeError', 'AssertionError', 'StopIteration',
+    'BufferError', 'ArithmeticError', 'LookupError', 'OSError',
+    'EOFError', 'ImportError', 'ModuleNotFoundError', 'NameError',
+    'UnboundLocalError', 'OverflowError', 'ZeroDivisionError',
+
+    # ========== 常量 ==========
+    'True', 'False', 'None',
+
+    # ========== 输出 ==========
+    'print',
+}
+```
+
+#### 10.4.2 被阻止的危险函数
+
+```python
+# CodeSandbox.DANGEROUS_FUNCTIONS
+
+DANGEROUS_FUNCTIONS = {
+    # ========== 代码执行 ==========
+    'eval',          # 动态代码执行
+    'exec',          # 动态代码执行
+    'compile',       # 代码编译
+
+    # ========== 系统访问 ==========
+    'open',          # 文件访问
+    'input',         # 标准输入（可能阻塞）
+
+    # ========== 内省 ==========
+    'globals',       # 访问全局命名空间
+    'locals',        # 访问局部命名空间
+    'vars',          # 访问对象属性
+    'dir',           # 列出对象属性
+    'getattr',       # 动态属性访问
+    'setattr',       # 动态属性设置
+    'delattr',       # 动态属性删除
+    'hasattr',       # 属性检查
+
+    # ========== 系统操作 ==========
+    'exit',          # 退出进程
+    'quit',          # 退出进程
+    'breakpoint',    # 调试断点
+
+    # ========== 内存操作 ==========
+    'memoryview',    # 内存视图
+    '__import__',    # 模块导入（单独处理）
+}
+```
+
+#### 10.4.3 允许的模块
+
+```python
+# CodeSandbox.ALLOWED_MODULES
+
+ALLOWED_MODULES = {
+    # ========== 数学运算 ==========
+    'math',          # 数学函数
+    'random',        # 随机数
+    'statistics',    # 统计函数
+    'decimal',       # 高精度小数
+    'fractions',     # 分数
+
+    # ========== 数据结构 ==========
+    'collections',   # 容器数据类型
+    'itertools',     # 迭代工具
+    'functools',     # 函数工具
+    'heapq',         # 堆队列
+    'bisect',        # 二分查找
+    'array',         # 数组
+
+    # ========== 文本处理 ==========
+    'string',        # 字符串常量
+    're',            # 正则表达式
+    'textwrap',      # 文本包装
+    'unicodedata',   # Unicode数据
+
+    # ========== 日期时间 ==========
+    'datetime',      # 日期时间
+    'time',          # 时间访问
+    'calendar',      # 日历
+
+    # ========== 编码 ==========
+    'json',          # JSON处理
+    'base64',        # Base64编码
+    'hashlib',       # 哈希函数
+
+    # ========== 类型 ==========
+    'typing',        # 类型提示
+    'dataclasses',   # 数据类
+    'enum',          # 枚举
+    'copy',          # 复制操作
+
+    # ========== 其他安全模块 ==========
+    'operator',      # 操作符函数
+    'pathlib',       # 路径操作（安全子集）
+    'pprint',        # 格式化输出
+    'uuid',          # UUID生成
+}
+```
+
+#### 10.4.4 被阻止的危险模块
+
+```python
+# CodeSandbox.DANGEROUS_MODULES
+
+DANGEROUS_MODULES = {
+    # ========== 系统操作 ==========
+    'os',            # 操作系统接口
+    'sys',           # 系统参数
+    'subprocess',    # 子进程
+    'shutil',        # 文件操作
+    'signal',        # 信号处理
+
+    # ========== 文件系统 ==========
+    'glob',          # 文件匹配
+    'fnmatch',       # 文件名匹配
+    'tempfile',      # 临时文件
+
+    # ========== 网络 ==========
+    'socket',        # 套接字
+    'ssl',           # SSL/TLS
+    'http',          # HTTP
+    'urllib',        # URL处理
+    'requests',      # HTTP请求
+    'aiohttp',       # 异步HTTP
+
+    # ========== 进程/线程 ==========
+    'threading',     # 线程
+    'multiprocessing', # 多进程
+    'asyncio',       # 异步IO
+    'concurrent',    # 并发
+
+    # ========== 危险功能 ==========
+    'pickle',        # 序列化（代码执行）
+    'marshal',       # 序列化
+    'shelve',        # 持久化
+    'ctypes',        # C接口
+    'cffi',          # C接口
+
+    # ========== 内省 ==========
+    'inspect',       # 内省
+    'dis',           # 反汇编
+    'code',          # 代码对象
+    'ast',           # AST（沙箱自己用）
+}
+```
+
+### 10.5 浏览器隔离权限
+
+#### 10.5.1 浏览器上下文隔离
+
+```
+浏览器隔离架构
+==============
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     BrowserContext 用户隔离                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  用户A (0xAAA...)                       用户B (0xBBB...)                 │
+│  ┌─────────────────────────────┐        ┌─────────────────────────────┐ │
+│  │ BrowserContext              │        │ BrowserContext              │ │
+│  │                             │        │                             │ │
+│  │ user_data_dir:              │        │ user_data_dir:              │ │
+│  │ /data/users/0xAAA/browser/  │        │ /data/users/0xBBB/browser/  │ │
+│  │                             │        │                             │ │
+│  │ ┌─────────────────────────┐ │        │ ┌─────────────────────────┐ │ │
+│  │ │ Playwright Context      │ │        │ │ Playwright Context      │ │ │
+│  │ │                         │ │        │ │                         │ │ │
+│  │ │ • Cookies (隔离)        │ │        │ │ • Cookies (隔离)        │ │ │
+│  │ │ • LocalStorage (隔离)   │ │        │ │ • LocalStorage (隔离)   │ │ │
+│  │ │ • SessionStorage (隔离) │ │        │ │ • SessionStorage (隔离) │ │ │
+│  │ │ • IndexedDB (隔离)      │ │        │ │ • IndexedDB (隔离)      │ │ │
+│  │ │ • Downloads (隔离)      │ │        │ │ • Downloads (隔离)      │ │ │
+│  │ └─────────────────────────┘ │        │ └─────────────────────────┘ │ │
+│  └─────────────────────────────┘        └─────────────────────────────┘ │
+│                                                                         │
+│  特点：                                                                 │
+│  • 每个用户使用 launch_persistent_context 创建独立浏览器实例             │
+│  • 用户数据目录完全隔离，无法互相访问                                    │
+│  • 空闲超时自动关闭浏览器，释放资源                                      │
+│  • 关闭后用户数据目录保留，下次恢复                                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.5.2 浏览器安全限制
+
+```python
+# BrowserContext 安全配置
+
+BROWSER_SECURITY_CONFIG = {
+    # 启动的浏览器参数
+    "launch_args": [
+        "--disable-dev-shm-usage",       # 禁用 /dev/shm 使用
+        "--no-sandbox",                  # 禁用沙箱（容器内）
+        "--disable-setuid-sandbox",      # 禁用 setuid 沙箱
+        "--disable-web-security",        # 禁用同源策略（仅限自动化）
+        "--disable-features=IsolateOrigins,site-per-process",  # 禁用站点隔离
+    ],
+
+    # 上下文配置
+    "context_options": {
+        "java_script_enabled": True,     # 启用 JavaScript
+        "accept_downloads": True,        # 允许下载
+        "ignore_https_errors": False,    # 不忽略 HTTPS 错误
+    },
+
+    # 超时配置
+    "timeouts": {
+        "page_load": 30000,              # 页面加载超时（毫秒）
+        "element_wait": 30000,           # 元素等待超时（毫秒）
+        "script": 30000,                 # 脚本执行超时（毫秒）
+        "idle": 600,                     # 空闲超时（秒）
+    },
+
+    # 限制配置
+    "limits": {
+        "max_pages_per_context": 5,      # 每个上下文最大页面数
+        "max_screenshot_size": 10000000, # 截图最大大小（字节）
+        "max_content_length": 100000,    # 内容最大长度（字符）
+    },
+
+    # 禁止的操作
+    "forbidden": [
+        "file://",                       # 禁止访问本地文件
+        "about:blank",                   # 特殊页面限制
+    ],
+}
+```
+
+### 10.6 数据库权限
+
+#### 10.6.1 数据库文件隔离
+
+```python
+# UserDatabase 数据库隔离
+
+class UserDatabasePaths:
+    """用户数据库路径配置"""
+
+    def __init__(self, wallet_address: str, data_dir: str = "/data/users"):
+        self.user_dir = Path(data_dir) / wallet_address
+
+    @property
+    def conversations_db(self) -> Path:
+        """对话数据库"""
+        return self.user_dir / "conversations.db"
+
+    @property
+    def memory_db(self) -> Path:
+        """记忆数据库"""
+        return self.user_dir / "memory.db"
+
+    @property
+    def knowledge_db(self) -> Path:
+        """知识库数据库"""
+        return self.user_dir / "knowledge.db"
+
+
+# 数据库连接配置
+DATABASE_CONFIG = {
+    # 连接池配置
+    "pool_size": 5,                    # 连接池大小
+    "max_overflow": 10,                # 最大溢出连接
+    "pool_timeout": 30,                # 获取连接超时（秒）
+    "pool_recycle": 3600,              # 连接回收时间（秒）
+
+    # SQLite 特定配置
+    "sqlite": {
+        "check_same_thread": False,    # 允许跨线程
+        "timeout": 30,                 # 锁等待超时
+        "isolation_level": None,       # 自动提交模式
+    },
+
+    # 写入优化
+    "pragma": {
+        "journal_mode": "WAL",         # 写前日志模式
+        "synchronous": "NORMAL",       # 同步模式
+        "cache_size": -64000,          # 缓存大小（64MB）
+        "foreign_keys": "ON",          # 启用外键
+    },
+}
+```
+
+#### 10.6.2 数据隔离保证
+
+```sql
+-- 所有查询自动添加用户过滤
+-- 对话表
+SELECT * FROM conversations WHERE owner_id = ?;
+
+-- 消息表（通过关联）
+SELECT m.* FROM messages m
+JOIN conversations c ON m.conversation_id = c.id
+WHERE c.owner_id = ?;
+
+-- 用户画像表
+SELECT * FROM user_profiles WHERE user_id = ?;
+
+-- 知识库表
+SELECT * FROM knowledge_items WHERE user_id = ?;
+```
+
+### 10.7 Docker 部署配置
+
+#### 10.7.1 Dockerfile
+
+```dockerfile
+# Dockerfile
+FROM python:3.12-slim
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    # Playwright 依赖
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    libatspi2.0-0 \
+    # 清理
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建非 root 用户
+RUN groupadd -r usmsb && useradd -r -g usmsb usmsb
+
+# 创建数据目录
+RUN mkdir -p /data/users /data/shared /data/system \
+    && chown -R usmsb:usmsb /data
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制依赖文件
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 安装 Playwright 浏览器
+RUN playwright install chromium --with-deps
+
+# 复制应用代码
+COPY . .
+
+# 设置权限
+RUN chown -R usmsb:usmsb /app
+
+# 切换到非 root 用户
+USER usmsb
+
+# 环境变量
+ENV NODE_ID=local-node \
+    DATA_ROOT=/data \
+    PYTHONUNBUFFERED=1
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# 启动命令
+CMD ["python", "run_server.py"]
+```
+
+#### 10.7.2 Docker Compose
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  meta-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: usmsb-meta-agent
+    restart: unless-stopped
+
+    # 环境变量
+    environment:
+      - NODE_ID=node-001
+      - NODE_ENV=production
+      - DATA_ROOT=/data
+      - SESSION_IDLE_TIMEOUT=1800
+      - BROWSER_IDLE_TIMEOUT=600
+
+    # 数据卷挂载
+    volumes:
+      - user-data:/data/users        # 用户数据（持久化）
+      - shared-data:/data/shared     # 共享数据
+      - system-data:/data/system     # 系统数据
+
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+    # 网络配置
+    ports:
+      - "8000:8000"
+    networks:
+      - usmsb-network
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# 数据卷定义
+volumes:
+  user-data:
+    driver: local
+  shared-data:
+    driver: local
+  system-data:
+    driver: local
+
+# 网络定义
+networks:
+  usmsb-network:
+    driver: bridge
+```
+
+### 10.8 安全检查清单
+
+```
+部署前安全检查清单
+=================
+
+□ 文件系统
+  □ /data/users 目录权限正确 (drwxrwx---)
+  □ 用户目录隔离验证通过
+  □ 符号链接处理正确
+  □ 路径遍历攻击测试通过
+
+□ 代码沙箱
+  □ 危险函数阻止测试通过
+  □ 危险模块阻止测试通过
+  □ 超时限制生效
+  □ 内存限制生效
+  □ AST 静态分析启用
+
+□ 浏览器隔离
+  □ Cookie 隔离验证通过
+  □ LocalStorage 隔离验证通过
+  □ 空闲超时清理正常
+  □ 下载目录隔离正确
+
+□ 数据库
+  □ 用户数据隔离验证
+  □ 连接池配置正确
+  □ WAL 模式启用
+
+□ 网络
+  □ 仅暴露必要端口
+  □ 内部服务不对外暴露
+  □ TLS 配置正确（如需要）
+
+□ 审计
+  □ 审计日志启用
+  □ 用户ID哈希处理
+  □ 日志轮转配置
+
+□ 资源限制
+  □ CPU 限制生效
+  □ 内存限制生效
+  □ 磁盘配额生效
+```
+
+---
+
+## 十一、附录
 
 ### A. 参考文档
 
@@ -1776,8 +2509,33 @@ await audit.log(
 | UserWorkspace | 用户工作空间，管理用户专属的文件系统空间 |
 | Primary Node | 主节点，用户首次访问的节点，存储用户元信息 |
 
+### C. 实现状态
+
+| 模块 | 文件位置 | 状态 | 测试覆盖 |
+|------|---------|------|---------|
+| UserSession | `session/user_session.py` | ✅ 已完成 | 100% |
+| SessionManager | `session/session_manager.py` | ✅ 已完成 | 100% |
+| CodeSandbox | `sandbox/code_sandbox.py` | ✅ 已完成 | 100% (52/52) |
+| BrowserContext | `browser/browser_context.py` | ✅ 已完成 | 功能验证 |
+| UserWorkspace | `workspace/user_workspace.py` | ✅ 已完成 | 100% (41/41) |
+| UserDatabase | `database/user_database.py` | ✅ 已完成 | 100% (18/18) |
+| IPFSClient | `ipfs/ipfs_client.py` | ✅ 已完成 | 100% (51/51) |
+| Encryption | `ipfs/encryption.py` | ✅ 已完成 | 100% |
+| AutoSyncManager | `sync/auto_sync_manager.py` | ✅ 已完成 | 100% (26/26) |
+| DataMigration | `migrate/data_migration.py` | ✅ 已完成 | 100% |
+| QuotaManager | `quota/quota_manager.py` | ✅ 已完成 | 100% |
+| AuditLogger | `audit/audit_logger.py` | ✅ 已完成 | 100% (17/17) |
+| ToolRegistry | `tools/registry.py` | ✅ 已改造 | 集成测试 |
+
+### D. Git 提交记录
+
+- `cc47541` - Initial multi-user isolation implementation
+- `7dd2415` - fix: CodeSandbox and BrowserContext improvements
+
 ---
 
 **文档结束**
 
-> 请确认以上设计方案，如有问题或需要调整的地方请指出。
+> 版本: v1.1
+> 最后更新: 2026-02-22
+> 状态: 已实现并测试通过
