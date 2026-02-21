@@ -96,8 +96,14 @@ class BrowserContext:
 
             # Start playwright
             self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.launch(
+
+            # Use launch_persistent_context for user data isolation
+            # This creates a browser context with persistent storage
+            self._context = await self._playwright.chromium.launch_persistent_context(
+                user_data_dir=str(self.user_data_dir),
                 headless=True,
+                accept_downloads=True,
+                java_script_enabled=True,
                 args=[
                     "--disable-dev-shm-usage",
                     "--no-sandbox",
@@ -105,15 +111,12 @@ class BrowserContext:
                 ],
             )
 
-            # Create browser context with isolated user data
-            self._context = await self._browser.new_context(
-                user_data_dir=str(self.user_data_dir),
-                accept_downloads=True,
-                java_script_enabled=True,
-            )
-
-            # Create default page
-            self._page = await self._context.new_page()
+            # Get or create default page
+            pages = self._context.pages
+            if pages:
+                self._page = pages[0]
+            else:
+                self._page = await self._context.new_page()
 
             self._is_initialized = True
             logger.info(
@@ -587,7 +590,7 @@ class BrowserContext:
     async def _cleanup_resources(self) -> None:
         """Clean up all browser resources."""
         try:
-            # Close page
+            # Close page (if exists and not already closed)
             if self._page and not self._page.is_closed():
                 try:
                     await self._page.close()
@@ -596,7 +599,7 @@ class BrowserContext:
                 finally:
                     self._page = None
 
-            # Close context
+            # Close context (persistent context handles browser lifecycle)
             if self._context:
                 try:
                     await self._context.close()
@@ -604,15 +607,6 @@ class BrowserContext:
                     logger.warning(f"Error closing context: {e}")
                 finally:
                     self._context = None
-
-            # Close browser
-            if self._browser:
-                try:
-                    await self._browser.close()
-                except Exception as e:
-                    logger.warning(f"Error closing browser: {e}")
-                finally:
-                    self._browser = None
 
             # Stop playwright
             if self._playwright:
