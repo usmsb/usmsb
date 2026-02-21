@@ -1,7 +1,8 @@
 """
-本地系统操作工具
+本地系统操作工具（支持 UserSession）
 
-提供文件操作、命令执行、目录管理等本地系统能力
+提供文件操作、命令执行、目录管理等本地系统能力。
+文件操作现在支持用户工作空间隔离。
 """
 
 import asyncio
@@ -14,7 +15,11 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from ..session.user_session import UserSession
+    from ..workspace.user_workspace import UserWorkspace
 
 from .registry import Tool
 from .security import (
@@ -34,66 +39,77 @@ def get_system_tools() -> List[Tool]:
             description="执行命令行命令。用于运行终端命令、脚本等。",
             handler=execute_command,
             security_level=SecurityLevel.HIGH,
+            requires_session=False,  # 全局命令执行
         ),
         Tool(
             name="run_program",
             description="运行程序或脚本文件",
             handler=run_program,
             security_level=SecurityLevel.HIGH,
+            requires_session=False,  # 全局程序执行
         ),
         Tool(
             name="read_file",
-            description="读取文件内容",
+            description="读取文件内容（支持用户工作空间隔离）",
             handler=read_file,
             security_level=SecurityLevel.MEDIUM,
+            requires_session=True,  # 需要访问用户工作空间
         ),
         Tool(
             name="write_file",
-            description="写入或创建文件",
+            description="写入或创建文件（支持用户工作空间隔离）",
             handler=write_file,
             security_level=SecurityLevel.HIGH,
+            requires_session=True,
         ),
         Tool(
             name="list_directory",
-            description="列出目录内容",
+            description="列出目录内容（支持用户工作空间隔离）",
             handler=list_directory,
             security_level=SecurityLevel.LOW,
+            requires_session=True,
         ),
         Tool(
             name="create_directory",
-            description="创建目录",
+            description="创建目录（支持用户工作空间隔离）",
             handler=create_directory,
             security_level=SecurityLevel.MEDIUM,
+            requires_session=True,
         ),
         Tool(
             name="delete_file",
-            description="删除文件或目录",
+            description="删除文件或目录（支持用户工作空间隔离）",
             handler=delete_file,
             security_level=SecurityLevel.HIGH,
+            requires_session=True,
         ),
         Tool(
             name="search_files",
-            description="搜索文件",
+            description="搜索文件（支持用户工作空间隔离）",
             handler=search_files,
             security_level=SecurityLevel.LOW,
+            requires_session=True,
         ),
         Tool(
             name="get_file_info",
-            description="获取文件信息",
+            description="获取文件信息（支持用户工作空间隔离）",
             handler=get_file_info,
             security_level=SecurityLevel.LOW,
+            requires_session=True,
         ),
         Tool(
             name="copy_file",
-            description="复制文件或目录",
+            description="复制文件或目录（支持用户工作空间隔离）",
             handler=copy_file,
             security_level=SecurityLevel.MEDIUM,
+            requires_session=True,
         ),
         Tool(
             name="move_file",
-            description="移动或重命名文件",
+            description="移动或重命名文件（支持用户工作空间隔离）",
             handler=move_file,
             security_level=SecurityLevel.MEDIUM,
+            requires_session=True,
         ),
     ]
 
@@ -106,7 +122,7 @@ async def register_tools(registry):
 
 async def execute_command(params: dict) -> Dict[str, Any]:
     """
-    执行命令行命令
+    执行命令行命令（全局版本，不需要用户会话）
 
     Args:
         params: 参数字典，包含:
@@ -186,7 +202,7 @@ async def execute_command(params: dict) -> Dict[str, Any]:
 
 async def run_program(params: dict) -> Dict[str, Any]:
     """
-    运行程序或脚本
+    运行程序或脚本（全局版本，不需要用户会话）
 
     Args:
         params: 参数字典，包含:
@@ -201,6 +217,7 @@ async def run_program(params: dict) -> Dict[str, Any]:
     cwd = params.get("cwd")
     timeout = params.get("timeout", 60)
     user_confirmed = params.get("user_confirmed", False)
+
     # 安全检查
     if not check_path_safety(program_path):
         return {"status": "error", "message": "路径不安全"}
@@ -253,319 +270,341 @@ async def run_program(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def read_file(params: dict) -> Dict[str, Any]:
+async def read_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     """
-    读取文件内容
+    读取文件内容（用户工作空间隔离版本）
+
+    在用户的工作空间中读取文件，确保：
+    1. 只能访问用户工作空间内的文件
+    2. 路径自动解析为工作空间相对路径
 
     Args:
+        session: 用户会话上下文
         params: 参数字典，包含:
-            - file_path: 文件路径
+            - path: 文件相对路径（相对于用户工作空间）
             - offset: 起始位置
             - limit: 读取字节数
             - encoding: 文件编码
+
+    Returns:
+        读取结果
     """
-    file_path = params.get("file_path", "")
+    path = params.get("path", "")
     offset = params.get("offset", 0)
     limit = params.get("limit", 10000)
     encoding = params.get("encoding", "utf-8")
-    # 安全检查
-    if not check_path_safety(file_path):
-        return {"status": "error", "message": "路径不安全"}
-
-    if not os.path.exists(file_path):
-        return {"status": "error", "message": "文件不存在"}
-
-    if not os.path.isfile(file_path):
-        return {"status": "error", "message": "不是文件"}
 
     try:
-        with open(file_path, "r", encoding=encoding, errors="ignore") as f:
-            f.seek(offset)
-            content = f.read(limit)
+        # 使用用户工作空间读取文件
+        content = await session.workspace.read_file(path, as_text=True)
 
-        # 获取文件信息
-        stat = os.stat(file_path)
+        # 处理 offset 和 limit
+        if offset > 0:
+            content = content[offset:]
+        if limit:
+            content = content[:limit]
 
         return {
             "status": "success",
-            "file_path": file_path,
+            "path": path,
             "content": content,
-            "size": stat.st_size,
+            "size": len(content),
             "offset": offset,
             "read": len(content),
         }
 
+    except FileNotFoundError:
+        return {
+            "status": "error",
+            "message": f"文件不存在: {path}",
+        }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"File read failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def write_file(params: dict) -> Dict[str, Any]:
+async def write_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     """
-    写入文件
+    写入文件（用户工作空间隔离版本）
+
+    在用户的工作空间中写入文件，确保：
+    1. 只能写入用户工作空间内的文件
+    2. 路径自动解析为工作空间相对路径
 
     Args:
+        session: 用户会话上下文
         params: 参数字典，包含:
-            - file_path: 文件路径
+            - path: 文件相对路径（相对于用户工作空间）
             - content: 文件内容
             - mode: 写入模式 (w/a)
-            - encoding: 编码
-            - user_confirmed: 用户确认
+            - user_confirmed: 用户确认（用于覆盖确认）
+
+    Returns:
+        写入结果
     """
-    file_path = params.get("file_path", "")
+    path = params.get("path", "")
     content = params.get("content", "")
     mode = params.get("mode", "w")
-    encoding = params.get("encoding", "utf-8")
     user_confirmed = params.get("user_confirmed", False)
-    # 安全检查
-    if not check_path_safety(file_path):
-        return {"status": "error", "message": "路径不安全"}
-
-    # 检查目录是否存在
-    directory = os.path.dirname(file_path)
-    if directory and not os.path.exists(directory):
-        try:
-            os.makedirs(directory, exist_ok=True)
-        except Exception as e:
-            return {"status": "error", "message": f"无法创建目录: {e}"}
-
-    # 检查文件是否已存在
-    if os.path.exists(file_path) and not user_confirmed:
-        return {
-            "status": "requires_confirmation",
-            "operation": "write_file",
-            "file_path": file_path,
-            "warning": "文件已存在，将被覆盖",
-        }
 
     try:
-        with open(file_path, mode, encoding=encoding) as f:
-            f.write(content)
+        # 检查文件是否已存在
+        workspace = session.workspace
+        if await workspace.exists(path) and not user_confirmed:
+            return {
+                "status": "requires_confirmation",
+                "operation": "write_file",
+                "path": path,
+                "warning": "文件已存在，将被覆盖",
+            }
+
+        # 使用用户工作空间写入文件
+        await workspace.write_file(path, content)
 
         return {
             "status": "success",
-            "file_path": file_path,
-            "bytes_written": len(content.encode(encoding)),
+            "path": path,
+            "bytes_written": len(content),
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"File write failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def list_directory(params: dict) -> Dict[str, Any]:
-    """列出目录内容"""
-    directory_path = params.get("directory_path", ".")
+async def list_directory(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    列出目录内容（用户工作空间隔离版本）
+
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - path: 目录相对路径（相对于用户工作空间），默认为根目录
+            - show_hidden: 是否显示隐藏文件
+            - recursive: 是否递归列出
+
+    Returns:
+        目录内容
+    """
+    path = params.get("path", "")
     show_hidden = params.get("show_hidden", False)
-
-    if not check_path_safety(directory_path):
-        return {"status": "error", "message": "路径不安全"}
-
-    if not os.path.exists(directory_path):
-        return {"status": "error", "message": "目录不存在"}
-
-    if not os.path.isdir(directory_path):
-        return {"status": "error", "message": "不是目录"}
+    recursive = params.get("recursive", False)
+    pattern = params.get("pattern", "*")
 
     try:
-        items = []
-        for item in os.listdir(directory_path):
-            if not show_hidden and item.startswith("."):
-                continue
+        # 使用用户工作空间列出文件
+        files = await session.workspace.list_files(
+            directory=path,
+            pattern=pattern,
+            recursive=recursive
+        )
 
-            item_path = os.path.join(directory_path, item)
-            stat = os.stat(item_path)
-
-            items.append(
-                {
-                    "name": item,
-                    "type": "directory" if os.path.isdir(item_path) else "file",
-                    "size": stat.st_size,
-                    "modified": stat.st_mtime,
-                }
-            )
+        # 过滤隐藏文件
+        if not show_hidden:
+            files = [f for f in files if not f.name.startswith(".")]
 
         return {
             "status": "success",
-            "directory": directory_path,
-            "items": items,
-            "count": len(items),
+            "path": path,
+            "files": [f.to_dict() for f in files],
+            "count": len(files),
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"Directory listing failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def create_directory(params: dict) -> Dict[str, Any]:
-    """创建目录"""
-    directory_path = params.get("directory_path", "")
+async def create_directory(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    创建目录（用户工作空间隔离版本）
+
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - path: 目录相对路径（相对于用户工作空间）
+            - parents: 是否创建父目录，默认 True
+
+    Returns:
+        创建结果
+    """
+    path = params.get("path", "")
     parents = params.get("parents", True)
 
-    if not check_path_safety(directory_path):
-        return {"status": "error", "message": "路径不安全"}
-    if not check_path_safety(directory_path):
-        return {"status": "error", "message": "路径不安全"}
-
     try:
-        os.makedirs(directory_path, exist_ok=parents)
+        # 使用用户工作空间创建目录
+        await session.workspace.create_directory(path)
+
         return {
             "status": "success",
-            "directory": directory_path,
+            "path": path,
         }
+
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"Directory creation failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def delete_file(params: dict) -> Dict[str, Any]:
-    """删除文件或目录"""
-    file_path = params.get("file_path", "")
-    recursive = params.get("recursive", False)
+async def delete_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    删除文件或目录（用户工作空间隔离版本）
+
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - path: 文件相对路径（相对于用户工作空间）
+            - user_confirmed: 用户确认
+
+    Returns:
+        删除结果
+    """
+    path = params.get("path", "")
     user_confirmed = params.get("user_confirmed", False)
 
-    if not check_path_safety(file_path):
-        return {"status": "error", "message": "路径不安全"}
-    if not check_path_safety(file_path):
-        return {"status": "error", "message": "路径不安全"}
-
-    if not os.path.exists(file_path):
-        return {"status": "error", "message": "路径不存在"}
-
-    # 敏感操作确认
     if not user_confirmed:
         return {
             "status": "requires_confirmation",
             "operation": "delete_file",
-            "file_path": file_path,
-            "warning": f"即将删除: {file_path}",
+            "path": path,
+            "warning": f"即将删除: {path}",
         }
 
     try:
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-        elif recursive:
-            shutil.rmtree(file_path)
-        else:
-            os.rmdir(file_path)
+        # 使用用户工作空间删除文件
+        deleted = await session.workspace.delete_file(path)
 
         return {
             "status": "success",
-            "file_path": file_path,
+            "path": path,
+            "deleted": deleted,
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"File deletion failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def search_files(params: dict) -> Dict[str, Any]:
-    """搜索文件"""
-    directory = params.get("directory", ".")
+async def search_files(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    搜索文件（用户工作空间隔离版本）
+
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - path: 搜索目录相对路径，默认为根目录
+            - pattern: 文件匹配模式（如 *.py）
+            - max_results: 最大结果数量
+            - recursive: 是否递归搜索
+
+    Returns:
+        搜索结果
+    """
+    path = params.get("path", "")
     pattern = params.get("pattern", "*")
-    file_type = params.get("file_type")
     max_results = params.get("max_results", 100)
-
-    if not check_path_safety(directory):
-        return {"status": "error", "message": "路径不安全"}
-    if not check_path_safety(directory):
-        return {"status": "error", "message": "路径不安全"}
-
-    if not os.path.exists(directory):
-        return {"status": "error", "message": "目录不存在"}
+    recursive = params.get("recursive", True)
 
     try:
-        results = []
-        path = Path(directory)
+        # 使用用户工作空间搜索文件
+        files = await session.workspace.list_files(
+            directory=path,
+            pattern=pattern,
+            recursive=recursive
+        )
 
-        # 构建搜索模式
-        glob_pattern = pattern
-        if file_type == "file":
-            glob_pattern = f"{pattern}*"
-        elif file_type == "directory":
-            glob_pattern = f"{pattern}*/"
-
-        for item in path.rglob(glob_pattern):
-            if len(results) >= max_results:
-                break
-
-            if not show_hidden and item.name.startswith("."):
-                continue
-
-            rel_path = item.relative_to(directory)
-            results.append(
-                {
-                    "path": str(item),
-                    "name": item.name,
-                    "type": "directory" if item.is_dir() else "file",
-                }
-            )
+        # 限制结果数量
+        files = files[:max_results]
 
         return {
             "status": "success",
-            "directory": directory,
+            "path": path,
             "pattern": pattern,
-            "results": results,
-            "count": len(results),
+            "results": [f.to_dict() for f in files],
+            "count": len(files),
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"File search failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def get_file_info(params: dict) -> Dict[str, Any]:
-    """获取文件信息"""
-    file_path = params.get("file_path", "")
+async def get_file_info(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    获取文件信息（用户工作空间隔离版本）
 
-    if not check_path_safety(file_path):
-        return {"status": "error", "message": "路径不安全"}
-    if not check_path_safety(file_path):
-        return {"status": "error", "message": "路径不安全"}
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - path: 文件相对路径（相对于用户工作空间）
 
-    if not os.path.exists(file_path):
-        return {"status": "error", "message": "文件不存在"}
+    Returns:
+        文件信息
+    """
+    path = params.get("path", "")
 
     try:
-        stat = os.stat(file_path)
+        # 使用用户工作空间获取文件信息
+        info = await session.workspace.get_file_info(path)
+
+        if info is None:
+            return {
+                "status": "error",
+                "message": f"文件不存在: {path}",
+            }
 
         return {
             "status": "success",
-            "file_path": file_path,
-            "name": os.path.basename(file_path),
-            "type": "directory" if os.path.isdir(file_path) else "file",
-            "size": stat.st_size,
-            "created": stat.st_ctime,
-            "modified": stat.st_mtime,
-            "accessed": stat.st_atime,
-            "permissions": oct(stat.st_mode)[-3:],
+            "path": path,
+            "info": info.to_dict(),
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"File info retrieval failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def copy_file(params: dict) -> Dict[str, Any]:
-    """复制文件或目录"""
+async def copy_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    复制文件或目录（用户工作空间隔离版本）
+
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - source: 源文件相对路径
+            - destination: 目标文件相对路径
+            - user_confirmed: 用户确认
+
+    Returns:
+        复制结果
+    """
     source = params.get("source", "")
     destination = params.get("destination", "")
     user_confirmed = params.get("user_confirmed", False)
 
-    if not check_path_safety(source) or not check_path_safety(destination):
-        return {"status": "error", "message": "路径不安全"}
-    if not check_path_safety(source) or not check_path_safety(destination):
-        return {"status": "error", "message": "路径不安全"}
-
-    if not os.path.exists(source):
-        return {"status": "error", "message": "源文件不存在"}
-
-    if os.path.exists(destination) and not user_confirmed:
-        return {
-            "status": "requires_confirmation",
-            "operation": "copy_file",
-            "source": source,
-            "destination": destination,
-        }
-
     try:
-        if os.path.isdir(source):
-            shutil.copytree(source, destination, dirs_exist_ok=True)
-        else:
-            shutil.copy2(source, destination)
+        # 使用用户工作空间复制文件
+        await session.workspace.copy_file(source, destination)
 
         return {
             "status": "success",
@@ -574,33 +613,35 @@ async def copy_file(params: dict) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.error(f"File copy failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
 
 
-async def move_file(params: dict) -> Dict[str, Any]:
-    """移动或重命名文件"""
+async def move_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+    """
+    移动或重命名文件（用户工作空间隔离版本）
+
+    Args:
+        session: 用户会话上下文
+        params: 参数字典，包含:
+            - source: 源文件相对路径
+            - destination: 目标文件相对路径
+            - user_confirmed: 用户确认
+
+    Returns:
+        移动结果
+    """
     source = params.get("source", "")
     destination = params.get("destination", "")
     user_confirmed = params.get("user_confirmed", False)
 
-    if not check_path_safety(source) or not check_path_safety(destination):
-        return {"status": "error", "message": "路径不安全"}
-    if not check_path_safety(source) or not check_path_safety(destination):
-        return {"status": "error", "message": "路径不安全"}
-
-    if not os.path.exists(source):
-        return {"status": "error", "message": "源文件不存在"}
-
-    if os.path.exists(destination) and not user_confirmed:
-        return {
-            "status": "requires_confirmation",
-            "operation": "move_file",
-            "source": source,
-            "destination": destination,
-        }
-
     try:
-        shutil.move(source, destination)
+        # 使用用户工作空间移动文件
+        await session.workspace.move_file(source, destination)
+
         return {
             "status": "success",
             "source": source,
@@ -608,9 +649,8 @@ async def move_file(params: dict) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-def show_hidden(item: str) -> bool:
-    """检查是否显示隐藏文件（辅助函数）"""
-    return not item.startswith(".")
+        logger.error(f"File move failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+        }
