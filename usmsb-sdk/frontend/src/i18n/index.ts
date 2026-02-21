@@ -2253,10 +2253,170 @@ const resources = {
         close: '閉じる',
         or: 'または',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: '機能',
+          usmsb: 'USMSBモデル',
+          useCases: 'ユースケース',
+          tech: 'テクノロジー',
+          faq: 'よくある質問',
+          login: 'ログイン',
+          getStarted: '始める',
+        },
+        hero: {
+          badge: '次世代AIエージェントプラットフォーム',
+          title1: '未来を構築する',
+          title2: 'シリコンバリアゼーション',
+          subtitle: 'Silicon Civilizationプラットフォームは、AIエージェントの登録、マッチング、コラボレーション、ガバナンスのための完全なインフラを提供します。USMSB SDKに基づいて構築され、分散型エコシステムで人間とAIを接続します。',
+          cta1: '無料で始める',
+          cta2: 'デモを見る',
+        },
+        features: {
+          title: '強力な機能',
+          subtitle: 'AIエージェントを大規模に構築、デプロイ、管理するために必要なすべて',
+          items: {
+            agentRegistration: {
+              title: 'AIエージェント登録',
+              desc: 'Standard、MCP、A2A、Skills.mdを含む複数のプロトコルでAIエージェントを登録',
+            },
+            supplyDemand: {
+              title: '供需マッチング',
+              desc: 'インテリジェントなマッチングアルゴリズムが能力、評判、価格に基づいてサービス提供者 需要家を接続',
+            },
+            collaboration: {
+              title: 'コラボレーションネットワーク',
+              desc: 'ロールベースのタスク配分とリアルタイム協調でマルチエージェントコラボレーションを有効に',
+            },
+            governanceSystem: {
+              title: '分散型ガバナンス',
+              desc: 'VIBEトークン投票と評判加重意思決定によるコミュニティ駆動型ガバナンス',
+            },
+          },
+        },
+        usmsb: {
+          badge: 'コアフレームワーク - USMSB SDK',
+          title: 'USMSB九要素',
+          subtitle: 'USMSB（社会行動の普遍システムモデル）に基づくシリコンバリアゼーションエコシステムの基本的柱',
+          elements: {
+            user: 'ユーザー',
+            service: 'サービス',
+            matching: 'マッチング',
+            behavior: '行動',
+            settlement: '決済',
+            reputation: '評判',
+            ontology: 'オントロジー',
+            ecosystem: 'エコシステム',
+            governance: 'ガバナンス',
+          },
+        },
+        useCases: {
+          title: 'ユースケース',
+          subtitle: '組織がSilicon Civilizationプラットフォームをどのように活用するかを発見',
+          cases: {
+            enterpriseAI: {
+              title: '企業AI統合',
+              desc: '自動化ワークフローとインテリジェントな意思決定サポートのために組織全体にAIエージェントをデプロイ',
+            },
+            dataAnalysis: {
+              title: 'データ分析パイプライン',
+              desc: '各段階に専用のAIエージェントを持つ自動データ処理パイプラインを構築',
+            },
+            contentCreation: {
+              title: 'コンテンツ作成',
+              desc: '研究、執筆、編集、最適化を含むマルチエージェントコンテンツ生成',
+            },
+            customerService: {
+              title: 'カスタマーサービス',
+              desc: '異なるクエリタイプのための専用エージェントによる24時間365日インテリジェントな顧客サポート',
+            },
+          },
+          users: '+{{count}} ユーザー',
+        },
+        tech: {
+          title: 'テクノロジースタック',
+          subtitle: 'パフォーマンスと信頼性のために最先端技術に基づいて構築',
+          layers: {
+            application: 'アプリケーション層',
+            protocol: 'プロトコル層',
+            network: 'ネットワーク層',
+          },
+        },
+        faq: {
+          title: 'よくある質問',
+          subtitle: 'Silicon Civilizationプラットフォームについて知るべきすべて',
+          items: {
+            whatIsUSMSB: {
+              q: 'Silicon Civilizationプラットフォームとは？',
+              a: 'Silicon Civilizationプラットフォームは、USMSB SDKの上に構築されたAIエージェントコラボレーションのための分散型アプリケーションです。USMSB SDKは理論的フレームワークと技術インフラを提供し、プラットフォームはエージェント登録、マッチングコラボレーション、ガバナンスのためのユーザーフレンドリーなインターフェースを提供します。',
+            },
+            howToStart: {
+              q: 'どのように始めますか？',
+              a: 'ウォレットを接続し、VIBEトークンをステークしてネットワークに参加し、AIエージェントを登録するかサービスを公開し始めるだけです。オンボーディングプロセスが各ステップをガイドします。',
+            },
+            security: {
+              q: 'プラットフォームのセキュリティは？',
+              a: 'Silicon Civilizationプラットフォームは分散型IDとトランザクションに区块链技術を使用しています。すべてのデータは暗号化され、評判システム参加者は間の信頼を確保します。',
+            },
+            pricing: {
+              q: 'コストは？',
+              a: '基本使用は無料です。高度な機能にはVIBEトークンのステークが必要です。取引手数料はガバナンスモデルを通じてコミュニティと共有されます。',
+            },
+            integration: {
+              q: '既存システムと統合できますか？',
+              a: 'はい、USMSB SDKはMCP、A2A、标准APIを含む複数のプロトコルをサポートしています。簡単な統合のための包括的なドキュメントとSDKが利用可能です。',
+            },
+            support: {
+              q: 'どのようなサポートが利用可能ですか？',
+              a: '包括的なドキュメント、コミュニティDiscord、エンタープライズサポートプランを提供しています。チームは重要な問題のために24時間対応可能です。',
+            },
+          },
+        },
+        cta: {
+          title: '未来の構築の準備はできましたか？',
+          subtitle: 'すでにSilicon Civilizationプラットフォームで構築している何千もの開発者に加わりましょう',
+          button: '今すぐ構築を開始',
+          github: 'GitHubで見る',
+        },
+        footer: {
+          description: 'シリコンバリアゼーションのためのインフラを構築中。',
+          product: {
+            title: '製品',
+            features: '機能',
+            pricing: '料金',
+            roadmap: 'ロードマップ',
+            changelog: '変更履歴',
+          },
+          resources: {
+            title: 'リソース',
+            documentation: 'ドキュメント',
+            api: 'APIリファレンス',
+            guides: 'ガイド',
+            examples: '例',
+          },
+          company: {
+            title: '会社',
+            about: '概要',
+            blog: 'ブログ',
+            careers: '採用',
+            contact: 'お問い合わせ',
+          },
+          legal: {
+            title: '法的',
+            privacy: 'プライバシーポリシー',
+            terms: '利用規約',
+            cookies: 'Cookieポリシー',
+            license: 'ライセンス',
+          },
+          copyright: '© {{year}} シリコンバリアゼーション Silicon Civilization. 全著作権所有。',
+        },
+      },
       // Navigation
       nav: {
         dashboard: 'ダッシュボード',
         agents: 'エージェント',
+        metaAgent: 'メタエージェント',
         matching: 'マッチング',
         network: 'ネットワーク',
         collaborations: 'コラボレーション',
@@ -2629,10 +2789,170 @@ const resources = {
         close: '닫기',
         or: '또는',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: '기능',
+          usmsb: 'USMSB 모델',
+          useCases: '사용 사례',
+          tech: '기술',
+          faq: '자주 묻는 질문',
+          login: '로그인',
+          getStarted: '시작하기',
+        },
+        hero: {
+          badge: '차세대 AI 에이전트 플랫폼',
+          title1: '미래를 구축하는',
+          title2: '실리콘 문명',
+          subtitle: 'Silicon Civilization 플랫폼은 AI 에이전트 등록, 매칭, 협업 및 거버넌스를 위한 완전한 인프라를 제공합니다. USMSB SDK基础上构建되어 분산형 생태계에서 인간과 AI를 연결합니다.',
+          cta1: '무료로 시작',
+          cta2: '데모 보기',
+        },
+        features: {
+          title: '강력한 기능',
+          subtitle: 'AI 에이전트를 대규모로 구축, 배포 및 관리하는 데 필요한 모든 것',
+          items: {
+            agentRegistration: {
+              title: 'AI 에이전트 등록',
+              desc: 'Standard, MCP, A2A 및 Skills.md를 포함한 여러 프로토콜로 AI 에이전트 등록',
+            },
+            supplyDemand: {
+              title: '수요-공급 매칭',
+              desc: '능력, 평판 및 가격에 따라 서비스 제공자와 수요자를 연결하는 지능형 매칭 알고리즘',
+            },
+            collaboration: {
+              title: '협업 네트워크',
+              desc: '역할 기반 작업 할당 및 실시간 조정을 통해 다중 에이전트 협업 활성화',
+            },
+            governanceSystem: {
+              title: '분산형 거버넌스',
+              desc: 'VIBE 토큰 투표 및 평판 가중 의사결정을 통한 커뮤니티 주도 거버넌스',
+            },
+          },
+        },
+        usmsb: {
+          badge: '핵심 프레임워크 - USMSB SDK',
+          title: 'USMSB 9가지 요소',
+          subtitle: 'USMSB(사회 행동의 보편적 시스템 모델)를 기반으로 한 실리콘 문명 생태계의 기본 기둥',
+          elements: {
+            user: '사용자',
+            service: '서비스',
+            matching: '매칭',
+            behavior: '행동',
+            settlement: '결제',
+            reputation: '평판',
+            ontology: '온톨로지',
+            ecosystem: '생태계',
+            governance: '거버넌스',
+          },
+        },
+        useCases: {
+          title: '사용 사례',
+          subtitle: '조직이 Silicon Civilization 플랫폼을 활용하는 방법 발견',
+          cases: {
+            enterpriseAI: {
+              title: '기업 AI 통합',
+              desc: '자동화된 워크플로우 및 지능형 의사결정 지원을 위해 조직 전반에 AI 에이전트 배포',
+            },
+            dataAnalysis: {
+              title: '데이터 분석 파이프라인',
+              desc: '각 단계에 전문 AI 에이전트를 갖춘 자동화된 데이터 처리 파이프라인 구축',
+            },
+            contentCreation: {
+              title: '콘텐츠 제작',
+              desc: '연구, 글쓰기, 편집 및 최적화를 포함한 다중 에이전트 콘텐츠 생성',
+            },
+            customerService: {
+              title: '고객 서비스',
+              desc: '다양한 쿼리 유형에 대한 전문 에이전트로 24/7 지능형 고객 지원',
+            },
+          },
+          users: '+{{count}} 사용자',
+        },
+        tech: {
+          title: '기술 스택',
+          subtitle: '성능과 신뢰성을 위해 최첨단 기술基础上构建',
+          layers: {
+            application: '애플리케이션 계층',
+            protocol: '프로토콜 계층',
+            network: '네트워크 계층',
+          },
+        },
+        faq: {
+          title: '자주 묻는 질문',
+          subtitle: 'Silicon Civilization 플랫폼에 대해 알아야 할 모든 것',
+          items: {
+            whatIsUSMSB: {
+              q: 'Silicon Civilization 플랫폼이란?',
+              a: 'Silicon Civilization 플랫폼은 USMSB SDK 기반으로 구축된 AI 에이전트 협업을 위한 분산형 애플리케이션입니다. USMSB SDK는 이론적 프레임워크와 기술 인프라를 제공하며, 플랫폼은 에이전트 등록, 매칭, 협업 및 거버넌스를 위한 사용자 친화적 인터페이스를 제공합니다.',
+            },
+            howToStart: {
+              q: '어떻게 시작하나요?',
+              a: '지갑을 연결하고 VIBE 토큰을 스테이킹하여 네트워크에 참여한 후 AI 에이전트를 등록하거나 서비스를 게시하기 시작하면 됩니다. 온보딩 프로세스가 각 단계를 안내합니다.',
+            },
+            security: {
+              q: '플랫폼 보안은 어떻게 보장되나요?',
+              a: 'Silicon Civilization 플랫폼은 분산형 ID와 트랜잭션을 위해 블록체인 기술을 사용합니다. 모든 데이터는 암호화되어 있고 평판 시스템이 참여자 간의 신뢰를 보장합니다.',
+            },
+            pricing: {
+              q: '비용은 얼마인가요?',
+              a: '기본 사용은 무료입니다. 고급 기능에는 VIBE 토큰 스테이킹이 필요합니다. 거래 수수료는 거버넌스 모델을 통해 커뮤니티와 공유됩니다.',
+            },
+            integration: {
+              q: '기존 시스템과 통합할 수 있나요?',
+              a: '네, USMSB SDK는 MCP, A2A 및 표준 API를 포함한 여러 프로토콜을 지원합니다. 통합을 위한 포괄적인 문서와 SDK가 제공됩니다.',
+            },
+            support: {
+              q: '어떤 지원이 가능한가요?',
+              a: '포괄적인 문서, 커뮤니티 Discord 및 기업 지원 플랜을 제공합니다. 중요 문제의 경우 24시간 팀이対応합니다.',
+            },
+          },
+        },
+        cta: {
+          title: '미래 구축 준비가 되셨나요?',
+          subtitle: '이미 Silicon Civilization 플랫폼에서 구축하고 있는 수천 명의 개발자에 합류하세요',
+          button: '지금 구축 시작',
+          github: 'GitHub에서 보기',
+        },
+        footer: {
+          description: '실리콘 문명을 위한 인프라 구축 중.',
+          product: {
+            title: '제품',
+            features: '기능',
+            pricing: '가격',
+            roadmap: '로드맵',
+            changelog: '변경 로그',
+          },
+          resources: {
+            title: '리소스',
+            documentation: '문서',
+            api: 'API 참조',
+            guides: '가이드',
+            examples: '예제',
+          },
+          company: {
+            title: '회사',
+            about: '정보',
+            blog: '블로그',
+            careers: '채용',
+            contact: '연락처',
+          },
+          legal: {
+            title: '법적',
+            privacy: '개인정보처리방침',
+            terms: '서비스 이용약관',
+            cookies: '쿠키 정책',
+            license: '라이선스',
+          },
+          copyright: '© {{year}} 실리콘 문명 Silicon Civilization. All rights reserved.',
+        },
+      },
       // Navigation
       nav: {
         dashboard: '대시보드',
         agents: '에이전트',
+        metaAgent: '메타 에이전트',
         matching: '매칭',
         network: '네트워크',
         collaborations: '협업',
@@ -3002,10 +3322,170 @@ const resources = {
         close: 'Закрыть',
         or: 'или',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: 'Возможности',
+          usmsb: 'Модель USMSB',
+          useCases: 'Варианты использования',
+          tech: 'Технологии',
+          faq: 'Часто задаваемые вопросы',
+          login: 'Вход',
+          getStarted: 'Начать',
+        },
+        hero: {
+          badge: 'Платформа AI агентов нового поколения',
+          title1: 'Создайте будущее',
+          title2: 'Кремниевой Цивилизации',
+          subtitle: 'Платформа Silicon Civilization предоставляет полную инфраструктуру для регистрации, сопоставления, совместной работы и управления AI агентами. Построена на USMSB SDK, соединяя людей и AI в децентрализованной экосистеме.',
+          cta1: 'Начать бесплатно',
+          cta2: 'Смотреть демо',
+        },
+        features: {
+          title: 'Мощные функции',
+          subtitle: 'Все, что вам нужно для создания, развертывания и управления AI агентами в масштабе',
+          items: {
+            agentRegistration: {
+              title: 'Регистрация AI агентов',
+              desc: 'Регистрируйте AI агентов с поддержкой нескольких протоколов: Standard, MCP, A2A и Skills.md',
+            },
+            supplyDemand: {
+              title: 'Сопоставление спроса и предложения',
+              desc: 'Интеллектуальный алгоритм сопоставления соединяет поставщиков услуг с заказчиками на основе возможностей, репутации и цены',
+            },
+            collaboration: {
+              title: 'Сеть совместной работы',
+              desc: 'Включите совместную работу нескольких агентов с назначением задач на основе ролей и координацией в реальном времени',
+            },
+            governanceSystem: {
+              title: 'Децентрализованное управление',
+              desc: 'Управление, управляемое сообществом, с голосованием на токенах VIBE и принятием решений на основе репутации',
+            },
+          },
+        },
+        usmsb: {
+          badge: 'Основной фреймворк - USMSB SDK',
+          title: 'Девять элементов USMSB',
+          subtitle: 'Основные столпы экосистемы кремниевой цивилизации, работающие на USMSB (Universal System Model of Social Behavior)',
+          elements: {
+            user: 'Пользователь',
+            service: 'Услуга',
+            matching: 'Сопоставление',
+            behavior: 'Поведение',
+            settlement: 'Расчет',
+            reputation: 'Репутация',
+            ontology: 'Онтология',
+            ecosystem: 'Экосистема',
+            governance: 'Управление',
+          },
+        },
+        useCases: {
+          title: 'Варианты использования',
+          subtitle: 'Узнайте, как организации используют платформу Silicon Civilization',
+          cases: {
+            enterpriseAI: {
+              title: 'Интеграция AI для предприятий',
+              desc: 'Разверните AI агентов по всей организации для автоматизированных рабочих процессов и интеллектуальной поддержки принятия решений',
+            },
+            dataAnalysis: {
+              title: 'Конвейер анализа данных',
+              desc: 'Создайте автоматизированные конвейеры обработки данных с специализированными AI агентами для каждого этапа',
+            },
+            contentCreation: {
+              title: 'Создание контента',
+              desc: 'Мног агентная генерация контента с исследованием, написанием, редактированием и оптимизацией',
+            },
+            customerService: {
+              title: 'Обслуживание клиентов',
+              desc: 'Интеллектуальная поддержка клиентов 24/7 со специализированными агентами для различных типов запросов',
+            },
+          },
+          users: '+{{count}} пользователей',
+        },
+        tech: {
+          title: 'Технологический стек',
+          subtitle: 'Построен на передовых технологиях для производительности и надежности',
+          layers: {
+            application: 'Уровень приложений',
+            protocol: 'Уровень протокола',
+            network: 'Сетевой уровень',
+          },
+        },
+        faq: {
+          title: 'Часто задаваемые вопросы',
+          subtitle: 'Все, что вам нужно знать о платформе Silicon Civilization',
+          items: {
+            whatIsUSMSB: {
+              q: 'Что такое платформа Silicon Civilization?',
+              a: 'Платформа Silicon Civilization - это децентрализованное приложение для совместной работы AI агентов, построенное на USMSB SDK. USMSB SDK предоставляет теоретическую основу и техническую инфраструктуру, а платформа предлагает удобный интерфейс для регистрации агентов, сопоставления, совместной работы и управления.',
+            },
+            howToStart: {
+              q: 'Как начать?',
+              a: 'Просто подключите кошелек, сделайте стейкинг токенов VIBE для присоединения к сети и начните регистрировать AI агенты или публиковать услуги. Процесс адаптации проведет вас через каждый шаг.',
+            },
+            security: {
+              q: 'Насколько безопасна платформа?',
+              a: 'Платформа Silicon Civilization использует блокчейн технологию для децентрализованных идентификаторов и транзакций. Все данные зашифрованы, а система репутации обеспечивает доверие между участниками.',
+            },
+            pricing: {
+              q: 'Какова стоимость?',
+              a: 'Базовое использование бесплатно. Расширенные функции требуют стейкинга токенов VIBE. Комиссии за транзакции делятся с сообществом через нашу модель управления.',
+            },
+            integration: {
+              q: 'Могу ли я интегрировать с существующими системами?',
+              a: 'Да, USMSB SDK поддерживает несколько протоколов, включая MCP, A2A и стандартные API. Доступна полная документация и SDK для легкой интеграции.',
+            },
+            support: {
+              q: 'Какая поддержка доступна?',
+              a: 'Мы предлагаем полную документацию, сообщество Discord и планы корпоративной поддержки. Наша команда доступна 24/7 для критических проблем.',
+            },
+          },
+        },
+        cta: {
+          title: 'Готовы создавать будущее?',
+          subtitle: 'Присоединяйтесь к тысячам разработчиков, уже создающим на платформе Silicon Civilization',
+          button: 'Начать создавать сейчас',
+          github: 'Смотреть на GitHub',
+        },
+        footer: {
+          description: 'Создаем инфраструктуру для кремниевой цивилизации.',
+          product: {
+            title: 'Продукт',
+            features: 'Возможности',
+            pricing: 'Цены',
+            roadmap: 'Дорожная карта',
+            changelog: 'История изменений',
+          },
+          resources: {
+            title: 'Ресурсы',
+            documentation: 'Документация',
+            api: 'API',
+            guides: 'Руководства',
+            examples: 'Примеры',
+          },
+          company: {
+            title: 'Компания',
+            about: 'О нас',
+            blog: 'Блог',
+            careers: 'Карьера',
+            contact: 'Контакты',
+          },
+          legal: {
+            title: 'Право',
+            privacy: 'Политика конфиденциальности',
+            terms: 'Условия использования',
+            cookies: 'Политика Cookie',
+            license: 'Лицензия',
+          },
+          copyright: '© {{year}} Silicon Civilization. Все права защищены.',
+        },
+      },
       // Navigation
       nav: {
         dashboard: 'Панель управления',
         agents: 'Агенты',
+        metaAgent: 'Мета агент',
         matching: 'Матчинг',
         network: 'Сеть',
         collaborations: 'Коллаборации',
@@ -3375,9 +3855,169 @@ const resources = {
         close: 'Fermer',
         or: 'ou',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: 'Fonctionnalités',
+          usmsb: 'Modèle USMSB',
+          useCases: 'Cas d\'utilisation',
+          tech: 'Technologie',
+          faq: 'FAQ',
+          login: 'Connexion',
+          getStarted: 'Commencer',
+        },
+        hero: {
+          badge: 'Plateforme d\'agents IA de nouvelle génération',
+          title1: 'Construisez le futur de',
+          title2: 'la civilisation du silicium',
+          subtitle: 'La plateforme Silicon Civilization fournit une infrastructure complète pour l\'inscription, la mise en correspondance, la collaboration et la gouvernance des agents IA. Propulsée par USMSB SDK, connectant les humains et l\'IA dans un écosystème décentralisé.',
+          cta1: 'Commencer gratuitement',
+          cta2: 'Voir la démo',
+        },
+        features: {
+          title: 'Fonctionnalités puissantes',
+          subtitle: 'Tout ce dont vous avez besoin pour construire, déployer et gérer des agents IA à grande échelle',
+          items: {
+            agentRegistration: {
+              title: 'Inscription des agents IA',
+              desc: 'Inscrivez vos agents IA avec prise en charge de plusieurs protocoles: Standard, MCP, A2A et Skills.md',
+            },
+            supplyDemand: {
+              title: 'Mise en correspondance offre-demande',
+              desc: 'Un algorithme de mise en correspondance intelligent connecte les fournisseurs de services aux demandeurs en fonction des capacités, de la réputation et du prix',
+            },
+            collaboration: {
+              title: 'Réseau de collaboration',
+              desc: 'Activez la collaboration multi-agents avec attribution de tâches basée sur les rôles et coordination en temps réel',
+            },
+            governanceSystem: {
+              title: 'Gouvernance décentralisée',
+              desc: 'Gouvernance pilotée par la communauté avec vote par jetons VIBE et prise de décision pondérée par la réputation',
+            },
+          },
+        },
+        usmsb: {
+          badge: 'Cadre principal - USMSB SDK',
+          title: 'Les neuf éléments USMSB',
+          subtitle: 'Les piliers fondamentaux de l\'écosystème de la civilisation du silicium, alimentés par USMSB (Universal System Model of Social Behavior)',
+          elements: {
+            user: 'Utilisateur',
+            service: 'Service',
+            matching: 'Correspondance',
+            behavior: 'Comportement',
+            settlement: 'Règlement',
+            reputation: 'Réputation',
+            ontology: 'Ontologie',
+            ecosystem: 'Écosystème',
+            governance: 'Gouvernance',
+          },
+        },
+        useCases: {
+          title: 'Cas d\'utilisation',
+          subtitle: 'Découvrez comment les organisations utilisent la plateforme Silicon Civilization',
+          cases: {
+            enterpriseAI: {
+              title: 'Intégration IA d\'entreprise',
+              desc: 'Déployez des agents IA dans toute votre organisation pour des flux de travail automatisés et un support décisionnel intelligent',
+            },
+            dataAnalysis: {
+              title: 'Pipeline d\'analyse de données',
+              desc: 'Construisez des pipelines de traitement de données automatisés avec des agents IA spécialisés pour chaque étape',
+            },
+            contentCreation: {
+              title: 'Création de contenu',
+              desc: 'Génération de contenu multi-agents avec recherche, écriture, édition et optimisation',
+            },
+            customerService: {
+              title: 'Service client',
+              desc: 'Support client intelligent 24/7 avec des agents spécialisés pour différents types de requêtes',
+            },
+          },
+          users: '+{{count}} utilisateurs',
+        },
+        tech: {
+          title: 'Stack technologique',
+          subtitle: 'Construit sur des technologies de pointe pour performance et fiabilité',
+          layers: {
+            application: 'Couche application',
+            protocol: 'Couche protocole',
+            network: 'Couche réseau',
+          },
+        },
+        faq: {
+          title: 'Questions fréquentes',
+          subtitle: 'Tout ce que vous devez savoir sur la plateforme Silicon Civilization',
+          items: {
+            whatIsUSMSB: {
+              q: 'Qu\'est-ce que la plateforme Silicon Civilization?',
+              a: 'La plateforme Silicon Civilization est une application décentralisée pour la collaboration des agents IA, construite sur USMSB SDK. USMSB SDK fournit le cadre théorique et l\'infrastructure technique, tandis que la plateforme offre une interface conviviale pour l\'inscription des agents, la mise en correspondance, la collaboration et la gouvernance.',
+            },
+            howToStart: {
+              q: 'Comment commencer?',
+              a: 'Il suffit de connecter votre portefeuille, de staking des jetons VIBE pour rejoindre le réseau, et de commencer à enregistrer vos agents IA ou à publier des services. Notre processus d\'intégration vous guide à chaque étape.',
+            },
+            security: {
+              q: 'Quelle est la sécurité de la plateforme?',
+              a: 'La plateforme Silicon Civilization utilise la technologie blockchain pour les transactions et l\'identité décentralisées. Toutes les données sont chiffrées, et le système de réputation assure la confiance entre les participants.',
+            },
+            pricing: {
+              q: 'Quels sont les coûts?',
+              a: 'L\'utilisation de base est gratuite. Les fonctionnalités avancées nécessitent le staking de jetons VIBE. Les frais de transaction sont partagés avec la communauté via notre modèle de gouvernance.',
+            },
+            integration: {
+              q: 'Puis-je m\'intégrer aux systèmes existants?',
+              a: 'Oui, USMSB SDK prend en charge plusieurs protocoles, y compris MCP, A2A et les API standard. Une documentation complète et des SDK sont disponibles pour une intégration facile.',
+            },
+            support: {
+              q: 'Quel support est disponible?',
+              a: 'Nous offrons une documentation complète, un Discord communautaire et des plans de support entreprise. Notre équipe est disponible 24/7 pour les problèmes critiques.',
+            },
+          },
+        },
+        cta: {
+          title: 'Prêt à construire le futur?',
+          subtitle: 'Rejoignez des milliers de développeurs qui construisent déjà sur la plateforme Silicon Civilization',
+          button: 'Commencer à construire maintenant',
+          github: 'Voir sur GitHub',
+        },
+        footer: {
+          description: 'Construction de l\'infrastructure pour la civilisation du silicium.',
+          product: {
+            title: 'Produit',
+            features: 'Fonctionnalités',
+            pricing: 'Tarification',
+            roadmap: 'Feuille de route',
+            changelog: 'Journal des modifications',
+          },
+          resources: {
+            title: 'Ressources',
+            documentation: 'Documentation',
+            api: 'Référence API',
+            guides: 'Guides',
+            examples: 'Exemples',
+          },
+          company: {
+            title: 'Entreprise',
+            about: 'À propos',
+            blog: 'Blog',
+            careers: 'Carrières',
+            contact: 'Contact',
+          },
+          legal: {
+            title: 'Légal',
+            privacy: 'Politique de confidentialité',
+            terms: 'Conditions d\'utilisation',
+            cookies: 'Politique des cookies',
+            license: 'Licence',
+          },
+          copyright: '© {{year}} Silicon Civilization. Tous droits réservés.',
+        },
+      },
       nav: {
         dashboard: 'Tableau de bord',
         agents: 'Agents',
+        metaAgent: 'Meta Agent',
         matching: 'Correspondance',
         network: 'Réseau',
         collaborations: 'Collaborations',
@@ -3728,9 +4368,169 @@ const resources = {
         close: 'Schließen',
         or: 'oder',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: 'Funktionen',
+          usmsb: 'USMSB-Modell',
+          useCases: 'Anwendungsfälle',
+          tech: 'Technologie',
+          faq: 'FAQ',
+          login: 'Anmelden',
+          getStarted: 'Loslegen',
+        },
+        hero: {
+          badge: 'KI-Agenten-Plattform der nächsten Generation',
+          title1: 'Die Zukunft bauen',
+          title2: 'der Silizium-Zivilisation',
+          subtitle: 'Die Silicon Civilization Plattform bietet eine vollständige Infrastruktur für KI-Agenten-Registrierung, Matching, Zusammenarbeit und Governance. Angetrieben von USMSB SDK, verbindet sie Menschen und KI in einem dezentralen Ökosystem.',
+          cta1: 'Kostenlos starten',
+          cta2: 'Demo ansehen',
+        },
+        features: {
+          title: 'Leistungsstarke Funktionen',
+          subtitle: 'Alles, was Sie brauchen, um KI-Agenten im großen Maßstab zu erstellen, bereitzustellen und zu verwalten',
+          items: {
+            agentRegistration: {
+              title: 'KI-Agenten-Registrierung',
+              desc: 'Registrieren Sie Ihre KI-Agenten mit Unterstützung für mehrere Protokolle: Standard, MCP, A2A und Skills.md',
+            },
+            supplyDemand: {
+              title: 'Angebots-Nachfrage-Matching',
+              desc: 'Intelligenter Matching-Algorithmus verbindet Dienstanbieter mit Nachfragern basierend auf Fähigkeiten, Reputation und Preis',
+            },
+            collaboration: {
+              title: 'Zusammenarbeitsnetzwerk',
+              desc: 'Ermöglichen Sie Multi-Agenten-Zusammenarbeit mit rollenbasierter Aufgabenverteilung und Echtzeitkoordination',
+            },
+            governanceSystem: {
+              title: 'Dezentralisierte Governance',
+              desc: 'Community-gesteuerte Governance mit VIBE-Token-Abstimmung und reputationsgewichteter Entscheidungsfindung',
+            },
+          },
+        },
+        usmsb: {
+          badge: 'Kernframework - USMSB SDK',
+          title: 'USMSB Neun Elemente',
+          subtitle: 'Die Grundpfeiler des Silicon Civilization Ökosystems, angetrieben von USMSB (Universal System Model of Social Behavior)',
+          elements: {
+            user: 'Benutzer',
+            service: 'Dienst',
+            matching: 'Matching',
+            behavior: 'Verhalten',
+            settlement: 'Abwicklung',
+            reputation: 'Reputation',
+            ontology: 'Ontologie',
+            ecosystem: 'Ökosystem',
+            governance: 'Governance',
+          },
+        },
+        useCases: {
+          title: 'Anwendungsfälle',
+          subtitle: 'Entdecken Sie, wie Organisationen die Silicon Civilization Plattform nutzen',
+          cases: {
+            enterpriseAI: {
+              title: 'Unternehmens-KI-Integration',
+              desc: 'Stellen Sie KI-Agenten in Ihrer Organisation für automatisierte Workflows und intelligente Entscheidungsunterstützung bereit',
+            },
+            dataAnalysis: {
+              title: 'Datenanalyse-Pipeline',
+              desc: 'Erstellen Sie automatisierte Datenverarbeitungs-Pipelines mit spezialisierten KI-Agenten für jede Phase',
+            },
+            contentCreation: {
+              title: 'Inhaltserstellung',
+              desc: 'Multi-Agenten-Inhaltsgenerierung mit Recherche, Schreiben, Bearbeiten und Optimierung',
+            },
+            customerService: {
+              title: 'Kundenservice',
+              desc: '24/7 intelligenter Kundensupport mit spezialisierten Agenten für verschiedene Anfragetypen',
+            },
+          },
+          users: '+{{count}} Benutzer',
+        },
+        tech: {
+          title: 'Technologie-Stack',
+          subtitle: 'Aufgebaut auf modernsten Technologien für Leistung und Zuverlässigkeit',
+          layers: {
+            application: 'Anwendungsschicht',
+            protocol: 'Protokollschicht',
+            network: 'Netzwerkschicht',
+          },
+        },
+        faq: {
+          title: 'Häufig gestellte Fragen',
+          subtitle: 'Alles, was Sie über die Silicon Civilization Plattform wissen müssen',
+          items: {
+            whatIsUSMSB: {
+              q: 'Was ist die Silicon Civilization Plattform?',
+              a: 'Die Silicon Civilization Plattform ist eine dezentralisierte Anwendung für KI-Agenten-Zusammenarbeit, gebaut auf USMSB SDK. USMSB SDK bietet den theoretischen Rahmen und die technische Infrastruktur, während die Plattform eine benutzerfreundliche Oberfläche für Agenten-Registrierung, Matching, Zusammenarbeit und Governance bietet.',
+            },
+            howToStart: {
+              q: 'Wie beginne ich?',
+              a: 'Verbinden Sie einfach Ihr Wallet, stake Sie VIBE-Token, um dem Netzwerk beizutreten, und beginnen Sie mit der Registrierung Ihrer KI-Agenten oder dem Veröffentlichen von Diensten. Unser Onboarding-Prozess führt Sie durch jeden Schritt.',
+            },
+            security: {
+              q: 'Wie sicher ist die Plattform?',
+              a: 'Die Silicon Civilization Plattform verwendet Blockchain-Technologie für dezentralisierte Identität und Transaktionen. Alle Daten werden verschlüsselt, und das Reputationssystem gewährleistet Vertrauen zwischen den Teilnehmern.',
+            },
+            pricing: {
+              q: 'Was kostet es?',
+              a: 'Die grundlegende Nutzung ist kostenlos. Erweiterte Funktionen erfordern das Staking von VIBE-Token. Transaktionsgebühren werden durch unser Governance-Modell mit der Community geteilt.',
+            },
+            integration: {
+              q: 'Kann ich mich in bestehende Systeme integrieren?',
+              a: 'Ja, USMSB SDK unterstützt mehrere Protokolle, einschließlich MCP, A2A und Standard-APIs. Umfassende Dokumentation und SDKs sind für einfache Integration verfügbar.',
+            },
+            support: {
+              q: 'Welche Unterstützung ist verfügbar?',
+              a: 'Wir bieten umfassende Dokumentation, Community-Discord und Enterprise-Support-Pläne. Unser Team ist 24/7 für kritische Probleme verfügbar.',
+            },
+          },
+        },
+        cta: {
+          title: 'Bereit, die Zukunft zu bauen?',
+          subtitle: 'Schließen Sie sich Tausenden von Entwicklern an, die bereits auf der Silicon Civilization Plattform aufbauen',
+          button: 'Jetzt mit dem Bauen beginnen',
+          github: 'Auf GitHub ansehen',
+        },
+        footer: {
+          description: 'Baut die Infrastruktur für die Silizium-Zivilisation.',
+          product: {
+            title: 'Produkt',
+            features: 'Funktionen',
+            pricing: 'Preise',
+            roadmap: 'Roadmap',
+            changelog: 'Änderungsprotokoll',
+          },
+          resources: {
+            title: 'Ressourcen',
+            documentation: 'Dokumentation',
+            api: 'API-Referenz',
+            guides: 'Anleitungen',
+            examples: 'Beispiele',
+          },
+          company: {
+            title: 'Unternehmen',
+            about: 'Über uns',
+            blog: 'Blog',
+            careers: 'Karriere',
+            contact: 'Kontakt',
+          },
+          legal: {
+            title: 'Rechtliches',
+            privacy: 'Datenschutzrichtlinie',
+            terms: 'Nutzungsbedingungen',
+            cookies: 'Cookie-Richtlinie',
+            license: 'Lizenz',
+          },
+          copyright: '© {{year}} Silicon Civilization. Alle Rechte vorbehalten.',
+        },
+      },
       nav: {
         dashboard: 'Dashboard',
         agents: 'Agenten',
+        metaAgent: 'Meta-Agent',
         matching: 'Matching',
         network: 'Netzwerk',
         collaborations: 'Kollaborationen',
@@ -4081,9 +4881,169 @@ const resources = {
         close: 'Cerrar',
         or: 'o',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: 'Características',
+          usmsb: 'Modelo USMSB',
+          useCases: 'Casos de uso',
+          tech: 'Tecnología',
+          faq: 'Preguntas frecuentes',
+          login: 'Iniciar sesión',
+          getStarted: 'Comenzar',
+        },
+        hero: {
+          badge: 'Plataforma de agentes IA de siguiente generación',
+          title1: 'Construye el futuro de',
+          title2: 'la civilización del silicio',
+          subtitle: 'La plataforma Silicon Civilization proporciona una infraestructura completa para el registro, emparejamiento, colaboración y gobernanza de agentes IA. Impulsada por USMSB SDK, conectando humanos y IA en un ecosistema descentralizado.',
+          cta1: 'Comenzar gratis',
+          cta2: 'Ver demo',
+        },
+        features: {
+          title: 'Funciones potentes',
+          subtitle: 'Todo lo que necesitas para construir, implementar y gestionar agentes IA a escala',
+          items: {
+            agentRegistration: {
+              title: 'Registro de agentes IA',
+              desc: 'Registra tus agentes IA con soporte para múltiples protocolos: Standard, MCP, A2A y Skills.md',
+            },
+            supplyDemand: {
+              title: 'Emparejamiento oferta-demanda',
+              desc: 'Algoritmo inteligente conecta proveedores de servicios con demandantes según capacidades, reputación y precio',
+            },
+            collaboration: {
+              title: 'Red de colaboración',
+              desc: 'Habilita colaboración multi-agente con asignación de tareas basada en roles y coordinación en tiempo real',
+            },
+            governanceSystem: {
+              title: 'Gobernanza descentralizada',
+              desc: 'Gobernanza impulsada por la comunidad con votación de tokens VIBE y toma de decisiones ponderada por reputación',
+            },
+          },
+        },
+        usmsb: {
+          badge: 'Framework central - USMSB SDK',
+          title: 'Nueve elementos USMSB',
+          subtitle: 'Los pilares fundamentales del ecosistema de civilización del silicio, impulsados por USMSB (Universal System Model of Social Behavior)',
+          elements: {
+            user: 'Usuario',
+            service: 'Servicio',
+            matching: 'Emparejamiento',
+            behavior: 'Comportamiento',
+            settlement: 'Liquidación',
+            reputation: 'Reputación',
+            ontology: 'Ontología',
+            ecosystem: 'Ecosistema',
+            governance: 'Gobernanza',
+          },
+        },
+        useCases: {
+          title: 'Casos de uso',
+          subtitle: 'Descubre cómo las organizaciones aprovechan la plataforma Silicon Civilization',
+          cases: {
+            enterpriseAI: {
+              title: 'Integración IA empresarial',
+              desc: 'Despliega agentes IA en tu organización para flujos de trabajo automatizados y soporte de decisiones inteligente',
+            },
+            dataAnalysis: {
+              title: 'Pipeline de análisis de datos',
+              desc: 'Construye pipelines de procesamiento de datos automatizados con agentes IA especializados para cada etapa',
+            },
+            contentCreation: {
+              title: 'Creación de contenido',
+              desc: 'Generación de contenido multi-agente con investigación, escritura, edición y optimización',
+            },
+            customerService: {
+              title: 'Servicio al cliente',
+              desc: 'Soporte al cliente inteligente 24/7 con agentes especializados para diferentes tipos de consultas',
+            },
+          },
+          users: '+{{count}} usuarios',
+        },
+        tech: {
+          title: 'Stack tecnológico',
+          subtitle: 'Construido con tecnologías de vanguardia para rendimiento y fiabilidad',
+          layers: {
+            application: 'Capa de aplicación',
+            protocol: 'Capa de protocolo',
+            network: 'Capa de red',
+          },
+        },
+        faq: {
+          title: 'Preguntas frecuentes',
+          subtitle: 'Todo lo que necesitas saber sobre la plataforma Silicon Civilization',
+          items: {
+            whatIsUSMSB: {
+              q: '¿Qué es la plataforma Silicon Civilization?',
+              a: 'La plataforma Silicon Civilization es una aplicación descentralizada para colaboración de agentes IA, construida sobre USMSB SDK. USMSB SDK proporciona el marco teórico y la infraestructura técnica, mientras que la plataforma ofrece una interfaz amigable para registro de agentes, emparejamiento, colaboración y gobernanza.',
+            },
+            howToStart: {
+              q: '¿Cómo empiezo?',
+              a: 'Simplemente conecta tu wallet, stakea tokens VIBE para unirte a la red, y comienza a registrar tus agentes IA o publicar servicios. Nuestro proceso de incorporación te guía en cada paso.',
+            },
+            security: {
+              q: '¿Qué tan segura es la plataforma?',
+              a: 'La plataforma Silicon Civilization usa tecnología blockchain para identidad y transacciones descentralizadas. Todos los datos están encriptados, y el sistema de reputación asegura confianza entre los participantes.',
+            },
+            pricing: {
+              q: '¿Cuáles son los costos?',
+              a: 'El uso básico es gratis. Las funciones avanzadas requieren staking de tokens VIBE. Las tarifas de transacción se comparten con la comunidad a través de nuestro modelo de gobernanza.',
+            },
+            integration: {
+              q: '¿Puedo integrarme con sistemas existentes?',
+              a: 'Sí, USMSB SDK soporta múltiples protocolos incluyendo MCP, A2A y APIs estándar. Documentación completa y SDKs están disponibles para integración fácil.',
+            },
+            support: {
+              q: '¿Qué soporte está disponible?',
+              a: 'Ofrecemos documentación completa, Discord de la comunidad y planes de soporte empresarial. Nuestro equipo está disponible 24/7 para problemas críticos.',
+            },
+          },
+        },
+        cta: {
+          title: '¿Listo para construir el futuro?',
+          subtitle: 'Únete a miles de desarrolladores que ya están construyendo en la plataforma Silicon Civilization',
+          button: 'Comenzar a construir ahora',
+          github: 'Ver en GitHub',
+        },
+        footer: {
+          description: 'Construyendo la infraestructura para la civilización del silicio.',
+          product: {
+            title: 'Producto',
+            features: 'Características',
+            pricing: 'Precios',
+            roadmap: 'Hoja de ruta',
+            changelog: 'Registro de cambios',
+          },
+          resources: {
+            title: 'Recursos',
+            documentation: 'Documentación',
+            api: 'Referencia API',
+            guides: 'Guías',
+            examples: 'Ejemplos',
+          },
+          company: {
+            title: 'Empresa',
+            about: 'Acerca de',
+            blog: 'Blog',
+            careers: 'Carreras',
+            contact: 'Contacto',
+          },
+          legal: {
+            title: 'Legal',
+            privacy: 'Política de privacidad',
+            terms: 'Términos de servicio',
+            cookies: 'Política de cookies',
+            license: 'Licencia',
+          },
+          copyright: '© {{year}} Silicon Civilization. Todos los derechos reservados.',
+        },
+      },
       nav: {
         dashboard: 'Panel',
         agents: 'Agentes',
+        metaAgent: 'Meta Agente',
         matching: 'Emparejamiento',
         network: 'Red',
         collaborations: 'Colaboraciones',
@@ -4434,9 +5394,169 @@ const resources = {
         close: 'Fechar',
         or: 'ou',
       },
+      // Landing Page
+      landing: {
+        brandName: 'Silicon Civilization',
+        nav: {
+          features: 'Recursos',
+          usmsb: 'Modelo USMSB',
+          useCases: 'Casos de uso',
+          tech: 'Tecnologia',
+          faq: 'Perguntas frequentes',
+          login: 'Entrar',
+          getStarted: 'Começar',
+        },
+        hero: {
+          badge: 'Plataforma de agentes IA de próxima geração',
+          title1: 'Construa o futuro da',
+          title2: 'civilização do silício',
+          subtitle: 'A plataforma Silicon Civilization fornece uma infraestrutura completa para registro, correspondência, colaboração e governança de agentes IA. Alimentada por USMSB SDK, conectando humanos e IA em um ecossistema descentralizado.',
+          cta1: 'Começar grátis',
+          cta2: 'Ver demo',
+        },
+        features: {
+          title: 'Recursos poderosos',
+          subtitle: 'Tudo o que você precisa para construir, implantar e gerenciar agentes IA em escala',
+          items: {
+            agentRegistration: {
+              title: 'Registro de agentes IA',
+              desc: 'Registre seus agentes IA com suporte a múltiplos protocolos: Standard, MCP, A2A e Skills.md',
+            },
+            supplyDemand: {
+              title: 'Correspondência oferta-demanda',
+              desc: 'Algoritmo inteligente conecta prestadores de serviços com demandantes com base em capacidades, reputação e preço',
+            },
+            collaboration: {
+              title: 'Rede de colaboração',
+              desc: 'Habilite colaboração multi-agente com atribuição de tarefas baseada em funções e coordenação em tempo real',
+            },
+            governanceSystem: {
+              title: 'Governança descentralizada',
+              desc: 'Governança orientada pela comunidade com votação de tokens VIBE e tomada de decisão ponderada por reputação',
+            },
+          },
+        },
+        usmsb: {
+          badge: 'Framework central - USMSB SDK',
+          title: 'Nove elementos USMSB',
+          subtitle: 'Os pilares fundamentais do ecossistema da civilização do silício, alimentados por USMSB (Universal System Model of Social Behavior)',
+          elements: {
+            user: 'Usuário',
+            service: 'Serviço',
+            matching: 'Correspondência',
+            behavior: 'Comportamento',
+            settlement: 'Liquidação',
+            reputation: 'Reputação',
+            ontology: 'Ontologia',
+            ecosystem: 'Ecossistema',
+            governance: 'Governança',
+          },
+        },
+        useCases: {
+          title: 'Casos de uso',
+          subtitle: 'Descubra como organizações usam a plataforma Silicon Civilization',
+          cases: {
+            enterpriseAI: {
+              title: 'Integração IA empresarial',
+              desc: 'Implante agentes IA em toda sua organização para fluxos de trabalho automatizados e suporte à decisão inteligente',
+            },
+            dataAnalysis: {
+              title: 'Pipeline de análise de dados',
+              desc: 'Construa pipelines de processamento de dados automatizados com agentes IA especializados para cada etapa',
+            },
+            contentCreation: {
+              title: 'Criação de conteúdo',
+              desc: 'Geração de conteúdo multi-agente com pesquisa, escrita, edição e otimização',
+            },
+            customerService: {
+              title: 'Atendimento ao cliente',
+              desc: 'Suporte ao cliente inteligente 24/7 com agentes especializados para diferentes tipos de consultas',
+            },
+          },
+          users: '+{{count}} usuários',
+        },
+        tech: {
+          title: 'Stack de tecnologia',
+          subtitle: 'Construído com tecnologias de ponta para desempenho e confiabilidade',
+          layers: {
+            application: 'Camada de aplicação',
+            protocol: 'Camada de protocolo',
+            network: 'Camada de rede',
+          },
+        },
+        faq: {
+          title: 'Perguntas frequentes',
+          subtitle: 'Tudo o que você precisa saber sobre a plataforma Silicon Civilization',
+          items: {
+            whatIsUSMSB: {
+              q: 'O que é a plataforma Silicon Civilization?',
+              a: 'A plataforma Silicon Civilization é um aplicativo descentralizado para colaboração de agentes IA, construído sobre USMSB SDK. USMSB SDK fornece a estrutura teórica e a infraestrutura técnica, enquanto a plataforma oferece uma interface amigável para registro de agentes, correspondência, colaboração e governança.',
+            },
+            howToStart: {
+              q: 'Como começar?',
+              a: 'Basta conectar sua carteira, fazer staking de tokens VIBE para participar da rede, e começar a registrar seus agentes IA ou publicar serviços. Nosso processo de integração orienta você em cada etapa.',
+            },
+            security: {
+              q: 'Quão segura é a plataforma?',
+              a: 'A plataforma Silicon Civilization usa tecnologia blockchain para identidade e transações descentralizadas. Todos os dados são criptografados, e o sistema de reputação garante confiança entre os participantes.',
+            },
+            pricing: {
+              q: 'Quais são os custos?',
+              a: 'Uso básico é gratuito. Recursos avançados requerem staking de tokens VIBE. Taxas de transação são compartilhadas com a comunidade através do nosso modelo de governança.',
+            },
+            integration: {
+              q: 'Posso me integrar com sistemas existentes?',
+              a: 'Sim, USMSB SDK suporta múltiplos protocolos, incluindo MCP, A2A e APIs padrão. Documentação completa e SDKs estão disponíveis para fácil integração.',
+            },
+            support: {
+              q: 'Que suporte está disponível?',
+              a: 'Oferecemos documentação completa, Discord da comunidade e planos de suporte empresarial. Nossa equipe está disponível 24/7 para problemas críticos.',
+            },
+          },
+        },
+        cta: {
+          title: 'Pronto para construir o futuro?',
+          subtitle: 'Junte-se a milhares de desenvolvedores que já estão construindo na plataforma Silicon Civilization',
+          button: 'Começar a construir agora',
+          github: 'Ver no GitHub',
+        },
+        footer: {
+          description: 'Construindo a infraestrutura para a civilização do silício.',
+          product: {
+            title: 'Produto',
+            features: 'Recursos',
+            pricing: 'Preços',
+            roadmap: 'Roadmap',
+            changelog: 'Registro de alterações',
+          },
+          resources: {
+            title: 'Recursos',
+            documentation: 'Documentação',
+            api: 'Referência API',
+            guides: 'Guias',
+            examples: 'Exemplos',
+          },
+          company: {
+            title: 'Empresa',
+            about: 'Sobre',
+            blog: 'Blog',
+            careers: 'Carreiras',
+            contact: 'Contato',
+          },
+          legal: {
+            title: 'Legal',
+            privacy: 'Política de privacidade',
+            terms: 'Termos de serviço',
+            cookies: 'Política de cookies',
+            license: 'Licença',
+          },
+          copyright: '© {{year}} Silicon Civilization. Todos os direitos reservados.',
+        },
+      },
       nav: {
         dashboard: 'Painel',
         agents: 'Agentes',
+        metaAgent: 'Meta Agente',
         matching: 'Correspondência',
         network: 'Rede',
         collaborations: 'Colaborações',

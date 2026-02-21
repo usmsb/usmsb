@@ -174,11 +174,11 @@ export default function Marketplace() {
                     <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-3">{example.description}</p>
                     <div className="text-xs space-y-1">
                       <div className="flex gap-2">
-                        <span className="text-secondary-500 dark:text-secondary-400">场景:</span>
+                        <span className="text-secondary-500 dark:text-secondary-400">{t('marketplace.scenario')}:</span>
                         <span className="text-secondary-700 dark:text-secondary-300">{example.scenario}</span>
                       </div>
                       <div className="flex gap-2">
-                        <span className="text-secondary-500 dark:text-secondary-400">结果:</span>
+                        <span className="text-secondary-500 dark:text-secondary-400">{t('marketplace.outcome')}:</span>
                         <span className="text-green-600 dark:text-green-400">{example.outcome}</span>
                       </div>
                     </div>

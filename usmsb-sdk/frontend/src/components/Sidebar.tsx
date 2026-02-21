@@ -16,6 +16,7 @@ import {
   PlusCircle,
   Target,
   Home,
+  Bot,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useState } from 'react'
@@ -33,6 +34,7 @@ export default function Sidebar() {
   const navigation = [
     { name: t('nav.dashboard'), href: '/app/dashboard', icon: LayoutDashboard, group: 'main' },
     { name: t('nav.agents'), href: '/app/agents', icon: Users, group: 'main' },
+    { name: t('nav.metaAgent'), href: '/app/chat', icon: Bot, group: 'main' },
     { name: t('nav.matching'), href: '/app/matching', icon: Zap, group: 'main' },
     { name: t('nav.network'), href: '/app/network', icon: Network, group: 'main' },
     { name: t('nav.collaborations'), href: '/app/collaborations', icon: GitBranch, group: 'tools' },
