@@ -1,0 +1,46 @@
+# Agent SDK Requirements
+# Core dependencies for running an agent
+
+# SDK Core
+usmsb-sdk>=1.0.0
+
+# Async and Networking
+aiohttp>=3.9.0
+websockets>=12.0
+aio-pika>=9.4.0  # For AMQP support
+
+# Protocol Support
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
+
+# Data Handling
+pydantic>=2.5.0
+pyyaml>=6.0
+python-dateutil>=2.8.2
+
+# Security
+cryptography>=41.0.0
+pyjwt>=2.8.0
+
+# Server
+uvicorn>=0.25.0
+gunicorn>=21.2.0
+fastapi>=0.109.0
+
+# Utilities
+python-dotenv>=1.0.0
+click>=8.1.0
+rich>=13.7.0
+
+# Optional: For specific agent capabilities
+# numpy>=1.26.0
+# pandas>=2.1.0
+# httpx>=0.26.0
+# tenacity>=8.2.0
+
+# Development dependencies (not needed in production)
+# pytest>=7.4.0
+# pytest-asyncio>=0.23.0
+# black>=24.1.0
+# mypy>=1.8.0

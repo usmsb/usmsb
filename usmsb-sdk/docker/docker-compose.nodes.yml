@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # 新文明平台节点 1
+  usmsb-node-1:
+    build:
+      context: ../
+      dockerfile: Dockerfile.node
+    container_name: usmsb-node-1
+    hostname: node1
+    ports:
+      - "8001:8000"   # HTTP API
+      - "8002:8001"   # WebSocket
+      - "50051:50051" # gRPC
+      - "9091:9090"   # Metrics
+    environment:
+      - NODE_ID=node1
+      - NODE_NAME=USMSB Node 1
+      - SEED_NODES=node2:8000,node3:8000
+      - DATABASE_URL=sqlite:///data/usmsb.db
+      - IPFS_GATEWAY=https://ipfs.io
+    volumes:
+      - node1-data:/app/data
+      - node1-logs:/app/logs
+    networks:
+      - usmsb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # 新文明平台节点 2
+  usmsb-node-2:
+    build:
+      context: ../
+      dockerfile: Dockerfile.node
+    container_name: usmsb-node-2
+    hostname: node2
+    ports:
+      - "8011:8000"   # HTTP API
+      - "8012:8001"   # WebSocket
+      - "50052:50051" # gRPC
+      - "9092:9090"   # Metrics
+    environment:
+      - NODE_ID=node2
+      - NODE_NAME=USMSB Node 2
+      - SEED_NODES=node1:8000,node3:8000
+      - DATABASE_URL=sqlite:///data/usmsb.db
+      - IPFS_GATEWAY=https://ipfs.io
+    volumes:
+      - node2-data:/app/data
+      - node2-logs:/app/logs
+    networks:
+      - usmsb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # 新文明平台节点 3
+  usmsb-node-3:
+    build:
+      context: ../
+      dockerfile: Dockerfile.node
+    container_name: usmsb-node-3
+    hostname: node3
+    ports:
+      - "8021:8000"   # HTTP API
+      - "8022:8001"   # WebSocket
+      - "50053:50051" # gRPC
+      - "9093:9090"   # Metrics
+    environment:
+      - NODE_ID=node3
+      - NODE_NAME=USMSB Node 3
+      - SEED_NODES=node1:8000,node2:8000
+      - DATABASE_URL=sqlite:///data/usmsb.db
+      - IPFS_GATEWAY=https://ipfs.io
+    volumes:
+      - node3-data:/app/data
+      - node3-logs:/app/logs
+    networks:
+      - usmsb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # IPFS 节点（可选，用于本地测试）
+  ipfs:
+    image: ipfs/kubo:latest
+    container_name: usmsb-ipfs
+    ports:
+      - "4001:4001"   # IPFS Swarm
+      - "5001:5001"   # IPFS API
+      - "8080:8080"   # IPFS Gateway
+    volumes:
+      - ipfs-data:/data/ipfs
+    networks:
+      - usmsb-network
+    restart: unless-stopped
+    profiles:
+      - ipfs
+
+networks:
+  usmsb-network:
+    driver: bridge
+
+volumes:
+  node1-data:
+  node1-logs:
+  node2-data:
+  node2-logs:
+  node3-data:
+  node3-logs:
+  ipfs-data:

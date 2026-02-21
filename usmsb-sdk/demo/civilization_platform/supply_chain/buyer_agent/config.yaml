@@ -1,0 +1,120 @@
+# BuyerAgent Configuration
+# 需求询价 Agent 配置文件
+
+agent:
+  id: "buyer_new_001"
+  name: "采购商Agent"
+  description: "代表制造企业进行原材料询价和采购"
+  version: "1.0.0"
+
+# 平台连接配置
+platform:
+  url: "${PLATFORM_URL:http://localhost:8080}"
+  api_key: "${PLATFORM_API_KEY:}"
+  auto_register: true
+  heartbeat_interval: 30
+  reconnect_interval: 5
+  max_reconnect_attempts: 10
+
+# Redis 配置
+redis:
+  url: "${REDIS_URL:redis://localhost:6379}"
+  channel: "supply_chain_quotes"
+
+# 能力声明
+capabilities:
+  - "quote_request"
+  - "quote_comparison"
+  - "match_confirm"
+  - "match_reject"
+
+# 采购偏好配置
+purchasing_preferences:
+  # 优先考虑的因素
+  priority_factors:
+    - name: "price"
+      weight: 0.4
+    - name: "delivery_time"
+      weight: 0.3
+    - name: "supplier_rating"
+      weight: 0.2
+    - name: "terms"
+      weight: 0.1
+
+  # 可接受的最高价格溢价（相对于市场平均）
+  max_price_premium: 0.15
+
+  # 首选供应商
+  preferred_suppliers:
+    - "supplier_001"
+    - "supplier_002"
+
+  # 黑名单供应商
+  blacklisted_suppliers: []
+
+# 常购商品配置
+frequently_purchased:
+  - product_id: "steel_001"
+    product_name: "钢板 Q235"
+    typical_quantity: 100
+    unit: "吨"
+    target_price: 4500.00
+
+  - product_id: "steel_002"
+    product_name: "螺纹钢 HRB400"
+    typical_quantity: 50
+    unit: "吨"
+    target_price: 4200.00
+
+# 自动决策配置
+auto_decision:
+  # 自动接受报价的最低评分
+  auto_accept_threshold: 80
+
+  # 自动拒绝报价的最高评分
+  auto_reject_threshold: 50
+
+  # 是否启用自动决策
+  enabled: true
+
+  # 需要人工确认的场景
+  human_confirmation_required:
+    - "total_amount > 1000000"
+    - "new_supplier"
+    - "urgent_delivery"
+
+# 交货地点
+delivery_locations:
+  - name: "上海仓库"
+    address: "上海市浦东新区XX路XX号"
+    is_default: true
+
+  - name: "苏州工厂"
+    address: "苏州市工业园区XX路XX号"
+    is_default: false
+
+# 日志配置
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "json"
+  output: "stdout"
+
+# 服务配置
+server:
+  host: "0.0.0.0"
+  port: 8002
+
+# 超时配置
+timeouts:
+  request_timeout: 30
+  response_timeout: 10
+  connection_timeout: 5
+
+# 报价等待配置
+quote_collection:
+  # 等待所有报价的时间（秒）
+  wait_time: 300
+  # 最少需要收到的报价数
+  min_quotes: 1
+  # 最多等待的报价数
+  max_quotes: 10

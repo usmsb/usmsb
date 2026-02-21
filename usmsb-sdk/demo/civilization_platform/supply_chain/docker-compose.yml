@@ -1,0 +1,251 @@
+version: '3.8'
+
+# Supply Chain Quote Demo
+# 供应链报价系统 Docker Compose 配置
+
+services:
+  # Redis 消息队列
+  redis:
+    image: redis:7-alpine
+    container_name: supply_chain_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      supply_chain_network:
+        aliases:
+          - redis
+          - message-broker
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 平台服务（模拟）
+  platform:
+    image: python:3.9-slim
+    container_name: supply_chain_platform
+    working_dir: /app
+    volumes:
+      - ./shared:/app/shared:ro
+    command: python -m http.server 8080
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - supply_chain_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # SupplierAgent - 供给报价 Agent
+  supplier_agent:
+    build:
+      context: .
+      dockerfile: supplier_agent/Dockerfile
+    container_name: supply_chain_supplier
+    hostname: supplier-agent
+    ports:
+      - "8001:8001"
+    environment:
+      - AGENT_NAME=${SUPPLIER_AGENT_NAME:-supplier_agent_001}
+      - PLATFORM_URL=http://platform:8080
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-30}
+      - CONFIG_PATH=/app/config.yaml
+    volumes:
+      - ./supplier_agent/config.yaml:/app/config.yaml:ro
+      - ./shared:/app/shared:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      platform:
+        condition: service_started
+    networks:
+      supply_chain_network:
+        aliases:
+          - supplier-agent
+    healthcheck:
+      test: ["CMD", "python", "-c", "print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # BuyerAgent - 需求询价 Agent
+  buyer_agent:
+    build:
+      context: .
+      dockerfile: buyer_agent/Dockerfile
+    container_name: supply_chain_buyer
+    hostname: buyer-agent
+    ports:
+      - "8002:8002"
+    environment:
+      - AGENT_NAME=${BUYER_AGENT_NAME:-buyer_agent_001}
+      - PLATFORM_URL=http://platform:8080
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-30}
+      - CONFIG_PATH=/app/config.yaml
+    volumes:
+      - ./buyer_agent/config.yaml:/app/config.yaml:ro
+      - ./shared:/app/shared:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      platform:
+        condition: service_started
+      supplier_agent:
+        condition: service_started
+    networks:
+      supply_chain_network:
+        aliases:
+          - buyer-agent
+    healthcheck:
+      test: ["CMD", "python", "-c", "print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # PredictorAgent - 价格预测 Agent
+  predictor_agent:
+    build:
+      context: .
+      dockerfile: predictor_agent/Dockerfile
+    container_name: supply_chain_predictor
+    hostname: predictor-agent
+    ports:
+      - "8003:8003"
+    environment:
+      - AGENT_NAME=${PREDICTOR_AGENT_NAME:-predictor_agent_001}
+      - PLATFORM_URL=http://platform:8080
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-60}
+      - PREDICTOR_MODEL_PATH=${PREDICTOR_MODEL_PATH:-/app/models/price_predictor.pkl}
+      - CONFIG_PATH=/app/config.yaml
+    volumes:
+      - ./predictor_agent/config.yaml:/app/config.yaml:ro
+      - ./shared:/app/shared:ro
+      - predictor_models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+      platform:
+        condition: service_started
+    networks:
+      supply_chain_network:
+        aliases:
+          - predictor-agent
+    healthcheck:
+      test: ["CMD", "python", "-c", "print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # MatchAgent - 交易撮合 Agent
+  match_agent:
+    build:
+      context: .
+      dockerfile: match_agent/Dockerfile
+    container_name: supply_chain_match
+    hostname: match-agent
+    ports:
+      - "8004:8004"
+    environment:
+      - AGENT_NAME=${MATCH_AGENT_NAME:-match_agent_001}
+      - PLATFORM_URL=http://platform:8080
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-30}
+      - CONFIG_PATH=/app/config.yaml
+    volumes:
+      - ./match_agent/config.yaml:/app/config.yaml:ro
+      - ./shared:/app/shared:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      platform:
+        condition: service_started
+      supplier_agent:
+        condition: service_started
+      buyer_agent:
+        condition: service_started
+    networks:
+      supply_chain_network:
+        aliases:
+          - match-agent
+    healthcheck:
+      test: ["CMD", "python", "-c", "print('healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+# 数据卷
+volumes:
+  redis_data:
+    driver: local
+  predictor_models:
+    driver: local
+
+# 网络
+networks:
+  supply_chain_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1

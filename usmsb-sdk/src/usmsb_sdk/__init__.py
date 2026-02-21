@@ -2,9 +2,10 @@
 USMSB SDK - Universal System Model of Social Behavior SDK
 
 A comprehensive framework for building AI-powered applications based on the USMSB model.
+Includes Agent SDK for creating, registering, and communicating with AI agents.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.9.0-alpha"
 __author__ = "Felix Gu"
 
 from usmsb_sdk.core.elements import (
@@ -22,6 +23,21 @@ from usmsb_sdk.api.python.usmsb_manager import USMSBManager
 from usmsb_sdk.api.python.agent_builder import AgentBuilder
 from usmsb_sdk.api.python.environment_builder import EnvironmentBuilder
 
+# Agent SDK
+from usmsb_sdk.agent_sdk import (
+    BaseAgent,
+    AgentConfig,
+    AgentCapability,
+    CapabilityDefinition,
+    SkillDefinition,
+    ProtocolConfig,
+    ProtocolType,
+    RegistrationManager,
+    CommunicationManager,
+    DiscoveryManager,
+    create_agent,
+)
+
 __all__ = [
     # Core Elements
     "Agent",
@@ -38,4 +54,16 @@ __all__ = [
     # Builders
     "AgentBuilder",
     "EnvironmentBuilder",
+    # Agent SDK
+    "BaseAgent",
+    "AgentConfig",
+    "AgentCapability",
+    "CapabilityDefinition",
+    "SkillDefinition",
+    "ProtocolConfig",
+    "ProtocolType",
+    "RegistrationManager",
+    "CommunicationManager",
+    "DiscoveryManager",
+    "create_agent",
 ]

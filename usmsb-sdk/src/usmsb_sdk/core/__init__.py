@@ -19,8 +19,19 @@ from usmsb_sdk.core.elements import (
     Value,
     ValueType,
 )
+from usmsb_sdk.core.config import (
+    NetworkConfig,
+    AuthConfig,
+    AgentConfig as CoreAgentConfig,
+    PlatformConfig,
+    DatabaseConfig,
+    LoggingConfig,
+    load_config,
+    load_config_from_env,
+)
 
 __all__ = [
+    # Elements
     "Agent",
     "AgentType",
     "Environment",
@@ -38,4 +49,13 @@ __all__ = [
     "RuleType",
     "Value",
     "ValueType",
+    # Configuration
+    "NetworkConfig",
+    "AuthConfig",
+    "CoreAgentConfig",
+    "PlatformConfig",
+    "DatabaseConfig",
+    "LoggingConfig",
+    "load_config",
+    "load_config_from_env",
 ]

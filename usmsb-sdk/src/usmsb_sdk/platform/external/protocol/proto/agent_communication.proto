@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package usmsb.agent;
+
+// Agent 间通信协议
+// 用于 Agent 之间的 P2P 直接通信
+
+// 消息类型
+enum MessageType {
+    UNKNOWN = 0;
+    REQUEST = 1;
+    RESPONSE = 2;
+    NOTIFICATION = 3;
+    ERROR = 4;
+    HEARTBEAT = 5;
+    DISCOVERY = 6;
+    SKILL_CALL = 7;
+    SKILL_RESPONSE = 8;
+    NEGOTIATION = 9;
+    TRANSACTION = 10;
+}
+
+// 消息优先级
+enum Priority {
+    LOW = 0;
+    NORMAL = 1;
+    HIGH = 2;
+    URGENT = 3;
+}
+
+// Agent 消息头
+message AgentMessageHeader {
+    string message_id = 1;
+    MessageType type = 2;
+    Priority priority = 3;
+    string source_agent_id = 4;
+    string target_agent_id = 5;
+    string conversation_id = 6;  // 会话ID，用于关联请求和响应
+    int64 timestamp = 7;
+    int32 ttl = 8;  // 消息生存时间（秒）
+    string reply_to = 9;  // 回复的消息ID
+    map<string, string> headers = 10;  // 自定义头
+}
+
+// Agent 消息体
+message AgentMessage {
+    AgentMessageHeader header = 1;
+    bytes payload = 2;  // 消息负载（JSON或其他格式）
+    string content_type = 3;  // payload 的内容类型
+    string signature = 4;  // 消息签名（可选）
+}
+
+// 技能调用请求
+message SkillCallRequest {
+    string call_id = 1;
+    string skill_name = 2;
+    string skill_id = 3;
+    map<string, string> arguments = 4;  // JSON 格式的参数
+    int32 timeout = 5;  // 超时时间（秒）
+    Priority priority = 6;
+}
+
+// 技能调用响应
+message SkillCallResponse {
+    string call_id = 1;
+    bool success = 2;
+    bytes result = 3;  // JSON 格式的结果
+    string error_code = 4;
+    string error_message = 5;
+    int64 execution_time = 6;  // 执行时间（毫秒）
+    map<string, string> metadata = 7;
+}
+
+// 发现请求
+message DiscoveryRequest {
+    string query = 1;  // 搜索关键词
+    repeated string capabilities = 2;  // 所需能力
+    repeated string skills = 3;  // 所需技能
+    int32 limit = 4;
+    double min_reputation = 5;
+}
+
+// 发现响应
+message DiscoveryResponse {
+    repeated AgentProfile agents = 1;
+    int32 total = 2;
+    bool has_more = 3;
+}
+
+// Agent 简要信息
+message AgentProfile {
+    string agent_id = 1;
+    string name = 2;
+    string description = 3;
+    repeated string capabilities = 4;
+    repeated string skills = 5;
+    double reputation = 6;
+    string status = 7;
+    string endpoint = 8;
+    string protocol = 9;
+}
+
+// 协商消息（用于报价/谈判）
+message NegotiationMessage {
+    string negotiation_id = 1;
+    string phase = 2;  // propose, counter, accept, reject
+    string proposal_type = 3;  // price, delivery, terms
+    double proposed_value = 4;
+    string currency = 5;
+    int64 valid_until = 6;
+    map<string, string> terms = 7;
+    string message = 8;
+}
+
+// 交易消息
+message TransactionMessage {
+    string transaction_id = 1;
+    string transaction_type = 2;  // create, confirm, cancel, complete
+    string buyer_agent_id = 3;
+    string seller_agent_id = 4;
+    string item_id = 5;
+    double amount = 6;
+    string currency = 7;
+    int64 timestamp = 8;
+    string status = 9;
+    map<string, string> details = 10;
+}
+
+// 心跳消息
+message HeartbeatMessage {
+    string agent_id = 1;
+    int64 timestamp = 2;
+    string status = 3;
+    double load = 4;  // 负载 0.0-1.0
+    int32 active_sessions = 5;
+}
+
+// 错误消息
+message ErrorMessage {
+    string code = 1;
+    string message = 2;
+    string details = 3;
+    bool retryable = 4;
+    int32 retry_after = 5;  // 重试等待时间（秒）
+}
+
+// Agent 通信服务定义
+service AgentCommunicationService {
+    // 发送消息
+    rpc SendMessage(AgentMessage) returns (AgentMessage);
+
+    // 双向流式通信
+    rpc StreamCommunication(stream AgentMessage) returns (stream AgentMessage);
+
+    // 技能调用
+    rpc CallSkill(SkillCallRequest) returns (SkillCallResponse);
+
+    // 发现其他 Agent
+    rpc DiscoverAgents(DiscoveryRequest) returns (DiscoveryResponse);
+
+    // 心跳
+    rpc Heartbeat(HeartbeatMessage) returns (HeartbeatMessage);
+}

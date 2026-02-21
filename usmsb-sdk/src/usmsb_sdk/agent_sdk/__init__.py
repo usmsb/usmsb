@@ -42,6 +42,7 @@ from usmsb_sdk.agent_sdk.base_agent import BaseAgent
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
     ProtocolConfig,
+    ProtocolType,
     SkillDefinition,
     CapabilityDefinition,
 )
@@ -63,6 +64,66 @@ from usmsb_sdk.agent_sdk.discovery import (
     AgentInfo,
     RecommendationResult,
 )
+from usmsb_sdk.agent_sdk.http_server import (
+    HTTPServer,
+    run_agent_with_http,
+)
+from usmsb_sdk.agent_sdk.p2p_server import (
+    P2PServer,
+    PeerInfo,
+    DHT,
+    run_agent_with_p2p,
+)
+
+# Alias for backward compatibility
+AgentCapability = CapabilityDefinition
+
+
+def create_agent(
+    agent_id: str = None,
+    name: str = "DefaultAgent",
+    description: str = "",
+    **kwargs
+) -> BaseAgent:
+    """
+    Factory function to create a simple agent instance.
+
+    Args:
+        agent_id: Unique agent identifier (auto-generated if not provided)
+        name: Agent name
+        description: Agent description
+        **kwargs: Additional configuration options
+
+    Returns:
+        A SimpleAgent instance
+    """
+    from uuid import uuid4
+
+    class SimpleAgent(BaseAgent):
+        """A simple agent implementation for quick prototyping"""
+
+        async def initialize(self):
+            self.logger.info(f"SimpleAgent {self.name} initialized")
+
+        async def handle_message(self, message, session=None):
+            self.logger.info(f"Received message: {message}")
+            return {"status": "received", "message_id": getattr(message, 'message_id', None)}
+
+        async def execute_skill(self, skill_name, params):
+            self.logger.info(f"Executing skill: {skill_name} with params: {params}")
+            return {"skill": skill_name, "result": "executed", "params": params}
+
+        async def shutdown(self):
+            self.logger.info(f"SimpleAgent {self.name} shutting down")
+
+    config = AgentConfig(
+        agent_id=agent_id or str(uuid4()),
+        name=name,
+        description=description,
+        **kwargs
+    )
+    return SimpleAgent(config)
+
 
 __all__ = [
     # Base Agent
@@ -70,8 +131,10 @@ __all__ = [
     # Configuration
     "AgentConfig",
     "ProtocolConfig",
+    "ProtocolType",
     "SkillDefinition",
     "CapabilityDefinition",
+    "AgentCapability",  # Alias
     # Registration
     "RegistrationManager",
     "RegistrationStatus",
@@ -87,6 +150,16 @@ __all__ = [
     "DiscoveryFilter",
     "AgentInfo",
     "RecommendationResult",
+    # HTTP Server
+    "HTTPServer",
+    "run_agent_with_http",
+    # P2P Server
+    "P2PServer",
+    "PeerInfo",
+    "DHT",
+    "run_agent_with_p2p",
+    # Factory
+    "create_agent",
 ]
 
 __version__ = "1.0.0"

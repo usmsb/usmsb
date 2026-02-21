@@ -1,0 +1,166 @@
+# PredictorAgent Configuration
+# 价格预测 Agent 配置文件
+
+agent:
+  id: "predictor_new_001"
+  name: "价格预测Agent"
+  description: "基于历史数据预测商品价格趋势"
+  version: "1.0.0"
+
+# 平台连接配置
+platform:
+  url: "${PLATFORM_URL:http://localhost:8080}"
+  api_key: "${PLATFORM_API_KEY:}"
+  auto_register: true
+  heartbeat_interval: 30
+  reconnect_interval: 5
+  max_reconnect_attempts: 10
+
+# Redis 配置
+redis:
+  url: "${REDIS_URL:redis://localhost:6379}"
+  channel: "supply_chain_predictions"
+
+# 能力声明
+capabilities:
+  - "price_prediction"
+  - "trend_analysis"
+  - "market_analysis"
+  - "risk_assessment"
+
+# 预测模型配置
+model:
+  name: "LinearRegression"
+  version: "1.0.0"
+  accuracy: 0.85
+  last_trained: "2024-01-01T00:00:00Z"
+  model_path: "${PREDICTOR_MODEL_PATH:/app/models/price_predictor.pkl}"
+
+  # 模型参数
+  parameters:
+    lookback_days: 30        # 回看天数
+    prediction_horizon: 7    # 预测周期
+    confidence_threshold: 0.6
+    min_data_points: 7       # 最少数据点
+
+# 预测配置
+prediction:
+  # 预测周期（天）
+  default_horizon: 7
+  max_horizon: 30
+
+  # 置信度计算
+  confidence:
+    base_value: 0.85
+    data_points_factor: 0.1
+    horizon_decay: 0.02
+
+  # 趋势判定阈值
+  trend_thresholds:
+    strong_up: 0.05      # 强上涨阈值
+    strong_down: -0.05   # 强下跌阈值
+
+  # 缓存配置
+  cache:
+    enabled: true
+    ttl_seconds: 300     # 缓存有效期
+
+# 数据源配置
+data_sources:
+  # 内部数据源
+  internal:
+    enabled: true
+    collection_interval: 3600  # 数据收集间隔（秒）
+
+  # 外部数据源（模拟）
+  external:
+    enabled: false
+    api_endpoints:
+      - name: "market_data_api"
+        url: "https://api.example.com/market"
+        api_key: "${EXTERNAL_API_KEY:}"
+
+# 跟踪的商品
+tracked_products:
+  - product_id: "steel_001"
+    product_name: "钢板 Q235"
+    collection_enabled: true
+
+  - product_id: "steel_002"
+    product_name: "螺纹钢 HRB400"
+    collection_enabled: true
+
+  - product_id: "copper_001"
+    product_name: "铜板 T2"
+    collection_enabled: true
+
+  - product_id: "aluminum_001"
+    product_name: "铝板 6061"
+    collection_enabled: true
+
+# 风险评估配置
+risk_assessment:
+  # 波动率阈值
+  volatility_thresholds:
+    low: 0.01
+    medium: 0.03
+    high: 0.05
+
+  # 风险等级定义
+  risk_levels:
+    - level: "low"
+      max_volatility: 0.01
+      recommendation: "市场稳定，正常采购"
+    - level: "medium"
+      max_volatility: 0.03
+      recommendation: "市场有波动，建议关注"
+    - level: "high"
+      max_volatility: 0.05
+      recommendation: "市场波动较大，建议谨慎"
+
+# 季节性因素
+seasonal_factors:
+  # 春季开工旺季
+  spring_peak:
+    months: [3, 4, 5]
+    demand_factor: 1.2
+
+  # 秋季施工旺季
+  autumn_peak:
+    months: [9, 10, 11]
+    demand_factor: 1.15
+
+  # 年底淡季
+  winter_low:
+    months: [12, 1, 2]
+    demand_factor: 0.9
+
+# 日志配置
+logging:
+  level: "${LOG_LEVEL:INFO}"
+  format: "json"
+  output: "stdout"
+
+# 服务配置
+server:
+  host: "0.0.0.0"
+  port: 8003
+
+# 超时配置
+timeouts:
+  request_timeout: 60     # 预测可能需要更长时间
+  response_timeout: 30
+  connection_timeout: 5
+
+# 定期任务配置
+scheduled_tasks:
+  # 定期预测
+  periodic_prediction:
+    enabled: true
+    interval_seconds: 3600  # 每小时
+    products: "all"         # 为所有跟踪商品生成预测
+
+  # 模型重新训练
+  model_retraining:
+    enabled: false
+    interval_seconds: 86400  # 每天

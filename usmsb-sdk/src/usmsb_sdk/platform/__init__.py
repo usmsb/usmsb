@@ -1,4 +1,18 @@
-"""USMSB Platform Extensions Module."""
+"""
+USMSB Platform Extensions Module.
+
+This module provides platform-level components including:
+
+- blockchain: Blockchain adapters and digital currency management
+- protocols: MCP protocol adapter
+- external: External agent adapters, authentication, protocols, and storage
+- internal: Internal platform components (node management)
+- compute: Compute resource adapters and scheduling
+- human: Human resource management and talent matching
+- governance: Governance and community services
+- registry: Model and dataset registries
+- environment: Environment broadcast services
+"""
 
 from usmsb_sdk.platform.blockchain.adapter import (
     IBlockchainAdapter,
@@ -57,6 +71,37 @@ from usmsb_sdk.platform.environment.broadcast_service import (
     BroadcastStats,
 )
 
+# Import internal node management components
+from usmsb_sdk.platform.internal import (
+    # Config
+    NodeConfig,
+    NetworkConfig,
+    SyncConfig,
+    SecurityConfig,
+    NodeCapabilities,
+    # Node Manager
+    NodeManager,
+    NodeState,
+    NodeConnection,
+    ConnectionStatus,
+    # Node Discovery
+    NodeDiscoveryService,
+    DiscoveredNode,
+    NodeHealthStatus,
+    HealthCheckResult,
+    # Broadcast Service
+    NodeBroadcastService,
+    BroadcastMessage as NodeBroadcastMessage,
+    BroadcastMessageType,
+    MessageAck,
+    # Sync Service
+    SyncService,
+    SyncMode,
+    SyncStatus,
+    SyncResult,
+    DataChunk,
+)
+
 __all__ = [
     # Blockchain
     "IBlockchainAdapter",
@@ -109,4 +154,31 @@ __all__ = [
     "BroadcastScope",
     "Subscription",
     "BroadcastStats",
+    # Internal Node Management - Config
+    "NodeConfig",
+    "NetworkConfig",
+    "SyncConfig",
+    "SecurityConfig",
+    "NodeCapabilities",
+    # Internal Node Management - Manager
+    "NodeManager",
+    "NodeState",
+    "NodeConnection",
+    "ConnectionStatus",
+    # Internal Node Management - Discovery
+    "NodeDiscoveryService",
+    "DiscoveredNode",
+    "NodeHealthStatus",
+    "HealthCheckResult",
+    # Internal Node Management - Broadcast
+    "NodeBroadcastService",
+    "NodeBroadcastMessage",
+    "BroadcastMessageType",
+    "MessageAck",
+    # Internal Node Management - Sync
+    "SyncService",
+    "SyncMode",
+    "SyncStatus",
+    "SyncResult",
+    "DataChunk",
 ]

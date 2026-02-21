@@ -19,6 +19,7 @@ import PublishDemand from './pages/PublishDemand'
 import LandingPage from './pages/LandingPage'
 import DocsPage from './pages/DocsPage'
 import LegalPage from './pages/LegalPage'
+import Chat from './pages/Chat'
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="marketplace" element={<Marketplace />} />
           <Route path="governance" element={<Governance />} />
+          <Route path="chat" element={<Chat />} />
           <Route path="settings" element={<Settings />} />
 
           {/* User Actions */}
@@ -72,6 +74,7 @@ function App() {
         <Route path="/analytics" element={<Navigate to="/app/analytics" replace />} />
         <Route path="/marketplace" element={<Navigate to="/app/marketplace" replace />} />
         <Route path="/governance" element={<Navigate to="/app/governance" replace />} />
+        <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         <Route path="/publish/service" element={<Navigate to="/app/publish/service" replace />} />
         <Route path="/publish/demand" element={<Navigate to="/app/publish/demand" replace />} />
