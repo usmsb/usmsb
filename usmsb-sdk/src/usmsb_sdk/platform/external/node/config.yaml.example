@@ -1,0 +1,148 @@
+# Node Configuration Template
+# 节点配置模板 - 用于部署新文明平台节点
+
+# 节点基础配置
+node:
+  id: "node_${HOSTNAME}"  # 节点ID，支持环境变量
+  name: "USMSB Node"
+  version: "1.0.0"
+  description: "USMSB Platform Node"
+
+# 网络配置
+network:
+  host: "0.0.0.0"
+  port: 8000
+  external_host: ""  # 外部访问地址，留空自动检测
+  external_port: 8000
+
+# WebSocket 配置
+websocket:
+  enabled: true
+  port: 8001
+  path: "/ws"
+  heartbeat_interval: 30  # 心跳间隔（秒）
+  connection_timeout: 60  # 连接超时（秒）
+  max_connections: 1000
+
+# gRPC 配置
+grpc:
+  enabled: true
+  port: 50051
+  max_receive_message_length: 4194304  # 4MB
+  max_send_message_length: 4194304
+
+# 种子节点配置
+seed_nodes:
+  - host: "node1.usmsb.io"
+    port: 8000
+    websocket_port: 8001
+    grpc_port: 50051
+  - host: "node2.usmsb.io"
+    port: 8000
+    websocket_port: 8001
+    grpc_port: 50051
+  - host: "node3.usmsb.io"
+    port: 8000
+    websocket_port: 8001
+    grpc_port: 50051
+
+# 发现配置
+discovery:
+  enabled: true
+  interval: 60  # 发现间隔（秒）
+  max_nodes: 100  # 最大保存节点数
+  min_reputation: 0.5  # 最低声誉要求
+
+# 同步配置
+sync:
+  enabled: true
+  interval: 300  # 全量同步间隔（秒）
+  incremental_interval: 10  # 增量同步间隔（秒）
+  batch_size: 100  # 批量同步大小
+  timeout: 30  # 同步超时（秒）
+
+# 存储配置
+storage:
+  # 本地文件存储
+  file:
+    enabled: true
+    base_path: "./data/files"
+    max_size: 104857600  # 100MB
+
+  # SQLite 存储
+  sqlite:
+    enabled: true
+    path: "./data/usmsb.db"
+    pool_size: 5
+
+  # IPFS 存储
+  ipfs:
+    enabled: true
+    gateway: "https://ipfs.io"  # 公共网关
+    api_host: "127.0.0.1"
+    api_port: 5001
+    timeout: 60
+    pin_content: true  # 是否固定内容
+
+# 身份验证配置
+auth:
+  enabled: true
+  wallet_verification: true
+  stake_verification: true
+  minimum_stake: 100  # 最低质押 VIBE 数量
+
+# 区块链配置
+blockchain:
+  enabled: true
+  network: "mainnet"  # mainnet, testnet
+  rpc_url: "${BLOCKCHAIN_RPC_URL}"
+  chain_id: 1
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "json"
+  file: "./logs/node.log"
+  max_size: 10485760  # 10MB
+  backup_count: 5
+
+# 监控配置
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  health_check_path: "/health"
+
+# Agent 配置
+agent:
+  registration_timeout: 300  # 注册超时（秒）
+  heartbeat_interval: 60  # 心跳间隔（秒）
+  max_inactive_time: 300  # 最大不活跃时间（秒）
+  default_reputation: 1.0
+
+# 协议配置
+protocols:
+  a2a:
+    enabled: true
+    timeout: 60
+  mcp:
+    enabled: true
+    timeout: 60
+    sse_enabled: true
+  p2p:
+    enabled: true
+    timeout: 60
+  http:
+    enabled: true
+    timeout: 30
+  websocket:
+    enabled: true
+    timeout: 60
+  grpc:
+    enabled: true
+    timeout: 60
+
+# 限流配置
+rate_limiting:
+  enabled: true
+  requests_per_minute: 1000
+  requests_per_hour: 10000

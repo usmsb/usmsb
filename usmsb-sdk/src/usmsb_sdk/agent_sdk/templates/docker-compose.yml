@@ -1,0 +1,221 @@
+# Agent SDK Docker Compose
+# Multi-agent deployment with platform integration
+
+version: '3.8'
+
+services:
+  # =====================================================
+  # Platform Services (Required for agent registration)
+  # =====================================================
+
+  platform:
+    image: usmsb/platform:latest
+    container_name: usmsb-platform
+    ports:
+      - "8000:8000"
+      - "8765:8765"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/usmsb
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: usmsb-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=usmsb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: usmsb-redis
+    volumes:
+      - redis-data:/data
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =====================================================
+  # Agent Services
+  # =====================================================
+
+  # Example: Text Processing Agent
+  text-agent:
+    build:
+      context: .
+      dockerfile: src/usmsb_sdk/agent_sdk/templates/Dockerfile.agent
+      target: production
+    container_name: text-agent
+    environment:
+      - AGENT_NAME=text-processor
+      - AGENT_DESCRIPTION=Text processing and NLP agent
+      - PLATFORM_ENDPOINT=http://platform:8000
+      - AGENT_CONFIG=/app/config/text-agent.yaml
+      - LOG_LEVEL=INFO
+      - API_KEY=${TEXT_AGENT_API_KEY:-}
+    volumes:
+      - ./config:/app/config:ro
+    ports:
+      - "8001:8000"
+      - "9001:9000"
+    depends_on:
+      platform:
+        condition: service_healthy
+    networks:
+      - agent-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    restart: unless-stopped
+
+  # Example: Data Analysis Agent
+  data-agent:
+    build:
+      context: .
+      dockerfile: src/usmsb_sdk/agent_sdk/templates/Dockerfile.agent
+      target: production
+    container_name: data-agent
+    environment:
+      - AGENT_NAME=data-analyst
+      - AGENT_DESCRIPTION=Data analysis and visualization agent
+      - PLATFORM_ENDPOINT=http://platform:8000
+      - AGENT_CONFIG=/app/config/data-agent.yaml
+      - LOG_LEVEL=INFO
+      - API_KEY=${DATA_AGENT_API_KEY:-}
+    volumes:
+      - ./config:/app/config:ro
+    ports:
+      - "8002:8000"
+      - "9002:9000"
+    depends_on:
+      platform:
+        condition: service_healthy
+    networks:
+      - agent-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+    restart: unless-stopped
+
+  # Example: AI/ML Agent
+  ai-agent:
+    build:
+      context: .
+      dockerfile: src/usmsb_sdk/agent_sdk/templates/Dockerfile.agent
+      target: production
+    container_name: ai-agent
+    environment:
+      - AGENT_NAME=ai-assistant
+      - AGENT_DESCRIPTION=AI-powered assistant with ML capabilities
+      - PLATFORM_ENDPOINT=http://platform:8000
+      - AGENT_CONFIG=/app/config/ai-agent.yaml
+      - LOG_LEVEL=INFO
+      - API_KEY=${AI_AGENT_API_KEY:-}
+    volumes:
+      - ./config:/app/config:ro
+      - ai-models:/app/models
+    ports:
+      - "8003:8000"
+      - "9003:9000"
+    depends_on:
+      platform:
+        condition: service_healthy
+    networks:
+      - agent-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+          # Uncomment for GPU support
+          # reservations:
+          #   devices:
+          #     - driver: nvidia
+          #       count: 1
+          #       capabilities: [gpu]
+    restart: unless-stopped
+
+  # Example: Orchestration Agent
+  orchestrator-agent:
+    build:
+      context: .
+      dockerfile: src/usmsb_sdk/agent_sdk/templates/Dockerfile.agent
+      target: production
+    container_name: orchestrator-agent
+    environment:
+      - AGENT_NAME=orchestrator
+      - AGENT_DESCRIPTION=Workflow orchestration and task distribution agent
+      - PLATFORM_ENDPOINT=http://platform:8000
+      - AGENT_CONFIG=/app/config/orchestrator-agent.yaml
+      - LOG_LEVEL=INFO
+      - API_KEY=${ORCHESTRATOR_API_KEY:-}
+    volumes:
+      - ./config:/app/config:ro
+    ports:
+      - "8004:8000"
+      - "9004:9000"
+    depends_on:
+      platform:
+        condition: service_healthy
+      text-agent:
+        condition: service_started
+      data-agent:
+        condition: service_started
+      ai-agent:
+        condition: service_started
+    networks:
+      - agent-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    restart: unless-stopped
+
+# =====================================================
+# Networks
+# =====================================================
+networks:
+  agent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =====================================================
+# Volumes
+# =====================================================
+volumes:
+  postgres-data:
+  redis-data:
+  ai-models:

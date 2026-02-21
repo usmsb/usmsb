@@ -348,3 +348,143 @@ export const getServices = async (agentId?: string, category?: string): Promise<
 }
 
 export default api
+
+// ============ Meta Agent Chat API ============
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp?: string
+}
+
+export interface ChatRequest {
+  message: string
+  wallet_address?: string
+  context?: Record<string, unknown>
+}
+
+export interface ChatResponse {
+  response: string
+  success: boolean
+  tool_used?: string
+  details?: Record<string, unknown>
+}
+
+export const sendChatMessage = async (request: ChatRequest): Promise<ChatResponse> => {
+  const response = await api.post<ChatResponse>('/meta-agent/chat', request)
+  return response.data
+}
+
+export const getAgentTools = async (): Promise<{ name: string; description: string }[]> => {
+  const response = await api.get<{ name: string; description: string }[]>('/meta-agent/tools')
+  return response.data
+}
+
+export interface HistoryMessage {
+  id: string
+  role: string
+  content: string
+  timestamp?: number
+  tool_calls?: Array<{
+    id?: string
+    function: {
+      name: string
+      arguments: string | Record<string, unknown>
+    }
+  }>
+}
+
+export const getConversationHistory = async (
+  walletAddress: string,
+  limit: number = 50
+): Promise<HistoryMessage[]> => {
+  const response = await api.get<HistoryMessage[]>(`/meta-agent/history/${walletAddress}`, {
+    params: { limit },
+  })
+  return response.data
+}
+
+// Get latest messages for polling
+export const getLatestMessages = async (
+  walletAddress: string,
+  afterTimestamp: number = 0
+): Promise<HistoryMessage[]> => {
+  const response = await api.get<HistoryMessage[]>(`/meta-agent/history/${walletAddress}/latest`, {
+    params: { after_timestamp: afterTimestamp },
+  })
+  return response.data
+}
+
+export interface EvolutionStats {
+  total_evolutions: number
+  by_type: Record<string, number>
+  by_status: Record<string, number>
+  capabilities: Record<string, { score: number; improvement_rate: number }>
+}
+
+export const getEvolutionStats = async (): Promise<EvolutionStats> => {
+  const response = await api.get<EvolutionStats>('/meta-agent/evolution-stats')
+  return response.data
+}
+
+// ============ Permission APIs ============
+
+export interface UserInfo {
+  wallet_address: string
+  role: string
+  permissions: string[]
+  stake_amount: number
+  token_balance: number
+  voting_power: number
+}
+
+export const getUserInfo = async (walletAddress: string): Promise<UserInfo> => {
+  const response = await api.get<UserInfo>(`/meta-agent/user/${walletAddress}`)
+  return response.data
+}
+
+export const updateUserRole = async (
+  walletAddress: string,
+  newRole: string,
+  reason?: string
+): Promise<UserInfo> => {
+  const response = await api.post<UserInfo>('/meta-agent/user/role', {
+    wallet_address: walletAddress,
+    new_role: newRole,
+    reason,
+  })
+  return response.data
+}
+
+export const updateUserStake = async (
+  walletAddress: string,
+  stakeAmount: number
+): Promise<UserInfo> => {
+  const response = await api.post<UserInfo>('/meta-agent/user/stake', {
+    wallet_address: walletAddress,
+    stake_amount: stakeAmount,
+  })
+  return response.data
+}
+
+export interface PermissionStats {
+  total_users: number
+  users_by_role: Record<string, number>
+  total_voting_power: number
+  total_stake: number
+}
+
+export const getPermissionStats = async (): Promise<PermissionStats> => {
+  const response = await api.get<PermissionStats>('/meta-agent/permission/stats')
+  return response.data
+}
+
+export const checkToolPermission = async (
+  walletAddress: string,
+  toolName: string
+): Promise<{ allowed: boolean; reason: string; user_role?: string }> => {
+  const response = await api.get(
+    `/meta-agent/permission/check-tool/${walletAddress}/${toolName}`
+  )
+  return response.data
+}

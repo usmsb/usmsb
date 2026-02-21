@@ -1,6 +1,17 @@
 """
 Node Management Layer
 
+.. deprecated::
+    This module has been moved to `usmsb_sdk.platform.internal.node`.
+    Please update your imports to use the new location.
+    This module will be removed in a future version.
+
+    Old import:
+        from usmsb_sdk.platform.external.node import NodeManager
+
+    New import:
+        from usmsb_sdk.platform.internal.node import NodeManager
+
 This module provides comprehensive node management capabilities for the
 decentralized network, including:
 
@@ -9,37 +20,43 @@ decentralized network, including:
 - Peer discovery and health monitoring
 - Real-time broadcast communication via WebSocket
 - Data synchronization services (WebSocket, gRPC, IPFS)
-
-The layer integrates with the existing P2P node architecture and provides
-higher-level abstractions for node operations.
 """
 
-from .config import (
+import warnings
+
+# Issue deprecation warning when this module is imported
+warnings.warn(
+    "usmsb_sdk.platform.external.node has been moved to "
+    "usmsb_sdk.platform.internal.node. Please update your imports. "
+    "This module will be removed in a future version.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+# Re-export from new location for backward compatibility
+from usmsb_sdk.platform.internal.node import (
+    # Config
     NodeConfig,
     NetworkConfig,
     SyncConfig,
     SecurityConfig,
     NodeCapabilities,
-)
-from .node_manager import (
+    # Node Manager
     NodeManager,
     NodeState,
     NodeConnection,
     ConnectionStatus,
-)
-from .node_discovery import (
+    # Node Discovery
     NodeDiscoveryService,
     DiscoveredNode,
     NodeHealthStatus,
     HealthCheckResult,
-)
-from .broadcast_service import (
+    # Broadcast Service
     NodeBroadcastService,
     BroadcastMessage,
     BroadcastMessageType,
     MessageAck,
-)
-from .sync_service import (
+    # Sync Service
     SyncService,
     SyncMode,
     SyncStatus,

@@ -14,7 +14,7 @@ const initTheme = () => {
   if (stored) {
     try {
       const parsed = JSON.parse(stored)
-      const themeMode = parsed.state?.themeMode || 'system'
+      const themeMode = parsed.state?.themeMode || 'dark'
       const effectiveTheme = themeMode === 'system'
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : themeMode
@@ -22,8 +22,12 @@ const initTheme = () => {
         document.documentElement.classList.add('dark')
       }
     } catch {
-      // Use system default
+      // Default to dark
+      document.documentElement.classList.add('dark')
     }
+  } else {
+    // Default to dark if no stored preference
+    document.documentElement.classList.add('dark')
   }
 }
 initTheme()

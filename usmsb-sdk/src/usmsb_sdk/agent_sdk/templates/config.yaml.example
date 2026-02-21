@@ -1,0 +1,279 @@
+# Agent Configuration Example
+# This file shows all available configuration options for an agent
+
+# =====================================================
+# Agent Identity
+# =====================================================
+agent:
+  # Unique identifier (auto-generated if not specified)
+  # agent_id: "my-unique-agent-id"
+
+  # Human-readable name (required)
+  name: "my-agent"
+
+  # Description of what this agent does
+  description: "A versatile agent capable of various tasks"
+
+  # Version of this agent
+  version: "1.0.0"
+
+  # Owner/organization
+  owner: "My Organization"
+
+  # Tags for categorization and discovery
+  tags:
+    - "automation"
+    - "ai"
+    - "productivity"
+
+# =====================================================
+# Capabilities
+# =====================================================
+capabilities:
+  - name: "text_processing"
+    description: "Process and analyze text content"
+    category: "nlp"
+    level: "advanced"  # basic, intermediate, advanced, expert
+    dependencies:
+      - "nltk"
+      - "spacy"
+    metrics:
+      accuracy: 0.95
+      speed: "1000 tokens/sec"
+
+  - name: "data_analysis"
+    description: "Analyze and visualize data"
+    category: "data"
+    level: "intermediate"
+    dependencies:
+      - "pandas"
+      - "numpy"
+      - "matplotlib"
+
+  - name: "web_search"
+    description: "Search the web for information"
+    category: "information"
+    level: "basic"
+
+# =====================================================
+# Skills
+# =====================================================
+skills:
+  - name: "summarize"
+    description: "Summarize text content"
+    parameters:
+      - name: "text"
+        type: "string"
+        description: "Text to summarize"
+        required: true
+      - name: "max_length"
+        type: "integer"
+        description: "Maximum summary length in words"
+        required: false
+        default: 100
+        min_value: 10
+        max_value: 1000
+      - name: "style"
+        type: "string"
+        description: "Summary style"
+        required: false
+        default: "concise"
+        enum:
+          - "concise"
+          - "detailed"
+          - "bullet_points"
+    returns: "object"
+    timeout: 30
+    rate_limit: 100
+    tags:
+      - "nlp"
+      - "text"
+
+  - name: "translate"
+    description: "Translate text between languages"
+    parameters:
+      - name: "text"
+        type: "string"
+        description: "Text to translate"
+        required: true
+      - name: "source_lang"
+        type: "string"
+        description: "Source language code (e.g., 'en', 'zh')"
+        required: false
+        default: "auto"
+      - name: "target_lang"
+        type: "string"
+        description: "Target language code"
+        required: true
+    returns: "object"
+    timeout: 60
+    rate_limit: 50
+    tags:
+      - "nlp"
+      - "translation"
+
+  - name: "analyze_sentiment"
+    description: "Analyze sentiment of text"
+    parameters:
+      - name: "text"
+        type: "string"
+        description: "Text to analyze"
+        required: true
+      - name: "detailed"
+        type: "boolean"
+        description: "Return detailed analysis"
+        required: false
+        default: false
+    returns: "object"
+    timeout: 15
+    rate_limit: 200
+
+# =====================================================
+# Protocol Configurations
+# =====================================================
+protocols:
+  # A2A Protocol
+  a2a:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8000
+    transport: "tcp"
+    timeout: 30
+    max_connections: 100
+    retry_attempts: 3
+    retry_delay: 1.0
+
+  # MCP Protocol
+  mcp:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8001
+    timeout: 30
+
+  # P2P Protocol
+  p2p:
+    enabled: true
+    host: "0.0.0.0"
+    port: 9000
+    transport: "tcp"
+    tls_enabled: false
+
+  # HTTP Protocol
+  http:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8080
+    tls_enabled: false
+    tls_cert_path: null
+    tls_key_path: null
+    timeout: 30
+    max_connections: 200
+
+  # WebSocket Protocol
+  websocket:
+    enabled: true
+    host: "0.0.0.0"
+    port: 8765
+    tls_enabled: false
+    timeout: 60
+
+  # gRPC Protocol
+  grpc:
+    enabled: false
+    host: "0.0.0.0"
+    port: 50051
+    tls_enabled: false
+
+# =====================================================
+# Network Configuration
+# =====================================================
+network:
+  # Platform endpoints for registration
+  platform_endpoints:
+    - "http://platform:8000"
+    - "http://localhost:8000"
+
+  # P2P bootstrap nodes
+  p2p_bootstrap_nodes:
+    - "p2p://bootstrap1.example.com:9000"
+    - "p2p://bootstrap2.example.com:9000"
+
+  # P2P settings
+  p2p_listen_port: 9000
+  p2p_nat_traversal: true
+  p2p_relay_enabled: true
+
+  # Connection settings
+  connection_pool_size: 50
+  keepalive_interval: 30
+  discovery_interval: 60
+
+# =====================================================
+# Security Configuration
+# =====================================================
+security:
+  # Enable authentication
+  auth_enabled: true
+
+  # API key for platform authentication
+  # (use environment variable API_KEY in production)
+  api_key: null
+
+  # JWT secret for token generation
+  # (use environment variable JWT_SECRET in production)
+  jwt_secret: null
+
+  # CORS allowed origins
+  allowed_origins:
+    - "*"
+
+  # Rate limiting
+  rate_limiting_enabled: true
+  max_requests_per_minute: 1000
+
+  # Encryption settings
+  encryption_enabled: true
+  encryption_algorithm: "AES-256-GCM"
+
+  # Message signing
+  signature_enabled: true
+
+  # Trusted agents (bypass some security checks)
+  trusted_agents: []
+
+# =====================================================
+# Runtime Settings
+# =====================================================
+runtime:
+  # Automatically register with platform on start
+  auto_register: true
+
+  # Automatically discover other agents
+  auto_discover: true
+
+  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_level: "INFO"
+
+  # Health check interval in seconds
+  health_check_interval: 30
+
+  # Heartbeat interval in seconds
+  heartbeat_interval: 10
+
+# =====================================================
+# Metadata
+# =====================================================
+metadata:
+  # Custom metadata fields
+  environment: "production"
+  team: "platform-team"
+  documentation_url: "https://docs.example.com/agents/my-agent"
+  support_contact: "support@example.com"
+
+  # Performance metrics
+  expected_latency_ms: 100
+  max_concurrent_tasks: 10
+
+  # Cost tracking
+  cost_per_request: 0.001
+  currency: "USD"

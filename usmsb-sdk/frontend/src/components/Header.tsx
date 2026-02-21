@@ -3,39 +3,42 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bell, Search, Wallet, LogOut, User, Copy, Check, PlusCircle, Target, Menu, SkipForward, HelpCircle } from 'lucide-react'
 import { useState } from 'react'
-import { useAccount, useDisconnect } from 'wagmi'
+import { useDisconnect } from 'wagmi'
 import { getHealth } from '@/lib/api'
 import { useAppStore } from '@/store'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, USER_ROLE_LABELS } from '@/stores/authStore'
 import { useWalletAuth } from '@/hooks/useWalletAuth'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
-import { ConnectButtonSimple } from './ConnectButton'
 import MobileDrawer from './MobileDrawer'
-import { Button } from './ui/Button'
 import { Tooltip } from './ui/Tooltip'
+import WalletBindingModal from './WalletBindingModal'
 
 export default function Header() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { notifications } = useAppStore()
   const { disconnect: _disconnect } = useDisconnect()
-  const { address, isConnected } = useAccount()
-  const { isAuthenticated, logout: authLogout, signIn } = useWalletAuth()
-  const { name, reputation, stake } = useAuthStore()
+  const { isAuthenticated, logout: authLogout } = useWalletAuth()
+  const { 
+    address, 
+    isConnected, 
+    bindingType, 
+    userRole, 
+    name, 
+    reputation, 
+    stake,
+    setManualIdentifier,
+  } = useAuthStore()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [copied, setCopied] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showBindingModal, setShowBindingModal] = useState(false)
 
-  // Handle skip wallet - navigate to dashboard without wallet
+  // Handle skip wallet - use random identifier
   const handleSkipWallet = () => {
-    // Set guest mode in auth store
-    useAuthStore.setState({
-      isConnected: true,
-      name: 'Guest User',
-      reputation: 0,
-      stake: 0,
-    })
+    const guestId = `guest_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+    setManualIdentifier(guestId)
     navigate('/app/dashboard')
   }
 
@@ -279,7 +282,21 @@ export default function Header() {
                           <Copy size={14} className="text-secondary-400 dark:text-neon-blue/60" />
                         )}
                       </button>
+                      <span className={`
+                        text-xs px-2 py-0.5 rounded
+                        bg-blue-100 text-blue-700
+                        dark:bg-neon-blue/20 dark:text-neon-blue
+                      `}>
+                        {USER_ROLE_LABELS[userRole] || userRole}
+                      </span>
                     </div>
+                    {bindingType && (
+                      <p className="text-xs text-secondary-400 dark:text-neon-blue/40 mt-1">
+                        {bindingType === 'wallet' ? t('header.realWallet', '真实钱包') : 
+                         bindingType === 'manual' ? t('header.tempId', '临时标识') : 
+                         t('header.aiAgent', 'AI Agent')}
+                      </p>
+                    )}
                   </div>
 
                   {/* Stats */}
@@ -318,6 +335,17 @@ export default function Header() {
 
                   {/* Actions */}
                   <div className="py-1" role="group">
+                    <button
+                      onClick={() => setShowBindingModal(true)}
+                      className={`
+                        flex items-center gap-2 px-4 py-2 text-sm w-full transition-colors
+                        text-blue-600 hover:bg-blue-50
+                        dark:text-neon-blue dark:hover:bg-neon-blue/10
+                      `}
+                    >
+                      <Wallet size={16} />
+                      {t('header.changeBinding', '更换绑定')}
+                    </button>
                     <Link
                       to="/app/publish/service"
                       role="menuitem"
@@ -375,33 +403,20 @@ export default function Header() {
                 </div>
               )}
             </div>
-          ) : isConnected ? (
-            // Wallet connected but not authenticated
-            <div className="flex items-center gap-2">
-              <Button onClick={signIn}>
-                <Wallet size={18} />
-                {t('header.signToVerify')}
-              </Button>
-              <button
-                onClick={handleSkipWallet}
-                title={t('header.skipWalletHint')}
-                className={`
-                  flex items-center gap-1 px-3 py-2 text-sm rounded-lg transition-all
-                  text-secondary-500 hover:text-secondary-700
-                  hover:bg-secondary-100
-                  dark:text-neon-blue/70 dark:hover:text-neon-blue dark:hover:bg-neon-blue/10
-                `}
-              >
-                <SkipForward size={16} />
-                <span className="hidden sm:inline">{t('header.skipWallet')}</span>
-              </button>
-            </div>
           ) : (
             // Not connected - show connect button with skip option
             <div className="flex items-center gap-2">
-              <ConnectButtonSimple onConnected={() => {
-                // After wallet connects, the user will need to sign
-              }} />
+              <button
+                onClick={() => setShowBindingModal(true)}
+                className={`
+                  flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all
+                  bg-blue-600 text-white hover:bg-blue-700
+                  dark:bg-neon-blue/20 dark:text-neon-blue dark:border dark:border-neon-blue/50 dark:hover:bg-neon-blue/30
+                `}
+              >
+                <Wallet size={18} />
+                {t('header.connectWallet')}
+              </button>
               <button
                 onClick={handleSkipWallet}
                 title={t('header.skipWalletHint')}
@@ -427,6 +442,12 @@ export default function Header() {
           />
         )}
       </header>
+
+      {/* Wallet Binding Modal */}
+      <WalletBindingModal
+        isOpen={showBindingModal}
+        onClose={() => setShowBindingModal(false)}
+      />
     </>
   )
 }

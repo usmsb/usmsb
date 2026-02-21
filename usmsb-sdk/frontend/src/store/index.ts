@@ -80,8 +80,8 @@ export const useAppStore = create<AppState>()(
         })),
 
       // Theme
-      themeMode: 'system',
-      theme: getSystemTheme(),
+      themeMode: 'dark',
+      theme: 'dark',
       setThemeMode: (mode) => {
         const effectiveTheme = getEffectiveTheme(mode)
         set({ themeMode: mode, theme: effectiveTheme })

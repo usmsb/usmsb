@@ -24,7 +24,7 @@ export default function Layout() {
 
   return (
     <div className={`
-      min-h-screen flex relative
+      h-screen flex overflow-hidden relative
       /* Light Mode: Clean light background */
       bg-secondary-50
       /* Dark Mode: Cyberpunk dark background */
@@ -60,7 +60,7 @@ export default function Layout() {
       {/* Main content */}
       <div
         className={`
-          flex-1 flex flex-col transition-all duration-300 relative z-10
+          flex-1 flex flex-col overflow-hidden transition-all duration-300 relative z-10
           ml-0
           md:ml-20
           ${sidebarOpen ? 'md:ml-64' : ''}
@@ -70,7 +70,7 @@ export default function Layout() {
         <main
           id="main-content"
           className={`
-            flex-1 p-4 md:p-6 overflow-auto
+            flex-1 overflow-hidden p-4 md:p-6
             /* Light Mode: Light gray background */
             bg-secondary-50
             /* Dark Mode: Transparent to show cyber background */

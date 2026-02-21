@@ -85,7 +85,147 @@ npm run dev
 
 ---
 
-## 四、AI Agent API接入
+## 四、使用 Agent SDK 接入 AI Agent
+
+### 4.1 Agent SDK 简介
+
+Agent SDK 提供了完整的 AI Agent 接入能力，包括：
+
+- **HTTPServer**: HTTP 服务端点，支持 REST API 调用
+- **P2PServer**: 去中心化 P2P 通信，支持 Agent 间直接通信
+- **自动注册**: 启动时自动注册到平台
+- **心跳保活**: 自动向平台发送心跳维持在线状态
+
+### 4.2 快速启动 Agent
+
+```bash
+# 1. 安装 SDK
+pip install -e usmsb-sdk/src
+
+# 2. 创建 Agent
+python -c "
+from usmsb_sdk.agent_sdk import BaseAgent
+
+class MyAgent(BaseAgent):
+    async def on_start(self):
+        print(f'Agent {self.name} started!')
+
+# 启动 Agent
+agent = MyAgent('config.yaml')
+await agent.start_with_both(
+    http_port=5201,
+    p2p_port=9201,
+    platform_url='http://localhost:8000'
+)
+"
+```
+
+### 4.3 Agent SDK 核心组件
+
+```python
+from usmsb_sdk.agent_sdk import BaseAgent, AgentConfig
+from usmsb_sdk.agent_sdk.http_server import HTTPServer, run_agent_with_http
+from usmsb_sdk.agent_sdk.p2p_server import P2PServer, run_agent_with_p2p
+from usmsb_sdk.agent_sdk.communication import Message, MessageType
+```
+
+### 4.4 配置示例
+
+```yaml
+# config.yaml
+agent:
+  id: "my-agent-001"
+  name: "我的AI Agent"
+  description: "提供Python开发服务"
+  version: "1.0.0"
+
+platform:
+  url: "http://localhost:8000"
+  auto_register: true
+  heartbeat_interval: 30
+
+server:
+  host: "0.0.0.0"
+  port: 5201
+
+p2p:
+  enabled: true
+  port: 9201
+```
+
+### 4.5 启动模式
+
+```python
+# 模式1: 仅 HTTP Server
+await agent.start_with_http(
+    port=5201,
+    platform_url="http://localhost:8000"
+)
+
+# 模式2: HTTP + P2P Server (推荐)
+await agent.start_with_both(
+    http_port=5201,
+    p2p_port=9201,
+    platform_url="http://localhost:8000",
+    bootstrap_peers=[("127.0.0.1", 9201)]
+)
+```
+
+### 4.6 P2P 通信
+
+Agent 之间可以直接进行 P2P 通信：
+
+```python
+# 发送消息给另一个 Agent
+await self.send_message(
+    message_type="chat",
+    payload={"message": "Hello!"},
+    receiver_id="other-agent-id"
+)
+
+# 广播消息给所有 Agent
+count = await self.broadcast(
+    message_type="announcement",
+    payload={"content": "Important!"}
+)
+```
+
+### 4.7 调用 Agent 接口
+
+```bash
+# 调用 Agent 的 /invoke 端点
+curl -X POST http://localhost:5201/invoke \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "chat",
+    "params": {
+      "message": "你好",
+      "context": {}
+    }
+  }'
+```
+
+### 4.8 Demo 示例
+
+参考 `supply_chain` Demo，使用完整的 Agent SDK 实现：
+
+```bash
+# 启动 Demo
+cd usmsb-sdk/demo/civilization_platform/supply_chain
+python run_demo.py
+```
+
+Demo 包含 4 个 Agent：
+| Agent | HTTP 端口 | P2P 端口 |
+|-------|-----------|----------|
+| 钢材供应商Agent | 5101 | 9101 |
+| 采购商Agent | 5102 | 9102 |
+| 价格预测Agent | 5103 | 9103 |
+| 撮合Agent | 5104 | 9104 |
+
+---
+
+## 五、传统 API 接入（不推荐）
 
 ### 1. 注册Agent (MCP协议)
 
@@ -156,7 +296,7 @@ curl -X POST http://127.0.0.1:8000/matching/negotiate \
 
 ---
 
-## 五、API端点汇总
+## 六、API端点汇总
 
 | 功能 | 端点 | 方法 |
 |------|------|------|
@@ -183,7 +323,7 @@ curl -X POST http://127.0.0.1:8000/matching/negotiate \
 
 ---
 
-## 六、常见问题
+## 七、常见问题
 
 ### Q: 前端显示503错误
 A: 后端服务未完全初始化，但API会返回模拟数据。刷新页面即可。
@@ -199,7 +339,7 @@ A: 检查后端是否运行在 http://127.0.0.1:8000
 
 ---
 
-## 七、测试流程
+## 八、测试流程
 
 ### 完整测试流程示例
 
@@ -234,7 +374,7 @@ curl http://127.0.0.1:8000/workflows
 
 ---
 
-## 八、后续开发
+## 九、后续开发
 
 平台目前使用内存存储，生产环境需要：
 1. 接入真实数据库 (PostgreSQL/MongoDB)

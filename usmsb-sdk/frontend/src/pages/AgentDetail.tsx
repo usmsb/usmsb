@@ -131,60 +131,137 @@ export default function AgentDetail() {
     },
   })
 
-  // Test agent endpoint
+  // Fetch transactions from API - must be before any conditional returns
+  const { data: transactions } = useQuery({
+    queryKey: ['agent-transactions', id],
+    queryFn: async () => {
+      const response = await fetch(`${API_BASE}/agents/${id}/transactions`)
+      if (!response.ok) return []
+      return response.json() as Promise<Transaction[]>
+    },
+    enabled: !!id,
+  })
+
+  // Test agent endpoint - P2P direct communication
   const handleTestAgent = async () => {
     if (!agent || !testInput.trim()) return
 
     setIsTesting(true)
     setTestResult(null)
+    const startTime = Date.now()
 
     try {
-      const response = await fetch(`${API_BASE}/agents/${agent.agent_id}/test`, {
+      // P2P: Call agent's endpoint directly
+      const agentEndpoint = agent.endpoint
+
+      if (!agentEndpoint) {
+        setTestResult({
+          success: false,
+          output: 'Agent endpoint not configured',
+          time: 0,
+        })
+        return
+      }
+
+      // Try direct P2P call to agent
+      const response = await fetch(`${agentEndpoint}/invoke`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          input: testInput,
-          context: {},
+          method: 'chat',
+          params: {
+            message: testInput,
+            context: {},
+          },
         }),
       })
 
+      const latency = Date.now() - startTime
       const data = await response.json()
 
-      if (data.success) {
+      if (response.ok) {
         setTestResult({
           success: true,
-          output: typeof data.response === 'string' ? data.response : JSON.stringify(data.response, null, 2),
-          time: data.latency_ms,
+          output: typeof data.result === 'string' ? data.result : JSON.stringify(data.result || data, null, 2),
+          time: latency,
         })
       } else {
         setTestResult({
           success: false,
-          output: data.error || 'Test failed',
-          time: data.latency_ms,
+          output: data.error || `HTTP ${response.status}: ${response.statusText}`,
+          time: latency,
         })
       }
     } catch (err) {
-      setTestResult({
-        success: false,
-        output: `Request failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        time: 0,
-      })
+      const latency = Date.now() - startTime
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+
+      // Check if it's a CORS error
+      if (errorMessage.includes('CORS') || errorMessage.includes('fetch')) {
+        setTestResult({
+          success: false,
+          output: `P2P连接失败: 无法直接连接到Agent (${agent.endpoint})。\n可能原因:\n1. Agent服务未启动\n2. CORS跨域限制\n3. 网络不可达\n\n请确保Agent服务正在运行并支持CORS。`,
+          time: latency,
+        })
+      } else {
+        setTestResult({
+          success: false,
+          output: `请求失败: ${errorMessage}`,
+          time: latency,
+        })
+      }
     } finally {
       setIsTesting(false)
     }
   }
 
-  // Send heartbeat
+  // Send heartbeat - P2P direct communication
   const handleHeartbeat = async () => {
+    if (!agent) return
+
     try {
-      const response = await fetch(`${API_BASE}/agents/${id}/heartbeat?status=online`, {
+      const agentEndpoint = agent.endpoint
+
+      if (!agentEndpoint) {
+        console.error('Agent endpoint not configured')
+        return
+      }
+
+      // P2P: Call agent's heartbeat endpoint directly
+      const response = await fetch(`${agentEndpoint}/heartbeat`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          timestamp: Date.now(),
+          status: 'online',
+        }),
       })
+
       if (response.ok) {
+        console.log('P2P Heartbeat successful')
+        // Also notify the platform
+        await fetch(`${API_BASE}/agent-auth/agents/${id}/heartbeat`, {
+          method: 'POST',
+        })
         refetch()
+      } else {
+        console.error('P2P Heartbeat failed:', response.status)
       }
     } catch (err) {
-      console.error('Heartbeat failed:', err)
+      console.error('P2P Heartbeat error:', err)
+      // Fallback: notify platform only
+      try {
+        await fetch(`${API_BASE}/agent-auth/agents/${id}/heartbeat`, {
+          method: 'POST',
+        })
+        refetch()
+      } catch (fallbackErr) {
+        console.error('Fallback heartbeat also failed:', fallbackErr)
+      }
     }
   }
 
@@ -197,7 +274,7 @@ export default function AgentDetail() {
         method: 'DELETE',
       })
       if (response.ok) {
-        navigate('/agents')
+        navigate('/app/agents')
       }
     } catch (err) {
       console.error('Delete failed:', err)
@@ -231,7 +308,7 @@ export default function AgentDetail() {
       <div className="text-center py-12">
         <AlertCircle size={48} className="mx-auto mb-4 text-red-400" />
         <p className="text-secondary-500 mb-4">Agent not found</p>
-        <button onClick={() => navigate('/agents')} className="btn btn-primary">
+        <button onClick={() => navigate('/app/agents')} className="btn btn-primary">
           Back to Agents
         </button>
       </div>
@@ -240,24 +317,13 @@ export default function AgentDetail() {
 
   const ProtocolIcon = getProtocolIcon(agent.protocol)
 
-  // Fetch transactions from API
-  const { data: transactions } = useQuery({
-    queryKey: ['agent-transactions', id],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE}/agents/${id}/transactions`)
-      if (!response.ok) return []
-      return response.json() as Promise<Transaction[]>
-    },
-    enabled: !!id,
-  })
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/agents')}
+            onClick={() => navigate('/app/agents')}
             aria-label="Go back to agents"
             className="p-2 rounded-lg hover:bg-secondary-100 text-secondary-500"
           >

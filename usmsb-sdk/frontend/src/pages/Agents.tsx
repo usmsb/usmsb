@@ -286,7 +286,12 @@ export default function Agents() {
               <div
                 key={agent.agent_id}
                 className="card hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/agents/${agent.agent_id}`)}
+                onClick={() => {
+                  const agentId = agent.agent_id
+                  if (agentId) {
+                    navigate('/app/agents/' + agentId)
+                  }
+                }}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">

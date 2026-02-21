@@ -34,6 +34,7 @@ from usmsb_sdk.platform.external.storage.storage_manager import (
     CacheStrategy,
     SyncStrategy,
     ConsistencyLevel,
+    create_storage_manager,
 )
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "CacheStrategy",
     "SyncStrategy",
     "ConsistencyLevel",
+    "create_storage_manager",
 ]

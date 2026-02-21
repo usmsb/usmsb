@@ -1,0 +1,346 @@
+# System Agents Configuration
+# This file contains configuration examples for all system agents
+
+# =============================================================================
+# Base System Agent Configuration
+# =============================================================================
+system_config:
+  # Default permission level for system agents
+  default_permission: "monitor"
+
+  # Rate limiting (operations per minute)
+  rate_limit: 1000
+
+  # Audit logging
+  audit_enabled: true
+  audit_log_path: "./logs/system_agents_audit.log"
+
+  # Resource access control
+  allowed_resources:
+    - "nodes.*"
+    - "agents.*"
+    - "logs.*"
+    - "metrics.*"
+    - "routes.*"
+
+# =============================================================================
+# Monitor Agent Configuration
+# =============================================================================
+monitor_agent:
+  # Agent identity
+  agent_id: "monitor-001"
+  name: "SystemMonitor"
+  description: "System health and performance monitoring agent"
+  version: "1.0.0"
+
+  # System-specific configuration
+  system:
+    permission_level: "monitor"
+    rate_limit: 500
+    audit_enabled: true
+
+  # Monitoring settings
+  monitoring:
+    # Health check interval in seconds
+    health_check_interval: 30
+
+    # Metrics collection interval in seconds
+    metrics_interval: 60
+
+    # Alert settings
+    alerts:
+      enabled: true
+      notification_channels:
+        - type: "log"
+          level: "warning"
+        - type: "webhook"
+          url: "https://example.com/alerts"
+          level: "critical"
+
+  # Default thresholds
+  thresholds:
+    cpu_usage:
+      warning: 70.0
+      critical: 90.0
+      enabled: true
+
+    memory_usage:
+      warning: 80.0
+      critical: 95.0
+      enabled: true
+
+    disk_usage:
+      warning: 80.0
+      critical: 95.0
+      enabled: true
+
+    response_time:
+      warning: 1000.0  # ms
+      critical: 5000.0  # ms
+      enabled: true
+
+    error_rate:
+      warning: 5.0  # percentage
+      critical: 20.0  # percentage
+      enabled: true
+
+    queue_size:
+      warning: 100
+      critical: 500
+      enabled: true
+
+# =============================================================================
+# Recommender Agent Configuration
+# =============================================================================
+recommender_agent:
+  # Agent identity
+  agent_id: "recommender-001"
+  name: "AgentRecommender"
+  description: "Intelligent agent recommendation service"
+  version: "1.0.0"
+
+  # System-specific configuration
+  system:
+    permission_level: "read_only"
+    rate_limit: 1000
+    audit_enabled: true
+
+  # Recommendation settings
+  recommendation:
+    # Maximum recommendations per request
+    max_recommendations: 10
+
+    # Minimum rating threshold
+    min_rating_threshold: 0.0
+
+    # Personalization settings
+    personalization:
+      enabled: true
+      user_history_weight: 0.2
+      preference_weight: 0.15
+
+    # Scoring weights
+    scoring:
+      text_match_weight: 0.40
+      skill_match_weight: 0.30
+      capability_match_weight: 0.20
+      reliability_weight: 0.10
+
+  # Skill keyword mappings
+  skill_keywords:
+    pdf_processing:
+      - "pdf"
+      - "document"
+      - "extract"
+      - "parse"
+    image_analysis:
+      - "image"
+      - "picture"
+      - "photo"
+      - "analyze"
+      - "vision"
+    text_generation:
+      - "text"
+      - "generate"
+      - "write"
+      - "content"
+    data_analysis:
+      - "data"
+      - "analyze"
+      - "statistics"
+      - "report"
+    web_scraping:
+      - "web"
+      - "scrape"
+      - "crawl"
+      - "fetch"
+    code_generation:
+      - "code"
+      - "generate"
+      - "programming"
+      - "develop"
+
+# =============================================================================
+# Router Agent Configuration
+# =============================================================================
+router_agent:
+  # Agent identity
+  agent_id: "router-001"
+  name: "MessageRouter"
+  description: "Message routing and load balancing agent"
+  version: "1.0.0"
+
+  # System-specific configuration
+  system:
+    permission_level: "configure"
+    rate_limit: 2000
+    audit_enabled: true
+
+  # Routing settings
+  routing:
+    # Default load balancing strategy
+    default_strategy: "least_connections"
+
+    # Queue settings
+    queue:
+      max_size: 1000
+      max_concurrent: 100
+      timeout_seconds: 30
+
+    # Retry settings
+    retry:
+      enabled: true
+      max_attempts: 3
+      backoff_seconds: 1
+
+  # Predefined routes
+  routes:
+    - id: "default"
+      name: "Default Route"
+      pattern: "*"
+      strategy: "round_robin"
+      enabled: true
+
+    - id: "high_priority"
+      name: "High Priority Route"
+      pattern: "critical.*"
+      strategy: "least_connections"
+      enabled: true
+      targets:
+        - agent_id: "worker-premium-*"
+          weight: 10
+          max_connections: 50
+
+    - id: "batch_processing"
+      name: "Batch Processing Route"
+      pattern: "batch.*"
+      strategy: "weighted"
+      enabled: true
+
+  # Target configurations
+  targets:
+    default_weight: 1
+    default_max_connections: 100
+    health_check_interval: 30
+
+# =============================================================================
+# Logger Agent Configuration
+# =============================================================================
+logger_agent:
+  # Agent identity
+  agent_id: "logger-001"
+  name: "CentralLogger"
+  description: "Centralized logging and log analysis agent"
+  version: "1.0.0"
+
+  # System-specific configuration
+  system:
+    permission_level: "configure"
+    rate_limit: 5000
+    audit_enabled: true
+
+  # Logging settings
+  logging:
+    # Log buffer settings
+    buffer:
+      max_size: 50000
+
+    # Archive settings
+    archive:
+      enabled: true
+      path: "./logs/archive"
+      interval_hours: 24
+      format: "json"
+
+    # Retention policy
+    retention:
+      enabled: true
+      max_days: 30
+      max_size_mb: 1000
+
+  # Log levels to capture
+  levels:
+    - "debug"
+    - "info"
+    - "warning"
+    - "error"
+    - "critical"
+
+  # Auto-tagging rules
+  auto_tagging:
+    - pattern: "error|exception|failed"
+      tag: "error"
+    - pattern: "warning|warn"
+      tag: "warning"
+    - pattern: "performance|slow|timeout"
+      tag: "performance"
+
+# =============================================================================
+# Network Configuration (applies to all system agents)
+# =============================================================================
+network:
+  # Platform node endpoints
+  nodes:
+    - id: "node-primary"
+      url: "https://platform.example.com"
+      protocols:
+        - "rest"
+        - "websocket"
+    - id: "node-secondary"
+      url: "https://platform2.example.com"
+      protocols:
+        - "rest"
+
+  # Protocol settings
+  protocols:
+    rest:
+      timeout_seconds: 30
+      retry_count: 3
+    websocket:
+      heartbeat_seconds: 30
+      reconnect_delay_seconds: 5
+
+  # Discovery settings
+  discovery:
+    enabled: true
+    interval_seconds: 60
+
+# =============================================================================
+# Security Configuration
+# =============================================================================
+security:
+  # Authentication
+  auth:
+    enabled: true
+    type: "token"
+    token_refresh_hours: 24
+
+  # Authorization
+  authorization:
+    enabled: true
+    rbac_enabled: true
+
+  # Encryption
+  encryption:
+    enabled: true
+    algorithm: "AES-256-GCM"
+
+# =============================================================================
+# Performance Configuration
+# =============================================================================
+performance:
+  # Async settings
+  async:
+    max_concurrent_tasks: 100
+    task_timeout_seconds: 300
+
+  # Caching
+  cache:
+    enabled: true
+    ttl_seconds: 300
+    max_size: 1000
+
+  # Connection pooling
+  connection_pool:
+    max_connections: 100
+    max_per_host: 20
