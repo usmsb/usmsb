@@ -4,7 +4,7 @@ Meta Agent - 超级 Agent
 """
 
 from .agent import MetaAgent
-from .config import MetaAgentConfig
+from .meta_agent_config import MetaAgentConfig
 from .migrate.data_migration import DataMigration, MigrationProgress, MigrationResult
 
 __all__ = [

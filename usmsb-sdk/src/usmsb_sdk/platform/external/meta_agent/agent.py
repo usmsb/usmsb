@@ -12,7 +12,7 @@ import os
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from uuid import uuid4
 
-from .config import MetaAgentConfig
+from .meta_agent_config import MetaAgentConfig
 from .core.perception import PerceptionService
 from .core.decision import DecisionService
 from .core.execution import ExecutionService
