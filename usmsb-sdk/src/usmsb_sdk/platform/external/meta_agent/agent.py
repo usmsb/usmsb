@@ -5,10 +5,11 @@ Meta Agent 主类
 """
 
 import asyncio
+import dataclasses
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from uuid import uuid4
 
 from .config import MetaAgentConfig
@@ -24,6 +25,10 @@ from .context.manager import ContextManager, UserInfo
 from .memory.conversation_manager import ConversationManager
 from .memory.conversation import ParticipantType, MessageRole
 from .memory.memory_manager import MemoryManager, MemoryConfig
+from .memory.experience_db import ExperienceDB
+from .memory.smart_recall import IntelligentRecall
+from .memory.error_learning import ErrorDrivenLearning, AgentWithSelfHealing
+from .memory.guardian_daemon import GuardianDaemon, GuardianConfig
 from .knowledge.base import KnowledgeBase
 from .knowledge.vector_store import VectorKnowledgeBase
 from .wallet.manager import WalletManager
@@ -35,7 +40,83 @@ from .memory.memory_manager import MemoryManager, MemoryConfig
 from .session.session_manager import SessionManager
 from .session.user_session import SessionConfig
 
+# 新增：敏感信息处理、意图识别、配置管理
+from .sensitive.registry import (
+    SensitiveInfoRegistry,
+    get_sensitive_info_registry,
+)
+from .intent.recognizer import IntentRecognizer, IntentType, Intent
+from .config.chat_config import ChatConfig
+
+# 类型检查时导入（避免循环导入）
+if TYPE_CHECKING:
+    from .session.user_session import UserSession
+
 logger = logging.getLogger(__name__)
+
+
+def _serialize_for_json(obj: Any) -> Any:
+    """
+    将对象转换为可 JSON 序列化的格式
+
+    处理以下类型：
+    - dataclass 对象（使用 asdict 转换）
+    - 包含 dataclass 的字典/列表（递归处理）
+    - 函数/方法（转换为字符串描述）
+    - 对象（提取 __dict__ 或转换为字符串）
+    - 其他可序列化对象（直接返回）
+    """
+    if obj is None:
+        return None
+
+    # 基本类型直接返回
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+
+    # 检查是否是函数或方法
+    if callable(obj):
+        return f"<function {getattr(obj, '__name__', 'unknown')}>"
+
+    # 检查是否是 dataclass 实例
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        # 使用 asdict 转换，然后递归处理所有属性值
+        return _serialize_for_json(dataclasses.asdict(obj))
+
+    # 递归处理字典
+    if isinstance(obj, dict):
+        return {k: _serialize_for_json(v) for k, v in obj.items()}
+
+    # 递归处理列表
+    if isinstance(obj, (list, tuple)):
+        return [_serialize_for_json(item) for item in obj]
+
+    # 处理集合
+    if isinstance(obj, (set, frozenset)):
+        return [_serialize_for_json(item) for item in obj]
+
+    # 处理 bytes
+    if isinstance(obj, bytes):
+        try:
+            return obj.decode("utf-8")
+        except UnicodeDecodeError:
+            return f"<bytes: {len(obj)} bytes>"
+
+    # 处理 datetime 对象
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+
+    # 处理其他对象（尝试提取 __dict__）
+    if hasattr(obj, "__dict__"):
+        try:
+            return _serialize_for_json(obj.__dict__)
+        except Exception:
+            pass
+
+    # 最后尝试转换为字符串
+    try:
+        return str(obj)
+    except Exception:
+        return f"<non-serializable: {type(obj).__name__}>"
 
 
 class MetaAgent:
@@ -117,6 +198,31 @@ class MetaAgent:
         # 进化引擎
         self.evolution_engine: Optional[EvolutionEngine] = None
 
+        # ========== 智能召回系统 ==========
+        self.smart_recall: Optional[IntelligentRecall] = None
+
+        # ========== 错误驱动学习系统 ==========
+        self.error_learning: Optional[ErrorDrivenLearning] = None
+
+        # ========== 守护进程 ==========
+        self.guardian_daemon: Optional[GuardianDaemon] = None
+
+        # ========== 精准匹配服务 ==========
+        self.meta_agent_service: Optional[Any] = None  # MetaAgentService
+
+        # ========== 新增：敏感信息处理、意图识别、配置管理 ==========
+        # Chat 配置
+        self.chat_config = ChatConfig.from_env()
+
+        # 敏感信息注册表
+        self.sensitive_registry = get_sensitive_info_registry()
+
+        # 意图识别器
+        self.intent_recognizer = IntentRecognizer(
+            llm_manager=self.llm_manager,
+            use_cache=True,
+        )
+
         # 状态
         self._running = False
         self._main_loop_task: Optional[asyncio.Task] = None
@@ -152,6 +258,77 @@ class MetaAgent:
         )
         await self.evolution_engine.start()
 
+        # ========== 初始化智能召回系统 ==========
+        if self.config.smart_recall_enabled:
+            self.smart_recall = IntelligentRecall(
+                llm_manager=self.llm_manager,
+                memory_db=self.memory_manager,
+                vector_store=self.vector_kb,
+            )
+            logger.info("Smart Recall initialized")
+
+        # ========== 初始化错误驱动学习系统 ==========
+        experience_db = ExperienceDB(
+            db_path=self.config.database.path.replace(".db", "_experience.db")
+        )
+        self.error_learning = ErrorDrivenLearning(
+            llm_manager=self.llm_manager,
+            experience_db=experience_db,
+        )
+        logger.info("Error-driven Learning initialized")
+
+        # ========== 启动守护进程 ==========
+        if self.config.guardian_enabled:
+            guardian_config = GuardianConfig(
+                idle_timeout_minutes=self.config.guardian_idle_minutes,
+                tasks_before_trigger=self.config.guardian_tasks_threshold,
+                errors_before_trigger=self.config.guardian_errors_threshold,
+            )
+            self.guardian_daemon = GuardianDaemon(
+                llm_manager=self.llm_manager,
+                knowledge_base=self.knowledge_base,
+                memory_manager=self.memory_manager,
+                evolution_engine=self.evolution_engine,
+                config=guardian_config,
+            )
+            await self.guardian_daemon.start()
+            logger.info("Guardian Daemon started")
+
+        # ========== 初始化精准匹配服务 ==========
+        try:
+            from .services.meta_agent_service import MetaAgentService
+            from .tools.precise_matching import set_meta_agent_service
+
+            # 尝试获取基因胶囊服务
+            gene_capsule_service = None
+            try:
+                from usmsb_sdk.api.rest.gene_capsule_service import GeneCapsuleService
+                gene_capsule_service = GeneCapsuleService()
+            except ImportError:
+                pass
+
+            # 尝试获取预匹配洽谈服务
+            pre_match_service = None
+            try:
+                from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
+                pre_match_service = PreMatchNegotiationService()
+            except ImportError:
+                pass
+
+            self.meta_agent_service = MetaAgentService(
+                meta_agent=self,
+                gene_capsule_service=gene_capsule_service,
+                pre_match_negotiation_service=pre_match_service,
+            )
+            await self.meta_agent_service.init()
+
+            # 设置全局服务实例供工具使用
+            set_meta_agent_service(self.meta_agent_service)
+
+            logger.info("MetaAgentService initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize MetaAgentService: {e}")
+
         # 启动主循环
         self._running = True
         self._main_loop_task = asyncio.create_task(self._main_loop())
@@ -173,6 +350,11 @@ class MetaAgent:
         # 停止进化引擎
         if self.evolution_engine:
             await self.evolution_engine.stop()
+
+        # ========== 停止守护进程 ==========
+        if self.guardian_daemon:
+            await self.guardian_daemon.stop()
+            logger.info("Guardian Daemon stopped")
 
         await self.goal_engine.stop()
         await self.context_manager.save()
@@ -256,6 +438,7 @@ class MetaAgent:
             system,
             web,
             system_agents,
+            precise_matching,
         )
 
         await platform.register_tools(self.tool_registry)
@@ -269,6 +452,7 @@ class MetaAgent:
         await system.register_tools(self.tool_registry)
         await web.register_tools(self.tool_registry)
         await system_agents.register_tools(self.tool_registry)
+        await precise_matching.register_tools(self.tool_registry)
 
         logger.info(f"Registered {len(self.tool_registry.list_tools())} default tools")
 
@@ -511,11 +695,15 @@ class MetaAgent:
         owner_id = wallet_address or f"anonymous_{uuid4().hex[:8]}"
 
         # 获取或创建用户会话
-        # 如果没有 wallet_address，使用匿名会话
+        user_session = None
         if wallet_address:
-            user_session = await self.session_manager.get_or_create_session(wallet_address)
-            # 更新会话活跃时间
-            user_session.update_activity()
+            try:
+                user_session = await self.session_manager.get_or_create_session(wallet_address)
+                # 更新会话活跃时间
+                user_session.update_activity()
+                logger.info(f"Got user session for wallet: {wallet_address[:10]}...")
+            except Exception as e:
+                logger.error(f"Failed to get user session: {e}")
 
         # 获取或创建会话（使用现有的 ConversationManager）
         # TODO: 未来可迁移到 UserSession.db
@@ -553,6 +741,93 @@ class MetaAgent:
             conversation_id=conversation.id,
         )
 
+        # ========== 智能召回：多维度检索相关记忆 ==========
+        smart_recall_context = ""
+        if self.smart_recall:
+            try:
+                # 获取LLM上下文限制
+                max_tokens = self.llm_manager.max_tokens or 4000
+
+                smart_recall_context = await self.smart_recall.recall(
+                    user_input=message,
+                    context={
+                        "user_id": owner_id,
+                        "conversation_id": conversation.id,
+                        "max_context_tokens": max_tokens,
+                        "wallet_address": wallet_address,
+                    },
+                )
+                logger.info(f"Smart recall context length: {len(smart_recall_context)} chars")
+            except Exception as e:
+                logger.warning(f"Smart recall failed: {e}")
+
+        # ========== 智能信息检索 ==========
+        # 当用户问需要之前提供的信息时，从历史对话中检索
+        retrieval_context = ""
+
+        logger.debug(f"Starting retrieval check for message: {message[:50]}...")
+
+        try:
+            # 使用敏感信息注册表获取关键词（替代硬编码）
+            info_keywords = self.sensitive_registry.get_all_keywords()
+            need_retrieval = any(kw in message.lower() for kw in info_keywords)
+
+            if need_retrieval:
+                task_info = {"task_description": message, "needed_info_type": "用户之前提供的信息"}
+                logger.info(f"Need retrieval for: {message[:30]}...")
+
+                # 获取候选消息
+                candidates = await self._get_all_candidate_info(owner_id)
+                print(f"[RETRIEVAL] Candidates count: {len(candidates)}")
+
+                if candidates:
+                    # 让 LLM 从所有候选中找出需要的信息
+                    try:
+                        found_info = await self._find_info_from_candidates(candidates, task_info)
+                        logger.debug(f"Found info: {found_info[:50] if found_info else 'None'}...")
+                    except Exception as e:
+                        logger.error(f"Error in _find_info_from_candidates: {e}")
+                        found_info = None
+
+                    if found_info:
+                        retrieval_context = self._format_found_info({"content": found_info})
+                        logger.info("Set retrieval_context!")
+                    else:
+                        # 直接返回候选内容（使用配置中的截断长度和显示数量）
+                        candidate_text = "\n\n".join(
+                            [
+                                f"消息{i + 1} [{c.get('role', '')}]: {c.get('content', '')[:self.chat_config.candidate_content_length]}..."
+                                for i, c in enumerate(candidates[:self.chat_config.display_candidates_limit])
+                            ]
+                        )
+                        retrieval_context = f"## 从历史对话中找到以下相关内容：\n\n{candidate_text}"
+                        logger.info("Set retrieval_context with candidates")
+
+        except Exception as e:
+            logger.warning(f"Retrieval failed: {e}")
+
+        # 如果检索到信息，使用检索结果
+        if retrieval_context:
+            logger.debug(f"Setting smart_recall_context: {retrieval_context[:100]}...")
+            smart_recall_context = retrieval_context
+            # 动态更新记忆
+            if self.memory_manager:
+                try:
+                    await self.memory_manager.dynamic_update_from_recall(
+                        user_id=owner_id, recalled_content=retrieval_context, source="agent_chat"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to dynamic update memories: {e}")
+
+        # ========== 方案四：检测用户强调记忆 ==========
+        if self.memory_manager:
+            try:
+                await self.memory_manager.check_and_store_user_emphasis(
+                    user_id=owner_id, message=message
+                )
+            except Exception as e:
+                logger.warning(f"Failed to check user emphasis: {e}")
+
         # 构建用户信息
         user_info = None
         if wallet_address:
@@ -565,57 +840,36 @@ class MetaAgent:
         # 获取可用工具
         available_tools = self.tool_registry.list_tools()
         tool_names = [t["name"] for t in available_tools]
-        print(f"[DEBUG] chat: tools count={len(tool_names)}")
+        logger.debug(f"chat: tools count={len(tool_names)}")
 
-        # 构建完整的消息列表（包含系统提示词、知识库检索、对话历史、分层记忆）
+        # 构建完整的消息列表（包含系统提示词、知识库检索、对话历史、分层记忆、智能召回）
         messages = await self.context_manager.build_messages(
             user_message=message,
             conversation_history=history_messages,
             user_info=user_info,
             available_tools=tool_names,
             memory_context=memory_context,
+            smart_recall_context=smart_recall_context,
         )
-        print(f"[DEBUG] chat: messages count={len(messages)}")
+        logger.debug(f"chat: messages count={len(messages)}")
 
         # 获取工具和技能 schema
         # MiniMax 使用 Anthropic API 格式
         llm_provider = "anthropic" if self.llm_manager.provider == "minimax" else "openai"
         tools_schema = self.tool_registry.get_tools_schema(provider=llm_provider)
         skills_schema = self.skills_manager.get_skills_schema(provider=llm_provider)
-        print(
-            f"[DEBUG] chat: tools_schema={len(tools_schema)}, skills_schema={len(skills_schema)}, provider={llm_provider}"
-        )
+        logger.debug(f"chat: tools_schema={len(tools_schema)}, skills_schema={len(skills_schema)}, provider={llm_provider}")
 
         # 调用 LLM（支持工具和技能调用）
         try:
-            # 检查是否需要执行工具调用
-            initial_messages = await self.context_manager.build_messages(
-                user_message=message,
-                conversation_history=history_messages,
-                user_info=user_info,
-                available_tools=tool_names,
-                memory_context=memory_context,
-            )
+            # 使用意图识别器判断用户意图（替代硬编码关键词）
+            intent = await self.intent_recognizer.recognize(message)
 
-            # 简单判断：如果消息很短且不包含工具相关关键词，直接处理
-            simple_keywords = ["你好", "hi", "hello", "嗨", "您好"]
-            is_simple = any(kw in message.lower() for kw in simple_keywords) and len(message) < 20
+            # 根据意图判断是否需要工具调用
+            is_simple = intent.is_simple() and len(message) < self.chat_config.simple_message_threshold
 
-            # 工具相关关键词
-            tool_keywords = [
-                "搜索",
-                "查找",
-                "执行",
-                "运行",
-                "计算",
-                "获取",
-                "查询",
-                "列出",
-                "读取",
-                "写",
-                "创建",
-            ]
-            needs_tools = any(kw in message for kw in tool_keywords) or not is_simple
+            # 使用意图识别器判断是否需要工具（替代硬编码关键词）
+            needs_tools = intent.is_tool_call() or not is_simple
 
             if needs_tools:
                 # 需要执行工具，启动后台处理
@@ -626,7 +880,7 @@ class MetaAgent:
                         await self.conversation_manager.add_message(
                             conversation_id=conversation.id,
                             role=MessageRole.BACKGROUND_TASK,
-                            content="🔄 后台任务开始执行...",
+                            content=self.chat_config.background_task_start_message,
                         )
 
                         result_text = await self._chat_with_llm(
@@ -634,10 +888,11 @@ class MetaAgent:
                             tools=tools_schema,
                             skills=skills_schema,
                             conversation_id=str(conversation.id),
+                            user_session=user_session,
                         )
 
-                        # 打印结果供调试
-                        logger.info(
+                        # 记录结果供调试
+                        logger.debug(
                             f"Background task result: {result_text[:500] if result_text else 'EMPTY'}"
                         )
 
@@ -647,14 +902,14 @@ class MetaAgent:
                             await self.conversation_manager.add_message(
                                 conversation_id=conversation.id,
                                 role=MessageRole.BACKGROUND_ERROR,
-                                content=f"⚠️ 后台任务执行遇到问题\n\n{result_text}\n\n请查看服务器日志获取详细错误信息。",
+                                content=self.chat_config.background_task_error_template.format(error=result_text),
                             )
                         else:
                             # 正常结果 - 使用 BACKGROUND_COMPLETE 类型
                             await self.conversation_manager.add_message(
                                 conversation_id=conversation.id,
                                 role=MessageRole.BACKGROUND_COMPLETE,
-                                content=f"✅ 后台任务完成\n\n{result_text}",
+                                content=self.chat_config.background_task_complete_template.format(result=result_text),
                             )
                         logger.info("Background task completed and saved to history")
                     except Exception as e:
@@ -665,28 +920,27 @@ class MetaAgent:
                         await self.conversation_manager.add_message(
                             conversation_id=conversation.id,
                             role=MessageRole.BACKGROUND_ERROR,
-                            content=f"❌ 后台任务执行失败\n\n错误: {str(e)}\n\n详情:\n{error_detail}",
+                            content=self.chat_config.background_task_fail_template.format(error=str(e), detail=error_detail),
                         )
 
                 # 启动后台任务，不等待完成
                 asyncio.create_task(background_task())
 
                 # 立即返回任务提交消息
-                response_text = "⏳ 您的请求已提交后台处理，完成后结果将自动保存到会话历史中。请稍后查看历史记录获取结果。"
+                response_text = self.chat_config.task_submitted_message
             else:
                 # 不需要工具调用，直接返回
                 response_text = await self._chat_with_llm(
                     messages,
                     tools=tools_schema,
                     skills=skills_schema,
+                    user_session=user_session,
                 )
 
-            print(
-                f"[DEBUG] chat: response_text={response_text[:100] if response_text else 'EMPTY'}"
-            )
+            logger.debug(f"chat: response_text={response_text[:100] if response_text else 'EMPTY'}")
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
-            response_text = "抱歉，我现在无法处理你的请求。请稍后再试。"
+            response_text = self.chat_config.llm_unavailable_message
 
         # 添加助手回复
         await self.conversation_manager.add_message(
@@ -711,12 +965,1141 @@ class MetaAgent:
 
         return response_text
 
+    async def _extract_search_keywords(self, user_message: str) -> List[str]:
+        """
+        使用 LLM 智能提取搜索关键词
+
+        从用户消息中提取用于搜索历史对话的关键词。
+        """
+        if not self.llm_manager:
+            return [user_message]
+
+        import json
+
+        prompt = f"""分析用户消息，提取用于搜索历史对话的关键词。
+
+用户消息: {user_message}
+
+请返回 JSON 格式：
+{{
+    "search_queries": ["关键词1", "关键词2", ...],
+    "reasoning": "提取理由"
+}}
+
+搜索关键词的要求：
+1. 要提取用户想要查找的具体信息（如 API Key、密码、token、账号等）
+2. 可以包含同义词和相关词
+3. 用户提到的时间相关词（如"之前"、"上次"、"以前"）也要提取
+4. 返回 2-5 个最相关的关键词
+"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+
+            # 解析 JSON
+            import re
+
+            json_match = re.search(r"\[[\s\S]*\]|\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                queries = data.get("search_queries", [])
+                if queries:
+                    logger.info(f"LLM extracted search keywords: {queries}")
+                    return queries
+        except Exception as e:
+            logger.warning(f"Failed to extract keywords with LLM: {e}")
+
+        # 如果 LLM 失败，使用原始消息
+        return [user_message]
+
+    async def _smart_info_retrieval(
+        self,
+        user_message: str,
+        user_id: str,
+        wallet_address: str,
+    ) -> Optional[str]:
+        """
+        智能信息检索：进化式探索
+
+        核心逻辑：
+        1. 搜索所有候选信息
+        2. 对每个候选进行验证（真的去用）
+        3. 能用就返回，不能用继续下一个
+        4. 所有都试过不行，扩大范围再搜
+        5. 最终找不到才询问用户
+        """
+        if not self.llm_manager or not self.conversation_manager:
+            return None
+
+        import json, re
+
+        # Step 1: LLM 判断是否需要检索 + 需要什么信息
+        need_retrieval, task_info = await self._analyze_user_task(user_message)
+        if not need_retrieval:
+            return None
+
+        logger.info(f"Task analysis: {task_info}")
+
+        # Step 2: 获取所有候选信息
+        all_candidates = await self._get_all_candidate_info(user_id)
+
+        if not all_candidates:
+            logger.info("No candidates found")
+            return None
+
+        logger.info(f"Found {len(all_candidates)} candidates")
+
+        # Step 3: 进化式验证 - 逐个尝试
+        verified_info = None
+
+        for candidate in all_candidates:
+            logger.info(f"Trying candidate: {candidate.get('value', '')[:30]}...")
+
+            # 让 LLM 判断这个信息是否正确
+            is_correct = await self._validate_info_with_llm(candidate, task_info)
+
+            if is_correct:
+                logger.info(f"Found correct info: {candidate.get('value', '')}")
+                verified_info = candidate
+                break
+            else:
+                logger.info(f"Not correct, trying next...")
+
+        # Step 4: 如果没找到，尝试扩大搜索范围
+        if not verified_info:
+            logger.info("No correct info found, expanding search...")
+            expanded_candidates = await self._expand_search(user_id, task_info)
+
+            for candidate in expanded_candidates:
+                is_correct = await self._validate_info_with_llm(candidate, task_info)
+                if is_correct:
+                    logger.info(f"Found correct info in expanded: {candidate.get('value', '')}")
+                    verified_info = candidate
+                    break
+
+        # Step 5: 找到就返回，找不到询问用户
+        if verified_info:
+            return self._format_found_info(verified_info)
+        else:
+            return self._format_ask_user(task_info)
+
+    async def _analyze_user_task(self, user_message: str) -> tuple:
+        """分析用户任务，判断是否需要检索 + 需要什么信息"""
+        import json, re
+
+        prompt = f"""分析用户消息，判断是否需要检索信息，以及需要什么信息。
+
+用户消息: {user_message}
+
+判断标准：
+- 如果用户需要完成一个任务但缺少关键信息，需要检索
+- 如果用户询问之前提供的信息，需要检索
+- 如果只是闲聊，不需要检索
+
+返回 JSON：
+{{
+    "need_retrieval": true/false,
+    "task_description": "用户想要完成的任务描述",
+    "needed_info_type": "需要的信息类型（如：虾聊API Key、GitHub密码等）",
+    "verification_method": "如何验证这个信息是否正确（如：用这个API Key调用虾聊API检查是否返回用户信息）"
+}}
+
+注意：verification_method非常重要，要具体说明如何验证这个信息是否正确！"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                need = data.get("need_retrieval", False)
+                task_info = {
+                    "task_description": data.get("task_description", ""),
+                    "needed_info_type": data.get("needed_info_type", ""),
+                    "verification_method": data.get("verification_method", ""),
+                }
+                return need, task_info
+        except Exception as e:
+            logger.warning(f"Analyze task failed: {e}")
+
+        return False, {}
+
+    async def _get_all_candidate_info(self, user_id: str) -> List[Dict]:
+        """获取历史对话中的所有相关内容，让 LLM 判断哪些是需要的"""
+        candidates = []
+
+        # 搜索用户提供的各种关键词（不限定类型）
+        search_queries = [
+            "password",
+            "密码",
+            "token",
+            "认证",
+            "密钥",
+            "api key",
+            "xialiao",
+            "github",
+            "账号",
+            "账户",
+            "登录",
+        ]
+
+        seen_contents = set()
+
+        for query in search_queries:
+            results = await self.conversation_manager.search_all_conversations(
+                owner_id=user_id,
+                query=query,
+                limit=30,
+            )
+
+            for r in results:
+                content = r.get("content", "")
+                role = r.get("role", "")
+
+                # 去重，避免重复内容
+                content_preview = content[:300]
+                if content_preview in seen_contents:
+                    continue
+                seen_contents.add(content_preview)
+
+                candidates.append(
+                    {
+                        "content": content,
+                        "role": role,
+                        "source": "conversation",
+                        "content_preview": content_preview,
+                    }
+                )
+
+        logger.info(f"Total candidate messages: {len(candidates)}")
+        return candidates
+
+    def _extract_all_sensitive_values(self, content: str) -> List[str]:
+        """提取所有可能的敏感信息值"""
+        import re
+
+        patterns = [
+            r"xialiao_[a-zA-Z0-9_]{10,}",
+            r"sk-[a-zA-Z0-9_-]{15,}",
+            r"API Key[:\s]+[^\s]+",
+            r"API key[:\s]+[^\s]+",
+            r"api_key[:\s]+[^\s]+",
+            r"密码[是为是]*\s*[:：]?\s*[\w]+",  # 匹配"密码是xxx"或"密码: xxx"
+            r"password[是为是]*\s*[:：]?\s*[\w]+",
+            r"token[:\s]+[a-zA-Z0-9_-]{10,}",
+            r"Bearer\s+[a-zA-Z0-9_-]{10,}",
+        ]
+
+        values = []
+        for pattern in patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            for m in matches:
+                # 清理值
+                value = m.split(":")[-1].strip() if ":" in m else m
+                if len(value) > 5:
+                    values.append(value)
+
+        return values
+
+    async def _find_info_from_candidates(
+        self, candidates: List[Dict], task_info: Dict
+    ) -> Optional[str]:
+        """让 LLM 从所有候选消息中找出需要的信息"""
+        import json, re
+
+        # 准备候选消息摘要
+        candidate_summaries = []
+        for i, c in enumerate(candidates[:20]):  # 限制数量
+            content = c.get("content", "")[:300]
+            role = c.get("role", "")
+            candidate_summaries.append(f"[{i}] 角色:{role} 内容:{content}")
+
+        candidates_text = "\n".join(candidate_summaries)
+
+        prompt = f"""用户当前任务: {task_info.get("task_description", "")}
+用户需要的信息类型: {task_info.get("needed_info_type", "")}
+
+以下是历史对话中的相关消息，找出包含用户需要信息的那条：
+
+{candidates_text}
+
+请从以上消息中找出用户需要的具体信息（如密码、API Key等）。
+只返回信息内容，不要返回其他内容。
+如果找不到，返回"未找到"。
+
+返回格式：
+{{
+    "found": true/false,
+    "info": "具体信息内容"
+}}"""
+
+        try:
+            print(f"[FIND_INFO] Calling LLM with {len(candidates)} candidates")
+            response = await self.llm_manager.chat(prompt)
+            print(f"[FIND_INFO] LLM response: {response[:300]}")
+
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                print(f"[FIND_INFO] Parsed: {data}")
+                if data.get("found"):
+                    info = data.get("info", "")
+                    print(f"[FIND_INFO] Found: {info[:50]}")
+                    return info
+            else:
+                print(f"[FIND_INFO] No JSON found in response")
+        except Exception as e:
+            print(f"[FIND_INFO] Error: {e}")
+
+        return None
+
+    async def _validate_info_with_llm(self, candidate: Dict, task_info: Dict) -> bool:
+        """用 LLM 判断这段历史消息是否包含用户当前需要的信息"""
+        import json, re
+
+        candidate_content = candidate.get("content", "")[:500]
+        candidate_role = candidate.get("role", "")
+
+        logger.info(
+            f"Validating candidate (role={candidate_role}): {candidate_content[:50]}... for task: {task_info.get('task_description', '')}"
+        )
+
+        prompt = f"""判断这段历史消息是否包含用户当前需要的信息。
+
+用户当前任务: {task_info.get("task_description", "")}
+用户需要的信息类型: {task_info.get("needed_info_type", "")}
+
+历史消息内容:
+角色: {candidate_role}
+内容: {candidate_content}
+
+判断标准：
+1. 这段消息是否包含用户当前需要的具体信息？（如密码、API Key、账号等）
+2. 如果用户问"我的密码是什么"，找出包含密码的那段消息
+3. 如果用户问"API Key"，找出包含 API Key 的那段消息
+
+返回 JSON：
+{{
+    "is_correct": true/false,
+    "reason": "为什么是/不是正确的信息",
+    "found_info": "如果正确，找出具体的信息内容"
+}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                is_correct = data.get("is_correct", False)
+                reason = data.get("reason", "")
+                logger.info(f"Validation: is_correct={is_correct}, reason={reason[:100]}")
+                return is_correct
+        except Exception as e:
+            logger.warning(f"Validate failed: {e}")
+
+        return False
+
+    async def _try_real_api_validation(self, api_key: str, api_type: str) -> bool:
+        """真正调用 API 验证 key 是否有效"""
+        import aiohttp
+
+        if api_type == "xialiao":
+            url = "https://xialiao.ai/api/v1/user/profile"
+            headers = {"Authorization": f"Bearer {api_key}"}
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)
+                    ) as resp:
+                        if resp.status == 200:
+                            return True
+                        else:
+                            logger.info(f"xialiao API validation failed: status={resp.status}")
+            except Exception as e:
+                logger.info(f"xialiao API validation error: {e}")
+
+        return False
+
+    async def _expand_search(self, user_id: str, task_info: Dict) -> List[Dict]:
+        """扩大搜索范围"""
+        import json, re
+
+        # 让 LLM 决定如何扩大搜索
+        prompt = f"""需要扩大搜索来找到正确的信息。
+
+任务描述: {task_info.get("task_description", "")}
+需要的信息类型: {task_info.get("needed_info_type", "")}
+
+请给出更多搜索关键词建议（可能相关的词、变体、同义词等）。
+
+返回 JSON：
+{{
+    "search_keywords": ["关键词1", "关键词2", ...]
+}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                keywords = data.get("search_keywords", [])
+
+                candidates = []
+                for kw in keywords:
+                    results = await self.conversation_manager.search_all_conversations(
+                        owner_id=user_id, query=kw, limit=20
+                    )
+
+                    for r in results:
+                        content = r.get("content", "")
+                        info_values = self._extract_all_sensitive_values(content)
+
+                        for value in info_values:
+                            candidates.append(
+                                {
+                                    "value": value,
+                                    "role": r.get("role", ""),
+                                    "source": "expanded_search",
+                                    "content_preview": content[:200],
+                                }
+                            )
+
+                # 去重
+                seen = set()
+                unique = []
+                for c in candidates:
+                    key = c.get("value", "")[:30]
+                    if key and key not in seen:
+                        seen.add(key)
+                        unique.append(c)
+
+                return unique
+        except Exception as e:
+            logger.warning(f"Expand search failed: {e}")
+
+        return []
+
+    def _format_found_info(self, info: Dict) -> str:
+        """格式化找到的信息"""
+        content = info.get("content", "")
+        # 提取关键信息
+        return f"""## 找到可用信息
+
+从历史对话中找到你需要的信息：
+
+**相关内容**: {content[:300]}
+
+（已从历史记录中验证）"""
+
+    def _format_ask_user(self, task_info: Dict) -> str:
+        """格式化询问用户"""
+        return f"""## 需要更多信息
+
+我已经尝试了所有能找到的候选信息，但都无法确认是正确的。
+
+需要的信息: {task_info.get("needed_info_type", "相关凭证")}
+任务描述: {task_info.get("task_description", "")}
+
+请问您能：
+1. 直接提供正确的{task_info.get("needed_info_type", "凭证")}吗？
+2. 或者告诉我是哪次对话提供的，我可以更精确地查找
+3. 或者告诉我验证方法，我再尝试"""
+
+    def _regex_match_sensitive_info(
+        self, messages: List[Dict], missing_info: List[Dict]
+    ) -> Optional[Dict]:
+        """用正则直接匹配敏感信息（不遗漏）"""
+
+        # 定义敏感信息模式
+        patterns = {
+            "xialiao_api_key": [
+                r"xialiao_[a-zA-Z0-9]{20,}",
+                r"API Key[:\s]+xialiao_[a-zA-Z0-9]+",
+                r"API key[:\s]+xialiao_[a-zA-Z0-9]+",
+                r"api_key[:\s]+xialiao_[a-zA-Z0-9]+",
+            ],
+            "sk_api_key": [
+                r"sk-[a-zA-Z0-9_-]{20,}",
+                r"API Key[:\s]+sk-[a-zA-Z0-9_-]+",
+            ],
+            "password": [
+                r"密码[:\s]+[^\s]+",
+                r"password[:\s]+[^\s]+",
+                r"记住.*密码.*[^\s]+",
+            ],
+            "token": [
+                r"token[:\s]+[a-zA-Z0-9_-]{10,}",
+                r"Bearer\s+[a-zA-Z0-9_-]{10,}",
+            ],
+        }
+
+        # 按信息类型匹配
+        for info in missing_info:
+            info_type = info.get("info_type", "")
+
+            # 优先匹配 xialiao
+            if "api" in info_type.lower() or "key" in info_type.lower():
+                key_patterns = patterns.get("xialiao_api_key", [])
+                for msg in messages:
+                    content = msg.get("content", "")
+                    for pattern in key_patterns:
+                        matches = re.findall(pattern, content, re.IGNORECASE)
+                        if matches:
+                            return {
+                                "info_type": "xialiao_api_key",
+                                "value": matches[0],
+                                "source": "regex_match",
+                            }
+
+                # 再匹配 sk- 开头的
+                for pattern in patterns.get("sk_api_key", []):
+                    for msg in messages:
+                        content = msg.get("content", "")
+                        matches = re.findall(pattern, content, re.IGNORECASE)
+                        if matches:
+                            return {
+                                "info_type": "api_key",
+                                "value": matches[0],
+                                "source": "regex_match",
+                            }
+
+            # 匹配密码
+            if "password" in info_type.lower() or "密码" in info_type:
+                for pattern in patterns.get("password", []):
+                    for msg in messages:
+                        content = msg.get("content", "")
+                        matches = re.findall(pattern, content, re.IGNORECASE)
+                        if matches:
+                            return {
+                                "info_type": "password",
+                                "value": matches[0],
+                                "source": "regex_match",
+                            }
+
+        return None
+
+    async def _extract_specific_info_v2(
+        self, messages: List[Dict], missing_info: List[Dict]
+    ) -> Optional[Dict]:
+        """用 LLM 从相关消息中提取具体信息"""
+        if not messages:
+            return None
+
+        import json, re
+
+        # 只取用户消息（更容易找到原始信息）
+        user_msgs = [m for m in messages if m.get("role") == "user"]
+        other_msgs = [m for m in messages if m.get("role") != "user"]
+        priority_msgs = user_msgs + other_msgs
+
+        contents_text = "\n---\n".join(
+            [
+                f"[{m.get('role', 'unknown')}] {m.get('content', '')[:600]}"
+                for m in priority_msgs[:15]
+            ]
+        )
+
+        prompt = f"""从对话消息中，找出用户明确提供的敏感信息。
+
+需要的信息类型:
+{json.dumps(missing_info, ensure_ascii=False, indent=2)}
+
+对话消息:
+{contents_text}
+
+请找出并返回用户提供的具体敏感信息值。
+
+返回格式（JSON）：
+{{
+    "found": true/false,
+    "info_type": "xialiao_api_key/password/token/...",
+    "value": "找到的具体值",
+    "reasoning": "从哪条消息找到的"
+}}
+
+注意：
+1. 虾聊 API Key 格式是 xialiao_xxx（如 xialiao_019c7c59f5f77884ac51ef6c092c9500）
+2. 直接返回找到的值，不要编造
+3. 如果找不到返回 {{"found": false}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                if data.get("found") and data.get("value"):
+                    return {
+                        "info_type": data.get("info_type", "unknown"),
+                        "value": data.get("value", ""),
+                        "source": "llm_extraction",
+                    }
+        except Exception as e:
+            logger.warning(f"LLM extraction failed: {e}")
+
+        return None
+
+    async def _check_need_retrieval_v2(self, user_message: str) -> tuple:
+        """判断是否需要检索（返回是否需要 + 上下文说明）"""
+        import json, re
+
+        prompt = f"""准确判断用户消息是否需要从历史对话中检索信息。
+
+用户消息: {user_message}
+
+判断标准：
+需要检索的情况（满足任一即可）：
+1. 用户要求完成任务但缺少关键信息（API Key、密码、配置等）
+2. 用户询问"之前告诉你的xxx是什么"、"你记得xxx吗"
+3. 用户要求使用某服务但没提供凭证
+4. 用户说"查找"、"找找之前"
+
+不需要检索的情况：
+1. 简单问候/闲聊
+2. 用户只是询问一般性问题且不需要特定信息
+3. 任务信息看起来已经完整
+
+返回 JSON：
+{{
+    "need_retrieval": true/false,
+    "context": "如果需要，说明需要什么信息（如：需要虾聊API Key）"
+}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                need = data.get("need_retrieval", False)
+                context = data.get("context", "")
+                logger.info(f"Retrieval check: need={need}, context={context}")
+                return need, context
+        except Exception as e:
+            logger.warning(f"Check retrieval failed: {e}")
+
+        return False, ""
+
+    async def _analyze_missing_info_v2(self, user_message: str) -> List[Dict]:
+        """分析需要搜索的信息类型"""
+        import json, re
+
+        prompt = f"""分析用户任务，返回需要搜索的信息类型。
+
+用户消息: {user_message}
+
+返回 JSON 数组：
+[
+    {{"info_type": "xialiao_api_key", "description": "虾聊API Key"}},
+    {{"info_type": "password", "description": "登录密码"}},
+    ...
+]
+
+如果任务不需要特定信息，返回空数组 []"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\[[\s\S]*\]", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                return data if isinstance(data, list) else []
+        except Exception as e:
+            logger.warning(f"Analyze info failed: {e}")
+
+        return []
+
+    async def _get_all_messages(self, user_id: str, max_count: int = 100) -> List[Dict]:
+        """获取用户所有对话消息 - 使用搜索方法直接获取相关消息"""
+
+        # 使用搜索方法获取所有相关消息
+        all_results = []
+
+        # 搜索多种关键词
+        search_queries = [
+            "xialiao_",
+            "虾聊",
+            "API Key",
+            "api_key",
+            "password",
+            "密码",
+            "token",
+            "认证",
+        ]
+
+        for query in search_queries:
+            results = await self.conversation_manager.search_all_conversations(
+                owner_id=user_id, query=query, limit=30
+            )
+            for r in results:
+                if r["id"] not in [x["id"] for x in all_results]:
+                    all_results.append(r)
+
+        # 按时间排序
+        all_results.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+
+        return all_results[:max_count]
+
+    async def _llm_find_relevant_messages(
+        self, messages: List[Dict], missing_info: List[Dict]
+    ) -> List[Dict]:
+        """用 LLM 判断哪些消息包含需要的信息（全文检索，不依赖关键词）"""
+        if not messages:
+            return []
+
+        import json, re
+
+        # 取最近的消息（更容易找到相关信息）
+        recent_messages = messages[:30]
+
+        # 构建消息摘要
+        msg_summary = []
+        for i, msg in enumerate(recent_messages):
+            content = msg.get("content", "")[:500]  # 截取前500字符
+            role = msg.get("role", "unknown")
+            msg_summary.append(f"[{i}] [{role}] {content}")
+
+        messages_text = "\n".join(msg_summary)
+
+        prompt = f"""从以下对话消息中，找出包含用户需要的敏感信息的消息。
+
+需要的信息类型:
+{json.dumps(missing_info, ensure_ascii=False, indent=2)}
+
+对话消息:
+{messages_text}
+
+请分析每条消息，判断是否包含需要的信息。
+
+返回 JSON 格式:
+{{
+    "relevant_indices": [消息索引列表，如 [0, 3, 5]],
+    "reasoning": "判断理由"
+}}
+
+注意：
+1. 即使消息中只有部分信息（如只有"xialiao_"前缀），也要标记为相关
+2. 用户之前提供的任何包含 API Key、密码、token 的消息都要找出来
+3. 重点关注用户(role=user)提供的原始消息"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                indices = data.get("relevant_indices", [])
+
+                # 返回相关消息
+                relevant = []
+                for idx in indices:
+                    if 0 <= idx < len(messages):
+                        relevant.append(messages[idx])
+                return relevant
+        except Exception as e:
+            logger.warning(f"LLM find relevant messages failed: {e}")
+
+        return []
+
+    async def _extract_specific_info(
+        self, messages: List[Dict], missing_info: List[Dict]
+    ) -> Optional[Dict]:
+        """从相关消息中提取具体的敏感信息"""
+        if not messages:
+            return None
+
+        import json, re
+
+        # 重点关注用户消息（role=user）
+        user_messages = [m for m in messages if m.get("role") == "user"]
+        other_messages = [m for m in messages if m.get("role") != "user"]
+
+        # 优先检查用户消息
+        priority_messages = user_messages + other_messages
+
+        # 提取所有可能包含敏感信息的内容
+        all_contents = []
+        for msg in priority_messages[:20]:
+            content = msg.get("content", "")
+            if content:
+                # 查找可能的 API Key 模式
+                patterns = [
+                    r"xialiao_[a-zA-Z0-9]+",  # xialiao_ 开头的 key
+                    r"sk-[a-zA-Z0-9-]+",  # sk- 开头的 key
+                    r"api[_-]?key[:\s]+[^\s]+",  # api_key: xxx
+                    r"API[_-]?Key[:\s]+[^\s]+",  # API Key: xxx
+                    r"token[:\s]+[^\s]+",  # token: xxx
+                    r"密码[:\s]+[^\s]+",  # 密码: xxx
+                ]
+
+                for pattern in patterns:
+                    matches = re.findall(pattern, content, re.IGNORECASE)
+                    if matches:
+                        all_contents.append(f"[用户消息] {content[:1000]}")
+                        break
+
+        if not all_contents:
+            # 如果没有匹配到模式，用原始消息内容
+            all_contents = [
+                f"[{msg.get('role', 'unknown')}] {msg.get('content', '')[:500]}"
+                for msg in priority_messages[:10]
+            ]
+
+        contents_text = "\n---\n".join(all_contents)
+
+        prompt = f"""从以下对话消息中，仔细找出用户提供的敏感信息。
+
+需要的信息类型:
+{json.dumps(missing_info, ensure_ascii=False, indent=2)}
+
+对话消息:
+{contents_text}
+
+请仔细分析每条消息，找出用户明确提供的敏感信息。
+
+返回 JSON 格式:
+{{
+    "extracted": true/false,
+    "info_type": "api_key/password/token/其他",
+    "value": "提取到的具体值",
+    "reasoning": "从哪条消息、如何提取的"
+}}
+
+特别注意：
+1. 虾聊的 API Key 格式是 xialiao_xxxxx（如 xialiao_019c7c59f5f77884ac51ef6c092c9500）
+2. sk- 开头的通常是测试用的，不是正式的
+3. 如果有多条消息都有相关信息，都要找出来
+4. 返回具体值，不是整个消息"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                logger.info(f"Extraction result: {data}")
+                if data.get("extracted") and data.get("value"):
+                    return data
+        except Exception as e:
+            logger.warning(f"Extract specific info failed: {e}")
+
+        return None
+
+        import json, re
+
+        # 提取消息内容
+        contents = "\n---\n".join(
+            [
+                f"[{msg.get('role', 'unknown')}] {msg.get('content', '')[:800]}"
+                for msg in messages[:10]
+            ]
+        )
+
+        prompt = f"""从以下对话消息中，提取用户需要的具体敏感信息。
+
+需要的信息类型:
+{json.dumps(missing_info, ensure_ascii=False, indent=2)}
+
+对话消息:
+{contents}
+
+请找出并提取具体的敏感信息（如完整的 API Key、密码等）。
+
+返回 JSON 格式:
+{{
+    "extracted": true/false,
+    "info_type": "api_key/password/token/...",
+    "value": "提取到的具体值（如完整的 xialiao_xxx）",
+    "reasoning": "提取理由"
+}}
+
+注意：
+1. 只要找到任何相关的敏感信息就返回
+2. 如果有多个同类信息，全部提取
+3. 返回具体的值，不要返回整个消息"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                if data.get("extracted") and data.get("value"):
+                    return data
+        except Exception as e:
+            logger.warning(f"Extract specific info failed: {e}")
+
+        return None
+
+    def _format_found_info(self, info: Dict) -> str:
+        """格式化找到的具体信息"""
+        info_type = info.get("info_type", "未知")
+        value = info.get("value", "")
+
+        return f"""## 找到的信息
+
+从历史对话中找到您需要的信息：
+
+**类型**: {info_type}
+**值**: `{value}`
+
+（如有需要，我可以帮您使用这个信息完成任务）"""
+
+    def _format_partial_results(self, messages: List[Dict], missing_info: List[Dict]) -> str:
+        """格式化部分结果（找到相关消息但没有具体信息）"""
+        info_descriptions = [info.get("description", "") for info in missing_info]
+
+        return f"""## 找到相关对话
+
+我找到了一些相关的历史对话，但无法确定具体的敏感信息值。
+
+需要的信息: {", ".join(info_descriptions)}
+
+找到的对话片段:
+{chr(10).join([f"- {msg.get('content', '')[:200]}..." for msg in messages[:3]])}
+
+请问：
+1. 您能告诉我是哪次对话提供的吗？
+2. 或者您可以直接再提供一次这个信息？
+3. 我可以继续搜索更早的对话历史"""
+
+    async def _check_need_retrieval(self, user_message: str) -> bool:
+        """判断是否需要信息检索（触发条件）"""
+        import json, re
+
+        prompt = f"""判断用户消息是否需要从历史对话中检索信息。
+
+用户消息: {user_message}
+
+需要检索的情况（满足任一即可）：
+1. 用户要求完成一个任务，但缺少关键信息（如API Key、密码、配置等）
+2. 用户询问"之前告诉你的xxx是什么"、"你记得xxx吗"
+3. 用户说"查找"、"找找看之前"
+4. 用户要求使用某个服务但没有提供凭证
+
+不需要检索的情况：
+1. 简单的问候、闲聊
+2. 用户只是询问一般性问题
+3. 任务信息看起来已经完整
+4. 用户只是聊天不需要特定信息
+
+返回 JSON：
+{{
+    "need_retrieval": true/false,
+    "reason": "判断理由（简洁）"
+}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                need = data.get("need_retrieval", False)
+                logger.info(f"Need retrieval check: {need}, reason: {data.get('reason', '')}")
+                return need
+        except Exception as e:
+            logger.warning(f"Check need retrieval failed: {e}")
+
+        return False
+
+    async def _analyze_missing_info(self, user_message: str) -> List[Dict]:
+        """分析缺少什么信息，并生成详细的搜索提示"""
+        import json, re
+
+        prompt = f"""分析用户任务，判断缺少什么关键信息，并生成详细的搜索提示。
+
+用户消息: {user_message}
+
+需要识别的信息类型：
+- api_key: API密钥（如 xialiao_xxx, sk-xxx, token 等）
+- password: 密码
+- token: 认证令牌
+- config: 配置信息
+- account: 账号信息
+- other: 其他
+
+重要：搜索提示应该包含可能出现的关键词变体！
+例如：
+- api_key 的搜索提示应该包含：xialiao_, sk-, api key, API Key, token, 密钥, 认证
+- 尽可能列出所有可能的关键词
+
+返回 JSON 数组：
+[
+    {{
+        "info_type": "api_key",
+        "description": "需要的API Key用于调用虾聊API",
+        "search_hint": "xialiao_ sk- api key API Key token 密钥 认证 key= xxx_xxx"
+    }},
+    ...
+]
+
+如果没有缺少信息，返回空数组 []"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\[[\s\S]*\]", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                return data if isinstance(data, list) else []
+        except Exception as e:
+            logger.warning(f"Analyze missing info failed: {e}")
+
+        return []
+
+    async def _full_text_search(self, user_id: str, missing_info: List[Dict]) -> List[Dict]:
+        """全文检索：直接搜索完整消息内容"""
+        results = []
+
+        for info in missing_info:
+            hint = info.get("search_hint", "")
+            # 直接用搜索提示词搜索完整消息
+            if hint:
+                search_results = await self.conversation_manager.search_all_conversations(
+                    owner_id=user_id, query=hint, limit=10
+                )
+                results.extend(search_results)
+
+        # 去重
+        seen = set()
+        unique_results = []
+        for r in results:
+            if r["id"] not in seen:
+                seen.add(r["id"])
+                unique_results.append(r)
+
+        return unique_results
+
+    async def _search_user_messages(self, user_id: str, missing_info: List[Dict]) -> List[Dict]:
+        """搜索用户原始提供的消息"""
+        # 这个需要直接查询数据库，优先用户消息
+        # 已经在 conversation_manager 中实现了按 role 排序
+        results = []
+
+        for info in missing_info:
+            hint = info.get("search_hint", "")
+            if hint:
+                search_results = await self.conversation_manager.search_all_conversations(
+                    owner_id=user_id, query=hint, limit=15
+                )
+                # 只取用户消息
+                user_msgs = [r for r in search_results if r.get("role") == "user"]
+                results.extend(user_msgs)
+
+        # 去重
+        seen = set()
+        unique_results = []
+        for r in results:
+            if r["id"] not in seen:
+                seen.add(r["id"])
+                unique_results.append(r)
+
+        return unique_results
+
+    async def _llm_assisted_search(
+        self, user_id: str, missing_info: List[Dict], round_num: int
+    ) -> List[Dict]:
+        """LLM 辅助的智能搜索"""
+        # 生成更多搜索词
+        prompt = f"""为以下信息类型生成更多搜索关键词。
+
+缺少的信息: {json.dumps(missing_info, ensure_ascii=False)}
+当前轮次: {round_num}
+
+请生成多种不同的搜索词/短语，越多越好，越全面越好。"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            # 提取搜索词
+            import re
+
+            keywords = re.findall(r"[\w_]+", response.lower())
+            keywords = [k for k in keywords if len(k) > 3][:20]
+
+            results = []
+            for kw in keywords:
+                search_results = await self.conversation_manager.search_all_conversations(
+                    owner_id=user_id, query=kw, limit=5
+                )
+                results.extend(search_results)
+
+            # 去重
+            seen = set()
+            unique_results = []
+            for r in results:
+                if r["id"] not in seen:
+                    seen.add(r["id"])
+                    unique_results.append(r)
+
+            return unique_results
+
+        except Exception as e:
+            logger.warning(f"LLM assisted search failed: {e}")
+            return []
+
+    async def _validate_search_results(self, results: List[Dict], missing_info: List[Dict]) -> bool:
+        """验证搜索结果是否有效"""
+        if not results:
+            return False
+
+        import json, re
+
+        # 提取结果内容
+        result_contents = "\n".join([r.get("content", "")[:500] for r in results[:3]])
+
+        prompt = f"""判断以下搜索结果是否包含需要的信息。
+
+需要的信息: {json.dumps(missing_info, ensure_ascii=False)}
+
+搜索结果:
+{result_contents}
+
+返回 JSON：
+{{
+    "is_valid": true/false,
+    "reason": "判断理由",
+    "found_info": "如果找到，描述找到的信息"
+}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+            json_match = re.search(r"\{{[\s\S]*\}}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                return data.get("is_valid", False)
+        except Exception as e:
+            logger.warning(f"Validate search results failed: {e}")
+
+        return False
+
+    def _format_retrieval_results(self, results: List[Dict]) -> str:
+        """格式化检索结果"""
+        from datetime import datetime
+
+        formatted = ["## 从历史对话中找到的信息\n"]
+
+        for r in results[:5]:
+            ts = datetime.fromtimestamp(r["timestamp"]).strftime("%Y-%m-%d %H:%M")
+            content = r.get("content", "")[:1000]
+            formatted.append(f"- [{ts}] {content}...")
+
+        return "\n".join(formatted)
+
+    def _format_continue_search_prompt(self, missing_info: List[Dict], max_rounds: int) -> str:
+        """格式化询问是否继续搜索"""
+        info_descriptions = [info.get("description", "") for info in missing_info]
+
+        return f"""## 需要更多信息
+
+我需要以下信息来完成你的任务：
+{", ".join(info_descriptions)}
+
+我已经搜索了 {max_rounds} 轮但没有找到相关信息。
+
+请问：
+1. 你能提供这些信息吗？
+2. 或者需要我继续搜索吗？
+3. 或者你可以告诉我具体是在哪次对话中提供的，我可以更精确地查找。"""
+
     async def _chat_with_llm(
         self,
         messages: List[Dict[str, str]],
         tools: Optional[List[Dict[str, Any]]] = None,
         skills: Optional[List[Dict[str, Any]]] = None,
         conversation_id: Optional[str] = None,
+        user_session: Optional["UserSession"] = None,
     ) -> str:
         """
         使用 LLM 生成回复，支持工具和技能调用
@@ -726,6 +2109,7 @@ class MetaAgent:
             tools: 工具 schema 列表
             skills: 技能 schema 列表
             conversation_id: 可选的会话 ID，用于记录后台任务阶段
+            user_session: 用户会话对象（包含 wallet_address, workspace, sandbox 等）
 
         Returns:
             Agent 回复
@@ -778,7 +2162,7 @@ class MetaAgent:
                 return content
 
             # 执行工具调用
-            tool_results = await self._execute_tool_calls(tool_calls)
+            tool_results = await self._execute_tool_calls(tool_calls, user_session=user_session)
 
             # 如果有 conversation_id，记录工具执行阶段到数据库
             if conversation_id:
@@ -837,21 +2221,35 @@ class MetaAgent:
                     }
                 )
 
-                # 构建 tool_result content blocks
+                # 构建 tool_result content blocks - 使用索引顺序匹配
                 tool_result_blocks = []
-                for tool_result in tool_results:
+                for idx, tool_result in enumerate(tool_results):
+                    # 使用索引匹配，确保一一对应
                     tool_call_id = None
-                    # 找到对应的 tool_call id
-                    for tc in tool_calls:
-                        if tc["function"]["name"] == tool_result.get("tool"):
-                            tool_call_id = tc["id"]
-                            break
+                    if idx < len(tool_calls):
+                        tool_call_id = tool_calls[idx].get("id")
+
+                    # 如果索引匹配失败，尝试按名称匹配
+                    if tool_call_id is None:
+                        for tc in tool_calls:
+                            if tc["function"]["name"] == tool_result.get("tool"):
+                                tool_call_id = tc["id"]
+                                break
+
+                    # 确保 tool_call_id 有效
+                    if tool_call_id is None:
+                        logger.warning(
+                            f"Could not find tool_call_id for tool: {tool_result.get('tool')}"
+                        )
+                        continue
 
                     tool_result_blocks.append(
                         {
                             "type": "tool_result",
                             "tool_use_id": tool_call_id,
-                            "content": json.dumps(tool_result, ensure_ascii=False),
+                            "content": json.dumps(
+                                _serialize_for_json(tool_result), ensure_ascii=False
+                            ),
                         }
                     )
 
@@ -883,7 +2281,9 @@ class MetaAgent:
                     current_messages.append(
                         {
                             "role": "tool",
-                            "content": json.dumps(tool_result, ensure_ascii=False),
+                            "content": json.dumps(
+                                _serialize_for_json(tool_result), ensure_ascii=False
+                            ),
                             "tool_call_id": tool_calls[0].get("id") if tool_calls else None,
                         }
                     )
@@ -963,14 +2363,30 @@ class MetaAgent:
             # 没有 LLM 适配器，返回降级响应
             return {"content": "LLM 不可用（请配置 MINIMAX_API_KEY）", "tool_calls": []}
 
-    async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """执行工具调用"""
+    async def _execute_tool_calls(
+        self, tool_calls: List[Dict[str, Any]], user_session: Optional["UserSession"] = None
+    ) -> List[Dict[str, Any]]:
+        """执行工具调用
+
+        Args:
+            tool_calls: 工具调用列表
+            user_session: 用户会话对象（包含 wallet_address, workspace, sandbox 等）
+
+        Returns:
+            工具执行结果列表
+        """
         results = []
+
+        # 获取用户信息用于日志
+        wallet_info = user_session.wallet_address[:10] + "..." if user_session else "anonymous"
+        logger.info(f"Executing {len(tool_calls)} tool calls for user: {wallet_info}")
 
         for tool_call in tool_calls:
             try:
                 tool_name = tool_call.get("function", {}).get("name", "")
                 tool_args = tool_call.get("function", {}).get("arguments", {})
+
+                logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
 
                 # 解析参数
                 if isinstance(tool_args, str):
@@ -981,9 +2397,55 @@ class MetaAgent:
                     except:
                         tool_args = {}
 
-                # 执行工具
-                result = await self.tool_registry.execute(tool_name, **tool_args)
+                # 检查工具是否需要 session
+                tool = self.tool_registry.get_tool(tool_name)
+                if tool is None:
+                    # 工具不存在
+                    logger.error(f"Tool not found: {tool_name}")
+                    results.append(
+                        {
+                            "tool": tool_name,
+                            "result": {
+                                "error": f"工具 '{tool_name}' 不存在。请检查工具名称是否正确。"
+                            },
+                            "success": False,
+                        }
+                    )
+                    continue
 
+                if tool.requires_session:
+                    if user_session is None:
+                        # 工具需要 session 但没有可用 session
+                        error_msg = (
+                            f"⚠️ **需要用户授权**\n\n"
+                            f"工具 `{tool_name}` 需要用户会话才能执行。\n\n"
+                            f"请先绑定身份：\n"
+                            f"1. 点击右上角的「绑定身份」按钮\n"
+                            f"2. 选择连接钱包或使用临时标识符\n"
+                            f"3. 重新尝试此操作"
+                        )
+                        logger.warning(f"Tool {tool_name} requires session but no session provided")
+                        results.append(
+                            {
+                                "tool": tool_name,
+                                "result": {"error": error_msg, "requires_auth": True},
+                                "success": False,
+                            }
+                        )
+                        continue
+                    # 执行需要 session 的工具
+                    logger.info(
+                        f"Executing tool {tool_name} with user session (wallet: {user_session.wallet_address[:10]}...)"
+                    )
+                    result = await self.tool_registry.execute(
+                        tool_name, session=user_session, **tool_args
+                    )
+                else:
+                    # 执行不需要 session 的工具
+                    logger.info(f"Executing tool {tool_name} without session")
+                    result = await self.tool_registry.execute(tool_name, **tool_args)
+
+                logger.info(f"Tool {tool_name} result: {result}")
                 results.append(
                     {
                         "tool": tool_name,
@@ -994,10 +2456,13 @@ class MetaAgent:
 
             except Exception as e:
                 logger.error(f"Tool execution failed: {e}")
+                import traceback
+
+                traceback.print_exc()
                 results.append(
                     {
-                        "tool": tool_name,
-                        "result": {"error": str(e)},
+                        "tool": tool_name if "tool_name" in dir() else "unknown",
+                        "result": {"error": f"工具执行失败: {str(e)}"},
                         "success": False,
                     }
                 )
@@ -1030,10 +2495,7 @@ class MetaAgent:
         }
 
     async def execute_tool(
-        self,
-        tool_name: str,
-        wallet_address: Optional[str] = None,
-        **kwargs
+        self, tool_name: str, wallet_address: Optional[str] = None, **kwargs
     ) -> Any:
         """
         执行指定工具（改造后）
@@ -1061,10 +2523,7 @@ class MetaAgent:
         # 向后兼容：不提供 wallet_address 时使用原有行为
         return await self.tool_registry.execute(tool_name, **kwargs)
 
-    async def sync_user_data(
-        self,
-        wallet_address: str
-    ) -> str:
+    async def sync_user_data(self, wallet_address: str) -> str:
         """
         同步用户数据到IPFS（新增方法）
 
@@ -1083,10 +2542,7 @@ class MetaAgent:
         user_session = await self.session_manager.get_or_create_session(wallet_address)
         return await user_session.sync_to_ipfs()
 
-    async def migrate_user_data(
-        self,
-        wallet_address: str
-    ) -> bool:
+    async def migrate_user_data(self, wallet_address: str) -> bool:
         """
         从IPFS迁移用户数据到当前节点（新增方法）
 
@@ -1105,10 +2561,7 @@ class MetaAgent:
         user_session = await self.session_manager.get_or_create_session(wallet_address)
         return await user_session.migrate_to_this_node()
 
-    async def get_session_info(
-        self,
-        wallet_address: str
-    ) -> Optional[Dict]:
+    async def get_session_info(self, wallet_address: str) -> Optional[Dict]:
         """
         获取用户会话信息（新增方法）
 
