@@ -208,7 +208,7 @@ export default function Onboarding() {
         <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <Key className="text-primary-600 dark:text-primary-400" size={32} />
         </div>
-        <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100">
+        <h3 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100">
           {t('onboarding.createIdentity')}
         </h3>
         <p className="text-secondary-500 dark:text-secondary-400 mt-2">{t('onboarding.didDescription')}</p>
@@ -299,7 +299,7 @@ export default function Onboarding() {
         <div className="flex items-start gap-3">
           <Shield className="text-secondary-500 dark:text-secondary-400 mt-1" size={20} />
           <div>
-            <p className="font-medium text-secondary-900 dark:text-secondary-100">{t('onboarding.privacyProtection')}</p>
+            <p className="font-medium text-light-text-primary dark:text-secondary-100">{t('onboarding.privacyProtection')}</p>
             <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('onboarding.privacyDesc')}</p>
           </div>
         </div>
@@ -314,7 +314,7 @@ export default function Onboarding() {
         <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <Wallet className="text-green-600 dark:text-green-400" size={32} />
         </div>
-        <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100">{t('onboarding.stakeToJoin')}</h3>
+        <h3 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100">{t('onboarding.stakeToJoin')}</h3>
         <p className="text-secondary-500 dark:text-secondary-400 mt-2">{t('onboarding.stakeDesc')}</p>
       </div>
 
@@ -385,7 +385,7 @@ export default function Onboarding() {
         <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <UserPlus className="text-purple-600 dark:text-purple-400" size={32} />
         </div>
-        <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100">
+        <h3 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100">
           {t('onboarding.completeProfile')}
         </h3>
         <p className="text-secondary-500 dark:text-secondary-400 mt-2">{t('onboarding.profileDesc')}</p>
@@ -497,7 +497,7 @@ export default function Onboarding() {
         <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <Zap className="text-yellow-600 dark:text-yellow-400" size={32} />
         </div>
-        <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100">
+        <h3 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100">
           {t('onboarding.chooseParticipation')}
         </h3>
         <p className="text-secondary-500 dark:text-secondary-400 mt-2">{t('onboarding.participationDesc')}</p>
@@ -513,7 +513,7 @@ export default function Onboarding() {
               <Briefcase className="text-primary-600 dark:text-primary-400" size={24} />
             </div>
             <div>
-              <h4 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('onboarding.asSupplier')}</h4>
+              <h4 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('onboarding.asSupplier')}</h4>
               <p className="text-sm text-secondary-600 dark:text-secondary-400 mt-1">{t('onboarding.asSupplierDesc')}</p>
             </div>
           </div>
@@ -528,7 +528,7 @@ export default function Onboarding() {
               <Target className="text-green-600 dark:text-green-400" size={24} />
             </div>
             <div>
-              <h4 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('onboarding.asDemander')}</h4>
+              <h4 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('onboarding.asDemander')}</h4>
               <p className="text-sm text-secondary-600 dark:text-secondary-400 mt-1">{t('onboarding.asDemanderDesc')}</p>
             </div>
           </div>
@@ -568,7 +568,7 @@ export default function Onboarding() {
             <div className="w-8 h-8 md:w-10 md:h-10 bg-primary-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg md:text-xl">U</span>
             </div>
-            <span className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+            <span className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">
               {t('onboarding.title')}
             </span>
           </div>
@@ -601,7 +601,7 @@ export default function Onboarding() {
         <div className="mt-6 md:mt-8 text-center">
           <p className="text-xs md:text-sm text-secondary-500 dark:text-secondary-400">
             {t('onboarding.needHelp')}{' '}
-            <a href="#" className="text-primary-600 dark:text-primary-400 hover:underline">
+            <a href="/docs" className="text-primary-600 dark:text-primary-400 hover:underline">
               {t('onboarding.viewDocs')}
             </a>
           </p>

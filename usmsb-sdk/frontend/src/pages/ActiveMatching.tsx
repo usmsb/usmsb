@@ -244,7 +244,7 @@ export default function ActiveMatching() {
             <Lightbulb className="text-primary-600 dark:text-primary-400" size={20} />
           </div>
           <div className="text-left">
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('matching.whatIsMatching')}</h3>
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('matching.whatIsMatching')}</h3>
             <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('matching.clickToLearnConcepts')}</p>
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function ActiveMatching() {
         <div className="mt-6 space-y-6">
           {/* Concept Definition */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Info size={16} className="text-primary-500" />
               {t('matching.conceptDefinition')}
             </h4>
@@ -266,14 +266,14 @@ export default function ActiveMatching() {
 
           {/* Use Cases */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <TrendingUp size={16} className="text-green-500" />
               {t('matching.useCases')}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {useCaseExamples.map((example, idx) => (
                 <div key={idx} className="p-4 bg-white dark:bg-secondary-800 rounded-lg border border-secondary-200 dark:border-secondary-700">
-                  <h5 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2">{example.title}</h5>
+                  <h5 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2">{example.title}</h5>
                   <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-3">{example.description}</p>
                   <div className="text-xs space-y-1">
                     <div className="flex gap-2">
@@ -292,7 +292,7 @@ export default function ActiveMatching() {
 
           {/* Matching Dimensions */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Target size={16} className="text-purple-500" />
               {t('matching.matchingDimensions')}
             </h4>
@@ -318,7 +318,7 @@ export default function ActiveMatching() {
 
           {/* Matching Process */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Users size={16} className="text-blue-500" />
               {t('matching.matchingProcess')}
             </h4>
@@ -358,8 +358,8 @@ export default function ActiveMatching() {
               <Briefcase className="text-primary-600 dark:text-primary-400" size={24} />
             </div>
             <div>
-              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('onboarding.asSupplier')}</h3>
-              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('dashboard.findSuppliers')}</p>
+              <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('onboarding.asSupplier')}</h3>
+              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('dashboard.findDemanders')}</p>
             </div>
           </div>
 
@@ -452,8 +452,8 @@ export default function ActiveMatching() {
               <Target className="text-green-600 dark:text-green-400" size={24} />
             </div>
             <div>
-              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('onboarding.asDemander')}</h3>
-              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('dashboard.findDemanders')}</p>
+              <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('onboarding.asDemander')}</h3>
+              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('dashboard.findSuppliers')}</p>
             </div>
           </div>
 
@@ -564,7 +564,7 @@ export default function ActiveMatching() {
 
       {/* Recent Activity */}
       <div className="card">
-        <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Recent Activity</h3>
+        <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Recent Activity</h3>
         {isLoading ? (
           <div className="flex items-center justify-center h-24">
             <RefreshCw className="animate-spin text-secondary-400 dark:text-secondary-500" size={24} />
@@ -588,7 +588,7 @@ export default function ActiveMatching() {
                     }`}
                   />
                   <div>
-                    <p className="text-sm font-medium text-secondary-900 dark:text-secondary-100">
+                    <p className="text-sm font-medium text-light-text-primary dark:text-secondary-100">
                       {opp.counterpart_name}
                     </p>
                     <p className="text-xs text-secondary-500 dark:text-secondary-400">
@@ -679,7 +679,7 @@ export default function ActiveMatching() {
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">
+                    <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">
                       {opp.counterpart_name}
                     </h3>
                     <p className="text-xs text-secondary-500 dark:text-secondary-400">
@@ -720,25 +720,25 @@ export default function ActiveMatching() {
               <div className="grid grid-cols-4 gap-2 mb-4">
                 <div className="text-center p-2 bg-secondary-50 dark:bg-secondary-700 rounded-lg">
                   <p className="text-xs text-secondary-500 dark:text-secondary-400">Capability</p>
-                  <p className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">
+                  <p className="text-sm font-semibold text-light-text-primary dark:text-secondary-100">
                     {(opp.match_score.capability_match * 100).toFixed(0)}%
                   </p>
                 </div>
                 <div className="text-center p-2 bg-secondary-50 dark:bg-secondary-700 rounded-lg">
                   <p className="text-xs text-secondary-500 dark:text-secondary-400">Price</p>
-                  <p className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">
+                  <p className="text-sm font-semibold text-light-text-primary dark:text-secondary-100">
                     {(opp.match_score.price_match * 100).toFixed(0)}%
                   </p>
                 </div>
                 <div className="text-center p-2 bg-secondary-50 dark:bg-secondary-700 rounded-lg">
                   <p className="text-xs text-secondary-500 dark:text-secondary-400">Reputation</p>
-                  <p className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">
+                  <p className="text-sm font-semibold text-light-text-primary dark:text-secondary-100">
                     {(opp.match_score.reputation_match * 100).toFixed(0)}%
                   </p>
                 </div>
                 <div className="text-center p-2 bg-secondary-50 dark:bg-secondary-700 rounded-lg">
                   <p className="text-xs text-secondary-500 dark:text-secondary-400">Time</p>
-                  <p className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">
+                  <p className="text-sm font-semibold text-light-text-primary dark:text-secondary-100">
                     {(opp.match_score.time_match * 100).toFixed(0)}%
                   </p>
                 </div>
@@ -801,7 +801,7 @@ export default function ActiveMatching() {
                       <MessageSquare className="text-purple-600 dark:text-purple-400" size={20} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">
+                      <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">
                         {(neg.context?.service as string) || 'Service Negotiation'}
                       </h3>
                       <p className="text-xs text-secondary-500 dark:text-secondary-400">
@@ -831,7 +831,7 @@ export default function ActiveMatching() {
           {/* Negotiation Detail */}
           {selectedNegotiation ? (
             <div className="card">
-              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">
+              <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
                 Negotiation Details
               </h3>
 
@@ -938,7 +938,7 @@ export default function ActiveMatching() {
 
       {/* Match History */}
       <div className="card">
-        <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Match History</h3>
+        <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Match History</h3>
         <div className="text-center text-secondary-500 dark:text-secondary-400 py-8">
           <CheckCircle size={48} className="mx-auto mb-3 opacity-50" />
           <p>No completed matches yet.</p>
@@ -953,7 +953,7 @@ export default function ActiveMatching() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('matching.title')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('matching.title')}</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">
             {t('matching.searchSuppliers')}
           </p>
@@ -973,7 +973,7 @@ export default function ActiveMatching() {
               <Search className="text-blue-600 dark:text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {stats.total_opportunities}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('matching.title')}</p>
@@ -986,7 +986,7 @@ export default function ActiveMatching() {
               <MessageSquare className="text-purple-600 dark:text-purple-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {stats.active_negotiations}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('common.search')}</p>
@@ -999,7 +999,7 @@ export default function ActiveMatching() {
               <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {stats.successful_matches}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('common.success')}</p>
@@ -1012,7 +1012,7 @@ export default function ActiveMatching() {
               <Clock className="text-yellow-600 dark:text-yellow-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {stats.pending_responses}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('common.loading')}</p>

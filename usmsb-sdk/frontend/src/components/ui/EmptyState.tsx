@@ -40,12 +40,12 @@ export function EmptyState({
       <div className="relative mb-6">
         <div className={clsx(
           'w-20 h-20 rounded-full flex items-center justify-center',
-          'bg-secondary-100 dark:bg-secondary-800'
+          'bg-light-bg-tertiary dark:bg-secondary-800'
         )}>
           {Icon ? (
-            <Icon className="w-10 h-10 text-secondary-400 dark:text-secondary-500" />
+            <Icon className="w-10 h-10 text-light-text-muted dark:text-secondary-500" />
           ) : (
-            <DefaultIcon className="w-10 h-10 text-secondary-400 dark:text-secondary-500" />
+            <DefaultIcon className="w-10 h-10 text-light-text-muted dark:text-secondary-500" />
           )}
         </div>
         {/* Decorative elements */}
@@ -54,11 +54,11 @@ export function EmptyState({
       </div>
 
       {/* Text content */}
-      <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-2">
+      <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-2">
         {title}
       </h3>
       {description && (
-        <p className="text-secondary-500 dark:text-secondary-400 max-w-sm mb-6">
+        <p className="text-light-text-muted dark:text-secondary-400 max-w-sm mb-6">
           {description}
         </p>
       )}
@@ -78,7 +78,7 @@ export function EmptyState({
           {secondaryAction && (
             <button
               onClick={secondaryAction.onClick}
-              className="text-sm text-secondary-600 dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              className="text-sm text-light-text-secondary dark:text-secondary-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
             >
               {secondaryAction.label}
             </button>
@@ -113,7 +113,7 @@ export function CardSkeleton({ className }: { className?: string }) {
 export function ListItemSkeleton({ className }: { className?: string }) {
   return (
     <div className={clsx(
-      'flex items-center gap-4 p-4 rounded-lg bg-secondary-50 dark:bg-secondary-800/50 animate-pulse',
+      'flex items-center gap-4 p-4 rounded-lg bg-light-bg-tertiary dark:bg-secondary-800/50 animate-pulse',
       className
     )}>
       <div className="w-10 h-10 bg-secondary-200 dark:bg-secondary-700 rounded-full" />

@@ -81,28 +81,28 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
   return (
     <div className="fixed inset-0 z-[9998] flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-md h-full bg-white dark:bg-secondary-800 shadow-2xl animate-slide-in-right overflow-hidden flex flex-col">
+      <div className="relative w-full max-w-md h-full bg-white dark:bg-cyber-card shadow-2xl animate-slide-in-right overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-secondary-200 dark:border-secondary-700">
+        <div className="flex items-center justify-between p-4 border-b border-light-border dark:border-secondary-700">
           <div className="flex items-center gap-2">
             <HelpCircle className="text-primary-600 dark:text-primary-400" size={20} />
-            <h2 className="font-semibold text-secondary-900 dark:text-white">
+            <h2 className="font-semibold text-light-text-primary dark:text-white">
               {t('help.title', 'Help Center')}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-secondary-100 dark:hover:bg-secondary-700"
+            className="p-1 rounded-lg hover:bg-light-bg-tertiary dark:hover:bg-secondary-700"
           >
-            <X size={20} className="text-secondary-500 dark:text-secondary-400" />
+            <X size={20} className="text-light-text-muted dark:text-secondary-400" />
           </button>
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b border-secondary-200 dark:border-secondary-700">
+        <div className="p-4 border-b border-light-border dark:border-secondary-700">
           <div className="relative">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-light-text-muted"
               size={18}
             />
             <input
@@ -110,7 +110,7 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
               placeholder={t('help.searchPlaceholder', 'Search help topics...')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-secondary-200 dark:border-secondary-600 rounded-lg bg-secondary-50 dark:bg-secondary-700 text-secondary-900 dark:text-secondary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-10 pr-4 py-2 border border-light-border dark:border-secondary-600 rounded-lg bg-light-bg-tertiary dark:bg-secondary-700 text-light-text-primary dark:text-secondary-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
@@ -126,14 +126,14 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
                 <ChevronRight size={16} className="rotate-180" />
                 {t('common.back', 'Back')}
               </button>
-              <h3 className="text-lg font-semibold text-secondary-900 dark:text-white mb-3">
+              <h3 className="text-lg font-semibold text-light-text-primary dark:text-white mb-3">
                 {selectedItem.title}
               </h3>
-              <p className="text-secondary-600 dark:text-secondary-400 mb-4">
+              <p className="text-light-text-secondary dark:text-secondary-400 mb-4">
                 {selectedItem.description}
               </p>
-              <div className="p-4 bg-secondary-50 dark:bg-secondary-700/50 rounded-lg">
-                <p className="text-sm text-secondary-600 dark:text-secondary-400">
+              <div className="p-4 bg-light-bg-tertiary dark:bg-secondary-700/50 rounded-lg">
+                <p className="text-sm text-light-text-secondary dark:text-secondary-400">
                   {t('help.detailedHelp', 'Detailed help content will be available here.')}
                 </p>
               </div>
@@ -148,7 +148,7 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
                     'px-3 py-1.5 text-sm rounded-full transition-colors',
                     activeCategory === null
                       ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                      : 'bg-secondary-100 dark:bg-secondary-700 text-secondary-600 dark:text-secondary-400'
+                      : 'bg-light-bg-tertiary dark:bg-secondary-700 text-light-text-secondary dark:text-secondary-400'
                   )}
                 >
                   {t('help.all', 'All')}
@@ -161,7 +161,7 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
                       'px-3 py-1.5 text-sm rounded-full transition-colors flex items-center gap-1',
                       activeCategory === cat.id
                         ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'
-                        : 'bg-secondary-100 dark:bg-secondary-700 text-secondary-600 dark:text-secondary-400'
+                        : 'bg-light-bg-tertiary dark:bg-secondary-700 text-light-text-secondary dark:text-secondary-400'
                     )}
                   >
                     <cat.icon size={14} />
@@ -176,18 +176,18 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
                   <button
                     key={item.id}
                     onClick={() => setSelectedItem(item)}
-                    className="w-full p-3 text-left rounded-lg border border-secondary-200 dark:border-secondary-700 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-secondary-50 dark:hover:bg-secondary-700/50 transition-colors"
+                    className="w-full p-3 text-left rounded-lg border border-light-border dark:border-secondary-700 hover:border-primary-300 dark:hover:border-primary-600 hover:bg-light-bg-tertiary dark:hover:bg-secondary-700/50 transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-medium text-secondary-900 dark:text-white">
+                        <h4 className="font-medium text-light-text-primary dark:text-white">
                           {item.title}
                         </h4>
-                        <p className="text-sm text-secondary-500 dark:text-secondary-400">
+                        <p className="text-sm text-light-text-muted dark:text-secondary-400">
                           {item.description}
                         </p>
                       </div>
-                      <ChevronRight size={18} className="text-secondary-400" />
+                      <ChevronRight size={18} className="text-light-text-muted" />
                     </div>
                   </button>
                 ))}
@@ -205,7 +205,7 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-secondary-200 dark:border-secondary-700 bg-secondary-50 dark:bg-secondary-700/50">
+        <div className="p-4 border-t border-light-border dark:border-secondary-700 bg-light-bg-secondary dark:bg-secondary-700/50">
           <div className="flex items-center justify-between text-sm">
             <a
               href="/docs"

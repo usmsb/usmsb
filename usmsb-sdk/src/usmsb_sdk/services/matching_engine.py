@@ -3,13 +3,19 @@ Matching Engine Service
 
 A standalone matching engine that can work without the full SDK dependencies.
 Provides real matching algorithms for the REST API.
+
+Integrates with DynamicPricingService for intelligent price suggestions.
 """
+
 import json
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from usmsb_sdk.services.dynamic_pricing_service import DynamicPricingService
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MatchScore:
     """Score for a supply-demand match."""
+
     overall: float
     capability_match: float
     price_match: float
@@ -42,6 +49,7 @@ class MatchScore:
 @dataclass
 class MatchResult:
     """Result of a matching operation."""
+
     match_id: str
     demand_id: str
     supply_id: str
@@ -70,9 +78,9 @@ class MatchingEngine:
     3. Reputation matching - trust scoring
     4. Time matching - availability/deadline alignment
     5. Semantic matching - description similarity
+    6. Dynamic pricing - intelligent price suggestions
     """
 
-    # Weights for overall score calculation
     WEIGHTS = {
         "capability": 0.35,
         "price": 0.20,
@@ -81,15 +89,21 @@ class MatchingEngine:
         "semantic": 0.15,
     }
 
-    def __init__(self, llm_adapter=None):
+    def __init__(self, llm_adapter=None, pricing_service: Optional["DynamicPricingService"] = None):
         """
         Initialize matching engine.
 
         Args:
             llm_adapter: Optional LLM adapter for semantic matching
+            pricing_service: Optional dynamic pricing service for intelligent pricing
         """
         self.llm = llm_adapter
+        self.pricing_service = pricing_service
         self._match_history: List[Dict[str, Any]] = []
+
+    def set_pricing_service(self, service: "DynamicPricingService") -> None:
+        """Set the dynamic pricing service."""
+        self.pricing_service = service
 
     def calculate_capability_match(
         self,
@@ -241,9 +255,10 @@ class MatchingEngine:
         if deadline:
             try:
                 from datetime import datetime, timedelta
+
                 # Try to parse deadline
-                if deadline.endswith('Z'):
-                    deadline_dt = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+                if deadline.endswith("Z"):
+                    deadline_dt = datetime.fromisoformat(deadline.replace("Z", "+00:00"))
                 else:
                     deadline_dt = datetime.fromisoformat(deadline)
 
@@ -303,10 +318,46 @@ Respond with only a number between 0 and 1.
         words2 = set(supply_description.lower().split())
 
         # Remove common words
-        stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-                      "have", "has", "had", "do", "does", "did", "will", "would", "could",
-                      "should", "may", "might", "must", "shall", "can", "need", "to", "for",
-                      "of", "in", "on", "at", "by", "with", "from", "as", "into", "through"}
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "to",
+            "for",
+            "of",
+            "in",
+            "on",
+            "at",
+            "by",
+            "with",
+            "from",
+            "as",
+            "into",
+            "through",
+        }
 
         words1 -= stop_words
         words2 -= stop_words
@@ -331,11 +382,11 @@ Respond with only a number between 0 and 1.
         Calculate weighted overall score.
         """
         return (
-            capability_match * self.WEIGHTS["capability"] +
-            price_match * self.WEIGHTS["price"] +
-            reputation_match * self.WEIGHTS["reputation"] +
-            time_match * self.WEIGHTS["time"] +
-            semantic_match * self.WEIGHTS["semantic"]
+            capability_match * self.WEIGHTS["capability"]
+            + price_match * self.WEIGHTS["price"]
+            + reputation_match * self.WEIGHTS["reputation"]
+            + time_match * self.WEIGHTS["time"]
+            + semantic_match * self.WEIGHTS["semantic"]
         )
 
     def suggest_price_range(
@@ -346,6 +397,9 @@ Respond with only a number between 0 and 1.
     ) -> Dict[str, float]:
         """
         Suggest a fair price range for negotiation.
+
+        Uses dynamic pricing service if available, otherwise falls back to
+        basic algorithm.
         """
         budget_min = budget_range.get("min", provider_price * 0.5)
         budget_max = budget_range.get("max", provider_price * 1.5)
@@ -376,6 +430,53 @@ Respond with only a number between 0 and 1.
             "min": round(suggested_min, 2),
             "max": round(suggested_max, 2),
         }
+
+    async def calculate_dynamic_price(
+        self,
+        base_price: float,
+        service_type: str,
+        supplier_id: str,
+        supplier_reputation: float = 0.5,
+        demander_urgency: float = 0.0,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Calculate intelligent price using dynamic pricing service.
+
+        Args:
+            base_price: Base/reference price
+            service_type: Type of service
+            supplier_id: Service provider ID
+            supplier_reputation: Reputation score (0-1)
+            demander_urgency: Urgency level (0-1)
+            context: Additional context
+
+        Returns:
+            Dict with pricing details including final price and factors
+        """
+        if not self.pricing_service:
+            return {
+                "final_price": base_price,
+                "price_range": {
+                    "min": base_price * 0.8,
+                    "max": base_price * 1.2,
+                    "recommended": base_price,
+                },
+                "factors": [],
+                "confidence": 0.0,
+                "reasoning": "Dynamic pricing service not available",
+            }
+
+        result = await self.pricing_service.calculate_price(
+            base_price=base_price,
+            service_type=service_type,
+            supplier_id=supplier_id,
+            supplier_reputation=supplier_reputation,
+            demander_urgency=demander_urgency,
+            context=context or {},
+        )
+
+        return result.to_dict()
 
     def generate_reasoning(
         self,
@@ -463,7 +564,9 @@ Respond with only a number between 0 and 1.
             price_score = self.calculate_price_match(budget_range, price)
             reputation_score = self.calculate_reputation_match(reputation)
             time_score = self.calculate_time_match(deadline, availability)
-            semantic_score = await self.calculate_semantic_match(demand_description, supply_description)
+            semantic_score = await self.calculate_semantic_match(
+                demand_description, supply_description
+            )
 
             # Calculate overall score
             overall_score = self.calculate_overall_score(
@@ -476,8 +579,7 @@ Respond with only a number between 0 and 1.
 
             # Generate reasoning
             reasoning = self.generate_reasoning(
-                capability_score, price_score, reputation_score, time_score,
-                demand, supply
+                capability_score, price_score, reputation_score, time_score, demand, supply
             )
 
             # Suggest price range
@@ -547,7 +649,9 @@ Respond with only a number between 0 and 1.
             price_score = self.calculate_price_match(budget_range, price)
             reputation_score = self.calculate_reputation_match(reputation)
             time_score = self.calculate_time_match(deadline, availability)
-            semantic_score = await self.calculate_semantic_match(demand_description, supply_description)
+            semantic_score = await self.calculate_semantic_match(
+                demand_description, supply_description
+            )
 
             # Calculate overall score
             overall_score = self.calculate_overall_score(
@@ -560,8 +664,7 @@ Respond with only a number between 0 and 1.
 
             # Generate reasoning
             reasoning = self.generate_reasoning(
-                capability_score, price_score, reputation_score, time_score,
-                demand, supply
+                capability_score, price_score, reputation_score, time_score, demand, supply
             )
 
             # Suggest price range

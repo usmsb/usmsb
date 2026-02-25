@@ -17,6 +17,7 @@ import {
   Target,
   Home,
   Bot,
+  Presentation,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useState } from 'react'
@@ -47,6 +48,7 @@ export default function Sidebar() {
   const quickActions = [
     { name: t('sidebar.publishService'), href: '/app/publish/service', icon: PlusCircle, desc: t('sidebar.publishServiceDesc'), color: 'blue' },
     { name: t('sidebar.publishDemand'), href: '/app/publish/demand', icon: Target, desc: t('sidebar.publishDemandDesc'), color: 'purple' },
+    { name: '投资人演示', href: '/pitch', icon: Presentation, desc: 'VIBE 项目介绍', color: 'green' },
   ]
 
   // Group navigation items
@@ -61,11 +63,11 @@ export default function Sidebar() {
         /* ========================================
            LIGHT MODE - Clean Professional Style
            ======================================== */
-        bg-white border-r border-secondary-200 shadow-sm
+        bg-white border-r border-light-border shadow-sm
         /* ========================================
            DARK MODE - Cyberpunk Sci-Fi Style
            ======================================== */
-        dark:bg-cyber-card/95 dark:backdrop-blur-xl dark:border-neon-blue/20
+        dark:bg-cyber-card/95 dark:backdrop-blur-xl dark:border-blue-500/20
         ${sidebarOpen ? 'w-64' : 'w-20'}
       `}
     >
@@ -80,8 +82,8 @@ export default function Sidebar() {
       <div className={`
         h-16 flex items-center justify-between px-4 shrink-0
         border-b
-        border-secondary-200
-        dark:border-neon-blue/20
+        border-gray-200
+        dark:border-blue-500/20
       `}>
         {sidebarOpen ? (
           <Link to="/" className="flex items-center gap-3 group">
@@ -92,22 +94,22 @@ export default function Sidebar() {
                 className={`
                   w-9 h-9 transition-all duration-300
                   group-hover:scale-110
-                  dark:group-hover:shadow-[0_0_20px_var(--neon-blue)]
+                  dark:group-hover:shadow-[0_0_20px_rgba(59,130,246,0.5)]
                 `}
               />
             </div>
             <div className="flex flex-col">
               <span className={`
                 font-bold text-lg leading-tight transition-colors
-                text-secondary-900 group-hover:text-primary-600
+                text-gray-900 group-hover:text-blue-600
                 dark:text-transparent dark:bg-clip-text dark:bg-gradient-to-r
-                dark:from-neon-blue dark:via-neon-purple dark:to-neon-green
-                dark:font-cyber dark:group-hover:from-neon-green dark:group-hover:to-neon-blue
+                dark:from-blue-400 dark:via-purple-400 dark:to-green-400
+                dark:font-cyber dark:group-hover:from-green-400 dark:group-hover:to-blue-400
               `}>USMSB</span>
               <span className={`
                 text-xs
-                text-secondary-400
-                dark:text-neon-blue/60 dark:font-cyber
+                text-gray-500
+                dark:text-blue-400/60 dark:font-cyber
               `}>SDK Platform</span>
             </div>
           </Link>
@@ -120,7 +122,7 @@ export default function Sidebar() {
                 className={`
                   w-9 h-9 transition-all duration-300
                   group-hover:scale-110
-                  dark:group-hover:shadow-[0_0_20px_var(--neon-blue)]
+                  dark:group-hover:shadow-[0_0_20px_rgba(59,130,246,0.5)]
                 `}
               />
             </div>
@@ -132,11 +134,10 @@ export default function Sidebar() {
           aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           className={`
             p-2 rounded-lg transition-all duration-200
-            text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100
+            text-gray-500 hover:text-gray-700 hover:bg-gray-100
             active:scale-95
-            dark:text-neon-blue/70 dark:hover:text-neon-blue
-            dark:hover:bg-neon-blue/10
-            dark:hover:shadow-[0_0_15px_rgba(0,245,255,0.3)]
+            dark:text-blue-400/70 dark:hover:text-blue-400
+            dark:hover:bg-blue-400/10
             ${!sidebarOpen ? 'absolute right-2' : ''}
           `}
         >
@@ -153,8 +154,8 @@ export default function Sidebar() {
           {sidebarOpen && (
             <p className={`
               px-3 text-xs font-semibold uppercase tracking-wider mb-2
-              text-secondary-400
-              dark:text-neon-blue/50 dark:font-cyber
+              text-gray-500
+              dark:text-blue-400/60 dark:font-cyber
             `}>
               Main
             </p>
@@ -168,15 +169,15 @@ export default function Sidebar() {
               className={({ isActive }) => `
                 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
                 group relative
-                /* Light Mode Active */
+                /* Light Mode */
                 ${isActive
-                  ? 'bg-primary-50 text-primary-700 font-medium'
-                  : 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900'
+                  ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 font-medium border border-blue-200'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200 active:text-gray-900'
                 }
-                /* Dark Mode Active */
+                /* Dark Mode */
                 ${isActive && isDark
-                  ? '!bg-neon-blue/10 !text-neon-blue border border-neon-blue/30 shadow-[0_0_15px_rgba(0,245,255,0.2)]'
-                  : isDark ? '!text-gray-400 hover:!bg-neon-blue/5 hover:!text-neon-blue' : ''
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  : isDark ? 'text-gray-300 hover:bg-blue-600/10 hover:text-blue-400 active:bg-blue-600/30 active:text-blue-400' : ''
                 }
                 ${!sidebarOpen ? 'justify-center' : ''}
               `}
@@ -184,37 +185,35 @@ export default function Sidebar() {
             >
               {({ isActive }) => (
                 <>
-                  {/* Active indicator bar - Dark Mode Only */}
-                  {isDark && isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-neon-blue rounded-r-full shadow-[0_0_10px_var(--neon-blue)]" />
-                  )}
                   <item.icon
                     size={20}
                     className={`
                       shrink-0 transition-all duration-200
                       ${isActive
-                        ? 'text-primary-600'
-                        : 'text-secondary-400 group-hover:text-secondary-600'
+                        ? isDark ? 'text-blue-400' : 'text-blue-600'
+                        : 'text-gray-500 group-hover:text-gray-700'
                       }
-                      ${isActive && isDark ? '!text-neon-blue drop-shadow-[0_0_8px_var(--neon-blue)]' : ''}
-                      ${!isActive && isDark ? '!text-gray-500 group-hover:!text-neon-blue group-hover:drop-shadow-[0_0_6px_var(--neon-blue)]' : ''}
+                      ${!isActive && isDark ? '!text-gray-400 group-hover:!text-blue-400 active:!text-blue-400' : ''}
                     `}
                   />
                   {sidebarOpen && (
                     <span className={`
                       truncate transition-all
+                      ${isActive 
+                        ? isDark ? 'text-blue-400' : 'text-blue-700' 
+                        : ''  
+                      }
                       ${isActive ? 'font-medium' : ''}
-                      ${isDark ? 'font-cyber tracking-wide' : ''}
+                      ${isDark ? 'font-cyber tracking-wide group-hover:text-blue-400 active:text-blue-400' : ''}
                     `}>{item.name}</span>
                   )}
-                  {/* Hover tooltip when collapsed */}
+                   {/* Hover tooltip when collapsed */}
                   {!sidebarOpen && hoveredItem === item.name && (
                     <div className={`
                       absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap z-50
                       animate-fade-in
-                      bg-secondary-900 text-white shadow-lg
-                      dark:bg-cyber-card dark:border dark:border-neon-blue/30 dark:text-neon-blue
-                      dark:shadow-[0_0_20px_rgba(0,245,255,0.3)]
+                      bg-white text-gray-900 shadow-lg border border-gray-200
+                      dark:bg-cyber-card dark:border dark:border-blue-500/30 dark:text-blue-400
                     `}>
                       {item.name}
                     </div>
@@ -230,8 +229,8 @@ export default function Sidebar() {
           {sidebarOpen && (
             <p className={`
               px-3 text-xs font-semibold uppercase tracking-wider mb-2
-              text-secondary-400
-              dark:text-neon-purple/50 dark:font-cyber
+              text-gray-500
+              dark:text-purple-400/60 dark:font-cyber
             `}>
               Tools
             </p>
@@ -247,13 +246,13 @@ export default function Sidebar() {
                 group relative
                 /* Light Mode */
                 ${isActive
-                  ? 'bg-primary-50 text-primary-700 font-medium'
-                  : 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900'
+                  ? 'bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 font-medium border border-purple-200'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200 active:text-gray-900'
                 }
-                /* Dark Mode - Purple accent for tools */
+                /* Dark Mode - 使用紫色发光效果 */
                 ${isActive && isDark
-                  ? '!bg-neon-purple/10 !text-neon-purple border border-neon-purple/30 shadow-[0_0_15px_rgba(191,0,255,0.2)]'
-                  : isDark ? '!text-gray-400 hover:!bg-neon-purple/5 hover:!text-neon-purple' : ''
+                  ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
+                  : isDark ? 'text-gray-300 hover:bg-purple-600/10 hover:text-purple-400 active:bg-purple-600/30 active:text-purple-400' : ''
                 }
                 ${!sidebarOpen ? 'justify-center' : ''}
               `}
@@ -261,37 +260,35 @@ export default function Sidebar() {
             >
               {({ isActive }) => (
                 <>
-                  {/* Active indicator bar - Dark Mode Only */}
-                  {isDark && isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-neon-purple rounded-r-full shadow-[0_0_10px_var(--neon-purple)]" />
-                  )}
                   <item.icon
                     size={20}
                     className={`
                       shrink-0 transition-all duration-200
                       ${isActive
-                        ? 'text-primary-600'
-                        : 'text-secondary-400 group-hover:text-secondary-600'
+                        ? isDark ? 'text-purple-400' : 'text-purple-600'
+                        : 'text-gray-500 group-hover:text-gray-700'
                       }
-                      ${isActive && isDark ? '!text-neon-purple drop-shadow-[0_0_8px_var(--neon-purple)]' : ''}
-                      ${!isActive && isDark ? '!text-gray-500 group-hover:!text-neon-purple group-hover:drop-shadow-[0_0_6px_var(--neon-purple)]' : ''}
+                      ${!isActive && isDark ? '!text-gray-400 group-hover:!text-purple-400 active:!text-purple-400' : ''}
                     `}
                   />
                   {sidebarOpen && (
                     <span className={`
                       truncate transition-all
+                      ${isActive 
+                        ? isDark ? 'text-purple-400' : 'text-purple-700' 
+                        : ''  
+                      }
                       ${isActive ? 'font-medium' : ''}
-                      ${isDark ? 'font-cyber tracking-wide' : ''}
+                      ${isDark ? 'font-cyber tracking-wide group-hover:text-purple-400 active:text-purple-400' : ''}
                     `}>{item.name}</span>
                   )}
-                  {/* Hover tooltip when collapsed */}
+                   {/* Hover tooltip when collapsed */}
                   {!sidebarOpen && hoveredItem === item.name && (
                     <div className={`
                       absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap z-50
                       animate-fade-in
-                      bg-secondary-900 text-white shadow-lg
-                      dark:bg-cyber-card dark:border dark:border-neon-purple/30 dark:text-neon-purple
-                      dark:shadow-[0_0_20px_rgba(191,0,255,0.3)]
+                      bg-white text-gray-900 shadow-lg border border-gray-200
+                      dark:bg-cyber-card dark:border dark:border-purple-500/30 dark:text-purple-400
                     `}>
                       {item.name}
                     </div>
@@ -307,8 +304,8 @@ export default function Sidebar() {
           <div className="px-3 mt-6">
             <p className={`
               px-3 text-xs font-semibold uppercase tracking-wider mb-2
-              text-secondary-400
-              dark:text-neon-green/50 dark:font-cyber
+              text-gray-500
+              dark:text-green-400/60 dark:font-cyber
             `}>
               {t('sidebar.quickActions')}
             </p>
@@ -323,16 +320,20 @@ export default function Sidebar() {
                     /* Light Mode */
                     ${isActive
                       ? action.color === 'blue'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-purple-50 text-purple-700'
-                      : 'text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-purple-50 text-purple-700 border border-purple-200'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                     }
                     /* Dark Mode */
                     ${isActive && isDark
                       ? action.color === 'blue'
-                        ? '!bg-neon-blue/10 !text-neon-blue border border-neon-blue/30 shadow-[0_0_15px_rgba(0,245,255,0.2)]'
-                        : '!bg-neon-purple/10 !text-neon-purple border border-neon-purple/30 shadow-[0_0_15px_rgba(191,0,255,0.2)]'
-                      : isDark ? '!text-gray-400 hover:!bg-white/5' : ''
+                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                        : 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
+                      : isDark 
+                        ? action.color === 'blue'
+                          ? 'text-gray-300 hover:bg-blue-600/10 hover:text-blue-400 active:bg-blue-600/30 active:text-blue-400'
+                          : 'text-gray-300 hover:bg-purple-600/10 hover:text-purple-400 active:bg-purple-600/30 active:text-purple-400'
+                        : ''
                     }
                   `}
                 >
@@ -344,27 +345,32 @@ export default function Sidebar() {
                           ? 'bg-blue-100 group-hover:bg-blue-200'
                           : 'bg-purple-100 group-hover:bg-purple-200'
                         }
-                        ${isDark && action.color === 'blue' ? '!bg-neon-blue/20 group-hover:!bg-neon-blue/30' : ''}
-                        ${isDark && action.color === 'purple' ? '!bg-neon-purple/20 group-hover:!bg-neon-purple/30' : ''}
+                        ${isDark && action.color === 'blue' ? '!bg-blue-600/20 group-hover:!bg-blue-600/30' : ''}
+                        ${isDark && action.color === 'purple' ? '!bg-purple-600/20 group-hover:!bg-purple-600/30' : ''}
                       `}>
                         <action.icon
                           size={16}
                           className={`
                             transition-all
                             ${action.color === 'blue' ? 'text-blue-600' : 'text-purple-600'}
-                            ${isDark && action.color === 'blue' ? '!text-neon-blue' : ''}
-                            ${isDark && action.color === 'purple' ? '!text-neon-purple' : ''}
+                            ${isDark && action.color === 'blue' ? '!text-blue-400' : ''}
+                            ${isDark && action.color === 'purple' ? '!text-purple-400' : ''}
                           `}
                         />
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className={`
                           text-sm truncate
-                          ${isDark ? 'font-cyber' : ''}
+                          ${isDark 
+                            ? action.color === 'blue' 
+                              ? 'font-cyber group-hover:text-blue-400 active:text-blue-400' 
+                              : 'font-cyber group-hover:text-purple-400 active:text-purple-400' 
+                            : ''
+                          }
                         `}>{action.name}</span>
                         <span className={`
                           text-xs truncate
-                          text-secondary-400
+                          text-gray-500
                           dark:text-gray-500
                         `}>{action.desc}</span>
                       </div>
@@ -382,8 +388,8 @@ export default function Sidebar() {
           ======================================== */}
       <div className={`
         shrink-0 p-3 border-t
-        border-secondary-200 bg-secondary-50/50
-        dark:border-neon-blue/20 dark:bg-cyber-card/50
+        border-gray-200 bg-gray-50
+        dark:border-blue-500/20 dark:bg-cyber-card/50
       `}>
         <NavLink
           to="/app/settings"
@@ -394,40 +400,39 @@ export default function Sidebar() {
             group relative
             /* Light Mode */
             ${isActive
-              ? 'bg-secondary-100 text-secondary-900 font-medium'
-              : 'text-secondary-600 hover:bg-secondary-100 hover:text-secondary-900'
+              ? 'bg-gray-100 text-gray-900 font-medium'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:bg-gray-200 active:text-gray-900'
             }
             /* Dark Mode */
             ${isActive && isDark
-              ? '!bg-neon-blue/10 !text-neon-blue border border-neon-blue/30 shadow-[0_0_15px_rgba(0,245,255,0.2)]'
-              : isDark ? '!text-gray-400 hover:!bg-neon-blue/5 hover:!text-neon-blue' : ''
+              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+              : isDark ? 'text-gray-300 hover:bg-blue-600/10 hover:text-blue-400 active:bg-blue-600/30 active:text-blue-400' : ''
             }
             ${!sidebarOpen ? 'justify-center' : ''}
           `}
         >
           {({ isActive }) => (
             <>
-              {/* Active indicator bar - Dark Mode Only */}
-              {isDark && isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-neon-blue rounded-r-full shadow-[0_0_10px_var(--neon-blue)]" />
-              )}
               <Settings
                 size={20}
                 className={`
                   shrink-0 transition-all duration-200
                   ${isActive
-                    ? 'text-secondary-700'
-                    : 'text-secondary-400 group-hover:text-secondary-600'
+                    ? isDark ? 'text-blue-400' : 'text-gray-700'
+                    : 'text-gray-500 group-hover:text-gray-700'
                   }
-                  ${isActive && isDark ? '!text-neon-blue drop-shadow-[0_0_8px_var(--neon-blue)]' : ''}
-                  ${!isActive && isDark ? '!text-gray-500 group-hover:!text-neon-blue group-hover:drop-shadow-[0_0_6px_var(--neon-blue)]' : ''}
+                  ${!isActive && isDark ? '!text-gray-400 group-hover:!text-blue-400 active:!text-blue-400' : ''}
                 `}
               />
               {sidebarOpen && (
                 <span className={`
-                  truncate
+                  truncate transition-all
+                  ${isActive 
+                    ? isDark ? 'text-blue-400' : 'text-gray-900' 
+                    : ''  
+                  }
                   ${isActive ? 'font-medium' : ''}
-                  ${isDark ? 'font-cyber tracking-wide' : ''}
+                  ${isDark ? 'font-cyber tracking-wide group-hover:text-blue-400 active:text-blue-400' : ''}
                 `}>{t('nav.settings')}</span>
               )}
               {/* Hover tooltip when collapsed */}
@@ -435,9 +440,8 @@ export default function Sidebar() {
                 <div className={`
                   absolute left-full ml-2 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap z-50
                   animate-fade-in
-                  bg-secondary-900 text-white shadow-lg
-                  dark:bg-cyber-card dark:border dark:border-neon-blue/30 dark:text-neon-blue
-                  dark:shadow-[0_0_20px_rgba(0,245,255,0.3)]
+                  bg-white text-gray-900 shadow-lg border border-gray-200
+                  dark:bg-cyber-card dark:border dark:border-blue-500/30 dark:text-blue-400
                 `}>
                   {t('nav.settings')}
                 </div>
@@ -453,8 +457,8 @@ export default function Sidebar() {
             className={`
               flex items-center gap-3 px-3 py-2 mt-2 rounded-lg transition-all duration-200
               group
-              text-secondary-400 hover:text-secondary-600 hover:bg-secondary-100
-              dark:text-gray-500 dark:hover:text-neon-green dark:hover:bg-neon-green/5
+              text-gray-500 hover:text-gray-700 hover:bg-gray-100
+              dark:text-gray-500 dark:hover:text-green-400 dark:hover:bg-green-400/5
             `}
           >
             <Home size={18} className="shrink-0" />

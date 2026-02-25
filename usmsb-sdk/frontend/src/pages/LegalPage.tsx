@@ -55,7 +55,7 @@ export default function LegalPage() {
   return (
     <div className="min-h-screen bg-secondary-50 dark:bg-secondary-950">
       {/* Header */}
-      <header className="bg-white dark:bg-secondary-900 border-b border-secondary-200 dark:border-secondary-800">
+      <header className="bg-white dark:bg-cyber-card border-b border-light-border dark:border-secondary-800">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-secondary-600 dark:text-secondary-400 hover:text-secondary-900 dark:hover:text-secondary-100">
             <ArrowLeft size={20} />
@@ -71,7 +71,7 @@ export default function LegalPage() {
       {/* Content */}
       <main className="max-w-4xl mx-auto px-4 py-12">
         <article className="card">
-          <h1 className="text-3xl font-bold text-secondary-900 dark:text-secondary-100 mb-2">
+          <h1 className="text-3xl font-bold text-light-text-primary dark:text-secondary-100 mb-2">
             {getTitle()}
           </h1>
           <p className="text-secondary-500 dark:text-secondary-400 mb-8">{getLastUpdated()}</p>
@@ -122,7 +122,7 @@ function PrivacyContent({ t }: { t: (key: string, fallback: string) => string })
   return (
     <div className="space-y-6 text-secondary-700 dark:text-secondary-300">
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.privacy.intro.title', 'Introduction')}
         </h2>
         <p>
@@ -131,7 +131,7 @@ function PrivacyContent({ t }: { t: (key: string, fallback: string) => string })
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.privacy.collect.title', 'Information We Collect')}
         </h2>
         <p className="mb-2">{t('legal.privacy.collect.intro', 'We may collect information about you in various ways, including:')}</p>
@@ -144,21 +144,21 @@ function PrivacyContent({ t }: { t: (key: string, fallback: string) => string })
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.privacy.use.title', 'How We Use Your Information')}
         </h2>
         <p>{t('legal.privacy.use.content', 'We use the information we collect to provide, maintain, and improve our services, including AI agent matching, reputation scoring, and settlement processing.')}</p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.privacy.security.title', 'Data Security')}
         </h2>
         <p>{t('legal.privacy.security.content', 'We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.')}</p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.privacy.contact.title', 'Contact Us')}
         </h2>
         <p>{t('legal.privacy.contact.content', 'If you have questions about this Privacy Policy, please contact us at privacy@usmsb.io')}</p>
@@ -171,7 +171,7 @@ function TermsContent({ t }: { t: (key: string, fallback: string) => string }) {
   return (
     <div className="space-y-6 text-secondary-700 dark:text-secondary-300">
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.terms.intro.title', 'Terms of Service')}
         </h2>
         <p>
@@ -180,14 +180,14 @@ function TermsContent({ t }: { t: (key: string, fallback: string) => string }) {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.terms.use.title', 'Use License')}
         </h2>
         <p>{t('legal.terms.use.content', 'Permission is granted to temporarily use USMSB SDK for personal or commercial purposes subject to the restrictions in these terms.')}</p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.terms.prohibited.title', 'Prohibited Activities')}
         </h2>
         <ul className="list-disc pl-6 space-y-2">
@@ -199,7 +199,7 @@ function TermsContent({ t }: { t: (key: string, fallback: string) => string }) {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.terms.disclaimer.title', 'Disclaimer')}
         </h2>
         <p>{t('legal.terms.disclaimer.content', 'USMSB SDK is provided "as is" without any warranties, expressed or implied. We do not warrant that the platform will be uninterrupted or error-free.')}</p>
@@ -212,7 +212,7 @@ function CookiesContent({ t }: { t: (key: string, fallback: string) => string })
   return (
     <div className="space-y-6 text-secondary-700 dark:text-secondary-300">
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.cookies.intro.title', 'Cookie Policy')}
         </h2>
         <p>
@@ -221,14 +221,14 @@ function CookiesContent({ t }: { t: (key: string, fallback: string) => string })
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.cookies.what.title', 'What Are Cookies?')}
         </h2>
         <p>{t('legal.cookies.what.content', 'Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are widely used by website owners to make their websites work, work more efficiently, and to provide reporting information.')}</p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.cookies.types.title', 'Types of Cookies We Use')}
         </h2>
         <ul className="list-disc pl-6 space-y-2">
@@ -239,7 +239,7 @@ function CookiesContent({ t }: { t: (key: string, fallback: string) => string })
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.cookies.control.title', 'Controlling Cookies')}
         </h2>
         <p>{t('legal.cookies.control.content', 'You can set your browser to refuse all or some browser cookies, or to alert you when websites set or access cookies.')}</p>
@@ -252,7 +252,7 @@ function LicenseContent({ t }: { t: (key: string, fallback: string) => string })
   return (
     <div className="space-y-6 text-secondary-700 dark:text-secondary-300">
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.license.intro.title', 'MIT License')}
         </h2>
         <p>
@@ -261,21 +261,21 @@ function LicenseContent({ t }: { t: (key: string, fallback: string) => string })
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.license.grant.title', 'License Grant')}
         </h2>
         <p>{t('legal.license.grant.content', 'Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.')}</p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.license.conditions.title', 'Conditions')}
         </h2>
         <p>{t('legal.license.conditions.content', 'The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.')}</p>
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
+        <h2 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-3">
           {t('legal.license.disclaimer.title', 'Disclaimer')}
         </h2>
         <p className="font-mono text-sm bg-secondary-100 dark:bg-secondary-800 p-4 rounded-lg">

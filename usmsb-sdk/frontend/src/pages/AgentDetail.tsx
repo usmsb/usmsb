@@ -373,35 +373,35 @@ export default function AgentDetail() {
           <div className="flex items-center justify-center mb-2">
             <Wallet className="text-green-600 dark:text-green-400" size={20} />
           </div>
-          <div className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{agent.balance || agent.stake || 0}</div>
+          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{agent.balance || agent.stake || 0}</div>
           <div className="text-xs text-secondary-500 dark:text-secondary-400">VIBE Balance</div>
         </div>
         <div className="card text-center">
           <div className="flex items-center justify-center mb-2">
             <TrendingUp className="text-blue-600 dark:text-blue-400" size={20} />
           </div>
-          <div className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{agent.stake || 0}</div>
+          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{agent.stake || 0}</div>
           <div className="text-xs text-secondary-500 dark:text-secondary-400">Staked</div>
         </div>
         <div className="card text-center">
           <div className="flex items-center justify-center mb-2">
             <ShoppingCart className="text-purple-600 dark:text-purple-400" size={20} />
           </div>
-          <div className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{demands?.length || 0}</div>
+          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{demands?.length || 0}</div>
           <div className="text-xs text-secondary-500 dark:text-secondary-400">Demands</div>
         </div>
         <div className="card text-center">
           <div className="flex items-center justify-center mb-2">
             <Package className="text-orange-600 dark:text-orange-400" size={20} />
           </div>
-          <div className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{services?.length || 0}</div>
+          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{services?.length || 0}</div>
           <div className="text-xs text-secondary-500 dark:text-secondary-400">Services</div>
         </div>
         <div className="card text-center">
           <div className="flex items-center justify-center mb-2">
             <Star className="text-yellow-500 dark:text-yellow-400" size={20} />
           </div>
-          <div className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{((agent.reputation || 0.5) * 100).toFixed(0)}%</div>
+          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{((agent.reputation || 0.5) * 100).toFixed(0)}%</div>
           <div className="text-xs text-secondary-500 dark:text-secondary-400">Reputation</div>
         </div>
       </div>
@@ -439,7 +439,7 @@ export default function AgentDetail() {
           <div className="lg:col-span-2 space-y-6">
             {/* Test Agent */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
                 <TestTube size={20} />
                 Test Agent
               </h2>
@@ -502,7 +502,7 @@ export default function AgentDetail() {
 
             {/* Capabilities */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Capabilities</h2>
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Capabilities</h2>
               <div className="flex flex-wrap gap-2">
                 {agent.capabilities?.length > 0 ? (
                   agent.capabilities.map((cap) => (
@@ -521,12 +521,12 @@ export default function AgentDetail() {
 
             {/* Skills */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Skills</h2>
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Skills</h2>
               {agent.skills && agent.skills.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {agent.skills.map((skill, idx) => (
                     <div key={idx} className="p-3 bg-secondary-50 dark:bg-secondary-700 rounded-lg">
-                      <p className="font-medium text-secondary-900 dark:text-secondary-100">{skill.name}</p>
+                      <p className="font-medium text-light-text-primary dark:text-secondary-100">{skill.name}</p>
                       {skill.level && (
                         <p className="text-xs text-secondary-500 dark:text-secondary-400">{skill.level}</p>
                       )}
@@ -541,7 +541,7 @@ export default function AgentDetail() {
             {/* Prediction Result */}
             {prediction && (
               <div className="card">
-                <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
                   <Activity size={20} />
                   Behavior Prediction
                 </h2>
@@ -556,11 +556,11 @@ export default function AgentDetail() {
           <div className="space-y-6">
             {/* Connection Info */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Connection</h2>
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Connection</h2>
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-secondary-500 dark:text-secondary-400 uppercase">Protocol</label>
-                  <p className="font-medium text-secondary-900 dark:text-secondary-100">{agent.protocol?.toUpperCase() || 'STANDARD'}</p>
+                  <p className="font-medium text-light-text-primary dark:text-secondary-100">{agent.protocol?.toUpperCase() || 'STANDARD'}</p>
                 </div>
                 <div>
                   <label className="text-xs text-secondary-500 dark:text-secondary-400 uppercase">Endpoint</label>
@@ -575,7 +575,7 @@ export default function AgentDetail() {
 
             {/* Timeline */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
                 <Clock size={18} />
                 Timeline
               </h2>
@@ -597,7 +597,7 @@ export default function AgentDetail() {
 
             {/* Quick Actions */}
             <div className="card">
-              <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Quick Actions</h2>
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Quick Actions</h2>
               <div className="space-y-2">
                 <button
                   onClick={() => navigate(`/publish/demand?agent=${agent.agent_id}`)}

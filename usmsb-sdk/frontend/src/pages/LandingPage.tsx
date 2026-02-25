@@ -133,6 +133,7 @@ export default function LandingPage() {
     { href: '#usecases', label: t('landing.nav.useCases') },
     { href: '#tech', label: t('landing.nav.tech') },
     { href: '#faq', label: t('landing.nav.faq') },
+    { href: '/pitch', label: 'Pitch', isRoute: true },
   ]
 
   return (
@@ -186,18 +187,28 @@ export default function LandingPage() {
             {/* Desktop Nav Links */}
             <div className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className={clsx(
-                    'text-sm font-medium transition-colors hover:text-primary-500 dark:hover:text-primary-400',
-                    activeSection === link.href.slice(1)
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-secondary-600 dark:text-slate-300'
-                  )}
-                >
-                  {link.label}
-                </a>
+                link.isRoute ? (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="text-sm font-medium transition-colors hover:text-primary-500 dark:hover:text-primary-400 text-secondary-600 dark:text-slate-300"
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className={clsx(
+                      'text-sm font-medium transition-colors hover:text-primary-500 dark:hover:text-primary-400',
+                      activeSection === link.href.slice(1)
+                        ? 'text-primary-600 dark:text-primary-400'
+                        : 'text-secondary-600 dark:text-slate-300'
+                    )}
+                  >
+                    {link.label}
+                  </a>
+                )
               ))}
             </div>
 
@@ -235,14 +246,25 @@ export default function LandingPage() {
           <div className="md:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-secondary-200 dark:border-white/10">
             <div className="px-4 py-4 space-y-4">
               {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-secondary-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 py-2"
-                >
-                  {link.label}
-                </a>
+                link.isRoute ? (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-secondary-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 py-2"
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-secondary-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 py-2"
+                  >
+                    {link.label}
+                  </a>
+                )
               ))}
               <div className="pt-4 border-t border-secondary-200 dark:border-white/10 flex items-center justify-between">
                 <LanguageSwitcher />
@@ -307,14 +329,16 @@ export default function LandingPage() {
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-secondary-300 dark:border-white/20 text-secondary-700 dark:text-secondary-100 hover:bg-secondary-100 dark:hover:bg-white/10 px-8 py-4 text-lg"
-              >
-                <Play className="w-5 h-5 mr-2" />
-                {t('landing.hero.cta2')}
-              </Button>
+              <Link to="/pitch">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="border-secondary-300 dark:border-white/20 text-secondary-700 dark:text-secondary-100 hover:bg-secondary-100 dark:hover:bg-white/10 px-8 py-4 text-lg"
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  {t('landing.hero.cta2')}
+                </Button>
+              </Link>
             </div>
 
             {/* Hero Visual - Animated network graph */}
@@ -389,7 +413,7 @@ export default function LandingPage() {
                 <div className={clsx('w-14 h-14 rounded-xl flex items-center justify-center mb-4', feature.color)}>
                   <feature.icon className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-2">
+                <h3 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-2">
                   {t(`landing.features.items.${feature.key}.title`)}
                 </h3>
                 <p className="text-secondary-600 dark:text-slate-400 text-sm">
@@ -457,7 +481,7 @@ export default function LandingPage() {
               <div className="absolute inset-12 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center shadow-lg">
                 <div className="text-center">
                   <Zap className="w-10 h-10 text-primary-500 dark:text-primary-400 mx-auto mb-2" />
-                  <span className="text-sm font-semibold text-secondary-900 dark:text-secondary-100">USMSB</span>
+                  <span className="text-sm font-semibold text-light-text-primary dark:text-secondary-100">USMSB</span>
                 </div>
               </div>
             </div>
@@ -497,7 +521,7 @@ export default function LandingPage() {
                       <useCase.icon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-2">
+                      <h3 className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mb-2">
                         {t(`landing.useCases.cases.${useCase.key}.title`)}
                       </h3>
                       <p className="text-secondary-600 dark:text-slate-400">
@@ -619,7 +643,7 @@ export default function LandingPage() {
                   onClick={() => setOpenFaq(openFaq === faq ? null : faq)}
                   className="w-full flex items-center justify-between p-5 text-left"
                 >
-                  <span className="font-medium text-secondary-900 dark:text-secondary-100">
+                  <span className="font-medium text-light-text-primary dark:text-secondary-100">
                     {t(`landing.faq.items.${faq}.q`)}
                   </span>
                   {openFaq === faq ? (
@@ -643,7 +667,7 @@ export default function LandingPage() {
       <section className="relative py-24 md:py-32">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="p-8 md:p-12 rounded-3xl bg-gradient-to-br from-primary-100 to-purple-100 dark:from-primary-500/10 dark:to-purple-500/10 border border-primary-200 dark:border-white/10">
-            <h2 className="text-3xl md:text-4xl font-bold text-secondary-900 dark:text-secondary-100 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-light-text-primary dark:text-secondary-100 mb-4">
               {t('landing.cta.title')}
             </h2>
             <p className="text-lg text-secondary-600 dark:text-slate-400 mb-8">
@@ -686,7 +710,7 @@ export default function LandingPage() {
                   alt="Silicon Civilization Logo"
                   className="w-10 h-10"
                 />
-                <span className="text-xl font-bold text-secondary-900 dark:text-secondary-100">{t('landing.brandName')}</span>
+                <span className="text-xl font-bold text-light-text-primary dark:text-secondary-100">{t('landing.brandName')}</span>
               </Link>
               <p className="text-sm text-secondary-600 dark:text-slate-400 mb-4">
                 {t('landing.footer.description')}
@@ -709,7 +733,7 @@ export default function LandingPage() {
 
             {/* Product Links */}
             <div>
-              <h4 className="text-sm font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('landing.footer.product.title')}</h4>
+              <h4 className="text-sm font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('landing.footer.product.title')}</h4>
               <ul className="space-y-2">
                 <li>
                   <a href="#features" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
@@ -736,7 +760,7 @@ export default function LandingPage() {
 
             {/* Resources Links */}
             <div>
-              <h4 className="text-sm font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('landing.footer.resources.title')}</h4>
+              <h4 className="text-sm font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('landing.footer.resources.title')}</h4>
               <ul className="space-y-2">
                 <li>
                   <Link to="/docs" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
@@ -763,7 +787,7 @@ export default function LandingPage() {
 
             {/* Company Links */}
             <div>
-              <h4 className="text-sm font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('landing.footer.company.title')}</h4>
+              <h4 className="text-sm font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('landing.footer.company.title')}</h4>
               <ul className="space-y-2">
                 <li>
                   <a href="#usmsb" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
@@ -790,7 +814,7 @@ export default function LandingPage() {
 
             {/* Legal Links */}
             <div>
-              <h4 className="text-sm font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('landing.footer.legal.title')}</h4>
+              <h4 className="text-sm font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('landing.footer.legal.title')}</h4>
               <ul className="space-y-2">
                 <li>
                   <Link to="/legal/privacy" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">

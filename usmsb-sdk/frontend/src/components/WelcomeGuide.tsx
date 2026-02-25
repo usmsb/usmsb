@@ -134,7 +134,7 @@ export function WelcomeGuide({ onComplete }: WelcomeGuideProps) {
       {/* Modal */}
       <div
         className={clsx(
-          'relative w-full max-w-lg bg-white dark:bg-secondary-900',
+          'relative w-full max-w-lg bg-white dark:bg-cyber-card',
           'rounded-2xl shadow-2xl overflow-hidden animate-scale-in'
         )}
         role="dialog"

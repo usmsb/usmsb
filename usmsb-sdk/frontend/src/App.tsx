@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { ReactNode, useState, useEffect } from 'react'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import Dashboard from './pages/Dashboard'
@@ -20,6 +21,46 @@ import LandingPage from './pages/LandingPage'
 import DocsPage from './pages/DocsPage'
 import LegalPage from './pages/LegalPage'
 import Chat from './pages/Chat'
+import PitchPage from './pages/pitch'
+import { useAuthStore } from './stores/authStore'
+import { StakeGuideModal } from './components/StakeGuideModal'
+
+// Protected Route Component that requires staking
+function StakeProtectedRoute({
+  children,
+  featureName,
+}: {
+  children: ReactNode
+  featureName: string
+}) {
+  const { stakeStatus, stakeRequired, accessToken } = useAuthStore()
+  const [showGuideModal, setShowGuideModal] = useState(false)
+  
+  // Check access in useEffect to avoid infinite loops
+  useEffect(() => {
+    if (stakeRequired && accessToken && stakeStatus !== 'staked') {
+      setShowGuideModal(true)
+    }
+  }, [stakeRequired, accessToken, stakeStatus])
+
+  const handleCloseModal = () => {
+    setShowGuideModal(false)
+  }
+
+  // Always render children - modal is shown conditionally via useEffect
+  return (
+    <>
+      {children}
+      {showGuideModal && (
+        <StakeGuideModal
+          isOpen={showGuideModal}
+          onClose={handleCloseModal}
+          featureName={featureName}
+        />
+      )}
+    </>
+  )
+}
 
 function App() {
   return (
@@ -35,6 +76,9 @@ function App() {
         {/* Legal Pages - full page without layout */}
         <Route path="/legal/:type" element={<LegalPage />} />
 
+        {/* Pitch Page - Investor Presentation */}
+        <Route path="/pitch" element={<PitchPage />} />
+
         {/* Onboarding - outside Layout */}
         <Route path="/app/onboarding" element={<Onboarding />} />
 
@@ -43,21 +87,63 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="agents" element={<Agents />} />
-          <Route path="agents/register" element={<RegisterAgent />} />
+          <Route
+            path="agents/register"
+            element={
+              <StakeProtectedRoute featureName="Register Agent">
+                <RegisterAgent />
+              </StakeProtectedRoute>
+            }
+          />
           <Route path="agents/:id" element={<AgentDetail />} />
-          <Route path="matching" element={<ActiveMatching />} />
+          <Route
+            path="matching"
+            element={
+              <StakeProtectedRoute featureName="Matching">
+                <ActiveMatching />
+              </StakeProtectedRoute>
+            }
+          />
           <Route path="network" element={<NetworkExplorer />} />
-          <Route path="collaborations" element={<Collaborations />} />
+          <Route
+            path="collaborations"
+            element={
+              <StakeProtectedRoute featureName="Collaborations">
+                <Collaborations />
+              </StakeProtectedRoute>
+            }
+          />
           <Route path="simulations" element={<Simulations />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="marketplace" element={<Marketplace />} />
-          <Route path="governance" element={<Governance />} />
+          <Route
+            path="governance"
+            element={
+              <StakeProtectedRoute featureName="Governance">
+                <Governance />
+              </StakeProtectedRoute>
+            }
+          />
           <Route path="chat" element={<Chat />} />
           <Route path="settings" element={<Settings />} />
 
           {/* User Actions */}
-          <Route path="publish/service" element={<PublishService />} />
-          <Route path="publish/demand" element={<PublishDemand />} />
+          <Route
+            path="publish/service"
+            element={
+              <StakeProtectedRoute featureName="Publish Service">
+                <PublishService />
+              </StakeProtectedRoute>
+            }
+          />
+          <Route
+            path="publish/demand"
+            element={
+              <StakeProtectedRoute featureName="Publish Demand">
+                <PublishDemand />
+              </StakeProtectedRoute>
+            }
+          />
         </Route>
 
         {/* Redirect old routes to new locations for backwards compatibility */}

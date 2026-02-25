@@ -7,12 +7,18 @@ Implements the discovery system for finding and recommending agents, including:
 - Keyword and tag search
 - Recommendation algorithm
 - Agent ranking and scoring
+- Multi-dimensional search (capability/price/reputation/availability)
+- Semantic matching (understanding task intent)
+- Experience-based discovery via Gene Capsule
+- Real-time monitoring (service status changes)
+- Batch comparison analysis
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from uuid import uuid4
 from urllib.parse import quote
 import asyncio
 import aiohttp
@@ -930,3 +936,1013 @@ class DiscoveryManager:
         """Clear all cached data"""
         self._agent_cache.clear()
         self._cache_expiry.clear()
+
+
+# ==================== Enhanced Discovery Classes ====================
+
+class MatchDimension(Enum):
+    """Dimensions for multi-dimensional matching"""
+    CAPABILITY = "capability"
+    PRICE = "price"
+    REPUTATION = "reputation"
+    AVAILABILITY = "availability"
+    EXPERIENCE = "experience"
+    SEMANTIC = "semantic"
+
+
+@dataclass
+class DimensionScore:
+    """Score for a single dimension"""
+    dimension: MatchDimension
+    score: float  # 0.0 - 1.0
+    weight: float
+    details: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class MultiDimensionalMatchResult:
+    """Result of multi-dimensional matching"""
+    agent: AgentInfo
+    overall_score: float
+    dimension_scores: List[DimensionScore]
+    strengths: List[str]
+    weaknesses: List[str]
+    recommendation: str
+    gene_capsule_match: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "agent_id": self.agent.agent_id,
+            "agent_name": self.agent.name,
+            "overall_score": self.overall_score,
+            "dimension_scores": [
+                {
+                    "dimension": ds.dimension.value,
+                    "score": ds.score,
+                    "weight": ds.weight,
+                    "details": ds.details,
+                }
+                for ds in self.dimension_scores
+            ],
+            "strengths": self.strengths,
+            "weaknesses": self.weaknesses,
+            "recommendation": self.recommendation,
+            "gene_capsule_match": self.gene_capsule_match,
+        }
+
+
+@dataclass
+class SearchCriteria:
+    """Multi-dimensional search criteria"""
+    task_description: Optional[str] = None
+    required_skills: Optional[List[str]] = None
+    required_capabilities: Optional[List[str]] = None
+
+    # Price constraints
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    price_type: Optional[str] = None  # hourly, fixed, per_request
+
+    # Reputation constraints
+    min_rating: Optional[float] = None
+    min_successful_tasks: Optional[int] = None
+    require_verified: bool = False
+
+    # Availability constraints
+    availability_window: Optional[Tuple[datetime, datetime]] = None
+    max_response_time: Optional[float] = None  # seconds
+    require_online: bool = False
+
+    # Experience requirements (Gene Capsule)
+    require_experience_in: Optional[List[str]] = None  # Task types
+    min_experience_count: Optional[int] = None
+    require_verified_experience: bool = False
+
+    # Weights for each dimension (should sum to 1.0)
+    dimension_weights: Dict[MatchDimension, float] = field(default_factory=lambda: {
+        MatchDimension.CAPABILITY: 0.30,
+        MatchDimension.PRICE: 0.15,
+        MatchDimension.REPUTATION: 0.20,
+        MatchDimension.AVAILABILITY: 0.10,
+        MatchDimension.EXPERIENCE: 0.25,
+    })
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_description": self.task_description,
+            "required_skills": self.required_skills,
+            "required_capabilities": self.required_capabilities,
+            "budget_min": self.budget_min,
+            "budget_max": self.budget_max,
+            "price_type": self.price_type,
+            "min_rating": self.min_rating,
+            "min_successful_tasks": self.min_successful_tasks,
+            "require_verified": self.require_verified,
+            "availability_window": [
+                self.availability_window[0].isoformat(),
+                self.availability_window[1].isoformat()
+            ] if self.availability_window else None,
+            "max_response_time": self.max_response_time,
+            "require_online": self.require_online,
+            "require_experience_in": self.require_experience_in,
+            "min_experience_count": self.min_experience_count,
+            "require_verified_experience": self.require_verified_experience,
+            "dimension_weights": {k.value: v for k, v in self.dimension_weights.items()},
+        }
+
+
+@dataclass
+class WatchCondition:
+    """Condition for watching agent changes"""
+    condition_type: str  # "status_change", "new_capability", "price_change", "rating_change"
+    agent_ids: Optional[Set[str]] = None
+    filter_criteria: Optional[DiscoveryFilter] = None
+    threshold: Optional[float] = None
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class WatchEvent:
+    """Event triggered by watch condition"""
+    event_id: str
+    watch_id: str
+    agent_id: str
+    event_type: str
+    old_value: Any
+    new_value: Any
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class AgentComparison:
+    """Comparison between multiple agents"""
+    agents: List[AgentInfo]
+    comparison_dimensions: List[MatchDimension]
+    rankings: Dict[str, int]  # agent_id -> rank
+    scores: Dict[str, Dict[MatchDimension, float]]  # agent_id -> dimension -> score
+    summary: str
+    recommendation: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "agents": [a.to_dict() for a in self.agents],
+            "comparison_dimensions": [d.value for d in self.comparison_dimensions],
+            "rankings": self.rankings,
+            "scores": {
+                agent_id: {dim.value: score for dim, score in scores.items()}
+                for agent_id, scores in self.scores.items()
+            },
+            "summary": self.summary,
+            "recommendation": self.recommendation,
+        }
+
+
+class EnhancedDiscoveryManager(DiscoveryManager):
+    """
+    Enhanced Discovery Manager with multi-dimensional search,
+    semantic matching, and gene capsule integration.
+    """
+
+    def __init__(
+        self,
+        agent_id: str,
+        agent_config: AgentConfig,
+        communication_manager: CommunicationManager,
+        platform_client: Optional[Any] = None,  # PlatformClient
+        logger: Optional[logging.Logger] = None,
+    ):
+        super().__init__(agent_id, agent_config, communication_manager, logger)
+        self.platform_client = platform_client
+
+        # Enhanced features
+        self._watchers: Dict[str, WatchCondition] = {}
+        self._watch_callbacks: Dict[str, Callable] = {}
+        self._watch_task: Optional[asyncio.Task] = None
+
+        # Experience cache from gene capsule searches
+        self._experience_cache: Dict[str, List[Dict]] = {}
+
+        # Semantic matching LLM client (optional)
+        self._llm_adapter = None
+
+    async def initialize(self) -> None:
+        """Initialize enhanced discovery manager"""
+        await super().initialize()
+
+        # Start watch task
+        self._watch_task = asyncio.create_task(self._watch_loop())
+
+        self.logger.info(f"Enhanced discovery manager initialized for agent {self.agent_id}")
+
+    async def close(self) -> None:
+        """Close enhanced discovery manager"""
+        if self._watch_task:
+            self._watch_task.cancel()
+            try:
+                await self._watch_task
+            except asyncio.CancelledError:
+                pass
+
+        await super().close()
+
+    # ==================== Multi-Dimensional Search ====================
+
+    async def multi_dimensional_search(
+        self,
+        criteria: SearchCriteria,
+        limit: int = 20,
+    ) -> List[MultiDimensionalMatchResult]:
+        """
+        Perform multi-dimensional search with comprehensive scoring.
+
+        Scoring dimensions:
+        - Capability match (30%)
+        - Experience match via Gene Capsule (25%)
+        - Reputation (20%)
+        - Price alignment (15%)
+        - Availability (10%)
+        """
+        # Step 1: Get base candidates
+        base_filter = DiscoveryFilter(
+            skills=criteria.required_skills,
+            capabilities=criteria.required_capabilities,
+            min_rating=criteria.min_rating,
+            online_only=criteria.require_online,
+            limit=100,
+        )
+        candidates = await self.discover(base_filter)
+
+        if not candidates:
+            return []
+
+        # Step 2: Score each candidate on all dimensions
+        results = []
+        for agent in candidates:
+            match_result = await self._score_multi_dimensional(agent, criteria)
+            results.append(match_result)
+
+        # Step 3: Sort by overall score
+        results.sort(key=lambda x: x.overall_score, reverse=True)
+
+        return results[:limit]
+
+    async def _score_multi_dimensional(
+        self,
+        agent: AgentInfo,
+        criteria: SearchCriteria,
+    ) -> MultiDimensionalMatchResult:
+        """Score an agent across all dimensions"""
+        dimension_scores = []
+        strengths = []
+        weaknesses = []
+
+        weights = criteria.dimension_weights
+
+        # 1. Capability Match
+        cap_score, cap_details = self._score_capability_match(agent, criteria)
+        dimension_scores.append(DimensionScore(
+            dimension=MatchDimension.CAPABILITY,
+            score=cap_score,
+            weight=weights.get(MatchDimension.CAPABILITY, 0.30),
+            details=cap_details,
+        ))
+        if cap_score > 0.8:
+            strengths.append(f"Strong capability match ({cap_score:.0%})")
+        elif cap_score < 0.5:
+            weaknesses.append(f"Limited capability match ({cap_score:.0%})")
+
+        # 2. Experience Match (via Gene Capsule)
+        exp_score, exp_details = await self._score_experience_match(agent, criteria)
+        dimension_scores.append(DimensionScore(
+            dimension=MatchDimension.EXPERIENCE,
+            score=exp_score,
+            weight=weights.get(MatchDimension.EXPERIENCE, 0.25),
+            details=exp_details,
+        ))
+        if exp_score > 0.7:
+            strengths.append(f"Proven experience in relevant tasks")
+        elif exp_score < 0.3 and criteria.require_experience_in:
+            weaknesses.append(f"Limited relevant experience")
+
+        # 3. Reputation Score
+        rep_score, rep_details = self._score_reputation(agent, criteria)
+        dimension_scores.append(DimensionScore(
+            dimension=MatchDimension.REPUTATION,
+            score=rep_score,
+            weight=weights.get(MatchDimension.REPUTATION, 0.20),
+            details=rep_details,
+        ))
+        if rep_score > 0.8:
+            strengths.append(f"High reputation ({agent.rating:.1f} rating)")
+        elif rep_score < 0.5:
+            weaknesses.append(f"Lower reputation score")
+
+        # 4. Price Match
+        price_score, price_details = self._score_price_match(agent, criteria)
+        dimension_scores.append(DimensionScore(
+            dimension=MatchDimension.PRICE,
+            score=price_score,
+            weight=weights.get(MatchDimension.PRICE, 0.15),
+            details=price_details,
+        ))
+        if price_score > 0.8:
+            strengths.append(f"Price within budget")
+        elif price_score < 0.5:
+            weaknesses.append(f"Price may exceed budget")
+
+        # 5. Availability Score
+        avail_score, avail_details = self._score_availability(agent, criteria)
+        dimension_scores.append(DimensionScore(
+            dimension=MatchDimension.AVAILABILITY,
+            score=avail_score,
+            weight=weights.get(MatchDimension.AVAILABILITY, 0.10),
+            details=avail_details,
+        ))
+        if avail_score > 0.8:
+            strengths.append(f"Currently available")
+        elif avail_score < 0.5:
+            weaknesses.append(f"Limited availability")
+
+        # Calculate overall score
+        overall_score = sum(ds.score * ds.weight for ds in dimension_scores)
+
+        # Generate recommendation
+        recommendation = self._generate_recommendation(
+            overall_score, strengths, weaknesses
+        )
+
+        return MultiDimensionalMatchResult(
+            agent=agent,
+            overall_score=overall_score,
+            dimension_scores=dimension_scores,
+            strengths=strengths,
+            weaknesses=weaknesses,
+            recommendation=recommendation,
+            gene_capsule_match=exp_details.get("gene_capsule_data"),
+        )
+
+    def _score_capability_match(
+        self,
+        agent: AgentInfo,
+        criteria: SearchCriteria,
+    ) -> Tuple[float, Dict[str, Any]]:
+        """Score capability match"""
+        if not criteria.required_capabilities and not criteria.required_skills:
+            return (0.7, {"reason": "No specific capabilities required"})
+
+        matched_caps = []
+        matched_skills = []
+        total_required = len(criteria.required_capabilities or []) + len(criteria.required_skills or [])
+
+        # Check capabilities
+        if criteria.required_capabilities:
+            for req_cap in criteria.required_capabilities:
+                if agent.has_capability(req_cap):
+                    matched_caps.append(req_cap)
+
+        # Check skills
+        if criteria.required_skills:
+            for req_skill in criteria.required_skills:
+                if agent.has_skill(req_skill):
+                    matched_skills.append(req_skill)
+
+        matched_count = len(matched_caps) + len(matched_skills)
+        score = matched_count / total_required if total_required > 0 else 0.7
+
+        return (score, {
+            "matched_capabilities": matched_caps,
+            "matched_skills": matched_skills,
+            "total_required": total_required,
+            "match_count": matched_count,
+        })
+
+    async def _score_experience_match(
+        self,
+        agent: AgentInfo,
+        criteria: SearchCriteria,
+    ) -> Tuple[float, Dict[str, Any]]:
+        """Score experience match using Gene Capsule"""
+        if not criteria.require_experience_in:
+            return (0.5, {"reason": "No experience requirements specified"})
+
+        # Try to get gene capsule data
+        gene_capsule_data = None
+        if self.platform_client:
+            try:
+                response = await self.platform_client.find_matching_experiences(
+                    task_description=criteria.task_description or "",
+                    required_skills=criteria.required_skills,
+                    min_relevance=0.3,
+                    limit=5,
+                )
+                if response.success:
+                    gene_capsule_data = response.data
+            except Exception as e:
+                self.logger.warning(f"Failed to get gene capsule data: {e}")
+
+        if not gene_capsule_data:
+            # Fallback to simple heuristic
+            return (0.5, {
+                "reason": "Gene capsule data not available",
+                "heuristic": True,
+            })
+
+        # Calculate experience score based on matched experiences
+        matched_experiences = gene_capsule_data.get("matches", [])
+        if not matched_experiences:
+            return (0.3, {
+                "reason": "No matching experiences found",
+                "gene_capsule_data": gene_capsule_data,
+            })
+
+        # Score based on relevance and count
+        total_relevance = sum(m.get("relevance_score", 0) for m in matched_experiences)
+        avg_relevance = total_relevance / len(matched_experiences) if matched_experiences else 0
+
+        # Bonus for verified experiences
+        verified_count = sum(
+            1 for m in matched_experiences
+            if m.get("experience", {}).get("verified", False)
+        )
+        verification_bonus = min(0.2, verified_count * 0.05)
+
+        # Count bonus
+        count_bonus = min(0.2, len(matched_experiences) * 0.04)
+
+        score = min(1.0, avg_relevance + verification_bonus + count_bonus)
+
+        return (score, {
+            "matched_count": len(matched_experiences),
+            "avg_relevance": avg_relevance,
+            "verified_count": verified_count,
+            "gene_capsule_data": gene_capsule_data,
+        })
+
+    def _score_reputation(
+        self,
+        agent: AgentInfo,
+        criteria: SearchCriteria,
+    ) -> Tuple[float, Dict[str, Any]]:
+        """Score reputation"""
+        # Base score from rating
+        rating_score = agent.rating / 5.0 if agent.rating else 0.5
+
+        # Adjust based on requirements
+        if criteria.min_rating and agent.rating < criteria.min_rating:
+            rating_score *= 0.5
+
+        # Verified bonus
+        is_verified = agent.metadata.get("verified", False)
+        verification_bonus = 0.2 if is_verified else 0
+
+        score = min(1.0, rating_score + verification_bonus)
+
+        return (score, {
+            "rating": agent.rating,
+            "verified": is_verified,
+            "rating_score": rating_score,
+            "verification_bonus": verification_bonus,
+        })
+
+    def _score_price_match(
+        self,
+        agent: AgentInfo,
+        criteria: SearchCriteria,
+    ) -> Tuple[float, Dict[str, Any]]:
+        """Score price alignment"""
+        if not criteria.budget_min and not criteria.budget_max:
+            return (0.7, {"reason": "No budget specified"})
+
+        agent_price = agent.metadata.get("hourly_rate") or agent.metadata.get("price")
+
+        if not agent_price:
+            return (0.5, {"reason": "Agent price not available"})
+
+        budget_min = criteria.budget_min or 0
+        budget_max = criteria.budget_max or float("inf")
+
+        if budget_min <= agent_price <= budget_max:
+            # Perfect match
+            budget_mid = (budget_min + budget_max) / 2 if budget_max != float("inf") else budget_min * 1.5
+            # Higher score if price is closer to budget mid
+            score = 0.7 + 0.3 * (1 - abs(agent_price - budget_mid) / max(budget_mid, 1))
+            return (min(1.0, score), {
+                "agent_price": agent_price,
+                "within_budget": True,
+            })
+        elif agent_price < budget_min:
+            # Below budget - still acceptable
+            score = 0.6
+            return (score, {
+                "agent_price": agent_price,
+                "within_budget": False,
+                "below_budget": True,
+            })
+        else:
+            # Above budget
+            overage_ratio = (agent_price - budget_max) / budget_max
+            score = max(0.1, 0.5 - overage_ratio)
+            return (score, {
+                "agent_price": agent_price,
+                "within_budget": False,
+                "overage_percent": overage_ratio * 100,
+            })
+
+    def _score_availability(
+        self,
+        agent: AgentInfo,
+        criteria: SearchCriteria,
+    ) -> Tuple[float, Dict[str, Any]]:
+        """Score availability"""
+        details = {}
+
+        # Online status
+        if criteria.require_online and not agent.is_online:
+            return (0.0, {"reason": "Agent not online but required"})
+
+        online_score = 0.3 if agent.is_online else 0.1
+
+        # Response time
+        response_score = 0.3
+        if criteria.max_response_time and agent.latency > criteria.max_response_time:
+            response_score = 0.1
+            details["latency_issue"] = True
+        elif agent.latency > 0:
+            response_score = max(0.1, 0.3 - (agent.latency / 1000))
+
+        # Availability window
+        window_score = 0.4
+        if criteria.availability_window:
+            # Check if agent has availability info
+            agent_availability = agent.metadata.get("availability")
+            if agent_availability:
+                # Simplified check - real implementation would parse schedule
+                window_score = 0.4
+            else:
+                window_score = 0.3
+                details["availability_unknown"] = True
+
+        score = online_score + response_score + window_score
+
+        return (score, details)
+
+    def _generate_recommendation(
+        self,
+        overall_score: float,
+        strengths: List[str],
+        weaknesses: List[str],
+    ) -> str:
+        """Generate a recommendation message"""
+        if overall_score >= 0.8:
+            return "Highly recommended - strong match across all dimensions"
+        elif overall_score >= 0.6:
+            return "Recommended - good overall match with some considerations"
+        elif overall_score >= 0.4:
+            return "Conditional - may be suitable depending on priorities"
+        else:
+            return "Not recommended - significant gaps in requirements"
+
+    # ==================== Semantic Search ====================
+
+    async def semantic_search(
+        self,
+        task_description: str,
+        limit: int = 10,
+    ) -> List[MultiDimensionalMatchResult]:
+        """
+        Perform semantic search using task description.
+
+        Uses LLM to understand task intent and find matching agents.
+        Falls back to keyword search if LLM is not available.
+        """
+        # Extract intent and requirements from task description
+        intent = await self._extract_task_intent(task_description)
+
+        # Build search criteria from extracted intent
+        criteria = SearchCriteria(
+            task_description=task_description,
+            required_skills=intent.get("skills", []),
+            required_capabilities=intent.get("capabilities", []),
+            budget_min=intent.get("budget_min"),
+            budget_max=intent.get("budget_max"),
+            require_experience_in=intent.get("experience_types", []),
+            dimension_weights={
+                MatchDimension.CAPABILITY: 0.25,
+                MatchDimension.EXPERIENCE: 0.35,
+                MatchDimension.REPUTATION: 0.20,
+                MatchDimension.PRICE: 0.10,
+                MatchDimension.AVAILABILITY: 0.10,
+            },
+        )
+
+        return await self.multi_dimensional_search(criteria, limit)
+
+    async def _extract_task_intent(self, task_description: str) -> Dict[str, Any]:
+        """Extract task intent using LLM or heuristics"""
+        # If LLM adapter is available, use it
+        if self._llm_adapter:
+            try:
+                prompt = f"""
+Analyze this task description and extract the following:
+1. Required skills (technical abilities)
+2. Required capabilities (functional abilities)
+3. Budget range (if mentioned)
+4. Task types that would be relevant experience
+
+Task: {task_description}
+
+Return as JSON with keys: skills, capabilities, budget_min, budget_max, experience_types
+"""
+                response = await self._llm_adapter.generate(prompt)
+                return json.loads(response)
+            except Exception as e:
+                self.logger.warning(f"LLM intent extraction failed: {e}")
+
+        # Fallback to keyword extraction
+        keywords = self._extract_keywords(task_description)
+
+        # Map keywords to potential skills/capabilities
+        skill_keywords = {
+            "python", "javascript", "typescript", "java", "rust", "go",
+            "machine learning", "ml", "ai", "nlp", "data analysis",
+            "web development", "api", "database", "sql", "nosql",
+            "cloud", "aws", "azure", "docker", "kubernetes",
+        }
+
+        capability_keywords = {
+            "analysis", "development", "design", "testing", "deployment",
+            "optimization", "integration", "migration", "automation",
+            "monitoring", "security", "documentation", "training",
+        }
+
+        skills = [kw for kw in keywords if kw in skill_keywords]
+        capabilities = [kw for kw in keywords if kw in capability_keywords]
+
+        # Extract budget if mentioned
+        budget_min, budget_max = None, None
+        budget_pattern = r'\$?(\d+(?:,\d+)*(?:\.\d+)?)\s*[-–to]\s*\$?(\d+(?:,\d+)*(?:\.\d+)?)'
+        match = re.search(budget_pattern, task_description, re.IGNORECASE)
+        if match:
+            budget_min = float(match.group(1).replace(',', ''))
+            budget_max = float(match.group(2).replace(',', ''))
+
+        return {
+            "skills": skills,
+            "capabilities": capabilities,
+            "budget_min": budget_min,
+            "budget_max": budget_max,
+            "experience_types": keywords[:5],  # Top 5 keywords as experience types
+        }
+
+    # ==================== Real-time Monitoring ====================
+
+    async def watch_agents(
+        self,
+        watch_id: str,
+        condition: WatchCondition,
+        callback: Callable[[WatchEvent], None],
+    ) -> str:
+        """
+        Watch agents for changes and trigger callbacks.
+
+        Watch types:
+        - status_change: Agent goes online/offline
+        - new_capability: Agent adds new capability
+        - price_change: Agent price changes
+        - rating_change: Agent rating changes
+        """
+        self._watchers[watch_id] = condition
+        self._watch_callbacks[watch_id] = callback
+
+        self.logger.info(f"Started watching agents with condition: {condition.condition_type}")
+        return watch_id
+
+    async def stop_watch(self, watch_id: str) -> bool:
+        """Stop watching for changes"""
+        if watch_id in self._watchers:
+            del self._watchers[watch_id]
+            del self._watch_callbacks[watch_id]
+            return True
+        return False
+
+    async def _watch_loop(self):
+        """Background loop for checking watch conditions"""
+        while True:
+            try:
+                await asyncio.sleep(30)  # Check every 30 seconds
+
+                for watch_id, condition in list(self._watchers.items()):
+                    try:
+                        events = await self._check_watch_condition(condition)
+                        for event in events:
+                            callback = self._watch_callbacks.get(watch_id)
+                            if callback:
+                                try:
+                                    if asyncio.iscoroutinefunction(callback):
+                                        await callback(event)
+                                    else:
+                                        callback(event)
+                                except Exception as e:
+                                    self.logger.error(f"Watch callback error: {e}")
+                    except Exception as e:
+                        self.logger.error(f"Watch check error for {watch_id}: {e}")
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.logger.error(f"Watch loop error: {e}")
+                await asyncio.sleep(5)
+
+    async def _check_watch_condition(self, condition: WatchCondition) -> List[WatchEvent]:
+        """Check if watch condition is triggered"""
+        events = []
+
+        # Get current state of watched agents
+        if condition.agent_ids:
+            agents = []
+            for agent_id in condition.agent_ids:
+                agent = await self.get_agent(agent_id)
+                if agent:
+                    agents.append(agent)
+        elif condition.filter_criteria:
+            agents = await self.discover(condition.filter_criteria)
+        else:
+            return events
+
+        for agent in agents:
+            cached_agent = self._agent_cache.get(agent.agent_id)
+
+            if not cached_agent:
+                continue
+
+            if condition.condition_type == "status_change":
+                if agent.is_online != cached_agent.is_online:
+                    events.append(WatchEvent(
+                        event_id=f"evt-{uuid4().hex[:8]}",
+                        watch_id=str(condition.created_at.timestamp()),
+                        agent_id=agent.agent_id,
+                        event_type="status_change",
+                        old_value=cached_agent.is_online,
+                        new_value=agent.is_online,
+                    ))
+
+            elif condition.condition_type == "rating_change":
+                if abs(agent.rating - cached_agent.rating) >= (condition.threshold or 0.5):
+                    events.append(WatchEvent(
+                        event_id=f"evt-{uuid4().hex[:8]}",
+                        watch_id=str(condition.created_at.timestamp()),
+                        agent_id=agent.agent_id,
+                        event_type="rating_change",
+                        old_value=cached_agent.rating,
+                        new_value=agent.rating,
+                    ))
+
+        return events
+
+    # ==================== Batch Comparison ====================
+
+    async def compare_agents(
+        self,
+        agent_ids: List[str],
+        criteria: Optional[SearchCriteria] = None,
+    ) -> AgentComparison:
+        """
+        Compare multiple agents across dimensions.
+
+        Returns ranking, scores, and recommendation.
+        """
+        # Get all agents
+        agents = []
+        for agent_id in agent_ids:
+            agent = await self.get_agent(agent_id)
+            if agent:
+                agents.append(agent)
+
+        if len(agents) < 2:
+            raise ValueError("Need at least 2 agents to compare")
+
+        # Default criteria if not provided
+        if not criteria:
+            criteria = SearchCriteria()
+
+        # Score each agent
+        comparison_dimensions = [
+            MatchDimension.CAPABILITY,
+            MatchDimension.EXPERIENCE,
+            MatchDimension.REPUTATION,
+            MatchDimension.PRICE,
+            MatchDimension.AVAILABILITY,
+        ]
+
+        scores: Dict[str, Dict[MatchDimension, float]] = {}
+
+        for agent in agents:
+            result = await self._score_multi_dimensional(agent, criteria)
+            scores[agent.agent_id] = {
+                ds.dimension: ds.score
+                for ds in result.dimension_scores
+            }
+
+        # Calculate rankings
+        overall_scores = {
+            agent_id: sum(
+                score * criteria.dimension_weights.get(dim, 0.2)
+                for dim, score in dim_scores.items()
+            )
+            for agent_id, dim_scores in scores.items()
+        }
+
+        sorted_agents = sorted(overall_scores.items(), key=lambda x: x[1], reverse=True)
+        rankings = {agent_id: rank + 1 for rank, (agent_id, _) in enumerate(sorted_agents)}
+
+        # Generate summary
+        top_agent_id = sorted_agents[0][0]
+        top_agent = next(a for a in agents if a.agent_id == top_agent_id)
+
+        summary = f"Compared {len(agents)} agents. "
+        summary += f"Top ranked: {top_agent.name} (score: {sorted_agents[0][1]:.2f})"
+
+        # Generate recommendation
+        score_diff = sorted_agents[0][1] - sorted_agents[1][1] if len(sorted_agents) > 1 else 1.0
+
+        if score_diff > 0.3:
+            recommendation = f"Clear winner: {top_agent.name} is significantly better matched"
+        elif score_diff > 0.1:
+            recommendation = f"Recommended: {top_agent.name} has a moderate advantage"
+        else:
+            recommendation = "Close match - consider specific priorities"
+
+        return AgentComparison(
+            agents=agents,
+            comparison_dimensions=comparison_dimensions,
+            rankings=rankings,
+            scores=scores,
+            summary=summary,
+            recommendation=recommendation,
+        )
+
+    # ==================== Experience-based Discovery ====================
+
+    async def discover_by_experience(
+        self,
+        task_description: str,
+        min_relevance: float = 0.6,
+        limit: int = 10,
+    ) -> List[MultiDimensionalMatchResult]:
+        """
+        Discover agents based on their proven experience (Gene Capsule).
+
+        This prioritizes agents with demonstrated experience over
+        just claimed capabilities.
+        """
+        if not self.platform_client:
+            self.logger.warning("Platform client not available for experience discovery")
+            return []
+
+        # Search agents by experience via platform
+        response = await self.platform_client.search_agents_by_experience(
+            task_description=task_description,
+            min_experience_relevance=min_relevance,
+            limit=limit * 2,  # Get more candidates for filtering
+        )
+
+        if not response.success:
+            self.logger.error(f"Experience search failed: {response.error}")
+            return []
+
+        results = []
+        for agent_match in response.data:
+            agent_id = agent_match.get("agent_id")
+
+            # Get full agent info
+            agent_info = await self.get_agent(agent_id)
+            if not agent_info:
+                continue
+
+            # Build match result from experience data
+            overall_relevance = agent_match.get("overall_relevance", 0)
+
+            dimension_scores = [
+                DimensionScore(
+                    dimension=MatchDimension.EXPERIENCE,
+                    score=overall_relevance,
+                    weight=0.40,
+                    details={
+                        "matched_experiences": len(agent_match.get("matched_experiences", [])),
+                        "verified_count": agent_match.get("verified_experiences_count", 0),
+                    },
+                ),
+            ]
+
+            # Add other dimension scores
+            rep_score = agent_info.rating / 5.0 if agent_info.rating else 0.5
+            dimension_scores.append(DimensionScore(
+                dimension=MatchDimension.REPUTATION,
+                score=rep_score,
+                weight=0.30,
+                details={"rating": agent_info.rating},
+            ))
+
+            avail_score = 0.7 if agent_info.is_online else 0.3
+            dimension_scores.append(DimensionScore(
+                dimension=MatchDimension.AVAILABILITY,
+                score=avail_score,
+                weight=0.30,
+                details={"online": agent_info.is_online},
+            ))
+
+            # Calculate overall
+            overall = sum(ds.score * ds.weight for ds in dimension_scores)
+
+            results.append(MultiDimensionalMatchResult(
+                agent=agent_info,
+                overall_score=overall,
+                dimension_scores=dimension_scores,
+                strengths=[f"Proven experience (relevance: {overall_relevance:.0%})"],
+                weaknesses=[],
+                recommendation="Based on demonstrated experience",
+                gene_capsule_match=agent_match,
+            ))
+
+        results.sort(key=lambda x: x.overall_score, reverse=True)
+        return results[:limit]
+
+    # ==================== Historical Success Recommendations ====================
+
+    async def get_recommendations_from_history(
+        self,
+        task_type: str,
+        limit: int = 5,
+    ) -> List[MultiDimensionalMatchResult]:
+        """
+        Get recommendations based on historical success patterns.
+
+        Looks at agents who have successfully completed similar tasks.
+        """
+        if not self.platform_client:
+            return []
+
+        # Get agents with successful experiences in this task type
+        response = await self.platform_client.search_agents_by_experience(
+            task_description=task_type,
+            min_experience_relevance=0.5,
+            limit=limit * 3,
+        )
+
+        if not response.success:
+            return []
+
+        results = []
+        for match in response.data:
+            agent_id = match.get("agent_id")
+
+            # Filter for successful outcomes
+            matched_exp = match.get("matched_experiences", [])
+            successful = [
+                e for e in matched_exp
+                if e.get("experience", {}).get("outcome") == "success"
+            ]
+
+            if not successful:
+                continue
+
+            agent_info = await self.get_agent(agent_id)
+            if not agent_info:
+                continue
+
+            # Calculate success-based score
+            success_rate = len(successful) / len(matched_exp) if matched_exp else 0
+            avg_rating = sum(
+                e.get("experience", {}).get("client_rating", 0)
+                for e in successful
+            ) / len(successful) if successful else 0
+
+            score = (success_rate * 0.6) + (avg_rating / 5.0 * 0.4)
+
+            results.append(MultiDimensionalMatchResult(
+                agent=agent_info,
+                overall_score=score,
+                dimension_scores=[
+                    DimensionScore(
+                        dimension=MatchDimension.EXPERIENCE,
+                        score=success_rate,
+                        weight=0.6,
+                        details={
+                            "successful_count": len(successful),
+                            "total_matched": len(matched_exp),
+                        },
+                    ),
+                    DimensionScore(
+                        dimension=MatchDimension.REPUTATION,
+                        score=avg_rating / 5.0,
+                        weight=0.4,
+                        details={"avg_rating": avg_rating},
+                    ),
+                ],
+                strengths=[f"{len(successful)} successful similar tasks"],
+                weaknesses=[],
+                recommendation="Based on historical success",
+            ))
+
+        results.sort(key=lambda x: x.overall_score, reverse=True)
+        return results[:limit]

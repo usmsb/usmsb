@@ -73,7 +73,7 @@ export default function Header() {
       <header className={`
         h-16 flex items-center justify-between px-4 md:px-6 relative z-20
         /* Light Mode: Clean white header */
-        bg-white border-b border-secondary-200
+        bg-white border-b border-light-border
         /* Dark Mode: Cyberpunk glass effect */
         dark:bg-cyber-card/80 dark:backdrop-blur-md dark:border-neon-blue/20
       `}>
@@ -86,7 +86,7 @@ export default function Header() {
           <button
             className={`
               md:hidden p-2 rounded-lg transition-all
-              text-secondary-500 hover:bg-secondary-100
+              text-secondary-600 hover:bg-secondary-100
               dark:text-neon-blue dark:hover:bg-neon-blue/10 dark:hover:shadow-neon-blue
             `}
             onClick={() => setMobileMenuOpen(true)}
@@ -108,8 +108,8 @@ export default function Header() {
               className={`
                 w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none transition-all
                 /* Light Mode */
-                bg-secondary-50 border-secondary-200 text-secondary-900
-                focus:ring-2 focus:ring-primary-500 focus:border-transparent
+                bg-secondary-100 border-secondary-200 text-secondary-900
+                focus:ring-2 focus:ring-blue-500 focus:border-transparent
                 /* Dark Mode */
                 dark:bg-cyber-dark/80 dark:border-neon-blue/30 dark:text-gray-100 dark:placeholder-neon-blue/40
                 dark:focus:border-neon-blue dark:focus:ring-neon-blue/30
@@ -155,7 +155,7 @@ export default function Header() {
               aria-label={`Notifications${notifications.length > 0 ? `, ${notifications.length} unread` : ''}`}
               className={`
                 relative p-2 rounded-lg transition-all
-                text-secondary-500 hover:bg-secondary-100
+                text-secondary-600 hover:bg-secondary-100
                 dark:text-neon-blue dark:hover:bg-neon-blue/10 dark:hover:shadow-[0_0_10px_rgba(0,245,255,0.3)]
               `}
             >
@@ -179,7 +179,7 @@ export default function Header() {
               aria-label={t('help.openHelp', 'Open Help Center')}
               className={`
                 p-2 rounded-lg transition-all
-                text-secondary-500 hover:bg-secondary-100
+                text-secondary-600 hover:bg-secondary-100
                 dark:text-neon-blue dark:hover:bg-neon-blue/10 dark:hover:shadow-[0_0_10px_rgba(0,245,255,0.3)]
               `}
             >
@@ -195,7 +195,7 @@ export default function Header() {
                 className={`
                   flex items-center gap-3 px-3 py-2 rounded-lg transition-all
                   /* Light Mode */
-                  bg-secondary-50 hover:bg-secondary-100
+                  bg-light-bg-tertiary hover:bg-secondary-100
                   /* Dark Mode */
                   dark:bg-cyber-dark/80 dark:border dark:border-neon-blue/30 dark:hover:border-neon-blue/50 dark:hover:shadow-[0_0_15px_rgba(0,245,255,0.2)]
                 `}
@@ -253,7 +253,7 @@ export default function Header() {
                   {/* Address */}
                   <div className={`
                     px-4 py-2 border-b
-                    border-secondary-100
+                    border-secondary-200
                     dark:border-neon-blue/20
                   `}>
                     <p className={`
@@ -302,7 +302,7 @@ export default function Header() {
                   {/* Stats */}
                   <div className={`
                     px-4 py-3 border-b
-                    border-secondary-100
+                    border-secondary-200
                     dark:border-neon-blue/20
                   `}>
                     <div className="grid grid-cols-2 gap-4">
@@ -372,7 +372,7 @@ export default function Header() {
                     </Link>
                     <div className={`
                       border-t my-1
-                      border-secondary-100
+                      border-secondary-200
                       dark:border-neon-blue/20
                     `} />
                     <a
@@ -380,7 +380,7 @@ export default function Header() {
                       role="menuitem"
                       className={`
                         flex items-center gap-2 px-4 py-2 text-sm transition-colors
-                        text-secondary-700 hover:bg-secondary-50
+                        text-secondary-600 hover:bg-secondary-100
                         dark:text-gray-300 dark:hover:bg-white/5
                       `}
                     >

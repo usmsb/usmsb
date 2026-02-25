@@ -36,17 +36,17 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-secondary-50 dark:bg-secondary-900 p-4">
-          <div className="max-w-md w-full bg-white dark:bg-secondary-800 rounded-lg shadow-lg p-6 text-center">
+        <div className="min-h-screen flex items-center justify-center bg-light-bg-secondary dark:bg-cyber-dark p-4">
+          <div className="max-w-md w-full bg-white dark:bg-cyber-card rounded-lg shadow-lg p-6 text-center">
             <div className="flex justify-center mb-4">
               <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
                 <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
               </div>
             </div>
-            <h1 className="text-xl font-bold text-secondary-900 dark:text-white mb-2">
+            <h1 className="text-xl font-bold text-light-text-primary dark:text-white mb-2">
               Something went wrong
             </h1>
-            <p className="text-secondary-600 dark:text-secondary-400 mb-6">
+            <p className="text-light-text-secondary dark:text-secondary-400 mb-6">
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
             <div className="flex gap-3 justify-center">

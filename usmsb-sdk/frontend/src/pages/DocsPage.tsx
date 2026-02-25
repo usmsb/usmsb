@@ -270,9 +270,9 @@ export default function DocsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-secondary-50 dark:bg-secondary-900">
+    <div className="min-h-screen bg-light-bg-secondary dark:bg-cyber-dark">
       {/* Top Header Bar */}
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-secondary-800/95 backdrop-blur-sm border-b border-secondary-200 dark:border-secondary-700 shadow-sm">
+      <header className="sticky top-0 z-50 bg-white/95 dark:bg-cyber-card/95 backdrop-blur-sm border-b border-light-border dark:border-secondary-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Mobile sidebar toggle */}
@@ -294,7 +294,7 @@ export default function DocsPage() {
 
             <div className="h-4 w-px bg-secondary-200 dark:bg-secondary-700 mx-2" />
 
-            <h1 className="font-semibold text-secondary-900 dark:text-secondary-100">
+            <h1 className="font-semibold text-light-text-primary dark:text-secondary-100">
               {t('docs.title', 'Documentation')}
             </h1>
           </div>
@@ -399,7 +399,7 @@ export default function DocsPage() {
                   <currentDoc.icon className="text-primary-600 dark:text-primary-400" size={24} />
                 </div>
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-secondary-900 dark:text-secondary-100">
+                  <h1 className="text-2xl md:text-3xl font-bold text-light-text-primary dark:text-secondary-100">
                     {t(currentDoc.titleKey, currentDoc.id)}
                   </h1>
                   <p className="text-sm text-secondary-500 dark:text-secondary-400 mt-1">
@@ -449,7 +449,7 @@ export default function DocsPage() {
                       return (
                         <h1
                           id={id}
-                          className="text-3xl font-bold text-secondary-900 dark:text-secondary-100 mt-8 mb-4 first:mt-0 scroll-mt-20"
+                          className="text-3xl font-bold text-light-text-primary dark:text-secondary-100 mt-8 mb-4 first:mt-0 scroll-mt-20"
                         >
                           {children}
                         </h1>
@@ -464,7 +464,7 @@ export default function DocsPage() {
                       return (
                         <h2
                           id={id}
-                          className="text-2xl font-semibold text-secondary-900 dark:text-secondary-100 mt-10 mb-4 pb-2 border-b border-secondary-200 dark:border-secondary-700 scroll-mt-20"
+                          className="text-2xl font-semibold text-light-text-primary dark:text-secondary-100 mt-10 mb-4 pb-2 border-b border-secondary-200 dark:border-secondary-700 scroll-mt-20"
                         >
                           {children}
                         </h2>
@@ -479,7 +479,7 @@ export default function DocsPage() {
                       return (
                         <h3
                           id={id}
-                          className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mt-8 mb-3 scroll-mt-20"
+                          className="text-xl font-semibold text-light-text-primary dark:text-secondary-100 mt-8 mb-3 scroll-mt-20"
                         >
                           {children}
                         </h3>
@@ -494,7 +494,7 @@ export default function DocsPage() {
                       return (
                         <h4
                           id={id}
-                          className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mt-6 mb-2 scroll-mt-20"
+                          className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mt-6 mb-2 scroll-mt-20"
                         >
                           {children}
                         </h4>
@@ -662,7 +662,7 @@ export default function DocsPage() {
                       </thead>
                     ),
                     th: ({ children }) => (
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-secondary-900 dark:text-secondary-100">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-light-text-primary dark:text-secondary-100">
                         {children}
                       </th>
                     ),
@@ -702,7 +702,7 @@ export default function DocsPage() {
                     ),
                     // Strong
                     strong: ({ children }) => (
-                      <strong className="font-semibold text-secondary-900 dark:text-secondary-100">
+                      <strong className="font-semibold text-light-text-primary dark:text-secondary-100">
                         {children}
                       </strong>
                     ),

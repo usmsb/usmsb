@@ -53,6 +53,7 @@ from usmsb_sdk.api.rest.environment import router as environment_router
 from usmsb_sdk.api.rest.governance import router as governance_router
 from usmsb_sdk.api.rest.agent_auth import router as agent_auth_router
 from usmsb_sdk.api.rest.quotes import router as quotes_router
+from usmsb_sdk.api.rest.dynamic_pricing import router as dynamic_pricing_router
 
 # Import new modular routers
 from usmsb_sdk.api.rest.routers import (
@@ -68,6 +69,9 @@ from usmsb_sdk.api.rest.routers import (
     registration_router,
     services_router,
     system_router,
+    gene_capsule_router,
+    pre_match_negotiation_router,
+    meta_agent_matching_router,
 )
 
 # Import Meta Agent router
@@ -157,7 +161,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize Meta Agent
     from usmsb_sdk.platform.external.meta_agent.agent import MetaAgent
-    from usmsb_sdk.platform.external.meta_agent.config import MetaAgentConfig
+    from usmsb_sdk.platform.external.meta_agent.meta_agent_config import MetaAgentConfig
     from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
     from usmsb_sdk.api.rest.meta_agent import set_meta_agent, set_permission_manager
 
@@ -172,6 +176,14 @@ async def lifespan(app: FastAPI):
     await permission_manager.init()
     set_permission_manager(permission_manager)
     logger.info("Permission Manager initialized")
+
+    # Initialize MetaAgentService for precise matching
+    from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import MetaAgentService
+    from usmsb_sdk.platform.external.meta_agent.tools.precise_matching import set_meta_agent_service
+
+    meta_agent_service = MetaAgentService(meta_agent=meta_agent)
+    set_meta_agent_service(meta_agent_service)
+    logger.info("MetaAgentService initialized")
 
     logger.info("USMSB SDK API started successfully")
 
@@ -208,6 +220,7 @@ app.include_router(environment_router)
 app.include_router(governance_router)
 app.include_router(agent_auth_router)
 app.include_router(quotes_router)
+app.include_router(dynamic_pricing_router)
 
 # Include new modular routers
 app.include_router(agents_router)
@@ -222,7 +235,10 @@ app.include_router(learning_router)
 app.include_router(registration_router)
 app.include_router(services_router)
 app.include_router(system_router)
+app.include_router(gene_capsule_router)
+app.include_router(pre_match_negotiation_router)
 app.include_router(meta_agent_router)
+app.include_router(meta_agent_matching_router)
 
 
 # WebSocket endpoint

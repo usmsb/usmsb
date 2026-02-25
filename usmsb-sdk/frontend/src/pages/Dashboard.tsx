@@ -133,8 +133,8 @@ export default function Dashboard() {
     primary: '#0ea5e9',
     secondary: '#22c55e',
     tertiary: '#8b5cf6',
-    grid: '#374151',
-    text: '#94a3b8',
+    grid: '#e2e8f0',
+    text: '#475569',
   }
 
   return (
@@ -147,11 +147,11 @@ export default function Dashboard() {
         <div>
           <h1 className={clsx(
             'text-xl md:text-2xl font-bold',
-            'text-secondary-900',
+            'text-light-text-primary',
             isDark && 'text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber'
           )}>{t('dashboard.title')}</h1>
           <p className={clsx(
-            'text-secondary-500',
+            'text-light-text-muted',
             isDark && 'text-gray-400'
           )}>{t('dashboard.welcome')}</p>
         </div>
@@ -193,13 +193,13 @@ export default function Dashboard() {
                 <div>
                   <p className={clsx(
                     'text-sm',
-                    'text-secondary-500',
+                    'text-light-text-muted',
                     isDark && 'text-neon-blue/70 font-cyber tracking-wider'
                   )}>{stat.name}</p>
                   <p
                     className={clsx(
                       'text-2xl font-bold mt-1',
-                      'text-secondary-900',
+                      'text-light-text-primary',
                       isDark && 'font-cyber'
                     )}
                     style={isDark ? {
@@ -212,7 +212,7 @@ export default function Dashboard() {
                 </div>
                 <div className={clsx(
                   'w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300',
-                  'bg-primary-50',
+                  'bg-gradient-to-br from-blue-100 to-purple-100',
                   isDark && 'bg-transparent border border-neon-blue/30 group-hover:shadow-[0_0_15px_var(--neon-blue)]'
                 )}>
                   <stat.icon
@@ -248,7 +248,7 @@ export default function Dashboard() {
                 </span>
                 <span className={clsx(
                   'text-sm',
-                  'text-secondary-400',
+                  'text-light-text-muted',
                   isDark && 'text-gray-500'
                 )}>{t('dashboard.recentActivity')}</span>
               </div>
@@ -266,7 +266,7 @@ export default function Dashboard() {
         )}>
           <h3 className={clsx(
             'text-base md:text-lg font-semibold mb-4',
-            'text-secondary-900',
+            'text-light-text-primary',
             isDark && 'text-neon-blue font-cyber'
           )}>{t('dashboard.recentActivity')}</h3>
           <div className="h-56 md:h-72">
@@ -314,7 +314,7 @@ export default function Dashboard() {
         )}>
           <h3 className={clsx(
             'text-base md:text-lg font-semibold mb-4',
-            'text-secondary-900',
+            'text-light-text-primary',
             isDark && 'text-neon-purple font-cyber'
           )}>{t('dashboard.completedTasks')}</h3>
           <div className="h-56 md:h-72">
@@ -350,7 +350,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h3 className={clsx(
               'text-lg font-semibold',
-              'text-secondary-900',
+              'text-light-text-primary',
               isDark && 'text-neon-blue font-cyber'
             )}>{t('dashboard.recentActivity')}</h3>
             <a
@@ -396,12 +396,12 @@ export default function Dashboard() {
                     <div>
                       <p className={clsx(
                         'font-medium',
-                        'text-secondary-900',
+                        'text-light-text-primary',
                         isDark && 'text-gray-100'
                       )}>{agent.name}</p>
                       <p className={clsx(
                         'text-sm',
-                        'text-secondary-500',
+                        'text-light-text-muted',
                         isDark && 'text-gray-500 font-mono'
                       )}>{agent.type}</p>
                     </div>
@@ -409,14 +409,14 @@ export default function Dashboard() {
                   <div className="text-right">
                     <p className={clsx(
                       'text-sm font-medium',
-                      'text-secondary-900',
+                      'text-light-text-primary',
                       isDark && 'text-neon-green'
                     )}>
                       {agent.capabilities.length} capabilities
                     </p>
                     <p className={clsx(
                       'text-sm',
-                      'text-secondary-500',
+                      'text-light-text-muted',
                       isDark && 'text-gray-500'
                     )}>
                       {agent.goals_count} goals
@@ -433,7 +433,7 @@ export default function Dashboard() {
                 isDark && 'text-neon-blue/30'
               )} />
               <p className={clsx(
-                'text-secondary-500',
+                'text-light-text-muted',
                 isDark && 'text-gray-400'
               )}>{t('empty.noAgents')}</p>
               <button
@@ -454,7 +454,7 @@ export default function Dashboard() {
         <div className="card">
           <h3 className={clsx(
             'text-lg font-semibold mb-4',
-            'text-secondary-900',
+            'text-light-text-primary',
             isDark && 'text-neon-purple font-cyber'
           )}>{t('nav.simulations')}</h3>
           <div className="space-y-4">
@@ -489,7 +489,7 @@ export default function Dashboard() {
                       <span
                         className={clsx(
                           'text-sm font-medium',
-                          'text-secondary-900',
+                          'text-light-text-primary',
                           isDark && 'font-cyber'
                         )}
                         style={isDark ? { color: neonColor.color } : undefined}

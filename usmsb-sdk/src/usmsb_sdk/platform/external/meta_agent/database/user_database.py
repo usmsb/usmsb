@@ -1200,10 +1200,11 @@ class UserDatabase:
             # Memory stats
             mem_db = self._get_memory_db()
 
-            async with self._memory_lock:
-                profile = await self.get_profile()
-                info["memory"]["has_profile"] = profile is not None
+            # Get profile without holding the lock (to avoid deadlock)
+            profile = await self.get_profile()
+            info["memory"]["has_profile"] = profile is not None
 
+            async with self._memory_lock:
                 cursor = await mem_db.execute(
                     "SELECT COUNT(*) FROM important_memories WHERE user_id = ?",
                     (self.wallet_address,)

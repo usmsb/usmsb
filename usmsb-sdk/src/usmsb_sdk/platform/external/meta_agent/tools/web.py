@@ -336,10 +336,13 @@ class WebTool:
         self.name = name
         self.description = description
         self.handler = handler
+        self.requires_session = False  # Web 工具不需要 session
 
     async def execute(self, **kwargs):
-        # Web 工具也需要接收 params 字典
-        return await self.handler(**kwargs)
+        # Web 工具不需要 session，过滤掉它
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'session'}
+        # Web handlers expect params as a dict, not individual kwargs
+        return await self.handler(params=filtered_kwargs)
 
     def to_dict(self):
         return {
@@ -355,7 +358,8 @@ class WebTool:
                 "description": self.description,
                 "input_schema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": self._get_parameters(),
+                    "required": self._get_required_parameters(),
                 },
             }
         else:
@@ -366,10 +370,52 @@ class WebTool:
                     "description": self.description,
                     "parameters": {
                         "type": "object",
-                        "properties": {},
+                        "properties": self._get_parameters(),
+                        "required": self._get_required_parameters(),
                     },
                 },
             }
+
+    def _get_parameters(self) -> Dict[str, Any]:
+        """获取工具参数定义"""
+        params_map = {
+            "fetch_url": {
+                "url": {"type": "string", "description": "目标 URL"},
+                "method": {"type": "string", "description": "HTTP 方法 (GET/POST)"},
+                "headers": {"type": "object", "description": "自定义请求头"},
+                "timeout": {"type": "integer", "description": "超时时间（秒）"},
+            },
+            "parse_html": {
+                "html": {"type": "string", "description": "HTML 内容"},
+                "selector": {"type": "string", "description": "CSS 选择器"},
+                "attribute": {"type": "string", "description": "要提取的属性名"},
+            },
+            "search_web": {
+                "query": {"type": "string", "description": "搜索关键词"},
+                "engine": {"type": "string", "description": "搜索引擎 (duckduckgo/google)"},
+                "num_results": {"type": "integer", "description": "返回结果数量"},
+            },
+            "download_file": {
+                "url": {"type": "string", "description": "远程文件 URL"},
+                "destination": {"type": "string", "description": "本地保存路径"},
+                "overwrite": {"type": "boolean", "description": "是否覆盖已存在的文件"},
+            },
+            "get_headers": {
+                "url": {"type": "string", "description": "目标 URL"},
+            },
+        }
+        return params_map.get(self.name, {})
+
+    def _get_required_parameters(self) -> List[str]:
+        """获取必需的参数列表"""
+        required_map = {
+            "fetch_url": ["url"],
+            "parse_html": ["html", "selector"],
+            "search_web": ["query"],
+            "download_file": ["url", "destination"],
+            "get_headers": ["url"],
+        }
+        return required_map.get(self.name, [])
 
 
 def get_web_tool_objects():

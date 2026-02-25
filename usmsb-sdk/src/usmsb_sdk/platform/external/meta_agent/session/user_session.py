@@ -44,10 +44,11 @@ class SessionConfig:
         max_code_timeout: 代码执行最大超时时间（秒）
         max_memory_mb: 代码执行最大内存限制（MB）
     """
-    session_idle_timeout: int = 1800        # 30分钟
-    browser_idle_timeout: int = 600         # 10分钟
-    max_code_timeout: int = 30             # 代码执行超时30秒
-    max_memory_mb: int = 256                # 最大内存256MB
+
+    session_idle_timeout: int = 1800  # 30分钟
+    browser_idle_timeout: int = 600  # 10分钟
+    max_code_timeout: int = 30  # 代码执行超时30秒
+    max_memory_mb: int = 256  # 最大内存256MB
 
     def is_session_idle(self, last_active: float) -> bool:
         """检查会话是否空闲超时"""
@@ -69,6 +70,7 @@ class UserProfile:
         knowledge: 用户知识总结
         last_updated: 最后更新时间
     """
+
     preferences: Dict[str, Any] = field(default_factory=dict)
     commitments: List[str] = field(default_factory=list)
     knowledge: Dict[str, Any] = field(default_factory=dict)
@@ -104,7 +106,7 @@ class UserSession:
         wallet_address: str,
         node_id: str,
         config: Optional[SessionConfig] = None,
-        data_dir: Optional[str] = None
+        data_dir: Optional[str] = None,
     ):
         """
         初始化用户会话
@@ -166,12 +168,10 @@ class UserSession:
             raise RuntimeError("Session not initialized. Call init() first.")
 
         if self._workspace is None:
-            from ..workspace.user_workspace import UserWorkspace
+            from ..workspace.user_workspace import UserWorkspace, WorkspaceConfig
 
-            self._workspace = UserWorkspace(
-                wallet_address=self.wallet_address,
-                workspace_root=Path(self._data_dir) / self.wallet_address / "workspace"
-            )
+            config = WorkspaceConfig(workspace_root=self._data_dir)
+            self._workspace = UserWorkspace(wallet_address=self.wallet_address, config=config)
         return self._workspace
 
     @property
@@ -195,8 +195,7 @@ class UserSession:
             from ..sandbox.code_sandbox import CodeSandbox
 
             self._sandbox = CodeSandbox(
-                wallet_address=self.wallet_address,
-                sandbox_root=self._data_dir
+                wallet_address=self.wallet_address, sandbox_root=self._data_dir
             )
         return self._sandbox
 
@@ -224,7 +223,7 @@ class UserSession:
 
             self._browser_context = BrowserContext(
                 wallet_address=self.wallet_address,
-                user_data_dir=Path(self._data_dir) / self.wallet_address / "browser/user_data"
+                user_data_dir=Path(self._data_dir) / self.wallet_address / "browser/user_data",
             )
         return self._browser_context
 
@@ -250,10 +249,7 @@ class UserSession:
         if self._db is None:
             from ..database.user_database import UserDatabase
 
-            self._db = UserDatabase(
-                wallet_address=self.wallet_address,
-                data_dir=self._data_dir
-            )
+            self._db = UserDatabase(wallet_address=self.wallet_address, data_dir=self._data_dir)
         return self._db
 
     @property
@@ -278,9 +274,7 @@ class UserSession:
         if self._ipfs_client is None:
             from ..ipfs.ipfs_client import IPFSClient
 
-            self._ipfs_client = IPFSClient(
-                gateways=[os.getenv("IPFS_NODE", "https://ipfs.io")]
-            )
+            self._ipfs_client = IPFSClient(gateways=[os.getenv("IPFS_NODE", "https://ipfs.io")])
         return self._ipfs_client
 
     @property
@@ -354,7 +348,7 @@ class UserSession:
         # 加载或创建元数据
         meta_file = user_dir / "meta.json"
         if meta_file.exists():
-            with open(meta_file, 'r') as f:
+            with open(meta_file, "r") as f:
                 meta_data = json.load(f)
                 self.is_primary_node = meta_data.get("primary_node") == self.node_id
                 self._ipfs_cid = meta_data.get("ipfs_cid")
@@ -365,9 +359,9 @@ class UserSession:
                 "primary_node": self.node_id,
                 "created_at": self.created_at,
                 "last_active": self.last_active,
-                "ipfs_cid": None
+                "ipfs_cid": None,
             }
-            with open(meta_file, 'w') as f:
+            with open(meta_file, "w") as f:
                 json.dump(meta_data, f, indent=2)
             self.is_primary_node = True
 
@@ -410,7 +404,7 @@ class UserSession:
         # 清除 IPFS 客户端（内存清除）
         if self._ipfs_client is not None:
             # IPFSClient 需要清除加密密钥
-            if hasattr(self._ipfs_client, 'clear_key'):
+            if hasattr(self._ipfs_client, "clear_key"):
                 self._ipfs_client.clear_key()
             self._ipfs_client = None
 
@@ -466,8 +460,7 @@ class UserSession:
         try:
             if self._ipfs_cid:
                 ipfs_data = await self.ipfs_client.download_user_data(
-                    self.wallet_address,
-                    self._ipfs_cid
+                    self.wallet_address, self._ipfs_cid
                 )
                 if ipfs_data and "profile" in ipfs_data:
                     profile_data = ipfs_data["profile"]
@@ -505,9 +498,7 @@ class UserSession:
         self.update_activity()
 
     async def sync_to_ipfs(
-        self,
-        progress_callback: Optional[Callable[[Dict], None]] = None,
-        verify: bool = True
+        self, progress_callback: Optional[Callable[[Dict], None]] = None, verify: bool = True
     ) -> str:
         """
         同步数据到 IPFS
@@ -537,15 +528,17 @@ class UserSession:
         # 添加进度回调
         if progress_callback:
             self.data_migration.add_progress_callback(
-                lambda p: progress_callback({
-                    "stage": p.stage,
-                    "percentage": p.percentage,
-                    "message": p.message,
-                    "elapsed_seconds": p.elapsed_seconds,
-                    "speed_mb_per_sec": p.speed_mb_per_sec,
-                    "total_items": p.total_items,
-                    "completed_items": p.completed_items
-                })
+                lambda p: progress_callback(
+                    {
+                        "stage": p.stage,
+                        "percentage": p.percentage,
+                        "message": p.message,
+                        "elapsed_seconds": p.elapsed_seconds,
+                        "speed_mb_per_sec": p.speed_mb_per_sec,
+                        "total_items": p.total_items,
+                        "completed_items": p.completed_items,
+                    }
+                )
             )
 
         # 使用 DataMigration 服务导出数据
@@ -578,7 +571,7 @@ class UserSession:
         self,
         progress_callback: Optional[Callable[[Dict], None]] = None,
         force: bool = False,
-        verify: bool = True
+        verify: bool = True,
     ) -> bool:
         """
         从 IPFS 迁移数据到当前节点
@@ -607,15 +600,17 @@ class UserSession:
         # 添加进度回调
         if progress_callback:
             self.data_migration.add_progress_callback(
-                lambda p: progress_callback({
-                    "stage": p.stage,
-                    "percentage": p.percentage,
-                    "message": p.message,
-                    "elapsed_seconds": p.elapsed_seconds,
-                    "speed_mb_per_sec": p.speed_mb_per_sec,
-                    "total_items": p.total_items,
-                    "completed_items": p.completed_items
-                })
+                lambda p: progress_callback(
+                    {
+                        "stage": p.stage,
+                        "percentage": p.percentage,
+                        "message": p.message,
+                        "elapsed_seconds": p.elapsed_seconds,
+                        "speed_mb_per_sec": p.speed_mb_per_sec,
+                        "total_items": p.total_items,
+                        "completed_items": p.completed_items,
+                    }
+                )
             )
 
         # 使用 DataMigration 服务导入数据
@@ -676,10 +671,10 @@ class UserSession:
             "primary_node": self.node_id if self.is_primary_node else None,
             "created_at": self.created_at,
             "last_active": self.last_active,
-            "ipfs_cid": self._ipfs_cid
+            "ipfs_cid": self._ipfs_cid,
         }
 
-        with open(meta_file, 'w') as f:
+        with open(meta_file, "w") as f:
             json.dump(meta_data, f, indent=2)
 
     def __repr__(self) -> str:
@@ -700,7 +695,7 @@ def _user_profile_to_dict(self) -> Dict[str, Any]:
         "preferences": self.preferences,
         "commitments": self.commitments,
         "knowledge": self.knowledge,
-        "last_updated": self.last_updated
+        "last_updated": self.last_updated,
     }
 
 

@@ -477,14 +477,14 @@ export default function RegisterAgent() {
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">Register External Agent</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">Register External Agent</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">Register an AI agent using various protocols</p>
         </div>
       </div>
 
       {/* Protocol Selection */}
       <div className="card">
-        <h2 className="text-base md:text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Select Protocol</h2>
+        <h2 className="text-base md:text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Select Protocol</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {protocolOptions.map((option) => (
             <button
@@ -500,7 +500,7 @@ export default function RegisterAgent() {
               <div className={clsx('w-10 h-10 rounded-lg flex items-center justify-center mb-2', option.color)}>
                 <option.icon size={20} />
               </div>
-              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{option.name}</h3>
+              <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{option.name}</h3>
               <p className="text-xs text-secondary-500 dark:text-secondary-400 mt-1 line-clamp-2">{option.description}</p>
             </button>
           ))}
@@ -509,7 +509,7 @@ export default function RegisterAgent() {
 
       {/* Registration Form */}
       <form onSubmit={handleSubmit} className="card">
-        <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">
+        <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
           {protocolOptions.find((p) => p.id === protocol)?.name} Registration
         </h2>
 

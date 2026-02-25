@@ -21,6 +21,7 @@ async def register_tools(registry):
     from .web import get_web_tool_objects
     from .execution import get_execution_tools
     from .system_agents import get_system_agents_tools
+    from .precise_matching import get_precise_matching_tools
 
     all_tools = []
     all_tools.extend(get_platform_tools())
@@ -34,6 +35,7 @@ async def register_tools(registry):
     all_tools.extend(get_web_tool_objects())
     all_tools.extend(get_execution_tools())
     all_tools.extend(get_system_agents_tools())
+    all_tools.extend(get_precise_matching_tools())
 
     for tool in all_tools:
         registry.register(tool)

@@ -51,9 +51,12 @@ class Tool:
         """
         if self.requires_session:
             if session is None:
-                raise RuntimeError(f"Tool {self.name} requires a UserSession")
+                raise RuntimeError(f"Tool {self.name} requires a UserSession but none was provided")
+            # 需要 session 的工具：handler(session, params=dict)
             return await self.handler(session, params=kwargs)
         else:
+            # 不需要 session 的工具：handler(params=dict)
+            # 统一传递 params 字典格式
             return await self.handler(params=kwargs)
 
     def to_function_schema(self, provider: str = "anthropic") -> Dict[str, Any]:
@@ -63,13 +66,14 @@ class Tool:
             provider: LLM提供商 (anthropic/openai/ollama)
         """
         if provider == "anthropic":
-            # Anthropic Claude 格式
+            # Anthropic Claude 格式 - 使用 parameters 而非 input_schema
             return {
                 "name": self.name,
                 "description": self.description,
                 "input_schema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": self._get_parameters(),
+                    "required": self._get_required_parameters(),
                 },
             }
         else:
@@ -81,10 +85,86 @@ class Tool:
                     "description": self.description,
                     "parameters": {
                         "type": "object",
-                        "properties": {},
+                        "properties": self._get_parameters(),
+                        "required": self._get_required_parameters(),
                     },
                 },
             }
+
+    def _get_parameters(self) -> Dict[str, Any]:
+        """获取工具参数定义"""
+        params_map = {
+            "execute_command": {
+                "command": {"type": "string", "description": "要执行的命令行命令"},
+                "cwd": {"type": "string", "description": "工作目录路径"},
+                "timeout": {"type": "integer", "description": "超时时间（秒）"},
+            },
+            "run_program": {
+                "program_path": {"type": "string", "description": "程序或脚本的路径"},
+                "args": {"type": "array", "items": {"type": "string"}, "description": "命令行参数"},
+                "cwd": {"type": "string", "description": "工作目录"},
+                "timeout": {"type": "integer", "description": "超时时间"},
+            },
+            "read_file": {
+                "path": {"type": "string", "description": "要读取的文件路径"},
+                "offset": {"type": "integer", "description": "起始位置"},
+                "limit": {"type": "integer", "description": "读取字节数"},
+                "encoding": {"type": "string", "description": "文件编码"},
+            },
+            "write_file": {
+                "path": {"type": "string", "description": "要写入的文件路径"},
+                "content": {"type": "string", "description": "文件内容"},
+                "mode": {"type": "string", "description": "写入模式 (w/a)"},
+            },
+            "list_directory": {
+                "path": {"type": "string", "description": "目录路径"},
+                "show_hidden": {"type": "boolean", "description": "是否显示隐藏文件"},
+                "recursive": {"type": "boolean", "description": "是否递归列出"},
+                "pattern": {"type": "string", "description": "文件匹配模式"},
+            },
+            "create_directory": {
+                "path": {"type": "string", "description": "要创建的目录路径"},
+                "parents": {"type": "boolean", "description": "是否创建父目录"},
+            },
+            "delete_file": {
+                "path": {"type": "string", "description": "要删除的文件或目录路径"},
+            },
+            "search_files": {
+                "path": {"type": "string", "description": "搜索目录"},
+                "pattern": {"type": "string", "description": "文件匹配模式"},
+                "max_results": {"type": "integer", "description": "最大结果数"},
+                "recursive": {"type": "boolean", "description": "是否递归搜索"},
+            },
+            "get_file_info": {
+                "path": {"type": "string", "description": "文件路径"},
+            },
+            "copy_file": {
+                "source": {"type": "string", "description": "源文件路径"},
+                "destination": {"type": "string", "description": "目标文件路径"},
+            },
+            "move_file": {
+                "source": {"type": "string", "description": "源文件路径"},
+                "destination": {"type": "string", "description": "目标文件路径"},
+            },
+        }
+        return params_map.get(self.name, {})
+
+    def _get_required_parameters(self) -> List[str]:
+        """获取必需的参数列表"""
+        required_map = {
+            "execute_command": ["command"],
+            "run_program": ["program_path"],
+            "read_file": ["path"],
+            "write_file": ["path", "content"],
+            "list_directory": [],
+            "create_directory": ["path"],
+            "delete_file": ["path"],
+            "search_files": [],
+            "get_file_info": ["path"],
+            "copy_file": ["source", "destination"],
+            "move_file": ["source", "destination"],
+        }
+        return required_map.get(self.name, [])
 
 
 class ToolRegistry:
@@ -118,10 +198,7 @@ class ToolRegistry:
         return [t.to_function_schema(provider) for t in self.tools.values()]
 
     async def execute(
-        self,
-        tool_name: str,
-        session: Optional["UserSession"] = None,
-        **kwargs
+        self, tool_name: str, session: Optional["UserSession"] = None, **kwargs
     ) -> Any:
         """执行工具
 

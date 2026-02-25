@@ -201,7 +201,7 @@ export default function NetworkExplorer() {
             <Lightbulb className="text-green-600 dark:text-green-400" size={20} />
           </div>
           <div className="text-left">
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('network.whatIsNetwork')}</h3>
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('network.whatIsNetwork')}</h3>
             <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('network.clickToLearnConcepts')}</p>
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function NetworkExplorer() {
         <div className="mt-6 space-y-6">
           {/* Concept Definition */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Info size={16} className="text-green-500 dark:text-green-400" />
               {t('network.conceptDefinition')}
             </h4>
@@ -223,14 +223,14 @@ export default function NetworkExplorer() {
 
           {/* Use Cases */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <TrendingUp size={16} className="text-green-500 dark:text-green-400" />
               {t('network.useCases')}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {useCaseExamples.map((example, idx) => (
                 <div key={idx} className="p-4 bg-white dark:bg-secondary-800 rounded-lg border border-secondary-200 dark:border-secondary-700">
-                  <h5 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2">{example.title}</h5>
+                  <h5 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2">{example.title}</h5>
                   <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-3">{example.description}</p>
                   <div className="text-xs space-y-1">
                     <div className="flex gap-2">
@@ -249,7 +249,7 @@ export default function NetworkExplorer() {
 
           {/* Exploration Dimensions */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Target size={16} className="text-purple-500" />
               {t('network.explorationDimensions')}
             </h4>
@@ -275,7 +275,7 @@ export default function NetworkExplorer() {
 
           {/* Trust Network */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Shield size={16} className="text-blue-500 dark:text-blue-400" />
               {t('network.trustNetwork')}
             </h4>
@@ -313,7 +313,7 @@ export default function NetworkExplorer() {
             <Search className="text-blue-600 dark:text-blue-400" size={24} />
           </div>
           <div>
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">Explore Network</h3>
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">Explore Network</h3>
             <p className="text-sm text-secondary-500 dark:text-secondary-400">Discover new agents in the network</p>
           </div>
         </div>
@@ -382,7 +382,7 @@ export default function NetworkExplorer() {
 
       {/* Discovered Agents */}
       <div className="card">
-        <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Discovered Agents</h3>
+        <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Discovered Agents</h3>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="animate-spin text-primary-500 dark:text-primary-400" size={24} />
@@ -406,7 +406,7 @@ export default function NetworkExplorer() {
                     <Network className="text-blue-600 dark:text-blue-400" size={20} />
                   </div>
                   <div>
-                    <p className="font-medium text-secondary-900 dark:text-secondary-100">{agent.agent_name}</p>
+                    <p className="font-medium text-light-text-primary dark:text-secondary-100">{agent.agent_name}</p>
                     <p className="text-xs text-secondary-500 dark:text-secondary-400">
                       {agent.capabilities.slice(0, 2).join(', ') || 'No capabilities listed'}
                     </p>
@@ -435,7 +435,7 @@ export default function NetworkExplorer() {
     <div className="space-y-6">
       {/* My Network */}
       <div className="card">
-        <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">My Network</h3>
+        <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">My Network</h3>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <RefreshCw className="animate-spin text-primary-500 dark:text-primary-400" size={24} />
@@ -458,7 +458,7 @@ export default function NetworkExplorer() {
                     {agent.status}
                   </span>
                 </div>
-                <h4 className="font-medium text-secondary-900 dark:text-secondary-100">{agent.agent_name}</h4>
+                <h4 className="font-medium text-light-text-primary dark:text-secondary-100">{agent.agent_name}</h4>
                 <p className="text-xs text-secondary-500 dark:text-secondary-400 mb-2">
                   {agent.capabilities.join(', ') || 'No capabilities listed'}
                 </p>
@@ -483,7 +483,7 @@ export default function NetworkExplorer() {
       <div className="space-y-6">
         {/* Trusted Agents */}
         <div className="card">
-          <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Trusted Agents</h3>
+          <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Trusted Agents</h3>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="animate-spin text-primary-500 dark:text-primary-400" size={24} />
@@ -507,7 +507,7 @@ export default function NetworkExplorer() {
                       <Users className="text-green-600 dark:text-green-400" size={24} />
                     </div>
                     <div>
-                      <p className="font-semibold text-secondary-900 dark:text-secondary-100">{agent.agent_name}</p>
+                      <p className="font-semibold text-light-text-primary dark:text-secondary-100">{agent.agent_name}</p>
                       <p className="text-sm text-secondary-500 dark:text-secondary-400">
                         {agent.capabilities.join(', ') || 'No capabilities listed'}
                       </p>
@@ -534,7 +534,7 @@ export default function NetworkExplorer() {
     <div className="space-y-6">
       {/* Recommendations */}
       <div className="card">
-        <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">Network Recommendations</h3>
+        <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Network Recommendations</h3>
         <div className="mb-4">
           <div className="flex gap-2">
             <input
@@ -571,7 +571,7 @@ export default function NetworkExplorer() {
                     <Star className="text-purple-600 dark:text-purple-400" size={24} />
                   </div>
                   <div>
-                    <p className="font-semibold text-secondary-900 dark:text-secondary-100">{rec.recommended_agent_name}</p>
+                    <p className="font-semibold text-light-text-primary dark:text-secondary-100">{rec.recommended_agent_name}</p>
                     <p className="text-sm text-secondary-500 dark:text-secondary-400">{rec.reason}</p>
                   </div>
                 </div>
@@ -605,7 +605,7 @@ export default function NetworkExplorer() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('network.title')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('network.title')}</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">
             {t('network.exploreAgents')}
           </p>
@@ -625,7 +625,7 @@ export default function NetworkExplorer() {
               <Search className="text-blue-600 dark:text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.total_explorations}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.total_explorations}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">Explorations</p>
             </div>
           </div>
@@ -636,7 +636,7 @@ export default function NetworkExplorer() {
               <Users className="text-green-600 dark:text-green-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.network_size}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.network_size}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">Network Size</p>
             </div>
           </div>
@@ -647,7 +647,7 @@ export default function NetworkExplorer() {
               <Star className="text-purple-600 dark:text-purple-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.trusted_agents}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.trusted_agents}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">Trusted</p>
             </div>
           </div>
@@ -658,7 +658,7 @@ export default function NetworkExplorer() {
               <TrendingUp className="text-yellow-600 dark:text-yellow-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.total_discovered}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.total_discovered}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">Discovered</p>
             </div>
           </div>

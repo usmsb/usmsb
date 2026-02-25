@@ -85,6 +85,37 @@ from usmsb_sdk.services.proactive_learning_service import (
     LearningType,
     InsightCategory,
 )
+from usmsb_sdk.services.dynamic_pricing_service import (
+    DynamicPricingService,
+    PricingStrategy,
+    ServiceCategory,
+    PricingFactor,
+    PricingResult,
+    MarketSnapshot,
+    PriceHistory,
+)
+from usmsb_sdk.services.joint_order_service import (
+    JointOrderService,
+    Demand,
+    OrderPool,
+    Bid,
+    PoolStatus,
+    ServiceStats,
+)
+from usmsb_sdk.services.asset_fractionalization_service import (
+    AssetFractionalizationService,
+    AssetInfo,
+    Shareholder,
+    AssetStatus,
+)
+from usmsb_sdk.services.zk_credential_service import (
+    ZKCredentialService,
+    ZKProof,
+    Credential,
+    PrivateInputs,
+    CredentialType,
+    CredentialStatus,
+)
 
 __all__ = [
     # Behavior Prediction
@@ -163,4 +194,31 @@ __all__ = [
     "MarketInsight",
     "LearningType",
     "InsightCategory",
+    # Dynamic Pricing
+    "DynamicPricingService",
+    "PricingStrategy",
+    "ServiceCategory",
+    "PricingFactor",
+    "PricingResult",
+    "MarketSnapshot",
+    "PriceHistory",
+    # Joint Order
+    "JointOrderService",
+    "Demand",
+    "OrderPool",
+    "Bid",
+    "PoolStatus",
+    "ServiceStats",
+    # Asset Fractionalization
+    "AssetFractionalizationService",
+    "AssetInfo",
+    "Shareholder",
+    "AssetStatus",
+    # ZK Credential
+    "ZKCredentialService",
+    "ZKProof",
+    "Credential",
+    "PrivateInputs",
+    "CredentialType",
+    "CredentialStatus",
 ]
