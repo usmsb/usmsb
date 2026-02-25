@@ -66,12 +66,12 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
       <div
         className={clsx(
           'fixed left-0 top-0 h-full w-72 z-50 transform transition-transform duration-300 ease-in-out md:hidden',
-          'bg-white dark:bg-secondary-900',
+          'bg-white dark:bg-cyber-dark',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-secondary-200 dark:border-secondary-700">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-light-border dark:border-secondary-700">
           <Link
             to="/"
             onClick={onClose}
@@ -82,11 +82,11 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
               alt="USMSB SDK Logo"
               className="w-8 h-8"
             />
-            <span className="font-semibold text-secondary-900 dark:text-secondary-100">USMSB SDK</span>
+            <span className="font-semibold text-light-text-primary dark:text-secondary-100">USMSB SDK</span>
           </Link>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-secondary-100 dark:hover:bg-secondary-800 text-secondary-500 dark:text-secondary-400"
+            className="p-2 rounded-lg hover:bg-light-bg-tertiary dark:hover:bg-secondary-800 text-light-text-muted dark:text-secondary-400"
             aria-label="Close menu"
           >
             <X size={20} />
@@ -104,8 +104,8 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                 clsx(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
                   isActive
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                    : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-400 dark:border dark:border-blue-500/30'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-blue-600/10'
                 )
               }
             >
@@ -115,8 +115,8 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           ))}
 
           {/* Quick Actions */}
-          <div className="pt-4 mt-4 border-t border-secondary-200 dark:border-secondary-700">
-            <p className="text-xs font-medium text-secondary-400 dark:text-secondary-500 uppercase tracking-wider mb-2 px-3">
+          <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-2 px-3">
               {t('sidebar.quickActions') || 'Quick Actions'}
             </p>
             <div className="space-y-1">
@@ -129,15 +129,17 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                     clsx(
                       'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
                       isActive
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                        : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800'
+                        ? action.color === 'blue'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-400 dark:border dark:border-blue-500/30'
+                          : 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-600/20 dark:text-purple-400 dark:border dark:border-purple-500/30'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
                     )
                   }
                 >
                   <action.icon size={18} className={action.color} />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{action.name}</span>
-                    <span className="text-xs text-secondary-400 dark:text-secondary-500">{action.desc}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-500">{action.desc}</span>
                   </div>
                 </NavLink>
               ))}
@@ -146,7 +148,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
         </nav>
 
         {/* Bottom section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-secondary-200 dark:border-secondary-700 bg-white dark:bg-secondary-900">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-cyber-dark">
           <NavLink
             to="/app/settings"
             onClick={handleNavClick}
@@ -154,8 +156,8 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
               clsx(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
                 isActive
-                  ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                  : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800'
+                  ? 'bg-gray-100 text-gray-900 border border-gray-200 dark:bg-blue-600/20 dark:text-blue-400 dark:border dark:border-blue-500/30'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-blue-600/10'
               )
             }
           >

@@ -18,16 +18,30 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Light mode CSS variables */
+  /* Light mode CSS variables - AI 科技风格 */
   --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --border-color: #e2e8f0;
-  --accent-primary: #0ea5e9;
-  --accent-secondary: #8b5cf6;
+  --bg-secondary: #f0f9ff;
+  --bg-tertiary: #e0f2fe;
+  --bg-card: #ffffff;
+  
+  /* AI 蓝色系文字颜色 */
+  --text-primary: #1e3a8a;
+  --text-secondary: #1d4ed8;
+  --text-muted: #3b82f6;
+  
+  --border-color: #bfdbfe;
+  
+  /* 浅色模式 accent - AI 科技蓝 */
+  --accent-primary: #2563eb;
+  --accent-secondary: #7c3aed;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+
+  /* 浅色模式阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
   /* Tooltip CSS variables - Light */
   --tooltip-bg: #1e293b;
@@ -300,7 +314,7 @@ body {
   /* Card - Light Mode (Default) */
   .card {
     @apply relative rounded-xl p-6;
-    @apply bg-white border border-secondary-200;
+    @apply bg-white border border-light-border;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
     transition: all 0.3s ease;
   }
@@ -396,11 +410,11 @@ body {
     color: #e5e7eb;
   }
 
-  /* Button - Light Mode (Default) */
+  /* Button - Light Mode (Default) - AI 蓝紫渐变风格 */
   .btn {
     @apply relative inline-flex items-center justify-center rounded-lg font-semibold px-6 py-3;
-    @apply bg-primary-600 text-white;
-    @apply hover:bg-primary-700 active:bg-primary-800;
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white;
+    @apply hover:from-blue-600 hover:to-purple-700;
     font-family: 'Rajdhani', sans-serif;
     font-size: 1rem;
     letter-spacing: 0.5px;
@@ -414,12 +428,6 @@ body {
 
   .btn:active {
     transform: translateY(0);
-  }
-
-  /* Button - Dark Mode */
-  .dark .btn {
-    letter-spacing: 1px;
-    text-transform: uppercase;
   }
 
   .dark .btn::before {
@@ -438,8 +446,8 @@ body {
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white;
-    @apply hover:bg-primary-700;
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white;
+    @apply hover:from-blue-600 hover:to-purple-700;
   }
 
   .dark .btn-primary {

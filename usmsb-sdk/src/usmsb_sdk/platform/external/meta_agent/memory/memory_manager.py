@@ -129,7 +129,10 @@ class MemoryManager:
                 memory_type TEXT,
                 importance REAL DEFAULT 0.5,
                 created_at REAL,
-                context TEXT
+                context TEXT,
+                recall_count INTEGER DEFAULT 0,
+                last_recalled_at REAL,
+                from_recall INTEGER DEFAULT 0
             )
         """)
 
@@ -609,3 +612,604 @@ class MemoryManager:
                 parts.append(f"- [{mem['type']}] {mem['content']}")
 
         return "\n".join(parts) if parts else ""
+
+    # ==================== 智能召回所需方法 ====================
+
+    async def search(self, query: str, limit: int = 20) -> List[Dict]:
+        """
+        通用搜索 - 用于智能召回
+
+        Args:
+            query: 搜索关键词
+            limit: 返回数量限制
+
+        Returns:
+            记忆列表
+        """
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._search_memory, query, limit)
+
+    def _search_memory(self, query: str, limit: int) -> List[Dict]:
+        """内部搜索方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 搜索重要记忆
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE content LIKE ?
+            ORDER BY importance DESC, created_at DESC
+            LIMIT ?
+            """,
+            (f"%{query}%", limit),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+            }
+            for row in rows
+        ]
+
+    async def search_by_keyword(self, keyword: str) -> List[Dict]:
+        """按关键词搜索"""
+        return await self.search(keyword, limit=20)
+
+    async def search_by_task_type(self, task_type: str) -> List[Dict]:
+        """按任务类型搜索"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._search_by_task_type, task_type)
+
+    def _search_by_task_type(self, task_type: str) -> List[Dict]:
+        """按任务类型搜索 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 搜索包含任务类型的记忆
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE memory_type = ? OR content LIKE ?
+            ORDER BY importance DESC
+            LIMIT 20
+            """,
+            (task_type, f"%{task_type}%"),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+            }
+            for row in rows
+        ]
+
+    async def search_by_time(self, time_range: str) -> List[Dict]:
+        """按时间范围搜索"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._search_by_time, time_range)
+
+    def _search_by_time(self, time_range: str) -> List[Dict]:
+        """按时间范围搜索 - 内部方法"""
+        import time
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        now = time.time()
+        if time_range == "recent":
+            # 最近1小时
+            start_time = now - 3600
+        elif time_range == "week":
+            # 最近一周
+            start_time = now - 7 * 24 * 3600
+        elif time_range == "month":
+            # 最近一月
+            start_time = now - 30 * 24 * 3600
+        else:  # all
+            start_time = 0
+
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE created_at >= ?
+            ORDER BY created_at DESC
+            LIMIT 20
+            """,
+            (start_time,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+            }
+            for row in rows
+        ]
+
+    async def search_by_entity(self, entity: str) -> List[Dict]:
+        """按实体搜索"""
+        return await self.search(entity, limit=20)
+
+    async def search_by_success(self, success: bool) -> List[Dict]:
+        """按成功/失败标记搜索"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._search_by_success, success)
+
+    def _search_by_success(self, success: bool) -> List[Dict]:
+        """按成功/失败搜索 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 通过memory_type区分成功和失败经验
+        memory_type = "success_experience" if success else "failure_lesson"
+
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE memory_type = ?
+            ORDER BY importance DESC
+            LIMIT 20
+            """,
+            (memory_type,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+                "success": success,
+            }
+            for row in rows
+        ]
+
+    # ==================== 守护进程所需方法 ====================
+
+    async def get_recent_conversations(self, limit: int = 20) -> List[Dict]:
+        """获取最近的对话"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_recent_conversations, limit)
+
+    def _get_recent_conversations(self, limit: int) -> List[Dict]:
+        """获取最近的对话 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, conversation_id, summary, created_at, message_count
+            FROM conversation_summaries
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "conversation_id": row[1],
+                "summary": row[2],
+                "created_at": row[3],
+                "message_count": row[4],
+            }
+            for row in rows
+        ]
+
+    async def get_recent_errors(self, limit: int = 10) -> List[Dict]:
+        """获取最近的错误记录"""
+        # 从重要记忆中获取错误相关的内容
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_recent_errors, limit)
+
+    def _get_recent_errors(self, limit: int) -> List[Dict]:
+        """获取最近的错误 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE memory_type = 'error_record' OR content LIKE '%error%' OR content LIKE '%failed%'
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+            }
+            for row in rows
+        ]
+
+    async def get_successful_conversations(self, limit: int = 10) -> List[Dict]:
+        """获取成功的对话"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_successful_conversations, limit)
+
+    def _get_successful_conversations(self, limit: int) -> List[Dict]:
+        """获取成功的对话 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, conversation_id, summary, created_at, message_count
+            FROM conversation_summaries
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "conversation_id": row[1],
+                "summary": row[2],
+                "created_at": row[3],
+                "message_count": row[4],
+            }
+            for row in rows
+        ]
+
+    async def get_pending_knowledge(self) -> List[Dict]:
+        """获取待验证的知识"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_pending_knowledge)
+
+    def _get_pending_knowledge(self) -> List[Dict]:
+        """获取待验证的知识 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE memory_type = 'pending_knowledge'
+            ORDER BY created_at DESC
+            LIMIT 10
+            """,
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+                "source": "user_interaction",
+            }
+            for row in rows
+        ]
+
+    async def mark_knowledge_validated(self, knowledge_id: str):
+        """标记知识已验证"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._mark_knowledge_validated, knowledge_id)
+
+    def _mark_knowledge_validated(self, knowledge_id: str):
+        """标记知识已验证 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 更新memory_type为validated_knowledge
+        cursor.execute(
+            """
+            UPDATE important_memories
+            SET memory_type = 'validated_knowledge'
+            WHERE id = ?
+            """,
+            (knowledge_id,),
+        )
+
+        conn.commit()
+        conn.close()
+
+    async def get_execution_logs(self, limit: int = 50) -> List[Dict]:
+        """获取执行日志"""
+        # 从重要记忆中获取执行相关的记录
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_execution_logs, limit)
+
+    def _get_execution_logs(self, limit: int) -> List[Dict]:
+        """获取执行日志 - 内部方法"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, user_id, content, memory_type, importance, created_at
+            FROM important_memories
+            WHERE memory_type = 'execution_log' OR content LIKE '%execute%' OR content LIKE '%tool%'
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "content": row[2],
+                "type": row[3],
+                "importance": row[4],
+                "timestamp": row[5],
+            }
+            for row in rows
+        ]
+
+    async def add_important_memory(
+        self,
+        user_id: str,
+        content: str,
+        memory_type: str,
+        importance: float = 0.5,
+        context: Optional[Dict] = None,
+    ):
+        """添加重要记忆"""
+        await self.init()
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self._add_important_memory, user_id, content, memory_type, importance, context
+        )
+
+    def _add_important_memory(
+        self,
+        user_id: str,
+        content: str,
+        memory_type: str,
+        importance: float,
+        context: Optional[Dict],
+    ):
+        """添加重要记忆 - 内部方法"""
+        import uuid
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO important_memories
+            (id, user_id, content, memory_type, importance, created_at, context)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(uuid.uuid4()),
+                user_id,
+                content,
+                memory_type,
+                importance,
+                datetime.now().timestamp(),
+                json.dumps(context) if context else None,
+            ),
+        )
+
+        conn.commit()
+        conn.close()
+
+    async def dynamic_update_from_recall(
+        self, user_id: str, recalled_content: str, source: str = "recall"
+    ):
+        """
+        动态更新从召回中发现的敏感信息
+
+        被召回的内容中发现重要实体时，自动更新到 important_memories。
+
+        Args:
+            user_id: 用户ID
+            recalled_content: 被召回的内容
+            source: 来源标识（如 "smart_recall", "conversation_history"）
+        """
+        await self.init()
+
+        if not self.llm_manager:
+            return
+
+        important_entity = await self._detect_important_entity(recalled_content, user_id)
+
+        if important_entity:
+            existing = await self._check_entity_exists(user_id, important_entity["content"])
+            if existing:
+                await self._increase_importance(existing["id"])
+            else:
+                await self.add_important_memory(
+                    user_id=user_id,
+                    content=important_entity["content"],
+                    memory_type=important_entity["type"],
+                    importance=0.8,
+                    context={
+                        "source": source,
+                        "detected_at": datetime.now().isoformat(),
+                        "entity_type": important_entity["entity_type"],
+                    },
+                )
+
+    async def _detect_important_entity(self, content: str, user_id: str) -> Optional[Dict]:
+        """使用 LLM 检测内容中的重要实体"""
+        prompt = f"""分析以下内容，检测是否包含重要实体信息。
+
+用户ID: {user_id}
+内容:
+{content[:2000]}
+
+请返回 JSON 格式：
+{{
+    "has_important_entity": true/false,
+    "entity_type": "api_key/password/private_key/token/wallet/phone/email/其他",
+    "content": "需要记忆的具体信息（不要包含完整凭证，只保留关键标识）",
+    "reasoning": "判断理由"
+}}
+
+注意：
+1. 只返回确实重要的信息（如 API Key、密码、钱包地址等）
+2. 如果是 API Key，只保留前缀如 "xialiao_xxx" 或 "sk-xxx"
+3. 普通对话内容不要返回
+4. 如果没有重要实体，返回 {{"has_important_entity": false}}"""
+
+        try:
+            response = await self.llm_manager.chat(prompt)
+
+            import re
+
+            json_match = re.search(r"\{[\s\S]*\}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                if data.get("has_important_entity") and data.get("content"):
+                    return {
+                        "content": data["content"],
+                        "type": f"sensitive_info_{data.get('entity_type', 'unknown')}",
+                        "entity_type": data.get("entity_type", "unknown"),
+                    }
+        except Exception as e:
+            logger.warning(f"Failed to detect important entity: {e}")
+
+        return None
+
+    def _check_entity_exists(self, user_id: str, content: str) -> Optional[Dict]:
+        """检查重要实体是否已存在"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, content, importance FROM important_memories
+            WHERE user_id = ? AND content LIKE ?
+            """,
+            (user_id, f"%{content[:50]}%"),
+        )
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {"id": row[0], "content": row[1], "importance": row[2]}
+        return None
+
+    def _increase_importance(self, memory_id: str):
+        """增加记忆的重要性"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE important_memories
+            SET importance = MIN(1.0, importance + 0.1),
+                recall_count = COALESCE(recall_count, 0) + 1,
+                last_recalled_at = ?
+            WHERE id = ?
+            """,
+            (datetime.now().timestamp(), memory_id),
+        )
+
+        conn.commit()
+        conn.close()
+
+    async def check_and_store_user_emphasis(self, user_id: str, message: str):
+        """
+        检测用户强调记忆的消息，并存储
+
+        用户说"记住这个"、"请记住"等指令时，自动存储到重要记忆。
+
+        Args:
+            user_id: 用户ID
+            message: 用户消息
+        """
+        await self.init()
+
+        emphasis_patterns = [
+            "记住这个",
+            "记住这个信息",
+            "请记住",
+            "记住",
+            "收藏",
+            "标记为重要",
+            "保存这个",
+            "remember this",
+            "save this",
+            "keep this in mind",
+            "don't forget",
+            "memorize",
+        ]
+
+        has_emphasis = any(p in message.lower() for p in emphasis_patterns)
+
+        if has_emphasis:
+            await self.add_important_memory(
+                user_id=user_id,
+                content=message,
+                memory_type="user_emphasized",
+                importance=0.9,
+                context={"source": "user_emphasis", "detected_at": datetime.now().isoformat()},
+            )

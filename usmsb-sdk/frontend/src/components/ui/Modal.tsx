@@ -65,8 +65,8 @@ export function Modal({
       {/* Modal Content */}
       <div
         className={clsx(
-          'relative w-full bg-white dark:bg-secondary-900 rounded-xl shadow-2xl',
-          'border border-secondary-200 dark:border-neon-blue/30',
+          'relative w-full bg-white dark:bg-cyber-card rounded-xl shadow-2xl',
+          'border border-light-border dark:border-neon-blue/30',
           'dark:shadow-[0_0_30px_rgba(0,245,255,0.2)]',
           'transform transition-all duration-300',
           'max-h-[90vh] flex flex-col',
@@ -79,11 +79,11 @@ export function Modal({
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-secondary-200 dark:border-secondary-700">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-light-border dark:border-secondary-700">
             {title && (
               <h2
                 id="modal-title"
-                className="text-xl font-semibold text-secondary-900 dark:text-white dark:font-cyber"
+                className="text-xl font-semibold text-light-text-primary dark:text-white dark:font-cyber"
               >
                 {title}
               </h2>
@@ -91,7 +91,7 @@ export function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-secondary-800 transition-colors focus:outline-none focus:ring-2 focus:ring-neon-blue"
+                className="p-2 rounded-lg text-light-text-secondary hover:text-light-text-primary hover:bg-light-bg-tertiary dark:text-gray-400 dark:hover:text-white dark:hover:bg-secondary-800 transition-colors focus:outline-none focus:ring-2 focus:ring-neon-blue"
                 aria-label="Close modal"
               >
                 <X size={20} />

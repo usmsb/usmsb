@@ -94,7 +94,7 @@ export default function Simulations() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('simulations.title')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('simulations.title')}</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">{t('simulations.newSimulation')}</p>
         </div>
         <button
@@ -118,7 +118,7 @@ export default function Simulations() {
               <Lightbulb className="text-orange-600 dark:text-orange-400" size={20} />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('simulations.whatIsSimulation')}</h3>
+              <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('simulations.whatIsSimulation')}</h3>
               <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('simulations.clickToLearnConcepts')}</p>
             </div>
           </div>
@@ -128,7 +128,7 @@ export default function Simulations() {
         {showInfo && (
           <div className="mt-6 space-y-6">
             <div>
-              <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+              <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
                 <Info size={16} className="text-orange-500" />
                 {t('simulations.conceptDefinition')}
               </h4>
@@ -138,14 +138,14 @@ export default function Simulations() {
             </div>
 
             <div>
-              <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+              <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
                 <TrendingUp size={16} className="text-orange-500" />
                 {t('simulations.useCases')}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {getUseCaseExamples(t).map((example, idx) => (
                   <div key={idx} className="p-4 bg-white dark:bg-secondary-800 rounded-lg border border-secondary-200 dark:border-secondary-700">
-                    <h5 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2">{example.title}</h5>
+                    <h5 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2">{example.title}</h5>
                     <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-3">{example.description}</p>
                     <div className="text-xs space-y-1">
                       <div className="flex gap-2">
@@ -163,7 +163,7 @@ export default function Simulations() {
             </div>
 
             <div>
-              <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+              <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
                 <Target size={16} className="text-orange-500" />
                 {t('simulations.simulationProcess')}
               </h4>
@@ -198,7 +198,7 @@ export default function Simulations() {
             </div>
             <div>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('simulations.running')}</p>
-              <p className="text-xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-xl font-bold text-light-text-primary dark:text-secondary-100">
                 {workflows?.filter((w) => w.status === 'running').length || 0}
               </p>
             </div>
@@ -211,7 +211,7 @@ export default function Simulations() {
             </div>
             <div>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('simulations.completed')}</p>
-              <p className="text-xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-xl font-bold text-light-text-primary dark:text-secondary-100">
                 {workflows?.filter((w) => w.status === 'completed').length || 0}
               </p>
             </div>
@@ -224,7 +224,7 @@ export default function Simulations() {
             </div>
             <div>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('simulations.failed')}</p>
-              <p className="text-xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-xl font-bold text-light-text-primary dark:text-secondary-100">
                 {workflows?.filter((w) => w.status === 'failed').length || 0}
               </p>
             </div>
@@ -237,7 +237,7 @@ export default function Simulations() {
             </div>
             <div>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('simulations.pending')}</p>
-              <p className="text-xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-xl font-bold text-light-text-primary dark:text-secondary-100">
                 {workflows?.filter((w) => w.status === 'pending').length || 0}
               </p>
             </div>
@@ -247,7 +247,7 @@ export default function Simulations() {
 
       {/* Workflows list */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('simulations.recentSimulations')}</h2>
+        <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('simulations.recentSimulations')}</h2>
         {workflowsLoading ? (
           <div className="flex items-center justify-center h-40">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 dark:border-primary-400" />
@@ -262,7 +262,7 @@ export default function Simulations() {
                 <div className="flex items-center gap-4">
                   {getStatusIcon(workflow.status)}
                   <div>
-                    <p className="font-medium text-secondary-900 dark:text-secondary-100">{workflow.name}</p>
+                    <p className="font-medium text-light-text-primary dark:text-secondary-100">{workflow.name}</p>
                     <p className="text-sm text-secondary-500 dark:text-secondary-400">
                       {workflow.steps_count} steps
                     </p>
@@ -314,7 +314,7 @@ export default function Simulations() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="create-simulation-title">
           <div className="bg-white dark:bg-secondary-800 rounded-xl p-6 w-full max-w-lg">
-            <h2 id="create-simulation-title" className="text-xl font-bold text-secondary-900 dark:text-secondary-100 mb-4">{t('simulations.newSimulation')}</h2>
+            <h2 id="create-simulation-title" className="text-xl font-bold text-light-text-primary dark:text-secondary-100 mb-4">{t('simulations.newSimulation')}</h2>
             <div className="space-y-4">
               <div>
                 <label className="label">{t('simulations.taskDescription')}</label>

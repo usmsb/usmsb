@@ -341,10 +341,41 @@ def init_db():
                 agent_id TEXT,
                 stake REAL DEFAULT 0,
                 reputation REAL DEFAULT 0.5,
+                vibe_balance REAL DEFAULT 10000.0,
+                stake_status TEXT DEFAULT 'none',
+                locked_stake REAL DEFAULT 0,
+                unlock_available_at REAL,
                 created_at REAL,
                 updated_at REAL
             )
         ''')
+
+        # Agent Wallets table (for AI Agent smart contract wallets)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS agent_wallets (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT UNIQUE NOT NULL,
+                owner_id TEXT NOT NULL,
+                wallet_address TEXT UNIQUE NOT NULL,
+                agent_address TEXT NOT NULL,
+                vibe_balance REAL DEFAULT 0,
+                staked_amount REAL DEFAULT 0,
+                stake_status TEXT DEFAULT 'none',
+                locked_stake REAL DEFAULT 0,
+                unlock_available_at REAL,
+                max_per_tx REAL DEFAULT 500,
+                daily_limit REAL DEFAULT 1000,
+                daily_spent REAL DEFAULT 0,
+                last_reset_time REAL,
+                registry_registered INTEGER DEFAULT 0,
+                created_at REAL,
+                updated_at REAL
+            )
+        ''')
+
+        # Create indexes for agent_wallets
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_wallets_owner ON agent_wallets(owner_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_wallets_address ON agent_wallets(wallet_address)')
 
         # Create indexes for commonly queried fields
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transactions_buyer ON transactions(buyer_id)')
@@ -1085,8 +1116,8 @@ def create_user(user_data: Dict) -> Dict:
         did = user_data.get('did', f"did:vibe:{user_data['wallet_address'].lower()}")
 
         cursor.execute('''
-            INSERT INTO users (id, wallet_address, did, agent_id, stake, reputation, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (id, wallet_address, did, agent_id, stake, reputation, vibe_balance, stake_status, locked_stake, unlock_available_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             user_id,
             user_data['wallet_address'].lower(),
@@ -1094,6 +1125,10 @@ def create_user(user_data: Dict) -> Dict:
             user_data.get('agent_id'),
             user_data.get('stake', 0),
             user_data.get('reputation', 0.5),
+            user_data.get('vibe_balance', 10000.0),
+            user_data.get('stake_status', 'none'),
+            user_data.get('locked_stake', 0),
+            user_data.get('unlock_available_at'),
             now,
             now
         ))
@@ -1104,6 +1139,10 @@ def create_user(user_data: Dict) -> Dict:
             'did': did,
             'stake': 0,
             'reputation': 0.5,
+            'vibe_balance': 10000.0,
+            'stake_status': 'none',
+            'locked_stake': 0,
+            'unlock_available_at': None,
         }
 
 def get_user_by_address(address: str) -> Optional[Dict]:
@@ -1160,6 +1199,61 @@ def update_user_agent(user_id: str, agent_id: str) -> bool:
             UPDATE users SET agent_id = ?, updated_at = ? WHERE id = ?
         ''', (agent_id, now, user_id))
         return cursor.rowcount > 0
+
+
+def update_user_balance(user_id: str, amount: float, deduct: bool = False) -> Optional[Dict]:
+    """Update user's VIBE balance (deduct or add)"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        # Get current balance
+        cursor.execute('SELECT vibe_balance FROM users WHERE id = ?', (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        current_balance = row['vibe_balance']
+        if deduct:
+            new_balance = current_balance - amount
+            if new_balance < 0:
+                return None  # Insufficient balance
+        else:
+            new_balance = current_balance + amount
+
+        cursor.execute('''
+            UPDATE users SET vibe_balance = ?, updated_at = ? WHERE id = ?
+        ''', (new_balance, now, user_id))
+
+        return {
+            'user_id': user_id,
+            'vibe_balance': new_balance,
+        }
+
+
+def update_stake_status(user_id: str, status: str, locked_stake: float = 0, unlock_available_at: float = None) -> bool:
+    """Update user's stake status"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+        cursor.execute('''
+            UPDATE users SET stake_status = ?, locked_stake = ?, unlock_available_at = ?, updated_at = ? WHERE id = ?
+        ''', (status, locked_stake, unlock_available_at, now, user_id))
+        return cursor.rowcount > 0
+
+
+def get_user_balance_info(user_id: str) -> Optional[Dict]:
+    """Get user's balance information"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT vibe_balance, stake, stake_status, locked_stake, unlock_available_at
+            FROM users WHERE id = ?
+        ''', (user_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
 
 
 # ==================== Transaction Operations ====================
@@ -1342,6 +1436,188 @@ def get_transaction_stats(user_id: str = None) -> Dict:
 
         row = cursor.fetchone()
         return dict(row) if row else {}
+
+
+# ==================== Agent Wallet Operations ====================
+
+def create_agent_wallet(wallet_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new agent wallet"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            INSERT INTO agent_wallets (
+                id, agent_id, owner_id, wallet_address, agent_address,
+                vibe_balance, staked_amount, stake_status, locked_stake,
+                max_per_tx, daily_limit, daily_spent, last_reset_time,
+                registry_registered, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            wallet_data.get('id'),
+            wallet_data.get('agent_id'),
+            wallet_data.get('owner_id'),
+            wallet_data.get('wallet_address'),
+            wallet_data.get('agent_address'),
+            wallet_data.get('vibe_balance', 0),
+            wallet_data.get('staked_amount', 0),
+            wallet_data.get('stake_status', 'none'),
+            wallet_data.get('locked_stake', 0),
+            wallet_data.get('max_per_tx', 500),
+            wallet_data.get('daily_limit', 1000),
+            wallet_data.get('daily_spent', 0),
+            wallet_data.get('last_reset_time', now),
+            wallet_data.get('registry_registered', 0),
+            now,
+            now
+        ))
+
+        conn.commit()
+        return wallet_data
+
+
+def get_agent_wallet(agent_id: str) -> Optional[Dict]:
+    """Get agent wallet by agent_id"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_agent_wallet_by_address(wallet_address: str) -> Optional[Dict]:
+    """Get agent wallet by wallet address"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_wallets WHERE wallet_address = ?', (wallet_address,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_agent_wallets_by_owner(owner_id: str) -> List[Dict]:
+    """Get all agent wallets for an owner"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_wallets WHERE owner_id = ?', (owner_id,))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> bool:
+    """Update agent wallet balance"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        if deduct:
+            cursor.execute('''
+                UPDATE agent_wallets
+                SET vibe_balance = vibe_balance - ?, updated_at = ?
+                WHERE agent_id = ? AND vibe_balance >= ?
+            ''', (amount, now, agent_id, amount))
+        else:
+            cursor.execute('''
+                UPDATE agent_wallets
+                SET vibe_balance = vibe_balance + ?, updated_at = ?
+                WHERE agent_id = ?
+            ''', (amount, now, agent_id))
+
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def update_agent_stake(agent_id: str, amount: float, deduct: bool = False) -> bool:
+    """Update agent stake amount"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        if deduct:
+            cursor.execute('''
+                UPDATE agent_wallets
+                SET staked_amount = staked_amount - ?, stake_status = 'unstaking', updated_at = ?
+                WHERE agent_id = ? AND staked_amount >= ?
+            ''', (amount, now, agent_id, amount))
+        else:
+            cursor.execute('''
+                UPDATE agent_wallets
+                SET staked_amount = staked_amount + ?, stake_status = 'staked', updated_at = ?
+                WHERE agent_id = ?
+            ''', (amount, now, agent_id))
+
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def update_agent_limits(agent_id: str, max_per_tx: float, daily_limit: float) -> bool:
+    """Update agent wallet limits"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            UPDATE agent_wallets
+            SET max_per_tx = ?, daily_limit = ?, updated_at = ?
+            WHERE agent_id = ?
+        ''', (max_per_tx, daily_limit, now, agent_id))
+
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def update_agent_daily_spent(agent_id: str, amount: float) -> bool:
+    """Update agent daily spent amount and reset if new day"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        # Get current wallet info
+        cursor.execute('SELECT last_reset_time, daily_spent FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+
+        last_reset = row['last_reset_time']
+        daily_spent = row['daily_spent']
+
+        # Reset if new day (more than 24 hours)
+        if now - last_reset >= 86400:  # 24 hours
+            daily_spent = 0
+            last_reset = now
+
+        # Update spent amount
+        cursor.execute('''
+            UPDATE agent_wallets
+            SET daily_spent = ?, last_reset_time = ?, updated_at = ?
+            WHERE agent_id = ?
+        ''', (daily_spent + amount, last_reset, now, agent_id))
+
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def register_agent_in_registry(agent_id: str) -> bool:
+    """Mark agent as registered in registry"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            UPDATE agent_wallets
+            SET registry_registered = 1, updated_at = ?
+            WHERE agent_id = ?
+        ''', (now, agent_id))
+
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def delete_agent_wallet(agent_id: str) -> bool:
+    """Delete agent wallet"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 if __name__ == '__main__':

@@ -135,7 +135,7 @@ export default function Agents() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('agents.aiAgents')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('agents.aiAgents')}</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">{t('agents.manageAgents')}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -164,7 +164,7 @@ export default function Agents() {
               <Bot className="text-blue-600 dark:text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{agents?.length || 0}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{agents?.length || 0}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('agents.aiAgents')}</p>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function Agents() {
               <Zap className="text-green-600 dark:text-green-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {agents?.filter((a) => a.status === 'online').length || 0}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('agents.online')}</p>
@@ -188,7 +188,7 @@ export default function Agents() {
               <Link2 className="text-purple-600 dark:text-purple-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {agents?.filter((a) => a.protocol === 'mcp').length || 0}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('agents.mcpProtocol')}</p>
@@ -201,7 +201,7 @@ export default function Agents() {
               <Star className="text-yellow-600 dark:text-yellow-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {agents && agents.length > 0
                   ? Math.round((agents.reduce((sum, a) => sum + (a.reputation || 0.5), 0) / agents.length) * 100)
                   : 0}%
@@ -263,7 +263,7 @@ export default function Agents() {
                 <p.icon size={20} />
               </div>
               <div>
-                <p className="font-medium text-secondary-900 dark:text-secondary-100">{p.label}</p>
+                <p className="font-medium text-light-text-primary dark:text-secondary-100">{p.label}</p>
                 <p className="text-xs text-secondary-500 dark:text-secondary-400">{t('agents.registerNewAgent')}</p>
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function Agents() {
                       <ProtocolIcon size={24} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{agent.name}</h3>
+                      <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{agent.name}</h3>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-secondary-500 dark:text-secondary-400">{protocolInfo.label}</span>
                         <span className={clsx('px-2 py-0.5 rounded-full text-xs', getStatusColor(agent.status))}>
@@ -310,7 +310,7 @@ export default function Agents() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Star className="text-yellow-500 dark:text-yellow-400" size={14} />
-                    <span className="text-sm font-medium text-secondary-900 dark:text-secondary-100">{(agent.reputation * 100).toFixed(0)}%</span>
+                    <span className="text-sm font-medium text-light-text-primary dark:text-secondary-100">{(agent.reputation * 100).toFixed(0)}%</span>
                   </div>
                 </div>
 
@@ -345,7 +345,7 @@ export default function Agents() {
                       <span>{formatTime(agent.last_heartbeat)}</span>
                     </div>
                   </div>
-                  <div className="text-sm font-medium text-secondary-900 dark:text-secondary-100">
+                  <div className="text-sm font-medium text-light-text-primary dark:text-secondary-100">
                     {agent.stake} VIBE
                   </div>
                 </div>

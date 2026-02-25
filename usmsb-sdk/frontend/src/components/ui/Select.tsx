@@ -35,7 +35,7 @@ export function Select({
       {label && (
         <label
           htmlFor={selectId}
-          className="block text-sm font-medium text-secondary-700 dark:text-gray-300 mb-1.5"
+          className="block text-sm font-medium text-light-text-secondary dark:text-gray-300 mb-1.5"
         >
           {label}
         </label>
@@ -45,11 +45,11 @@ export function Select({
         <select
           id={selectId}
           className={clsx(
-            'w-full appearance-none rounded-lg border bg-white dark:bg-secondary-800',
-            'px-4 py-2.5 pr-10 text-secondary-900 dark:text-white',
-            'border-secondary-300 dark:border-secondary-700',
+            'w-full appearance-none rounded-lg border bg-white dark:bg-cyber-card',
+            'px-4 py-2.5 pr-10 text-light-text-primary dark:text-white',
+            'border-light-border dark:border-secondary-700',
             'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-            'disabled:bg-secondary-100 dark:disabled:bg-secondary-900 disabled:cursor-not-allowed',
+            'disabled:bg-light-bg-tertiary dark:disabled:bg-secondary-900 disabled:cursor-not-allowed',
             // Cyberpunk dark mode styling
             'dark:shadow-[0_0_10px_rgba(0,245,255,0.1)]',
             'dark:focus:shadow-[0_0_15px_rgba(0,245,255,0.3)]',
@@ -57,7 +57,7 @@ export function Select({
             // Error state
             error
               ? 'border-red-500 focus:ring-red-500 dark:border-red-400'
-              : 'border-secondary-300 dark:border-neon-blue/30'
+              : 'border-light-border dark:border-neon-blue/30'
           )}
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={
@@ -80,14 +80,14 @@ export function Select({
         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
           <ChevronDown
             size={18}
-            className="text-secondary-400 dark:text-gray-500"
+            className="text-light-text-muted dark:text-gray-500"
           />
         </div>
       </div>
 
       {/* Hint text */}
       {hint && !error && (
-        <p id={hintId} className="mt-1.5 text-sm text-secondary-500 dark:text-gray-400">
+        <p id={hintId} className="mt-1.5 text-sm text-light-text-muted dark:text-gray-400">
           {hint}
         </p>
       )}

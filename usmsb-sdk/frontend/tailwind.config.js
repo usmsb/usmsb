@@ -5,15 +5,34 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   darkMode: 'class',
-  // Safelist dynamic neon color classes
+  // Safelist dynamic color classes
   safelist: [
     { pattern: /text-neon-(blue|purple|pink|green|yellow|orange|red)/ },
     { pattern: /bg-neon-(blue|purple|pink|green|yellow|orange|red)/ },
     { pattern: /border-neon-(blue|purple|pink|green|yellow|orange|red)/ },
+    // Light mode semantic colors
+    { pattern: /text-light-/ },
+    { pattern: /bg-light-/ },
+    { pattern: /border-light-/ },
   ],
   theme: {
     extend: {
       colors: {
+        // Light mode semantic colors - AI 科技风格
+        light: {
+          bg: {
+            primary: '#ffffff',
+            secondary: '#f0f9ff',
+            tertiary: '#e0f2fe',
+            card: '#ffffff',
+          },
+          text: {
+            primary: '#1e3a8a',
+            secondary: '#1d4ed8',
+            muted: '#3b82f6',
+          },
+          border: '#bfdbfe',
+        },
         // Cyberpunk color system
         primary: {
           50: '#f0f9ff',

@@ -141,7 +141,7 @@ export default function Collaborations() {
             <Lightbulb className="text-purple-600 dark:text-purple-400" size={20} />
           </div>
           <div className="text-left">
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('collaborations.whatIsCollaboration')}</h3>
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('collaborations.whatIsCollaboration')}</h3>
             <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('collaborations.clickToLearn')}</p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function Collaborations() {
         <div className="mt-6 space-y-6">
           {/* Concept Definition */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Info size={16} className="text-purple-500 dark:text-purple-400" />
               {t('collaborations.conceptDefinition')}
             </h4>
@@ -163,14 +163,14 @@ export default function Collaborations() {
 
           {/* Use Cases */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <TrendingUp size={16} className="text-purple-500 dark:text-purple-400" />
               {t('collaborations.useCases')}
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {useCaseExamples.map((example, idx) => (
                 <div key={idx} className="p-4 bg-white dark:bg-secondary-800 rounded-lg border border-secondary-200 dark:border-secondary-700">
-                  <h5 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2">{example.title}</h5>
+                  <h5 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2">{example.title}</h5>
                   <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-3">{example.description}</p>
                   <div className="text-xs space-y-1">
                     <div className="flex gap-2">
@@ -189,7 +189,7 @@ export default function Collaborations() {
 
           {/* Role Types */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <Target size={16} className="text-purple-500 dark:text-purple-400" />
               {t('collaborations.roleTypes')}
             </h4>
@@ -219,7 +219,7 @@ export default function Collaborations() {
 
           {/* Workflow */}
           <div>
-            <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
               <GitBranch size={16} className="text-purple-500 dark:text-purple-400" />
               {t('collaborations.workflow')}
             </h4>
@@ -255,7 +255,7 @@ export default function Collaborations() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('collaborations.title')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('collaborations.title')}</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">
             {t('collaborations.createSession')}
           </p>
@@ -280,7 +280,7 @@ export default function Collaborations() {
               <GitBranch className="text-blue-600 dark:text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.active}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.active}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('collaborations.activeSessions')}</p>
             </div>
           </div>
@@ -291,7 +291,7 @@ export default function Collaborations() {
               <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.completed}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.completed}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('collaborations.completedSessions')}</p>
             </div>
           </div>
@@ -302,7 +302,7 @@ export default function Collaborations() {
               <XCircle className="text-red-600 dark:text-red-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">{stats.failed}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{stats.failed}</p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('collaborations.failed')}</p>
             </div>
           </div>
@@ -312,7 +312,7 @@ export default function Collaborations() {
       {/* Sessions List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
-          <h2 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('collaborations.sessionDetails')}</h2>
+          <h2 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('collaborations.sessionDetails')}</h2>
           {isLoading ? (
             <div className="card flex items-center justify-center py-12">
               <RefreshCw className="animate-spin text-primary-500" size={24} />
@@ -354,7 +354,7 @@ export default function Collaborations() {
                       <Users className="text-purple-600 dark:text-purple-400" size={20} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{session.goal.name}</h3>
+                      <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{session.goal.name}</h3>
                       <p className="text-xs text-secondary-500 dark:text-secondary-400">
                         {session.participants.length} {t('collaborations.participants')}
                       </p>
@@ -378,12 +378,12 @@ export default function Collaborations() {
 
         {/* Session Detail */}
         <div className="card">
-          <h2 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('collaborations.sessionDetails')}</h2>
+          <h2 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('collaborations.sessionDetails')}</h2>
           {selectedSession ? (
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-secondary-500">{t('collaborations.goal')}</label>
-                <p className="font-medium text-secondary-900 dark:text-secondary-100">{selectedSession.goal.description}</p>
+                <p className="font-medium text-light-text-primary dark:text-secondary-100">{selectedSession.goal.description}</p>
               </div>
 
               <div>
@@ -456,7 +456,7 @@ export default function Collaborations() {
       {isCreating && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="create-collaboration-title">
           <div className="card w-full max-w-lg">
-            <h3 id="create-collaboration-title" className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('collaborations.createCollaboration')}</h3>
+            <h3 id="create-collaboration-title" className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('collaborations.createCollaboration')}</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-1">

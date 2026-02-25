@@ -126,24 +126,24 @@ export default function Marketplace() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('marketplace.title')}</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('marketplace.title')}</h1>
         <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">
           {t('marketplace.discover')}
         </p>
       </div>
 
       {/* 概念说明卡片 */}
-      <div className="card bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 border border-cyan-200 dark:border-cyan-800">
+      <div className="card bg-gradient-to-r from-primary-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 border border-primary-200 dark:border-cyan-800">
         <button
           onClick={() => setShowInfo(!showInfo)}
           className="w-full flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
-              <Lightbulb className="text-cyan-600 dark:text-cyan-400" size={20} />
+            <div className="w-10 h-10 bg-primary-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
+              <Lightbulb className="text-primary-600 dark:text-cyan-400" size={20} />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold text-secondary-900 dark:text-secondary-100">{t('marketplace.whatIsMarketplace')}</h3>
+              <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{t('marketplace.whatIsMarketplace')}</h3>
               <p className="text-sm text-secondary-600 dark:text-secondary-400">{t('marketplace.clickToLearnConcepts')}</p>
             </div>
           </div>
@@ -153,8 +153,8 @@ export default function Marketplace() {
         {showInfo && (
           <div className="mt-6 space-y-6">
             <div>
-              <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
-                <Info size={16} className="text-cyan-500" />
+              <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
+                <Info size={16} className="text-primary-500 dark:text-cyan-400" />
                 {t('marketplace.conceptDefinition')}
               </h4>
               <p className="text-secondary-700 dark:text-secondary-300 leading-relaxed">
@@ -163,14 +163,14 @@ export default function Marketplace() {
             </div>
 
             <div>
-              <h4 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
-                <TrendingUp size={16} className="text-cyan-500" />
+              <h4 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2 flex items-center gap-2">
+                <TrendingUp size={16} className="text-primary-500 dark:text-cyan-400" />
                 {t('marketplace.useCases')}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {getUseCaseExamples(t).map((example, idx) => (
                   <div key={idx} className="p-4 bg-white dark:bg-secondary-800 rounded-lg border border-secondary-200 dark:border-secondary-700">
-                    <h5 className="font-medium text-secondary-900 dark:text-secondary-100 mb-2">{example.title}</h5>
+                    <h5 className="font-medium text-light-text-primary dark:text-secondary-100 mb-2">{example.title}</h5>
                     <p className="text-sm text-secondary-600 dark:text-secondary-400 mb-3">{example.description}</p>
                     <div className="text-xs space-y-1">
                       <div className="flex gap-2">
@@ -257,7 +257,7 @@ export default function Marketplace() {
                     <Icon className="text-primary-600 dark:text-primary-400" size={24} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 truncate">{item.name}</h3>
+                    <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 truncate">{item.name}</h3>
                     <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('marketplace.by')} {item.author}</p>
                   </div>
                 </div>
@@ -288,7 +288,7 @@ export default function Marketplace() {
                   </div>
                   <div className="flex items-center gap-2">
                     {item.price > 0 ? (
-                      <span className="text-lg font-bold text-secondary-900 dark:text-secondary-100">${item.price}</span>
+                      <span className="text-lg font-bold text-light-text-primary dark:text-secondary-100">${item.price}</span>
                     ) : (
                       <span className="text-sm font-medium text-green-600 dark:text-green-400">Free</span>
                     )}

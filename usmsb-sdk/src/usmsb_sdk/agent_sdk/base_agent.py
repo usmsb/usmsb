@@ -11,13 +11,14 @@ The BaseAgent class implements:
 - P2P direct connection capability
 - Automatic agent discovery
 - Skill execution and publishing
+- Platform integration (marketplace, wallet, collaboration, etc.)
 """
 
 from abc import ABC, abstractmethod
 from asyncio import Lock, Event, create_task, gather, sleep
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 import asyncio
 import logging
 
@@ -30,6 +31,39 @@ from usmsb_sdk.agent_sdk.agent_config import (
 from usmsb_sdk.agent_sdk.registration import RegistrationManager, RegistrationStatus
 from usmsb_sdk.agent_sdk.communication import CommunicationManager, Message, MessageType, Session
 from usmsb_sdk.agent_sdk.discovery import DiscoveryManager, AgentInfo, DiscoveryFilter
+
+# New platform integration modules
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient, RegistrationResult
+from usmsb_sdk.agent_sdk.marketplace import (
+    MarketplaceManager,
+    ServiceDefinition,
+    Service,
+    DemandDefinition,
+    Demand,
+    Opportunity,
+    MatchScore,
+)
+from usmsb_sdk.agent_sdk.wallet import WalletManager, WalletBalance, StakeInfo, StakeResult
+from usmsb_sdk.agent_sdk.negotiation import (
+    NegotiationManager,
+    NegotiationSession,
+    NegotiationTerms,
+    ProposalResult,
+)
+from usmsb_sdk.agent_sdk.collaboration import (
+    CollaborationManager,
+    CollaborationSession,
+    CollaborationRole,
+    Contribution,
+)
+from usmsb_sdk.agent_sdk.workflow import WorkflowManager, Workflow, WorkflowResult
+from usmsb_sdk.agent_sdk.learning import (
+    LearningManager,
+    LearningInsight,
+    PerformanceAnalysis,
+    MarketInsights,
+    Experience,
+)
 
 
 class AgentState(Enum):
@@ -108,6 +142,18 @@ class BaseAgent(ABC):
         self._registration_manager: Optional[RegistrationManager] = None
         self._communication_manager: Optional[CommunicationManager] = None
         self._discovery_manager: Optional[DiscoveryManager] = None
+
+        # Platform integration components
+        self._platform_client: Optional[PlatformClient] = None
+        self._marketplace: Optional[MarketplaceManager] = None
+        self._wallet: Optional[WalletManager] = None
+        self._negotiation: Optional[NegotiationManager] = None
+        self._collaboration: Optional[CollaborationManager] = None
+        self._workflow: Optional[WorkflowManager] = None
+        self._learning: Optional[LearningManager] = None
+
+        # Platform URL for integration
+        self._platform_url: str = "http://localhost:8000"
 
         # Skill and capability registries
         self._skills: Dict[str, SkillDefinition] = {s.name: s for s in config.skills}
@@ -442,6 +488,68 @@ class BaseAgent(ABC):
             logger=self.logger,
         )
         await self._discovery_manager.initialize()
+
+        # Initialize platform integration
+        await self._initialize_platform_integration()
+
+    async def _initialize_platform_integration(self) -> None:
+        """Initialize platform integration components"""
+        # Get platform URL from config
+        self._platform_url = (
+            self.config.network.platform_endpoints[0]
+            if self.config.network.platform_endpoints
+            else "http://localhost:8000"
+        )
+
+        # Initialize platform client
+        self._platform_client = PlatformClient(
+            platform_url=self._platform_url,
+            api_key=self.config.security.api_key,
+            agent_id=self.agent_id,
+            logger=self.logger,
+        )
+
+        # Initialize marketplace manager
+        self._marketplace = MarketplaceManager(
+            platform_client=self._platform_client,
+            logger=self.logger,
+        )
+
+        # Initialize wallet manager
+        self._wallet = WalletManager(
+            platform_client=self._platform_client,
+            logger=self.logger,
+        )
+
+        # Initialize negotiation manager
+        self._negotiation = NegotiationManager(
+            platform_client=self._platform_client,
+            agent_id=self.agent_id,
+            logger=self.logger,
+        )
+
+        # Initialize collaboration manager
+        self._collaboration = CollaborationManager(
+            platform_client=self._platform_client,
+            agent_id=self.agent_id,
+            logger=self.logger,
+        )
+
+        # Initialize workflow manager
+        self._workflow = WorkflowManager(
+            platform_client=self._platform_client,
+            agent_id=self.agent_id,
+            logger=self.logger,
+        )
+
+        # Initialize learning manager
+        self._learning = LearningManager(
+            platform_client=self._platform_client,
+            agent_id=self.agent_id,
+            logger=self.logger,
+        )
+
+        self.logger.info("Platform integration components initialized")
 
     # ==================== Background Tasks ====================
 
@@ -901,3 +1009,441 @@ class BaseAgent(ABC):
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id={self.agent_id}, name={self.name}, state={self._state.value})>"
+
+    # ==================== Platform Integration ====================
+
+    @property
+    def platform(self) -> Optional[PlatformClient]:
+        """Get platform client"""
+        return self._platform_client
+
+    @property
+    def marketplace(self) -> Optional[MarketplaceManager]:
+        """Get marketplace manager"""
+        return self._marketplace
+
+    @property
+    def wallet(self) -> Optional[WalletManager]:
+        """Get wallet manager"""
+        return self._wallet
+
+    @property
+    def negotiation(self) -> Optional[NegotiationManager]:
+        """Get negotiation manager"""
+        return self._negotiation
+
+    @property
+    def collaboration(self) -> Optional[CollaborationManager]:
+        """Get collaboration manager"""
+        return self._collaboration
+
+    @property
+    def workflow(self) -> Optional[WorkflowManager]:
+        """Get workflow manager"""
+        return self._workflow
+
+    @property
+    def learning(self) -> Optional[LearningManager]:
+        """Get learning manager"""
+        return self._learning
+
+    # --- Registration ---
+
+    async def register_to_platform(self) -> RegistrationResult:
+        """
+        Register agent to the platform.
+
+        Returns:
+            RegistrationResult with status
+        """
+        if not self._platform_client:
+            raise RuntimeError("Platform client not initialized")
+
+        return await self._platform_client.register(
+            name=self.name,
+            agent_type="ai_agent",
+            capabilities=[c.name for c in self.capabilities],
+            skills=[s.to_dict() for s in self.skills],
+            endpoint=self._get_endpoint(),
+            protocol="standard",
+            description=self.description,
+        )
+
+    async def unregister_from_platform(self) -> bool:
+        """Unregister from platform"""
+        if self._platform_client:
+            return await self._platform_client.unregister()
+        return False
+
+    async def send_platform_heartbeat(self, status: str = "online") -> bool:
+        """Send heartbeat to platform"""
+        if self._platform_client:
+            return await self._platform_client.send_heartbeat(status)
+        return False
+
+    # --- Service Management ---
+
+    async def offer_service(self, service_def: ServiceDefinition) -> Optional[Service]:
+        """
+        Publish a service to the marketplace.
+
+        Args:
+            service_def: Service definition
+
+        Returns:
+            Published Service or None
+        """
+        if not self._marketplace:
+            raise RuntimeError("Marketplace not initialized")
+        return await self._marketplace.publish_service(service_def)
+
+    async def update_service(self, service_id: str, **updates) -> bool:
+        """Update a published service"""
+        if self._marketplace:
+            return await self._marketplace.update_service(service_id, **updates)
+        return False
+
+    async def stop_service(self, service_id: str) -> bool:
+        """Stop offering a service"""
+        if self._marketplace:
+            return await self._marketplace.unpublish_service(service_id)
+        return False
+
+    async def list_my_services(self) -> List[Service]:
+        """List my published services"""
+        if self._marketplace:
+            return await self._marketplace.list_my_services()
+        return []
+
+    # --- Demand Management ---
+
+    async def request_service(self, demand_def: DemandDefinition) -> Optional[Demand]:
+        """
+        Publish a service request/demand.
+
+        Args:
+            demand_def: Demand definition
+
+        Returns:
+            Published Demand or None
+        """
+        if not self._marketplace:
+            raise RuntimeError("Marketplace not initialized")
+        return await self._marketplace.publish_demand(demand_def)
+
+    async def cancel_demand(self, demand_id: str) -> bool:
+        """Cancel a published demand"""
+        if self._marketplace:
+            return await self._marketplace.cancel_demand(demand_id)
+        return False
+
+    async def list_my_demands(self) -> List[Demand]:
+        """List my published demands"""
+        if self._marketplace:
+            return await self._marketplace.list_my_demands()
+        return []
+
+    # --- Matching & Opportunities ---
+
+    async def find_work(self, capabilities: Optional[List[str]] = None) -> List[Opportunity]:
+        """
+        Find work opportunities matching agent's capabilities.
+
+        Args:
+            capabilities: Specific capabilities to match (uses own if None)
+
+        Returns:
+            List of matching opportunities
+        """
+        if not self._marketplace:
+            raise RuntimeError("Marketplace not initialized")
+
+        if capabilities is None:
+            capabilities = [c.name for c in self.capabilities]
+
+        return await self._marketplace.find_work(capabilities)
+
+    async def find_workers(
+        self,
+        required_skills: List[str],
+        budget_range: Optional[tuple] = None,
+    ) -> List[Opportunity]:
+        """
+        Find workers/suppliers for a task.
+
+        Args:
+            required_skills: Required skills
+            budget_range: (min, max) budget
+
+        Returns:
+            List of matching suppliers
+        """
+        if not self._marketplace:
+            raise RuntimeError("Marketplace not initialized")
+
+        return await self._marketplace.find_workers(required_skills, budget_range)
+
+    async def get_opportunities(self) -> List[Opportunity]:
+        """Get all available opportunities"""
+        if self._marketplace:
+            return await self._marketplace.get_all_opportunities()
+        return []
+
+    # --- Negotiation ---
+
+    async def negotiate(
+        self,
+        opportunity_id: str,
+    ) -> Optional[NegotiationSession]:
+        """
+        Start negotiating for an opportunity.
+
+        Args:
+            opportunity_id: Opportunity to negotiate
+
+        Returns:
+            NegotiationSession
+        """
+        if not self._negotiation:
+            raise RuntimeError("Negotiation manager not initialized")
+
+        # Get opportunity details
+        opportunity = None
+        if self._marketplace:
+            opportunity = await self._marketplace.get_opportunity(opportunity_id)
+
+        if not opportunity:
+            self.logger.error(f"Opportunity not found: {opportunity_id}")
+            return None
+
+        # Initiate negotiation
+        return await self._negotiation.negotiate(
+            counterpart_id=opportunity.counterpart_id,
+            task_description=opportunity.details.get("description", ""),
+            initial_terms=NegotiationTerms(price=opportunity.details.get("price", 100)),
+            demand_id=opportunity.details.get("id") if opportunity.type == "demand" else None,
+            service_id=opportunity.details.get("id") if opportunity.type == "supply" else None,
+        )
+
+    async def propose_terms(
+        self,
+        session_id: str,
+        terms: NegotiationTerms,
+    ) -> ProposalResult:
+        """Submit a proposal in negotiation"""
+        if self._negotiation:
+            return await self._negotiation.propose(session_id, terms)
+        return ProposalResult(success=False, session=None, message="Negotiation manager not initialized")
+
+    async def accept_deal(self, session_id: str) -> ProposalResult:
+        """Accept current proposal and close deal"""
+        if self._negotiation:
+            return await self._negotiation.accept(session_id)
+        return ProposalResult(success=False, session=None, message="Negotiation manager not initialized")
+
+    async def reject_deal(self, session_id: str, reason: str = "") -> ProposalResult:
+        """Reject current proposal"""
+        if self._negotiation:
+            return await self._negotiation.reject(session_id, reason)
+        return ProposalResult(success=False, session=None, message="Negotiation manager not initialized")
+
+    # --- Collaboration ---
+
+    async def start_collaboration(
+        self,
+        goal: str,
+        required_skills: List[str],
+        mode: str = "parallel",
+    ) -> Optional[CollaborationSession]:
+        """
+        Start a multi-agent collaboration.
+
+        Args:
+            goal: Goal description
+            required_skills: Skills needed
+            mode: Collaboration mode
+
+        Returns:
+            CollaborationSession
+        """
+        if not self._collaboration:
+            raise RuntimeError("Collaboration manager not initialized")
+
+        return await self._collaboration.start_collaboration(goal, required_skills, mode)
+
+    async def join_collaboration(
+        self,
+        session_id: str,
+        role: str = "support",
+    ) -> bool:
+        """Join an existing collaboration"""
+        if self._collaboration:
+            return await self._collaboration.join(session_id, role)
+        return False
+
+    async def contribute(
+        self,
+        session_id: str,
+        output: Any,
+        role: Optional[str] = None,
+    ) -> bool:
+        """Submit contribution to collaboration"""
+        if self._collaboration:
+            return await self._collaboration.contribute(session_id, output, role)
+        return False
+
+    async def list_collaborations(self) -> List[CollaborationSession]:
+        """List active collaborations"""
+        if self._collaboration:
+            return await self._collaboration.list_active()
+        return []
+
+    # --- Workflow ---
+
+    async def plan_workflow(
+        self,
+        task: str,
+        tools: Optional[List[str]] = None,
+    ) -> Optional[Workflow]:
+        """
+        Create a workflow for a task.
+
+        Args:
+            task: Task description
+            tools: Available tools
+
+        Returns:
+            Workflow
+        """
+        if not self._workflow:
+            raise RuntimeError("Workflow manager not initialized")
+
+        return await self._workflow.create(task, tools)
+
+    async def run_workflow(self, workflow_id: str) -> Optional[WorkflowResult]:
+        """Execute a workflow"""
+        if self._workflow:
+            return await self._workflow.execute(workflow_id)
+        return None
+
+    async def run_task(self, task: str, tools: Optional[List[str]] = None) -> Optional[WorkflowResult]:
+        """
+        Convenience: Create and run a workflow in one call.
+
+        Args:
+            task: Task description
+            tools: Available tools
+
+        Returns:
+            WorkflowResult
+        """
+        if self._workflow:
+            return await self._workflow.run(task, tools)
+        return None
+
+    # --- Wallet ---
+
+    async def get_balance(self) -> Optional[WalletBalance]:
+        """Get wallet balance"""
+        if self._wallet:
+            return await self._wallet.get_balance()
+        return None
+
+    async def stake_tokens(self, amount: float) -> StakeResult:
+        """
+        Stake tokens to increase reputation.
+
+        Args:
+            amount: Amount to stake
+
+        Returns:
+            StakeResult
+        """
+        if not self._wallet:
+            raise RuntimeError("Wallet manager not initialized")
+        return await self._wallet.stake(amount)
+
+    async def unstake_tokens(self, amount: float) -> StakeResult:
+        """Unstake tokens"""
+        if self._wallet:
+            return await self._wallet.unstake(amount)
+        return StakeResult(success=False, amount=amount, total_staked=0, new_reputation=0.5, message="Wallet not initialized")
+
+    async def get_stake_info(self) -> Optional[StakeInfo]:
+        """Get stake information"""
+        if self._wallet:
+            return await self._wallet.get_stake_info()
+        return None
+
+    # --- Learning ---
+
+    async def get_insights(self) -> List[LearningInsight]:
+        """Get learning insights"""
+        if self._learning:
+            return await self._learning.get_insights()
+        return []
+
+    async def analyze_performance(self) -> Optional[PerformanceAnalysis]:
+        """Analyze own performance"""
+        if self._learning:
+            return await self._learning.analyze_performance()
+        return None
+
+    async def optimize_strategy(self) -> Optional[Dict[str, Any]]:
+        """Get optimized matching strategy"""
+        if self._learning:
+            strategy = await self._learning.get_optimized_strategy()
+            return {
+                "optimal_price_range": strategy.optimal_price_range,
+                "best_contact_timing": strategy.best_contact_timing,
+                "focus_capabilities": strategy.focus_capabilities,
+                "negotiation_approach": strategy.negotiation_approach,
+            }
+        return None
+
+    async def analyze_market(self) -> Optional[MarketInsights]:
+        """Get market insights"""
+        if self._learning:
+            return await self._learning.get_market_insights()
+        return None
+
+    async def report_experience(
+        self,
+        experience_type: str,
+        outcome: str,
+        details: Dict[str, Any],
+        lessons: Optional[List[str]] = None,
+    ) -> bool:
+        """
+        Report an experience for learning.
+
+        Args:
+            experience_type: Type (transaction, negotiation, collaboration)
+            outcome: Result (success, failure, partial)
+            details: Experience details
+            lessons: Lessons learned
+
+        Returns:
+            True if reported
+        """
+        if self._learning:
+            from usmsb_sdk.agent_sdk.learning import Experience
+            experience = Experience(
+                experience_type=experience_type,
+                outcome=outcome,
+                details=details,
+                lessons_learned=lessons or [],
+            )
+            return await self._learning.report_experience(experience)
+        return False
+
+    # --- Utility ---
+
+    def _get_endpoint(self) -> str:
+        """Get agent's HTTP endpoint"""
+        http_config = self.config.protocols.get(ProtocolType.HTTP)
+        if http_config:
+            host = http_config.host or "localhost"
+            port = http_config.port or 5001
+            return f"http://{host}:{port}"
+        return ""

@@ -628,3 +628,110 @@ class ConversationManager:
 
         conn.commit()
         conn.close()
+
+    async def search_all_conversations(
+        self, owner_id: str, query: str, limit: int = 20
+    ) -> List[Dict]:
+        """
+        跨会话搜索历史消息
+
+        搜索用户所有会话中的消息，用于召回历史敏感信息等场景。
+
+        Args:
+            owner_id: 用户ID/钱包地址
+            query: 搜索关键词
+            limit: 返回结果数量限制
+
+        Returns:
+            消息列表，每条包含会话ID、消息内容、时间戳等
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self._search_all_conversations, owner_id, query, limit
+        )
+
+    def _search_all_conversations(self, owner_id: str, query: str, limit: int) -> List[Dict]:
+        """跨会话搜索实现"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 检查是否包含敏感信息关键词
+        has_sensitive = any(
+            kw in query.lower() for kw in ["api", "key", "token", "密码", "密钥", "xialiao"]
+        )
+
+        if has_sensitive:
+            # 搜索所有敏感信息，不限制角色，按时间升序（老消息在前）
+            cursor.execute(
+                """
+                SELECT m.id, m.conversation_id, m.role, m.content, m.timestamp, c.summary
+                FROM messages m
+                JOIN conversations c ON m.conversation_id = c.id
+                WHERE c.owner_id = ? AND m.content LIKE ?
+                ORDER BY m.timestamp ASC
+                LIMIT ?
+                """,
+                (owner_id, f"%{query}%", limit),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT m.id, m.conversation_id, m.role, m.content, m.timestamp, c.summary
+                FROM messages m
+                JOIN conversations c ON m.conversation_id = c.id
+                WHERE c.owner_id = ? AND m.content LIKE ?
+                ORDER BY m.timestamp DESC
+                LIMIT ?
+                """,
+                (owner_id, f"%{query}%", limit),
+            )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "conversation_id": row[1],
+                "role": row[2],
+                "content": row[3],
+                "timestamp": row[4],
+                "conversation_title": row[5] if row[5] else "未命名会话",
+            }
+            for row in rows
+        ]
+
+    async def get_recent_conversations(self, owner_id: str, limit: int = 10) -> List[Dict]:
+        """获取用户最近的会话列表"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_recent_conversations, owner_id, limit)
+
+    def _get_recent_conversations(self, owner_id: str, limit: int) -> List[Dict]:
+        """获取最近会话实现"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, summary, created_at, updated_at, status
+            FROM conversations
+            WHERE owner_id = ?
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (owner_id, limit),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "title": row[1] if row[1] else "未命名会话",
+                "created_at": row[2],
+                "updated_at": row[3],
+                "status": row[4],
+            }
+            for row in rows
+        ]

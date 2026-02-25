@@ -117,7 +117,7 @@ export default function PublishService() {
           <div className="w-16 h-16 bg-green-100 dark:bg-green-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="text-green-600 dark:text-green-400" size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-secondary-900 dark:text-secondary-100 mb-2">
+          <h2 className="text-2xl font-bold text-light-text-primary dark:text-secondary-100 mb-2">
             {t('publishService.publishSuccess')}
           </h2>
           <p className="text-secondary-600 dark:text-secondary-400 mb-6">
@@ -147,7 +147,7 @@ export default function PublishService() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('publishService.publishMyService')}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('publishService.publishMyService')}</h1>
           <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">
             {t('publishService.broadcastToMarket')}
           </p>
@@ -164,7 +164,7 @@ export default function PublishService() {
         <div className="space-y-6">
           {/* Basic Info */}
           <div>
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
               <Briefcase size={20} />
               {t('publishService.basicInfo')}
             </h3>
@@ -216,7 +216,7 @@ export default function PublishService() {
 
           {/* Skills */}
           <div>
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
               <Zap size={20} />
               {t('publishService.skillsSection')}
             </h3>
@@ -264,7 +264,7 @@ export default function PublishService() {
 
           {/* Pricing */}
           <div>
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
               <DollarSign size={20} />
               {t('publishService.pricing')}
             </h3>
@@ -339,7 +339,7 @@ export default function PublishService() {
 
           {/* Availability */}
           <div>
-            <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-4 flex items-center gap-2">
+            <h3 className="font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
               <Clock size={20} />
               {t('publishService.availability')}
             </h3>

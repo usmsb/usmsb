@@ -43,7 +43,7 @@ export default function LanguageSwitcher() {
         aria-expanded={isOpen}
         aria-haspopup="true"
         aria-label={`Current language: ${currentLang.name}. Change language`}
-        className="flex items-center gap-2 px-3 py-2 text-sm text-secondary-600 dark:text-secondary-400 hover:text-secondary-900 dark:hover:text-secondary-100 hover:bg-secondary-100 dark:hover:bg-secondary-800 rounded-lg transition-colors"
+        className="flex items-center gap-2 px-3 py-2 text-sm text-light-text-secondary dark:text-secondary-400 hover:text-light-text-primary dark:hover:text-secondary-100 hover:bg-light-bg-tertiary dark:hover:bg-secondary-800 rounded-lg transition-colors"
       >
         <Globe size={18} />
         <span className="hidden sm:inline">{currentLang.flag} {currentLang.name}</span>
@@ -51,15 +51,15 @@ export default function LanguageSwitcher() {
       </button>
 
       {isOpen && (
-        <div role="menu" aria-label="Language selection" className="absolute right-0 mt-1 w-40 bg-white dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 rounded-lg shadow-lg py-1 z-50">
+        <div role="menu" aria-label="Language selection" className="absolute right-0 mt-1 w-40 bg-white dark:bg-cyber-card border border-light-border dark:border-secondary-700 rounded-lg shadow-lg py-1 z-50">
           {languages.map((lang) => (
             <button
               key={lang.code}
               onClick={() => handleLanguageChange(lang.code)}
               role="menuitem"
               aria-current={i18n.language === lang.code ? 'true' : undefined}
-              className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors ${
-                i18n.language === lang.code ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400' : 'text-secondary-700 dark:text-secondary-300'
+              className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-light-bg-tertiary dark:hover:bg-secondary-700 transition-colors ${
+                 i18n.language === lang.code ? 'bg-blue-50 text-blue-700 dark:bg-primary-900/30 dark:text-primary-400' : 'text-light-text-secondary dark:text-secondary-300'
               }`}
             >
               <span>{lang.flag}</span>

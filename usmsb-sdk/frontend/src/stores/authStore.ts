@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type UserRole = 'superadmin' | 'developer' | 'node_admin' | 'node_operator' | 'human' | 'ai_owner' | 'ai_agent'
 export type BindingType = 'wallet' | 'manual' | 'agent'  // wallet=真实钱包, manual=手动输入, agent=AI Agent
+export type StakeStatus = 'none' | 'staked' | 'unstaking' | 'unlocked'
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   'superadmin': '超级管理员',
@@ -12,6 +13,30 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   'human': '普通用户',
   'ai_owner': 'AI主人',
   'ai_agent': 'AI Agent',
+}
+
+export interface StakeInfo {
+  vibeBalance: number
+  stakedAmount: number
+  lockedAmount: number
+  stakeStatus: StakeStatus
+  unlockAvailableAt: number | null
+  stakeRequired: boolean
+}
+
+export interface AgentWalletInfo {
+  agentId: string
+  walletAddress: string
+  agentAddress: string
+  balance: number
+  stakedAmount: number
+  stakeStatus: string
+  maxPerTx: number
+  dailyLimit: number
+  dailySpent: number
+  remainingDailyLimit: number
+  isRegistered: boolean
+  unlockAvailableAt?: number | null
 }
 
 export interface AuthState {
@@ -50,6 +75,18 @@ export interface AuthState {
   permissions: string[]
   votingPower: number
 
+  // Staking state
+  vibeBalance: number
+  stakedAmount: number
+  lockedAmount: number
+  stakeStatus: StakeStatus
+  unlockAvailableAt: number | null
+  stakeRequired: boolean
+
+  // Agent Wallet state (方案A: 单独创建的钱包)
+  agentWallets: AgentWalletInfo[]
+  currentAgentWallet: AgentWalletInfo | null
+
   // Actions
   setWallet: (address: string, chainId: number) => void
   setManualIdentifier: (identifier: string) => void
@@ -68,6 +105,12 @@ export interface AuthState {
     availability: string
   }) => void
   setPermissions: (permissions: string[], votingPower: number) => void
+  updateStakeInfo: (info: Partial<StakeInfo>) => void
+  setStakeRequired: (required: boolean) => void
+  // Agent Wallet actions
+  setAgentWallets: (wallets: AgentWalletInfo[]) => void
+  setCurrentAgentWallet: (wallet: AgentWalletInfo | null) => void
+  updateAgentWallet: (agentId: string, updates: Partial<AgentWalletInfo>) => void
   logout: () => void
 }
 
@@ -94,6 +137,17 @@ export const useAuthStore = create<AuthState>()(
       availability: 'full-time',
       permissions: [],
       votingPower: 0,
+      // Staking state
+      vibeBalance: 10000,
+      stakedAmount: 0,
+      lockedAmount: 0,
+      stakeStatus: 'none',
+      unlockAvailableAt: null,
+      stakeRequired: true,
+
+      // Agent Wallet state
+      agentWallets: [],
+      currentAgentWallet: null,
 
       // Actions
       setWallet: (address, chainId) =>
@@ -154,6 +208,33 @@ export const useAuthStore = create<AuthState>()(
       setPermissions: (permissions, votingPower) =>
         set({ permissions, votingPower }),
 
+      updateStakeInfo: (info) =>
+        set((state) => ({
+          vibeBalance: info.vibeBalance ?? state.vibeBalance,
+          stakedAmount: info.stakedAmount ?? state.stakedAmount,
+          lockedAmount: info.lockedAmount ?? state.lockedAmount,
+          stakeStatus: info.stakeStatus ?? state.stakeStatus,
+          unlockAvailableAt: info.unlockAvailableAt ?? state.unlockAvailableAt,
+          stakeRequired: info.stakeRequired ?? state.stakeRequired,
+        })),
+
+      setStakeRequired: (required) => set({ stakeRequired: required }),
+
+      // Agent Wallet actions
+      setAgentWallets: (wallets) => set({ agentWallets: wallets }),
+
+      setCurrentAgentWallet: (wallet) => set({ currentAgentWallet: wallet }),
+
+      updateAgentWallet: (agentId, updates) =>
+        set((state) => ({
+          agentWallets: state.agentWallets.map((w) =>
+            w.agentId === agentId ? { ...w, ...updates } : w
+          ),
+          currentAgentWallet: state.currentAgentWallet?.agentId === agentId
+            ? { ...state.currentAgentWallet, ...updates }
+            : state.currentAgentWallet,
+        })),
+
       logout: () =>
         set({
           address: null,
@@ -175,6 +256,14 @@ export const useAuthStore = create<AuthState>()(
           availability: 'full-time',
           permissions: [],
           votingPower: 0,
+          vibeBalance: 10000,
+          stakedAmount: 0,
+          lockedAmount: 0,
+          stakeStatus: 'none',
+          unlockAvailableAt: null,
+          stakeRequired: true,
+          agentWallets: [],
+          currentAgentWallet: null,
         }),
     }),
     {
@@ -199,6 +288,14 @@ export const useAuthStore = create<AuthState>()(
         availability: state.availability,
         permissions: state.permissions,
         votingPower: state.votingPower,
+        vibeBalance: state.vibeBalance,
+        stakedAmount: state.stakedAmount,
+        lockedAmount: state.lockedAmount,
+        stakeStatus: state.stakeStatus,
+        unlockAvailableAt: state.unlockAvailableAt,
+        stakeRequired: state.stakeRequired,
+        agentWallets: state.agentWallets,
+        currentAgentWallet: state.currentAgentWallet,
       }),
     }
   )

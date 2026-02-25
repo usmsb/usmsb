@@ -129,7 +129,7 @@ export default function Analytics() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-secondary-900 dark:text-secondary-100">{t('analytics.title')}</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-light-text-primary dark:text-secondary-100">{t('analytics.title')}</h1>
         <p className="text-sm md:text-base text-secondary-500 dark:text-secondary-400">{t('analytics.predictionAccuracyTrend')}</p>
       </div>
 
@@ -143,7 +143,7 @@ export default function Analytics() {
               </div>
               <div>
                 <p className="text-sm text-secondary-500 dark:text-secondary-400">{stat.name}</p>
-                <p className="text-xl font-bold text-secondary-900 dark:text-secondary-100">{stat.value}</p>
+                <p className="text-xl font-bold text-light-text-primary dark:text-secondary-100">{stat.value}</p>
               </div>
             </div>
             <p className="mt-2 text-sm text-green-600 dark:text-green-400 font-medium">{stat.change} vs last month</p>
@@ -155,7 +155,7 @@ export default function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Prediction Accuracy */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">
+          <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
             {t('analytics.predictionAccuracyTrend')}
           </h3>
           <div className="h-72">
@@ -192,7 +192,7 @@ export default function Analytics() {
 
         {/* Agent Distribution */}
         <div className="card">
-          <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('analytics.agentDistribution')}</h3>
+          <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('analytics.agentDistribution')}</h3>
           <div className="h-72 flex items-center justify-center">
             {hasAgentData ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -246,7 +246,7 @@ export default function Analytics() {
 
       {/* Resource Usage */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">{t('analytics.resourceUsage')}</h3>
+        <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">{t('analytics.resourceUsage')}</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={resourceUsageData} layout="vertical">
@@ -271,30 +271,30 @@ export default function Analytics() {
       {/* Intelligence Source Metrics */}
       {metrics?.intelligence_sources && (
         <div className="card">
-          <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-4">
+          <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
             {t('analytics.intelligenceSourceMetrics')}
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-secondary-50 dark:bg-secondary-700/50 rounded-lg text-center">
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {metrics.intelligence_sources.total_sources}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('analytics.totalSources')}</p>
             </div>
             <div className="p-4 bg-secondary-50 dark:bg-secondary-700/50 rounded-lg text-center">
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {metrics.intelligence_sources.total_requests.toLocaleString()}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('analytics.totalRequests')}</p>
             </div>
             <div className="p-4 bg-secondary-50 dark:bg-secondary-700/50 rounded-lg text-center">
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 {(metrics.intelligence_sources.success_rate * 100).toFixed(1)}%
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('analytics.successRateLabel')}</p>
             </div>
             <div className="p-4 bg-secondary-50 dark:bg-secondary-700/50 rounded-lg text-center">
-              <p className="text-2xl font-bold text-secondary-900 dark:text-secondary-100">
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
                 ${metrics.intelligence_sources.total_cost.toFixed(2)}
               </p>
               <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('analytics.totalCost')}</p>

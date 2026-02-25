@@ -130,6 +130,7 @@ class ContextManager:
         user_info: Optional[UserInfo] = None,
         available_tools: Optional[List[str]] = None,
         memory_context: Optional[Dict[str, Any]] = None,
+        smart_recall_context: str = "",
     ) -> List[Dict[str, str]]:
         """
         构建完整的消息列表
@@ -140,6 +141,7 @@ class ContextManager:
             user_info: 用户信息
             available_tools: 可用工具列表
             memory_context: 分层记忆上下文（摘要、用户画像）
+            smart_recall_context: 智能召回上下文
 
         Returns:
             完整的消息列表，用于 LLM API 调用
@@ -158,6 +160,10 @@ class ContextManager:
             memory_prompt = self._build_memory_prompt(memory_context)
             if memory_prompt:
                 system_prompt += f"\n\n{memory_prompt}"
+
+        # 添加智能召回上下文
+        if smart_recall_context:
+            system_prompt += f"\n\n## 历史相关记忆\n\n{smart_recall_context}"
 
         messages.append({"role": "system", "content": system_prompt})
 
