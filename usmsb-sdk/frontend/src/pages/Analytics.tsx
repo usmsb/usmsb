@@ -15,7 +15,7 @@ import {
   Bar,
 } from 'recharts'
 import { TrendingUp, Users, Activity, Zap, BarChart3 } from 'lucide-react'
-import { getMetrics } from '@/lib/api'
+import { getMetrics, authFetch } from '@/lib/api'
 import { useAppStore } from '@/store'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
@@ -33,7 +33,7 @@ export default function Analytics() {
   const { data: environmentState } = useQuery({
     queryKey: ['environment'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/environment/state`)
+      const response = await authFetch(`${API_BASE}/environment/state`)
       if (!response.ok) throw new Error('Failed to fetch environment state')
       return response.json()
     },
@@ -42,7 +42,7 @@ export default function Analytics() {
   const { data: governanceStats } = useQuery({
     queryKey: ['governance-stats'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/governance/stats`)
+      const response = await authFetch(`${API_BASE}/governance/stats`)
       if (!response.ok) throw new Error('Failed to fetch governance stats')
       return response.json()
     },

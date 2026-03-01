@@ -27,6 +27,7 @@ if env_path.exists():
                 os.environ.setdefault(key, value)
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -44,7 +45,13 @@ from usmsb_sdk.services.agentic_workflow_service import AgenticWorkflowService
 from usmsb_sdk.services.matching_engine import MatchingEngine
 
 # Import database module
-from usmsb_sdk.api.database import init_db
+from usmsb_sdk.api.database import (
+    init_db,
+    check_and_mark_offline_agents,
+    auto_unregister_inactive_agents,
+    AUTO_UNREGISTER_GRACE_PERIOD,
+    AUTO_UNREGISTER_CHECK_INTERVAL,
+)
 
 # Import existing routers
 from usmsb_sdk.api.rest.auth import router as auth_router
@@ -72,6 +79,10 @@ from usmsb_sdk.api.rest.routers import (
     gene_capsule_router,
     pre_match_negotiation_router,
     meta_agent_matching_router,
+    staking_router,
+    reputation_router,
+    wallet_router,
+    heartbeat_router,
 )
 
 # Import Meta Agent router
@@ -88,12 +99,74 @@ source_manager: IntelligenceSourceManager = None
 prediction_service: BehaviorPredictionService = None
 workflow_service: AgenticWorkflowService = None
 matching_engine: MatchingEngine = None
+heartbeat_monitor_task: asyncio.Task = None
+auto_unregister_task: asyncio.Task = None
+
+
+async def heartbeat_monitor():
+    """Background task to monitor agent heartbeats and mark offline agents.
+
+    Runs every 30 seconds to check for agents with expired TTL.
+    """
+    while True:
+        try:
+            await asyncio.sleep(30)  # Check every 30 seconds
+            offline_count = check_and_mark_offline_agents()
+            if offline_count > 0:
+                logger.info(f"Heartbeat monitor: marked {offline_count} agents as offline")
+        except asyncio.CancelledError:
+            logger.info("Heartbeat monitor task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Heartbeat monitor error: {e}")
+
+
+async def auto_unregister_monitor():
+    """Background task to auto-unregister inactive agents without wallet binding.
+
+    Auto-unregister rules:
+    - AI agents WITHOUT wallet binding: Auto-unregister (DELETE) after grace period
+    - AI agents WITH wallet binding: Keep but mark as offline
+    - Human agents: Never auto-unregister
+    - System agents: Never auto-unregister
+
+    Grace period: 24 hours by default (configurable via AUTO_UNREGISTER_GRACE_PERIOD)
+    Check interval: 1 hour by default (configurable via AUTO_UNREGISTER_CHECK_INTERVAL)
+    """
+    while True:
+        try:
+            # Check interval (default: 1 hour)
+            await asyncio.sleep(AUTO_UNREGISTER_CHECK_INTERVAL)
+
+            result = auto_unregister_inactive_agents()
+
+            if result["unregistered"] > 0:
+                logger.info(
+                    f"Auto-unregister: removed {result['unregistered']} inactive agents without wallet binding"
+                )
+            if result["kept"] > 0:
+                logger.debug(f"Auto-unregister: kept {result['kept']} agents with wallet binding")
+            if result["errors"]:
+                for error in result["errors"]:
+                    logger.error(f"Auto-unregister error for {error['agent_id']}: {error['error']}")
+
+        except asyncio.CancelledError:
+            logger.info("Auto-unregister monitor task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Auto-unregister monitor error: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    global settings, source_manager, prediction_service, workflow_service, matching_engine
+    global \
+        settings, \
+        source_manager, \
+        prediction_service, \
+        workflow_service, \
+        matching_engine, \
+        heartbeat_monitor_task
 
     # Startup
     logger.info("Starting USMSB SDK API...")
@@ -172,10 +245,17 @@ async def lifespan(app: FastAPI):
     logger.info("Meta Agent initialized")
 
     # Initialize Permission Manager
-    permission_manager = PermissionManager("meta_agent.db")
-    await permission_manager.init()
-    set_permission_manager(permission_manager)
-    logger.info("Permission Manager initialized")
+    try:
+        permission_manager = PermissionManager("meta_agent.db")
+        await permission_manager.init()
+        set_permission_manager(permission_manager)
+        logger.info("Permission Manager initialized")
+    except Exception as e:
+        import traceback
+
+        logger.error(f"Failed to initialize Permission Manager: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        set_permission_manager(None)
 
     # Initialize MetaAgentService for precise matching
     from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import MetaAgentService
@@ -187,10 +267,39 @@ async def lifespan(app: FastAPI):
 
     logger.info("USMSB SDK API started successfully")
 
+    # Start heartbeat monitor background task
+    heartbeat_monitor_task = asyncio.create_task(heartbeat_monitor())
+    logger.info("Heartbeat monitor started")
+
+    # Start auto-unregister monitor background task
+    auto_unregister_task = asyncio.create_task(auto_unregister_monitor())
+    logger.info(
+        f"Auto-unregister monitor started (grace period: {AUTO_UNREGISTER_GRACE_PERIOD}s, check interval: {AUTO_UNREGISTER_CHECK_INTERVAL}s)"
+    )
+
     yield
 
     # Shutdown
     logger.info("Shutting down USMSB SDK API...")
+
+    # Cancel heartbeat monitor task
+    if heartbeat_monitor_task:
+        heartbeat_monitor_task.cancel()
+        try:
+            await heartbeat_monitor_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Heartbeat monitor stopped")
+
+    # Cancel auto-unregister monitor task
+    if auto_unregister_task:
+        auto_unregister_task.cancel()
+        try:
+            await auto_unregister_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Auto-unregister monitor stopped")
+
     if source_manager:
         await source_manager.shutdown_all()
     logger.info("USMSB SDK API shutdown complete")
@@ -213,32 +322,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add Request Tracing Middleware
+from usmsb_sdk.api.rest.request_tracing import RequestTracingMiddleware
+app.add_middleware(RequestTracingMiddleware)
+
+# Add Rate Limiting Middleware
+from usmsb_sdk.api.rest.rate_limiter import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware)
+
+# Import error handler
+from usmsb_sdk.api.rest.error_handler import APIError, api_error_handler
+app.add_exception_handler(APIError, api_error_handler)
+
 # Include existing routers
-app.include_router(auth_router)
-app.include_router(transactions_router)
-app.include_router(environment_router)
-app.include_router(governance_router)
-app.include_router(agent_auth_router)
-app.include_router(quotes_router)
-app.include_router(dynamic_pricing_router)
+app.include_router(auth_router, prefix="/api")
+app.include_router(transactions_router, prefix="/api")
+app.include_router(environment_router, prefix="/api")
+app.include_router(governance_router, prefix="/api")
+app.include_router(agent_auth_router, prefix="/api")
+app.include_router(quotes_router, prefix="/api")
+app.include_router(dynamic_pricing_router, prefix="/api")
 
 # Include new modular routers
-app.include_router(agents_router)
-app.include_router(environments_router)
-app.include_router(demands_router)
-app.include_router(predictions_router)
-app.include_router(workflows_router)
-app.include_router(matching_router)
-app.include_router(network_router)
-app.include_router(collaborations_router)
-app.include_router(learning_router)
-app.include_router(registration_router)
-app.include_router(services_router)
-app.include_router(system_router)
-app.include_router(gene_capsule_router)
-app.include_router(pre_match_negotiation_router)
-app.include_router(meta_agent_router)
-app.include_router(meta_agent_matching_router)
+app.include_router(agents_router, prefix="/api")
+app.include_router(environments_router, prefix="/api")
+app.include_router(demands_router, prefix="/api")
+app.include_router(predictions_router, prefix="/api")
+app.include_router(workflows_router, prefix="/api")
+app.include_router(matching_router, prefix="/api")
+app.include_router(network_router, prefix="/api")
+app.include_router(collaborations_router, prefix="/api")
+app.include_router(learning_router, prefix="/api")
+app.include_router(registration_router, prefix="/api")
+app.include_router(services_router, prefix="/api")
+app.include_router(system_router, prefix="/api")
+app.include_router(gene_capsule_router, prefix="/api")
+app.include_router(pre_match_negotiation_router, prefix="/api")
+app.include_router(meta_agent_router, prefix="/api")
+app.include_router(meta_agent_matching_router, prefix="/api")
+app.include_router(staking_router, prefix="/api")
+app.include_router(reputation_router, prefix="/api")
+app.include_router(wallet_router, prefix="/api")
+app.include_router(heartbeat_router, prefix="/api")
 
 
 # WebSocket endpoint
@@ -256,6 +381,26 @@ async def websocket_endpoint(websocket: WebSocket):
                 break
     finally:
         await manager.disconnect(websocket)
+
+
+# Metrics endpoint for Prometheus scraping
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Prometheus metrics endpoint for monitoring auto-unregister mechanism."""
+    from usmsb_sdk.api.rest.metrics import get_auto_unregister_metrics
+    from fastapi.responses import PlainTextResponse
+
+    metrics_text = get_auto_unregister_metrics()
+    return PlainTextResponse(content=metrics_text, media_type="text/plain")
+
+
+# Cache statistics endpoint
+@app.get("/cache-stats")
+async def cache_stats_endpoint():
+    """Get cache statistics for monitoring cache performance."""
+    from usmsb_sdk.api.cache import cache_manager
+
+    return cache_manager.get_stats()
 
 
 # Exception handlers

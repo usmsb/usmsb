@@ -23,6 +23,7 @@ import clsx from 'clsx'
 import { useAuthStore } from '../stores/authStore'
 import { toast } from '../stores/toastStore'
 import { getStatusColor } from '@/utils/statusColors'
+import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -88,13 +89,7 @@ export default function Governance() {
   const { data: votingPowerData } = useQuery<{ voting_power: number }>({
     queryKey: ['voting-power', agentId],
     queryFn: async () => {
-      const headers: HeadersInit = {}
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`
-      }
-      const response = await fetch(`${API_BASE}/governance/voting-power`, {
-        headers,
-      })
+      const response = await authFetch(`${API_BASE}/governance/voting-power`)
       if (!response.ok) {
         // Return default voting power if not authenticated or endpoint not available
         return { voting_power: 0 }
@@ -116,7 +111,7 @@ export default function Governance() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${API_BASE}/governance/proposals`)
+      const response = await authFetch(`${API_BASE}/governance/proposals`)
       if (response.ok) {
         const data = await response.json()
         setProposals(data)
@@ -133,7 +128,7 @@ export default function Governance() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/governance/stats`)
+      const response = await authFetch(`${API_BASE}/governance/stats`)
       if (response.ok) {
         const data = await response.json()
         setStats(data)
@@ -156,12 +151,8 @@ export default function Governance() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/governance/proposals`, {
+      const response = await authFetch(`${API_BASE}/governance/proposals`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
         body: JSON.stringify({
           title,
           description,
@@ -195,12 +186,8 @@ export default function Governance() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/governance/proposals/${proposalId}/vote`, {
+      const response = await authFetch(`${API_BASE}/governance/proposals/${proposalId}/vote`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
         body: JSON.stringify({
           voter_id: agentId || 'anonymous',
           support,

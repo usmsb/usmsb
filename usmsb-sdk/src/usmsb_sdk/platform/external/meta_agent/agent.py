@@ -19,7 +19,7 @@ from .core.execution import ExecutionService
 from .core.interaction import InteractionService
 from .core.learning import LearningService
 from .llm.manager import LLMManager
-from .tools.registry import ToolRegistry
+from .tools.registry import ToolRegistry, Tool
 from .skills.manager import SkillsManager
 from .context.manager import ContextManager, UserInfo
 from .memory.conversation_manager import ConversationManager
@@ -47,6 +47,19 @@ from .sensitive.registry import (
 )
 from .intent.recognizer import IntentRecognizer, IntentType, Intent
 from .config.chat_config import ChatConfig
+
+# 新增：信息提取器
+from .info.extractor import InfoExtractor
+from .info.types import InfoNeed, InfoNeedType
+
+# 新增：权限管理
+from .permission import (
+    PermissionManager,
+    get_audit_logger,
+    AuditLogger,
+    AuditAction,
+    AuditLevel,
+)
 
 # 类型检查时导入（避免循环导入）
 if TYPE_CHECKING:
@@ -159,6 +172,14 @@ class MetaAgent:
         self.tool_registry = ToolRegistry()
         self.skills_manager = SkillsManager(self.config.database.path)
 
+        # ========== 权限管理和审计 ==========
+        self.permission_manager = PermissionManager(
+            db_path=self.config.database.path.replace(".db", "_permissions.db")
+        )
+        self.audit_logger = get_audit_logger(
+            db_path=self.config.database.path.replace(".db", "_audit.db")
+        )
+
         # 知识库 - 使用向量知识库（共享，只读）
         self.vector_kb = VectorKnowledgeBase(
             db_path=self.config.database.path.replace(".db", "_vector.db"),
@@ -223,6 +244,14 @@ class MetaAgent:
             use_cache=True,
         )
 
+        # ========== 新增：信息提取器 ==========
+        self.info_extractor = InfoExtractor(
+            llm_manager=self.llm_manager,
+            conversation_manager=self.conversation_manager,
+            tool_registry=self.tool_registry,
+            memory_manager=self.memory_manager,
+        )
+
         # 状态
         self._running = False
         self._main_loop_task: Optional[asyncio.Task] = None
@@ -246,6 +275,12 @@ class MetaAgent:
 
         # 加载 skills
         await self.skills_manager.load_skills()
+
+        # 注册 npm 命令执行技能
+        await self._register_npm_skill()
+
+        # 注册 git 命令执行技能
+        await self._register_git_skill()
 
         # 启动目标引擎
         await self.goal_engine.start()
@@ -303,6 +338,7 @@ class MetaAgent:
             gene_capsule_service = None
             try:
                 from usmsb_sdk.api.rest.gene_capsule_service import GeneCapsuleService
+
                 gene_capsule_service = GeneCapsuleService()
             except ImportError:
                 pass
@@ -311,6 +347,7 @@ class MetaAgent:
             pre_match_service = None
             try:
                 from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
+
                 pre_match_service = PreMatchNegotiationService()
             except ImportError:
                 pass
@@ -412,6 +449,17 @@ class MetaAgent:
         except Exception as e:
             logger.warning(f"Wallet initialization failed: {e}")
 
+        # 初始化权限管理器
+        try:
+            await self.permission_manager.init()
+            await self.audit_logger.init()
+            logger.info("Permission manager and audit logger initialized")
+        except Exception as e:
+            import traceback
+
+            logger.warning(f"Permission manager initialization failed: {e}")
+            logger.warning(f"Traceback: {traceback.format_exc()}")
+
         # 加载项目知识（可选）
         try:
             await self._load_project_knowledge()
@@ -454,7 +502,138 @@ class MetaAgent:
         await system_agents.register_tools(self.tool_registry)
         await precise_matching.register_tools(self.tool_registry)
 
+        # 注册信息提取工具
+        from .info.tool_wrapper import InfoExtractorTool
+
+        info_tool_instance = InfoExtractorTool()
+
+        async def info_tool_handler(session, params: dict) -> dict:
+            """信息提取工具的 handler"""
+            user_id = session.wallet_address if session else None
+            context = {
+                "info_extractor": self.info_extractor,
+                "user_id": user_id,
+            }
+            return await info_tool_instance.execute(params, context)
+
+        tool = Tool(
+            name=info_tool_instance.name,
+            description=info_tool_instance.description,
+            handler=info_tool_handler,
+            requires_session=True,
+            parameters=info_tool_instance.parameters,
+        )
+        self.tool_registry.register(tool)
+        logger.info(f"Registered info extractor tool: {info_tool_instance.name}")
+
+        # 注册知识库搜索工具
+        async def search_knowledge_handler(session, params: dict) -> dict:
+            """知识库搜索工具的 handler"""
+            query = params.get("query", "")
+            top_k = params.get("top_k", 5)
+            if not query:
+                return {"success": False, "error": "query is required"}
+
+            try:
+                results = await self.search_knowledge(query, top_k=top_k)
+                return {"success": True, "results": results, "count": len(results)}
+            except Exception as e:
+                logger.error(f"Search knowledge failed: {e}")
+                return {"success": False, "error": str(e)}
+
+        search_knowledge_tool = Tool(
+            name="search_knowledge",
+            description="搜索内部知识库。用于查找关于USMSB模型、系统功能、API文档等内部知识。当用户问及系统相关知识、模型信息、技术文档时使用此工具。",
+            handler=search_knowledge_handler,
+            requires_session=True,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "搜索查询内容，如'USMSB模型使用方法'、'如何调用API'等",
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "返回结果数量，默认5",
+                        "default": 5,
+                    },
+                },
+                "required": ["query"],
+            },
+        )
+        self.tool_registry.register(search_knowledge_tool)
+        logger.info(f"Registered search_knowledge tool")
+
         logger.info(f"Registered {len(self.tool_registry.list_tools())} default tools")
+
+    async def _register_npm_skill(self):
+        """注册 npm 命令执行技能"""
+        try:
+            from usmsb_sdk.core.skills.npm_skill import NpxCommandSkill
+
+            npm_skill = NpxCommandSkill()
+
+            await self.skills_manager.register_skill(
+                name=npm_skill.metadata.name,
+                description=npm_skill.metadata.description,
+                handler=npm_skill.execute,
+                parameters={
+                    "command": {
+                        "type": "string",
+                        "description": "命令类型: execute, install, uninstall, run, dev, init",
+                        "required": True,
+                    },
+                    "package": {"type": "string", "description": "npm 包名"},
+                    "args": {"type": "array", "description": "命令参数", "required": False},
+                    "script": {"type": "string", "description": "package.json 脚本名"},
+                    "working_dir": {"type": "string", "description": "执行目录", "required": False},
+                    "timeout": {"type": "integer", "description": "超时秒数", "required": False},
+                    "env": {"type": "object", "description": "环境变量", "required": False},
+                    "save_dev": {
+                        "type": "boolean",
+                        "description": "安装为 devDependencies",
+                        "required": False,
+                    },
+                    "global": {"type": "boolean", "description": "全局安装", "required": False},
+                },
+                category="development",
+            )
+            logger.info(f"Registered npm executor skill: {npm_skill.metadata.name}")
+        except Exception as e:
+            logger.warning(f"Failed to register npm skill: {e}")
+
+    async def _register_git_skill(self):
+        """注册 git 命令执行技能"""
+        try:
+            from usmsb_sdk.core.skills.git_skill import GitCommandSkill
+
+            git_skill = GitCommandSkill()
+
+            await self.skills_manager.register_skill(
+                name=git_skill.metadata.name,
+                description=git_skill.metadata.description,
+                handler=git_skill.execute,
+                parameters={
+                    "command": {
+                        "type": "string",
+                        "description": "Git子命令: clone, init, remote, branch, checkout, switch, merge, fetch, pull, push, add, commit, reset, revert, status, log, diff, show, blame, stash",
+                        "required": True,
+                    },
+                    "repository": {"type": "string", "description": "仓库URL (clone/remote)"},
+                    "branch": {"type": "string", "description": "分支名"},
+                    "remote": {"type": "string", "description": "远程名，默认origin"},
+                    "message": {"type": "string", "description": "提交信息"},
+                    "path": {"type": "string", "description": "文件路径"},
+                    "working_dir": {"type": "string", "description": "仓库目录", "required": False},
+                    "timeout": {"type": "integer", "description": "超时秒数", "required": False},
+                    "flags": {"type": "array", "description": "额外标志", "required": False},
+                },
+                category="development",
+            )
+            logger.info(f"Registered git executor skill: {git_skill.metadata.name}")
+        except Exception as e:
+            logger.warning(f"Failed to register git skill: {e}")
 
     async def _load_project_knowledge(self):
         """加载项目知识到向量知识库 - 扫描整个项目"""
@@ -723,7 +902,7 @@ class MetaAgent:
         history_messages = await self.conversation_manager.get_messages_for_llm(
             conversation_id=conversation.id,
             accessor_id=owner_id,
-            max_tokens=2000,
+            max_tokens=80000,
         )
 
         # 处理对话，提取记忆（异步，不阻塞响应）
@@ -761,65 +940,7 @@ class MetaAgent:
             except Exception as e:
                 logger.warning(f"Smart recall failed: {e}")
 
-        # ========== 智能信息检索 ==========
-        # 当用户问需要之前提供的信息时，从历史对话中检索
-        retrieval_context = ""
-
-        logger.debug(f"Starting retrieval check for message: {message[:50]}...")
-
-        try:
-            # 使用敏感信息注册表获取关键词（替代硬编码）
-            info_keywords = self.sensitive_registry.get_all_keywords()
-            need_retrieval = any(kw in message.lower() for kw in info_keywords)
-
-            if need_retrieval:
-                task_info = {"task_description": message, "needed_info_type": "用户之前提供的信息"}
-                logger.info(f"Need retrieval for: {message[:30]}...")
-
-                # 获取候选消息
-                candidates = await self._get_all_candidate_info(owner_id)
-                print(f"[RETRIEVAL] Candidates count: {len(candidates)}")
-
-                if candidates:
-                    # 让 LLM 从所有候选中找出需要的信息
-                    try:
-                        found_info = await self._find_info_from_candidates(candidates, task_info)
-                        logger.debug(f"Found info: {found_info[:50] if found_info else 'None'}...")
-                    except Exception as e:
-                        logger.error(f"Error in _find_info_from_candidates: {e}")
-                        found_info = None
-
-                    if found_info:
-                        retrieval_context = self._format_found_info({"content": found_info})
-                        logger.info("Set retrieval_context!")
-                    else:
-                        # 直接返回候选内容（使用配置中的截断长度和显示数量）
-                        candidate_text = "\n\n".join(
-                            [
-                                f"消息{i + 1} [{c.get('role', '')}]: {c.get('content', '')[:self.chat_config.candidate_content_length]}..."
-                                for i, c in enumerate(candidates[:self.chat_config.display_candidates_limit])
-                            ]
-                        )
-                        retrieval_context = f"## 从历史对话中找到以下相关内容：\n\n{candidate_text}"
-                        logger.info("Set retrieval_context with candidates")
-
-        except Exception as e:
-            logger.warning(f"Retrieval failed: {e}")
-
-        # 如果检索到信息，使用检索结果
-        if retrieval_context:
-            logger.debug(f"Setting smart_recall_context: {retrieval_context[:100]}...")
-            smart_recall_context = retrieval_context
-            # 动态更新记忆
-            if self.memory_manager:
-                try:
-                    await self.memory_manager.dynamic_update_from_recall(
-                        user_id=owner_id, recalled_content=retrieval_context, source="agent_chat"
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to dynamic update memories: {e}")
-
-        # ========== 方案四：检测用户强调记忆 ==========
+        # ========== 检测用户强调记忆 ==========
         if self.memory_manager:
             try:
                 await self.memory_manager.check_and_store_user_emphasis(
@@ -858,7 +979,9 @@ class MetaAgent:
         llm_provider = "anthropic" if self.llm_manager.provider == "minimax" else "openai"
         tools_schema = self.tool_registry.get_tools_schema(provider=llm_provider)
         skills_schema = self.skills_manager.get_skills_schema(provider=llm_provider)
-        logger.debug(f"chat: tools_schema={len(tools_schema)}, skills_schema={len(skills_schema)}, provider={llm_provider}")
+        logger.debug(
+            f"chat: tools_schema={len(tools_schema)}, skills_schema={len(skills_schema)}, provider={llm_provider}"
+        )
 
         # 调用 LLM（支持工具和技能调用）
         try:
@@ -866,50 +989,199 @@ class MetaAgent:
             intent = await self.intent_recognizer.recognize(message)
 
             # 根据意图判断是否需要工具调用
-            is_simple = intent.is_simple() and len(message) < self.chat_config.simple_message_threshold
+            is_simple = (
+                intent.is_simple() and len(message) < self.chat_config.simple_message_threshold
+            )
 
             # 使用意图识别器判断是否需要工具（替代硬编码关键词）
             needs_tools = intent.is_tool_call() or not is_simple
+
+            logger.info(
+                f"[CHAT] needs_tools={needs_tools}, is_simple={is_simple}, is_tool_call={intent.is_tool_call()}"
+            )
+            logger.info(f"[CHAT] message={message[:50]}...")
 
             if needs_tools:
                 # 需要执行工具，启动后台处理
                 async def background_task():
                     try:
-                        logger.info("Starting background task execution")
-                        # 先记录开始执行 - 使用 BACKGROUND_TASK 类型
+                        logger.info("[BACKGROUND] Starting background task execution")
+                        logger.info(f"[BACKGROUND] tools_schema count: {len(tools_schema)}")
+                        logger.info(f"[BACKGROUND] skills_schema count: {len(skills_schema)}")
                         await self.conversation_manager.add_message(
                             conversation_id=conversation.id,
                             role=MessageRole.BACKGROUND_TASK,
                             content=self.chat_config.background_task_start_message,
                         )
 
+                        max_retries = 3
+                        current_messages = messages
+
+                        for attempt in range(max_retries):
+                            logger.info(f"[BACKGROUND] Attempt {attempt + 1}/{max_retries}")
+                            # Step 1: LLM 调用
+                            llm_response = await self._chat_with_llm(
+                                current_messages,
+                                tools=tools_schema,
+                                skills=skills_schema,
+                                conversation_id=str(conversation.id),
+                                user_session=user_session,
+                            )
+
+                            # Step 2: LLM 返回后判断
+                            llm_retry_decision = await self._llm_judge_response_retry(
+                                response=llm_response, attempt=attempt, max_retries=max_retries
+                            )
+
+                            if not llm_retry_decision.get("need_retry"):
+                                result_text = llm_response
+                                break
+
+                            # Step 3: 如果需要补充信息
+                            if llm_retry_decision.get("need_info"):
+                                info_description = llm_retry_decision.get("info_description", "")
+
+                                need = InfoNeed(
+                                    need_id=f"llm_retry_{attempt}",
+                                    name=info_description,
+                                    info_type=InfoNeedType(
+                                        llm_retry_decision.get("info_type", "other")
+                                    ),
+                                    description=info_description,
+                                    format_hint=llm_retry_decision.get("format_hint", ""),
+                                )
+
+                                logger.info(
+                                    f"[INFO_EXTRACT] Calling info_extractor from LLM response retry, need: {info_description}"
+                                )
+                                extracted = await self.info_extractor.extract([need], owner_id)
+                                logger.info(
+                                    f"[INFO_EXTRACT] Extracted from LLM response retry: {extracted}"
+                                )
+
+                                if extracted and need.need_id in extracted:
+                                    current_messages = self._inject_extracted_info(
+                                        current_messages, need.name, extracted[need.need_id]
+                                    )
+                                    logger.info(f"Injected extracted info for retry: {need.name}")
+                                    continue
+
+                            # Step 4: 解析工具调用
+                            tool_calls = self._parse_tool_calls(llm_response)
+
+                            if not tool_calls:
+                                current_messages = self._add_response_to_messages(
+                                    current_messages, llm_response
+                                )
+                                continue
+
+                            # Step 5: 执行工具调用
+                            tool_results = []
+
+                            for tool_call in tool_calls:
+                                tool_name = tool_call.get("name")
+                                tool_args = tool_call.get("arguments", {})
+
+                                tool_result = await self._execute_tool(
+                                    tool_name, tool_args, user_session
+                                )
+
+                                tool_results.append(
+                                    {
+                                        "tool": tool_name,
+                                        "result": tool_result,
+                                        "success": tool_result.get("success", False),
+                                    }
+                                )
+
+                            # Step 6: 工具调用后判断
+                            tool_retry_decision = await self._llm_judge_tool_retry(
+                                tool_results=tool_results, attempt=attempt, max_retries=max_retries
+                            )
+
+                            if not tool_retry_decision.get("need_retry"):
+                                result_text = self._format_tool_results(tool_results)
+                                break
+
+                            # Step 7: 如果工具调用需要补充信息
+                            if tool_retry_decision.get("need_info"):
+                                info_description = tool_retry_decision.get("info_description", "")
+
+                                need = InfoNeed(
+                                    need_id=f"tool_retry_{attempt}",
+                                    name=info_description,
+                                    info_type=InfoNeedType(
+                                        tool_retry_decision.get("info_type", "other")
+                                    ),
+                                    description=info_description,
+                                    format_hint=tool_retry_decision.get("format_hint", ""),
+                                )
+
+                                logger.info(
+                                    f"[INFO_EXTRACT] Calling info_extractor from tool retry, need: {info_description}"
+                                )
+                                extracted = await self.info_extractor.extract([need], owner_id)
+                                logger.info(
+                                    f"[INFO_EXTRACT] Extracted from tool retry: {extracted}"
+                                )
+
+                                if extracted and need.need_id in extracted:
+                                    fixed_tool_args = self._fix_tool_args(
+                                        tool_args, need.name, extracted[need.need_id]
+                                    )
+
+                                    tool_result = await self._execute_tool(
+                                        tool_name, fixed_tool_args, user_session
+                                    )
+
+                                    tool_results = [{"tool": tool_name, "result": tool_result}]
+
+                            # Step 8: 将工具结果加入上下文
+                            current_messages = self._add_tool_results_to_messages(
+                                current_messages, llm_response, tool_results
+                            )
+
+                        # 返回最终结果
                         result_text = await self._chat_with_llm(
-                            messages,
-                            tools=tools_schema,
-                            skills=skills_schema,
+                            current_messages,
+                            tools=[],
+                            skills=[],
                             conversation_id=str(conversation.id),
                             user_session=user_session,
                         )
 
-                        # 记录结果供调试
                         logger.debug(
                             f"Background task result: {result_text[:500] if result_text else 'EMPTY'}"
                         )
 
-                        # 检查结果是否是超时或需要更多时间
-                        if "需要更多时间" in result_text or "稍后再试" in result_text:
-                            # 执行遇到问题，记录更详细的信息 - 使用 BACKGROUND_ERROR 类型
+                        completion_check = self._check_task_completion(
+                            result_text, tool_results if "tool_results" in dir() else None
+                        )
+                        logger.info(f"[BACKGROUND] Completion check: {completion_check}")
+
+                        if not completion_check.get("is_complete", False):
+                            reason = completion_check.get("reason", "未知原因")
+                            logger.info(f"[BACKGROUND] Task not complete: {reason}")
                             await self.conversation_manager.add_message(
                                 conversation_id=conversation.id,
                                 role=MessageRole.BACKGROUND_ERROR,
-                                content=self.chat_config.background_task_error_template.format(error=result_text),
+                                content=f"任务未完成: {reason}",
+                            )
+                        elif "需要更多时间" in result_text or "稍后再试" in result_text:
+                            await self.conversation_manager.add_message(
+                                conversation_id=conversation.id,
+                                role=MessageRole.BACKGROUND_ERROR,
+                                content=self.chat_config.background_task_error_template.format(
+                                    error=result_text
+                                ),
                             )
                         else:
-                            # 正常结果 - 使用 BACKGROUND_COMPLETE 类型
                             await self.conversation_manager.add_message(
                                 conversation_id=conversation.id,
                                 role=MessageRole.BACKGROUND_COMPLETE,
-                                content=self.chat_config.background_task_complete_template.format(result=result_text),
+                                content=self.chat_config.background_task_complete_template.format(
+                                    result=result_text
+                                ),
                             )
                         logger.info("Background task completed and saved to history")
                     except Exception as e:
@@ -920,7 +1192,9 @@ class MetaAgent:
                         await self.conversation_manager.add_message(
                             conversation_id=conversation.id,
                             role=MessageRole.BACKGROUND_ERROR,
-                            content=self.chat_config.background_task_fail_template.format(error=str(e), detail=error_detail),
+                            content=self.chat_config.background_task_fail_template.format(
+                                error=str(e), detail=error_detail
+                            ),
                         )
 
                 # 启动后台任务，不等待完成
@@ -2433,6 +2707,66 @@ class MetaAgent:
                             }
                         )
                         continue
+
+                    # ===== 权限检查 =====
+                    wallet_address = user_session.wallet_address
+                    user_role = "human"
+
+                    # 获取用户角色
+                    try:
+                        user_perm = await self.permission_manager.get_user(wallet_address)
+                        if user_perm:
+                            user_role = user_perm.role.value
+                    except Exception as e:
+                        logger.warning(f"Failed to get user role: {e}")
+
+                    # 检查工具权限
+                    check_result = await self.permission_manager.check_tool_access(
+                        wallet_address, tool_name
+                    )
+
+                    if not check_result.get("allowed"):
+                        error_msg = (
+                            f"⚠️ **权限不足**\n\n"
+                            f"工具 `{tool_name}` 需要以下权限：\n"
+                            f"{', '.join(check_result.get('required_permissions', []))}\n\n"
+                            f"当前角色: {user_role}\n"
+                            f"原因: {check_result.get('reason', 'unknown')}"
+                        )
+                        logger.warning(
+                            f"Tool {tool_name} permission denied for {wallet_address}: {check_result.get('reason')}"
+                        )
+
+                        # 记录审计日志
+                        await self.audit_logger.log(
+                            action=AuditAction.TOOL_EXECUTE,
+                            wallet_address=wallet_address,
+                            role=user_role,
+                            operation=tool_name,
+                            result="permission_denied",
+                            level=AuditLevel.WARNING,
+                            details={"reason": check_result.get("reason")},
+                        )
+
+                        results.append(
+                            {
+                                "tool": tool_name,
+                                "result": {"error": error_msg, "permission_denied": True},
+                                "success": False,
+                            }
+                        )
+                        continue
+
+                    # 记录审计日志
+                    await self.audit_logger.log(
+                        action=AuditAction.TOOL_EXECUTE,
+                        wallet_address=wallet_address,
+                        role=user_role,
+                        operation=tool_name,
+                        result="success",
+                        details=tool_args,
+                    )
+
                     # 执行需要 session 的工具
                     logger.info(
                         f"Executing tool {tool_name} with user session (wallet: {user_session.wallet_address[:10]}...)"
@@ -2641,3 +2975,258 @@ class MetaAgent:
         if self.evolution_engine:
             return self.evolution_engine.get_evolution_stats()
         return {}
+
+    # ========== 信息提取相关辅助方法 ==========
+
+    async def _llm_judge_response_retry(
+        self, response: str, attempt: int, max_retries: int
+    ) -> Dict:
+        """LLM 返回后判断是否需要重试"""
+        import json
+
+        prompt = f"""判断当前响应是否需要重试。
+
+当前尝试: {attempt + 1}/{max_retries}
+
+LLM 响应:
+{response[:3000]}
+
+请返回JSON:
+{{
+    "need_retry": true/false,
+    "reason": "判断理由",
+    "need_info": true/false,
+    "info_description": "需要什么信息",
+    "info_type": "credential/param/url/other",
+    "format_hint": "格式提示（可选）"
+}}
+
+注意：完全根据实际响应判断，不要预设任何条件。
+"""
+        try:
+            logger.info(
+                f"[INFO_EXTRACT] _llm_judge_response_retry called, attempt={attempt + 1}/{max_retries}"
+            )
+            resp = await self.llm_manager.chat(prompt)
+            data = self._parse_json(resp)
+            logger.info(f"[INFO_EXTRACT] _llm_judge_response_retry result: {data}")
+            return data or {"need_retry": False}
+        except Exception as e:
+            logger.warning(f"LLM judge response retry failed: {e}")
+            return {"need_retry": False}
+
+    async def _llm_judge_tool_retry(
+        self, tool_results: List[Dict], attempt: int, max_retries: int
+    ) -> Dict:
+        """工具调用后判断是否需要重试"""
+        import json
+
+        prompt = f"""你是一个智能助手，需要判断工具执行结果是否满足用户需求。
+
+当前尝试: {attempt + 1}/{max_retries}
+
+用户需求可能是：需要从历史对话中查找虾聊API Key、需要查找账号信息、需要查找网址链接等。
+
+工具执行结果:
+{json.dumps(tool_results, ensure_ascii=False, indent=2)}
+
+请判断：
+1. 工具执行结果是否表明缺少关键信息（如API Key、账号、密码等）？
+2. 工具是否返回错误（如unauthorized、invalid key、missing param等）？
+3. 用户需求是否需要从历史对话记录中提取信息？
+
+请返回JSON:
+{{
+    "need_retry": true/false,
+    "reason": "判断理由，越详细越好",
+    "need_info": true/false,
+    "info_description": "如果需要信息，具体需要什么（如：虾聊API Key、用户账号等）",
+    "info_type": "credential（凭证）/account（账号）/url（网址）/param（参数）/other（其他）",
+    "format_hint": "格式提示（如：xialiao_开头、github.com/xxx等）"
+}}
+
+关键判断标准：
+- 如果工具返回认证失败、缺少API Key、需要登录等信息，need_info应为true
+- 如果用户问题涉及"之前给的"、"历史对话中的"、"我的API Key"等，need_info应为true
+- 即使工具执行成功，如果结果不完整，也应考虑need_retry为true
+"""
+        try:
+            logger.info(
+                f"[INFO_EXTRACT] _llm_judge_tool_retry called, attempt={attempt + 1}/{max_retries}, tool_count={len(tool_results)}"
+            )
+            logger.info(
+                f"[INFO_EXTRACT] tool_results: {json.dumps(tool_results, ensure_ascii=False)[:500]}..."
+            )
+            resp = await self.llm_manager.chat(prompt)
+            logger.info(f"[INFO_EXTRACT] _llm_judge_tool_retry raw response: {resp[:500]}...")
+            data = self._parse_json(resp)
+            logger.info(f"[INFO_EXTRACT] _llm_judge_tool_retry parsed result: {data}")
+            return data or {"need_retry": False}
+        except Exception as e:
+            logger.warning(f"LLM judge tool retry failed: {e}")
+            return {"need_retry": False}
+
+    def _check_task_completion(self, result_text: str, tool_results: List[Dict] = None) -> Dict:
+        """最终检查任务是否真正完成
+
+        检查点：
+        1. 响应是否包含中间状态词汇（正在、稍后、等待、检索中）
+        2. 工具执行是否成功
+        3. 响应是否完整回答了用户问题
+        """
+        if not result_text:
+            return {"is_complete": False, "reason": "结果为空"}
+
+        result_lower = result_text.lower()
+
+        intermediate_patterns = [
+            "正在",
+            "稍后",
+            "等待",
+            "检索中",
+            "查询中",
+            "处理中",
+            "请稍等",
+            "请等待",
+            "正在查询",
+            "正在处理",
+            "等待结果",
+            "获取中",
+            "加载中",
+            "pending",
+            "正在获取",
+            "准备中",
+            "进行中",
+        ]
+
+        for pattern in intermediate_patterns:
+            if pattern in result_text:
+                return {
+                    "is_complete": False,
+                    "reason": f"响应包含中间状态词: {pattern}",
+                    "is_intermediate": True,
+                }
+
+        if tool_results:
+            failed_tools = [t for t in tool_results if not t.get("success", False)]
+            if failed_tools:
+                return {
+                    "is_complete": False,
+                    "reason": f"有 {len(failed_tools)} 个工具执行失败",
+                    "failed_tools": failed_tools,
+                }
+
+        return {"is_complete": True, "reason": "检查通过"}
+
+    def _parse_json(self, response: str) -> Optional[Dict]:
+        import json
+        import re
+
+        try:
+            if "```json" in response:
+                response = response.split("```json")[1].split("```")[0]
+            elif "```" in response:
+                response = response.split("```")[1].split("```")[0]
+            return json.loads(response.strip())
+        except Exception:
+            match = re.search(r"\{[\s\S]*\}", response)
+            if match:
+                try:
+                    return json.loads(match.group())
+                except Exception:
+                    pass
+        return None
+
+    def _parse_tool_calls(self, response: str) -> List[Dict]:
+        """解析工具调用"""
+        import re
+
+        tool_calls = []
+        try:
+            json_match = re.search(
+                r'\[[\s\S]*"tool_calls"[\s\S]*\]|\{[^\}]*"tool_calls"[^\}]*\}', response
+            )
+            if json_match:
+                data = json.loads(json_match.group())
+                if isinstance(data, dict) and "tool_calls" in data:
+                    tool_calls = data["tool_calls"]
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and "tool_calls" in item:
+                            tool_calls.extend(item["tool_calls"])
+        except Exception as e:
+            logger.warning(f"Parse tool calls failed: {e}")
+        return tool_calls
+
+    async def _execute_tool(self, tool_name: str, tool_args: Dict, user_session) -> Dict:
+        """执行工具"""
+        try:
+            return await self.tool_registry.execute(tool_name, session=user_session, **tool_args)
+        except Exception as e:
+            logger.error(f"Tool execution failed: {tool_name}, error: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _inject_extracted_info(self, messages: List, info_name: str, info_value: str) -> List:
+        """将提取到的信息注入到消息上下文"""
+        injection = f"\n\n## 已获取的信息\n{info_name}: {info_value}\n"
+        new_messages = []
+        for msg in messages:
+            new_messages.append(msg)
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                new_messages.append({"role": "system", "content": injection})
+            elif hasattr(msg, "role") and msg.role == "user":
+                new_messages.append({"role": "system", "content": injection})
+        return new_messages
+
+    def _add_response_to_messages(self, messages: List, response: str) -> List:
+        """将 LLM 响应添加到消息列表"""
+        messages = list(messages)
+        messages.append({"role": "assistant", "content": response})
+        return messages
+
+    def _add_tool_results_to_messages(
+        self, messages: List, llm_response: str, tool_results: List[Dict]
+    ) -> List:
+        """将工具结果添加到消息列表"""
+        import json
+
+        messages = list(messages)
+        messages.append({"role": "assistant", "content": llm_response})
+        for tr in tool_results:
+            messages.append(
+                {
+                    "role": "tool",
+                    "content": json.dumps(tr.get("result", {}), ensure_ascii=False),
+                    "tool_call_id": tr.get("tool", ""),
+                }
+            )
+        return messages
+
+    def _format_tool_results(self, tool_results: List[Dict]) -> str:
+        """格式化工具结果"""
+        import json
+
+        lines = []
+        for tr in tool_results:
+            lines.append(
+                f"### {tr.get('tool', 'unknown')}\n```\n{json.dumps(tr.get('result', {}), ensure_ascii=False, indent=2)}\n```"
+            )
+        return "\n\n".join(lines)
+
+    def _fix_tool_args(self, original_args: Dict, info_name: str, extracted_value: str) -> Dict:
+        """修复工具参数"""
+        fixed_args = original_args.copy()
+        param_mappings = {
+            "api_key": ["api_key", "apikey", "key", "apiKey", "api-key"],
+            "token": ["token", "access_token", "auth_token"],
+            "url": ["url", "link", "href"],
+        }
+        info_name_lower = info_name.lower()
+        for standard_name, possible_names in param_mappings.items():
+            if any(n in info_name_lower for n in possible_names):
+                for param_name in possible_names:
+                    if param_name in fixed_args:
+                        fixed_args[param_name] = extracted_value
+                        logger.info(f"Fixed tool arg: {param_name}")
+                        break
+        return fixed_args

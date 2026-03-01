@@ -320,11 +320,51 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 获取 DEX 流动性
+     * @dev 通过工厂合约查询 VIBE-WETH 配对地址，获取实际流动性储备
+     * @return totalLiquidity USD价值估算的流动性总额
      */
     function _getDEXLiquidity() internal view returns (uint256) {
-        // 简化实现：返回 VIBE 在 DEX 的储备量
-        // 实际应查询 DEX 池
-        return vibeToken.balanceOf(dexRouter);
+        // 获取工厂地址
+        address factory = IDEXRouter(dexRouter).factory();
+
+        // 获取 VIBE-WETH 配对地址
+        address pair = IDEXFactory(factory).getPair(address(vibeToken), address(weth));
+
+        // 如果配对不存在，返回0
+        if (pair == address(0)) {
+            return 0;
+        }
+
+        // 获取储备量
+        (uint112 reserve0, uint112 reserve1, ) = IDEXPair(pair).getReserves();
+
+        // 确定哪个是VIBE，哪个是WETH
+        address token0 = IDEXPair(pair).token0();
+        uint256 vibeReserve;
+        uint256 wethReserve;
+
+        if (token0 == address(vibeToken)) {
+            vibeReserve = reserve0;
+            wethReserve = reserve1;
+        } else {
+            vibeReserve = reserve1;
+            wethReserve = reserve0;
+        }
+
+        // 获取当前价格计算流动性USD价值
+        uint256 currentPrice = _getCurrentPrice();
+        if (currentPrice == 0) {
+            // 如果价格查询失败，返回VIBE储备量作为近似值
+            return vibeReserve;
+        }
+
+        // 流动性 = VIBE储备 + WETH储备 × 价格
+        // 假设价格是 VIBE/ETH，即 1 VIBE = price ETH
+        // 将WETH转换为VIBE等价物: wethReserve / (10^decimals) * price
+        uint256 wethValueInVibe = (wethReserve * 1e18) / currentPrice;
+        uint256 totalLiquidity = vibeReserve + wethValueInVibe;
+
+        return totalLiquidity;
     }
 
     /**
@@ -387,6 +427,8 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 支付触发者奖励
+     * @dev 奖励 = 基础奖励 + Gas补贴 + 时间累积奖励
+     *      Gas补贴 = 估算Gas成本 × 120%
      */
     function _payTriggerReward() internal {
         uint256 hoursSinceLastTrigger = (block.timestamp - lastTriggerTime) / 1 hours;
@@ -394,8 +436,14 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
             hoursSinceLastTrigger = MAX_ACCUMULATED_HOURS;
         }
 
+        // 时间累积奖励
         uint256 timeBonus = hoursSinceLastTrigger * ACCUMULATION_RATE;
-        uint256 reward = BASE_REWARD + timeBonus;
+
+        // Gas补贴：估算约21000 Gas × 120%
+        uint256 estimatedGasCost = 21000 * 30 gwei;
+        uint256 gasBonus = (estimatedGasCost * (100 + GAS_BONUS_PERCENT)) / 100;
+
+        uint256 reward = BASE_REWARD + gasBonus + timeBonus;
 
         if (address(this).balance >= reward) {
             payable(msg.sender).transfer(reward);
@@ -455,6 +503,17 @@ interface IDEXRouter {
         uint256 amountETH,
         uint256 liquidity
     );
+
+    function factory() external view returns (address);
+}
+
+interface IDEXFactory {
+    function getPair(address tokenA, address tokenB) external view returns (address);
+}
+
+interface IDEXPair {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function token0() external view returns (address);
 }
 
 // VIBE Token 需要有 burn 函数

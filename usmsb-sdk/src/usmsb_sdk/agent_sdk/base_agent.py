@@ -21,12 +21,14 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 import asyncio
 import logging
+import os
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
     CapabilityDefinition,
     ProtocolType,
     SkillDefinition,
+    SkillParameter,
 )
 from usmsb_sdk.agent_sdk.registration import RegistrationManager, RegistrationStatus
 from usmsb_sdk.agent_sdk.communication import CommunicationManager, Message, MessageType, Session
@@ -65,9 +67,20 @@ from usmsb_sdk.agent_sdk.learning import (
     Experience,
 )
 
+# Database imports for wallet binding check
+try:
+    from usmsb_sdk.api.database import has_wallet_binding, set_agent_offline, get_agent
+    _DB_AVAILABLE = True
+except ImportError:
+    _DB_AVAILABLE = False
+    has_wallet_binding = None
+    set_agent_offline = None
+    get_agent = None
+
 
 class AgentState(Enum):
     """Agent lifecycle states"""
+
     CREATED = "created"
     INITIALIZING = "initializing"
     READY = "ready"
@@ -157,7 +170,9 @@ class BaseAgent(ABC):
 
         # Skill and capability registries
         self._skills: Dict[str, SkillDefinition] = {s.name: s for s in config.skills}
-        self._capabilities: Dict[str, CapabilityDefinition] = {c.name: c for c in config.capabilities}
+        self._capabilities: Dict[str, CapabilityDefinition] = {
+            c.name: c for c in config.capabilities
+        }
 
         # Message handlers
         self._message_handlers: Dict[str, Callable] = {}
@@ -290,7 +305,9 @@ class BaseAgent(ABC):
         This method:
         1. Transitions to STOPPING
         2. Stops background tasks
-        3. Unregisters from platform
+        3. Checks wallet binding:
+           - If has wallet binding: set to offline (keep record for restart)
+           - If no wallet binding: fully unregister (delete record)
         4. Calls user-defined shutdown()
         5. Cleans up resources
         6. Transitions to STOPPED
@@ -305,9 +322,30 @@ class BaseAgent(ABC):
             # Stop background tasks
             await self._stop_background_tasks()
 
-            # Unregister
-            if self._registration_manager:
-                await self._registration_manager.unregister()
+            # Check wallet binding and decide whether to keep or delete
+            if _DB_AVAILABLE and has_wallet_binding and set_agent_offline:
+                try:
+                    agent_id = self.agent_id
+                    has_wallet = has_wallet_binding(agent_id)
+
+                    if has_wallet:
+                        # Has wallet binding - just set offline (keep record)
+                        self.logger.info(f"Agent {self.name} has wallet binding, setting to offline")
+                        set_agent_offline(agent_id)
+                    else:
+                        # No wallet binding - fully unregister
+                        self.logger.info(f"Agent {self.name} has no wallet binding, unregistering")
+                        if self._registration_manager:
+                            await self._registration_manager.unregister()
+                except Exception as e:
+                    # If DB check fails, fall back to unregister
+                    self.logger.warning(f"Failed to check wallet binding: {e}, unregistering")
+                    if self._registration_manager:
+                        await self._registration_manager.unregister()
+            else:
+                # No DB available - just unregister
+                if self._registration_manager:
+                    await self._registration_manager.unregister()
 
             # Cleanup components
             if self._communication_manager:
@@ -418,7 +456,9 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    async def handle_message(self, message: Message, session: Optional[Session] = None) -> Optional[Message]:
+    async def handle_message(
+        self, message: Message, session: Optional[Session] = None
+    ) -> Optional[Message]:
         """
         Handle incoming messages.
 
@@ -478,7 +518,7 @@ class BaseAgent(ABC):
             logger=self.logger,
             message_handler=self._handle_internal_message,
         )
-        await self._communication_manager.initialize()
+        await self._communication_manager.initialize(skip_http_start=self.config.skip_http_auto_start)
 
         # Initialize discovery manager
         self._discovery_manager = DiscoveryManager(
@@ -491,6 +531,170 @@ class BaseAgent(ABC):
 
         # Initialize platform integration
         await self._initialize_platform_integration()
+
+        # Register built-in skills
+        await self._register_builtin_skills()
+
+    async def _register_builtin_skills(self) -> None:
+        """Register built-in skills including npm and git executors"""
+        try:
+            from usmsb_sdk.core.skills.npm_skill import NpxCommandSkill
+            from usmsb_sdk.core.skills.git_skill import GitCommandSkill
+
+            npm_skill = NpxCommandSkill()
+
+            npm_skill_def = SkillDefinition(
+                name=npm_skill.metadata.name,
+                description=npm_skill.metadata.description,
+                parameters=[
+                    SkillParameter(
+                        name="command",
+                        type="string",
+                        description="命令类型: execute, install, uninstall, run, dev, init",
+                        required=True,
+                        enum=["execute", "install", "uninstall", "run", "dev", "init"],
+                    ),
+                    SkillParameter(
+                        name="package",
+                        type="string",
+                        description="npm 包名",
+                        required=False,
+                    ),
+                    SkillParameter(
+                        name="args",
+                        type="array",
+                        description="命令参数",
+                        required=False,
+                        default=[],
+                    ),
+                    SkillParameter(
+                        name="script",
+                        type="string",
+                        description="package.json 脚本名",
+                        required=False,
+                    ),
+                    SkillParameter(
+                        name="working_dir",
+                        type="string",
+                        description="执行目录",
+                        required=False,
+                        default=".",
+                    ),
+                    SkillParameter(
+                        name="timeout",
+                        type="integer",
+                        description="超时秒数",
+                        required=False,
+                        default=300,
+                        min_value=1,
+                        max_value=3600,
+                    ),
+                    SkillParameter(
+                        name="env",
+                        type="object",
+                        description="环境变量",
+                        required=False,
+                        default={},
+                    ),
+                    SkillParameter(
+                        name="save_dev",
+                        type="boolean",
+                        description="安装为 devDependencies",
+                        required=False,
+                        default=False,
+                    ),
+                    SkillParameter(
+                        name="global",
+                        type="boolean",
+                        description="全局安装",
+                        required=False,
+                        default=False,
+                    ),
+                ],
+                returns="object",
+                timeout=300,
+                tags=["npm", "npx", "development", "execution"],
+            )
+
+            self.register_skill(npm_skill_def, npm_skill.execute)
+            self.logger.info(f"Registered built-in skill: {npm_skill_def.name}")
+
+            git_skill = GitCommandSkill()
+
+            git_skill_def = SkillDefinition(
+                name=git_skill.metadata.name,
+                description=git_skill.metadata.description,
+                parameters=[
+                    SkillParameter(
+                        name="command",
+                        type="string",
+                        description="Git子命令: clone, init, remote, branch, checkout, switch, merge, fetch, pull, push, add, commit, reset, revert, status, log, diff, show, blame, stash",
+                        required=True,
+                    ),
+                    SkillParameter(
+                        name="repository",
+                        type="string",
+                        description="仓库URL (clone/remote)",
+                        required=False,
+                    ),
+                    SkillParameter(
+                        name="branch",
+                        type="string",
+                        description="分支名",
+                        required=False,
+                    ),
+                    SkillParameter(
+                        name="remote",
+                        type="string",
+                        description="远程名",
+                        required=False,
+                        default="origin",
+                    ),
+                    SkillParameter(
+                        name="message",
+                        type="string",
+                        description="提交信息",
+                        required=False,
+                    ),
+                    SkillParameter(
+                        name="path",
+                        type="string",
+                        description="文件路径",
+                        required=False,
+                    ),
+                    SkillParameter(
+                        name="working_dir",
+                        type="string",
+                        description="仓库目录",
+                        required=False,
+                        default=".",
+                    ),
+                    SkillParameter(
+                        name="timeout",
+                        type="integer",
+                        description="超时秒数",
+                        required=False,
+                        default=120,
+                        min_value=1,
+                        max_value=3600,
+                    ),
+                    SkillParameter(
+                        name="flags",
+                        type="array",
+                        description="额外标志",
+                        required=False,
+                        default=[],
+                    ),
+                ],
+                returns="object",
+                timeout=120,
+                tags=["git", "github", "version-control"],
+            )
+
+            self.register_skill(git_skill_def, git_skill.execute)
+            self.logger.info(f"Registered built-in skill: {git_skill_def.name}")
+        except Exception as e:
+            self.logger.warning(f"Failed to register built-in skills: {e}")
 
     async def _initialize_platform_integration(self) -> None:
         """Initialize platform integration components"""
@@ -640,7 +844,9 @@ class BaseAgent(ABC):
 
     # ==================== Message Handling ====================
 
-    async def _handle_internal_message(self, message: Message, session: Optional[Session] = None) -> Optional[Message]:
+    async def _handle_internal_message(
+        self, message: Message, session: Optional[Session] = None
+    ) -> Optional[Message]:
         """Internal message handler with hooks and metrics"""
         self._metrics["messages_received"] += 1
         self._metrics["last_activity"] = datetime.now()
@@ -656,7 +862,9 @@ class BaseAgent(ABC):
                 self.logger.error(f"Error in message hook: {e}")
 
         # Check for registered handlers
-        handler = self._message_handlers.get(message.type.value if hasattr(message.type, 'value') else message.type)
+        handler = self._message_handlers.get(
+            message.type.value if hasattr(message.type, "value") else message.type
+        )
         if handler:
             try:
                 return await handler(message, session)
@@ -764,8 +972,11 @@ class BaseAgent(ABC):
                 # Pattern validation
                 if param.pattern and isinstance(value, str):
                     import re
+
                     if not re.match(param.pattern, value):
-                        raise ValueError(f"Parameter {param.name} does not match pattern {param.pattern}")
+                        raise ValueError(
+                            f"Parameter {param.name} does not match pattern {param.pattern}"
+                        )
 
     # ==================== Capability Management ====================
 
@@ -857,7 +1068,9 @@ class BaseAgent(ABC):
             target_ids = [a.agent_id for a in agents]
         else:
             # Broadcast to all known agents
-            target_ids = await self._discovery_manager.get_all_agent_ids() if self._discovery_manager else []
+            target_ids = (
+                await self._discovery_manager.get_all_agent_ids() if self._discovery_manager else []
+            )
 
         # Send to all targets
         tasks = [
@@ -1233,19 +1446,25 @@ class BaseAgent(ABC):
         """Submit a proposal in negotiation"""
         if self._negotiation:
             return await self._negotiation.propose(session_id, terms)
-        return ProposalResult(success=False, session=None, message="Negotiation manager not initialized")
+        return ProposalResult(
+            success=False, session=None, message="Negotiation manager not initialized"
+        )
 
     async def accept_deal(self, session_id: str) -> ProposalResult:
         """Accept current proposal and close deal"""
         if self._negotiation:
             return await self._negotiation.accept(session_id)
-        return ProposalResult(success=False, session=None, message="Negotiation manager not initialized")
+        return ProposalResult(
+            success=False, session=None, message="Negotiation manager not initialized"
+        )
 
     async def reject_deal(self, session_id: str, reason: str = "") -> ProposalResult:
         """Reject current proposal"""
         if self._negotiation:
             return await self._negotiation.reject(session_id, reason)
-        return ProposalResult(success=False, session=None, message="Negotiation manager not initialized")
+        return ProposalResult(
+            success=False, session=None, message="Negotiation manager not initialized"
+        )
 
     # --- Collaboration ---
 
@@ -1326,7 +1545,9 @@ class BaseAgent(ABC):
             return await self._workflow.execute(workflow_id)
         return None
 
-    async def run_task(self, task: str, tools: Optional[List[str]] = None) -> Optional[WorkflowResult]:
+    async def run_task(
+        self, task: str, tools: Optional[List[str]] = None
+    ) -> Optional[WorkflowResult]:
         """
         Convenience: Create and run a workflow in one call.
 
@@ -1367,7 +1588,13 @@ class BaseAgent(ABC):
         """Unstake tokens"""
         if self._wallet:
             return await self._wallet.unstake(amount)
-        return StakeResult(success=False, amount=amount, total_staked=0, new_reputation=0.5, message="Wallet not initialized")
+        return StakeResult(
+            success=False,
+            amount=amount,
+            total_staked=0,
+            new_reputation=0.5,
+            message="Wallet not initialized",
+        )
 
     async def get_stake_info(self) -> Optional[StakeInfo]:
         """Get stake information"""
@@ -1428,6 +1655,7 @@ class BaseAgent(ABC):
         """
         if self._learning:
             from usmsb_sdk.agent_sdk.learning import Experience
+
             experience = Experience(
                 experience_type=experience_type,
                 outcome=outcome,

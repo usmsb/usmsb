@@ -22,15 +22,30 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     /// @notice 一年的秒数
     uint256 public constant SECONDS_PER_YEAR = 365 days;
 
+    /// @notice 紧急提取延迟时间 (7天) - 安全增强
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 7 days;
+
+    /// @notice 移除受益人延迟时间 (7天)
+    uint256 public constant REMOVE_BENEFICIARY_DELAY = 7 days;
+
+    /// @notice 待提取地址
+    address public pendingWithdrawRecipient;
+
+    /// @notice 提取生效时间
+    uint256 public withdrawEffectiveTime;
+
+    /// @notice 待移除受益人
+    address public pendingBeneficiaryRemoval;
+
+    /// @notice 移除受益人生效时间
+    uint256 public beneficiaryRemovalEffectiveTime;
+
     // ========== 受益人类型 ==========
 
     /// @notice 受益人类型
     enum BeneficiaryType {
         TEAM,           // 团队：4 年锁仓
-        EARLY_SUPPORTER,// 早期支持者：2 年锁仓
-        INCENTIVE_POOL, // 激励池：5 年线性释放
-        ADVISOR,        // 顾问：2 年锁仓
-        PARTNER         // 合作伙伴：3 年锁仓
+        EARLY_SUPPORTER // 早期支持者：2 年锁仓
     }
 
     // ========== 状态变量 ==========
@@ -85,12 +100,16 @@ contract VIBVesting is Ownable, ReentrancyGuard {
 
     /// @notice 受益人移除事件
     event BeneficiaryRemoved(address indexed beneficiary, uint256 remainingAmount);
+    event BeneficiaryRemovalInitiated(address indexed beneficiary, uint256 effectiveTime);
+    event BeneficiaryRemovalCancelled();
 
     /// @notice 代币地址更新事件
     event TokenUpdated(address indexed oldToken, address indexed newToken);
 
     /// @notice 紧急提取事件
     event EmergencyWithdraw(address indexed to, uint256 amount);
+    event EmergencyWithdrawInitiated(address indexed to, uint256 effectiveTime);
+    event EmergencyWithdrawCancelled();
 
     // ========== 修饰符 ==========
 
@@ -143,10 +162,66 @@ contract VIBVesting is Ownable, ReentrancyGuard {
         require(amount > 0, "VIBVesting: amount must be positive");
         require(!isBeneficiary[beneficiary], "VIBVesting: beneficiary already exists");
 
-        // 转入代币
-        vibeToken.safeTransferFrom(msg.sender, address(this), amount);
-
+        // CEI 模式：先更新状态，再执行外部调用
         // 存储受益人信息
+        beneficiaries[beneficiary] = BeneficiaryInfo({
+            totalAmount: amount,
+            releasedAmount: 0,
+            vestingStart: vestingStart,
+            vestingDuration: vestingDuration,
+            cliffPeriod: cliffPeriod,
+            vestingType: uint256(beneficiaryType),
+            isActive: true
+        });
+
+        isBeneficiary[beneficiary] = true;
+        beneficiaryList.push(beneficiary);
+        beneficiaryCount++;
+
+        emit BeneficiaryAdded(
+            beneficiary,
+            amount,
+            beneficiaryType,
+            vestingStart,
+            vestingDuration,
+            cliffPeriod
+        );
+
+        // 外部调用放在最后
+        vibeToken.safeTransferFrom(msg.sender, address(this), amount);
+    }
+
+    // ========== 注册受益人（不转移代币，用于distributeToPools后） ==========
+
+    /**
+     * @notice 注册单个受益人（不转移代币）
+     * @dev 用于代币已通过distributeToPools mint到合约后的场景
+     * @param beneficiary 受益人地址
+     * @param amount 分配数量
+     * @param beneficiaryType 受益人类型
+     * @param vestingStart 锁仓开始时间
+     * @param vestingDuration 锁仓持续时间
+     * @param cliffPeriod 悬崖期
+     */
+    function registerBeneficiary(
+        address beneficiary,
+        uint256 amount,
+        BeneficiaryType beneficiaryType,
+        uint256 vestingStart,
+        uint256 vestingDuration,
+        uint256 cliffPeriod
+    ) external onlyOwner {
+        require(beneficiary != address(0), "VIBVesting: invalid beneficiary");
+        require(amount > 0, "VIBVesting: amount must be positive");
+        require(!isBeneficiary[beneficiary], "VIBVesting: beneficiary already exists");
+
+        // 检查合约余额是否足够
+        uint256 totalAllocated = _getTotalAllocated();
+        require(
+            totalAllocated + amount <= vibeToken.balanceOf(address(this)),
+            "VIBVesting: insufficient contract balance"
+        );
+
         beneficiaries[beneficiary] = BeneficiaryInfo({
             totalAmount: amount,
             releasedAmount: 0,
@@ -172,111 +247,121 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice 批量添加受益人（团队）
+     * @notice 批量注册团队成员（不转移代币）
+     * @dev 用于代币已通过distributeToPools mint到合约后的场景
      * @param teamMembers 团队成员地址数组
      * @param amounts 分配数量数组
      * @param vestingStart 锁仓开始时间
      */
-    function addTeamMembers(
+    function registerTeamMembers(
         address[] calldata teamMembers,
         uint256[] calldata amounts,
         uint256 vestingStart
     ) external onlyOwner {
-        require(
-            teamMembers.length == amounts.length,
-            "VIBVesting: arrays length mismatch"
+        // 团队成员：4 年锁仓，1 年悬崖期
+        _registerBeneficiaries(
+            teamMembers,
+            amounts,
+            vestingStart,
+            BeneficiaryType.TEAM,
+            4 * SECONDS_PER_YEAR,  // 4年
+            365 days               // 1年悬崖期
         );
-        require(teamMembers.length > 0, "VIBVesting: empty arrays");
-
-        for (uint256 i = 0; i < teamMembers.length; i++) {
-            require(teamMembers[i] != address(0), "VIBVesting: invalid beneficiary");
-            require(amounts[i] > 0, "VIBVesting: amount must be positive");
-            require(
-                !isBeneficiary[teamMembers[i]],
-                "VIBVesting: beneficiary already exists"
-            );
-
-            // 转入代币
-            vibeToken.safeTransferFrom(msg.sender, address(this), amounts[i]);
-
-            // 团队成员：4 年锁仓，1 年悬崖期
-            uint256 cliff = 365 days;
-            uint256 duration = 4 * SECONDS_PER_YEAR;
-
-            beneficiaries[teamMembers[i]] = BeneficiaryInfo({
-                totalAmount: amounts[i],
-                releasedAmount: 0,
-                vestingStart: vestingStart,
-                vestingDuration: duration,
-                cliffPeriod: cliff,
-                vestingType: uint256(BeneficiaryType.TEAM),
-                isActive: true
-            });
-
-            isBeneficiary[teamMembers[i]] = true;
-            beneficiaryList.push(teamMembers[i]);
-            beneficiaryCount++;
-
-            emit BeneficiaryAdded(
-                teamMembers[i],
-                amounts[i],
-                BeneficiaryType.TEAM,
-                vestingStart,
-                duration,
-                cliff
-            );
-        }
     }
 
     /**
-     * @notice 添加早期支持者
+     * @notice 批量注册早期支持者（不转移代币）
+     * @dev 用于代币已通过distributeToPools mint到合约后的场景
      * @param supporters 支持者地址数组
      * @param amounts 分配数量数组
      * @param vestingStart 锁仓开始时间
      */
-    function addEarlySupporters(
+    function registerEarlySupporters(
         address[] calldata supporters,
         uint256[] calldata amounts,
         uint256 vestingStart
     ) external onlyOwner {
+        // 早期支持者：2 年锁仓，6 个月悬崖期
+        _registerBeneficiaries(
+            supporters,
+            amounts,
+            vestingStart,
+            BeneficiaryType.EARLY_SUPPORTER,
+            2 * SECONDS_PER_YEAR,  // 2年
+            182 days               // 6个月悬崖期
+        );
+    }
+
+    /**
+     * @notice 内部函数：获取已分配总额
+     */
+    function _getTotalAllocated() internal view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < beneficiaryList.length; i++) {
+            if (beneficiaries[beneficiaryList[i]].isActive) {
+                total += beneficiaries[beneficiaryList[i]].totalAmount;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * @notice 内部函数：批量注册受益人（不转移代币）
+     */
+    function _registerBeneficiaries(
+        address[] calldata beneficiaries_,
+        uint256[] calldata amounts,
+        uint256 vestingStart,
+        BeneficiaryType beneficiaryType,
+        uint256 duration,
+        uint256 cliff
+    ) internal {
         require(
-            supporters.length == amounts.length,
+            beneficiaries_.length == amounts.length,
             "VIBVesting: arrays length mismatch"
         );
-        require(supporters.length > 0, "VIBVesting: empty arrays");
+        require(beneficiaries_.length > 0, "VIBVesting: empty arrays");
 
-        for (uint256 i = 0; i < supporters.length; i++) {
-            require(supporters[i] != address(0), "VIBVesting: invalid beneficiary");
+        // 计算总金额
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            totalAmount += amounts[i];
+        }
+
+        // 检查合约余额是否足够
+        uint256 currentAllocated = _getTotalAllocated();
+        require(
+            currentAllocated + totalAmount <= vibeToken.balanceOf(address(this)),
+            "VIBVesting: insufficient contract balance"
+        );
+
+        // 验证并注册所有受益人
+        for (uint256 i = 0; i < beneficiaries_.length; i++) {
+            require(beneficiaries_[i] != address(0), "VIBVesting: invalid beneficiary");
             require(amounts[i] > 0, "VIBVesting: amount must be positive");
             require(
-                !isBeneficiary[supporters[i]],
+                !isBeneficiary[beneficiaries_[i]],
                 "VIBVesting: beneficiary already exists"
             );
 
-            vibeToken.safeTransferFrom(msg.sender, address(this), amounts[i]);
-
-            // 早期支持者：2 年锁仓，6 个月悬崖期
-            uint256 cliff = 180 days;
-            uint256 duration = 2 * SECONDS_PER_YEAR;
-
-            beneficiaries[supporters[i]] = BeneficiaryInfo({
+            beneficiaries[beneficiaries_[i]] = BeneficiaryInfo({
                 totalAmount: amounts[i],
                 releasedAmount: 0,
                 vestingStart: vestingStart,
                 vestingDuration: duration,
                 cliffPeriod: cliff,
-                vestingType: uint256(BeneficiaryType.EARLY_SUPPORTER),
+                vestingType: uint256(beneficiaryType),
                 isActive: true
             });
 
-            isBeneficiary[supporters[i]] = true;
-            beneficiaryList.push(supporters[i]);
+            isBeneficiary[beneficiaries_[i]] = true;
+            beneficiaryList.push(beneficiaries_[i]);
             beneficiaryCount++;
 
             emit BeneficiaryAdded(
-                supporters[i],
+                beneficiaries_[i],
                 amounts[i],
-                BeneficiaryType.EARLY_SUPPORTER,
+                beneficiaryType,
                 vestingStart,
                 duration,
                 cliff
@@ -302,29 +387,71 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice 移除受益人（未释放部分返还给发送者）
+     * @notice 发起移除受益人（需要时间锁）
      * @param beneficiary 受益人地址
+     * @dev 安全增强: 移除需要3天时间锁，防止滥用
      */
     function removeBeneficiary(address beneficiary)
         external
         onlyOwner
         isActiveBeneficiary(beneficiary)
     {
+        // 如果有待生效的移除，先取消
+        if (pendingBeneficiaryRemoval != address(0)) {
+            delete pendingBeneficiaryRemoval;
+            delete beneficiaryRemovalEffectiveTime;
+            emit BeneficiaryRemovalCancelled();
+        }
+
+        // 设置待生效的移除
+        pendingBeneficiaryRemoval = beneficiary;
+        beneficiaryRemovalEffectiveTime = block.timestamp + REMOVE_BENEFICIARY_DELAY;
+
+        emit BeneficiaryRemovalInitiated(beneficiary, beneficiaryRemovalEffectiveTime);
+    }
+
+    /**
+     * @notice 确认移除受益人（在延迟期过后）
+     * @dev 未释放的代币将保留在合约中，用于其他受益人
+     */
+    function confirmRemoveBeneficiary() external onlyOwner {
+        require(pendingBeneficiaryRemoval != address(0), "VIBVesting: no pending removal");
+        require(
+            block.timestamp >= beneficiaryRemovalEffectiveTime,
+            "VIBVesting: removal not yet effective"
+        );
+
+        address beneficiary = pendingBeneficiaryRemoval;
         BeneficiaryInfo storage info = beneficiaries[beneficiary];
 
-        uint256 remaining = info.totalAmount - info.releasedAmount;
+        // 检查受益人仍然活跃
+        require(info.isActive, "VIBVesting: beneficiary not active");
 
-        // 如果有未释放代币，返还给发送者
-        if (remaining > 0) {
-            vibeToken.safeTransfer(msg.sender, remaining);
-        }
+        // 记录未释放的代币数量（保留在合约中）
+        uint256 remaining = info.totalAmount - info.releasedAmount;
 
         // 更新状态
         info.isActive = false;
         isBeneficiary[beneficiary] = false;
         beneficiaryCount--;
 
+        // 清除待生效状态
+        delete pendingBeneficiaryRemoval;
+        delete beneficiaryRemovalEffectiveTime;
+
         emit BeneficiaryRemoved(beneficiary, remaining);
+    }
+
+    /**
+     * @notice 取消待生效的移除
+     */
+    function cancelBeneficiaryRemoval() external onlyOwner {
+        require(pendingBeneficiaryRemoval != address(0), "VIBVesting: no pending removal");
+
+        delete pendingBeneficiaryRemoval;
+        delete beneficiaryRemovalEffectiveTime;
+
+        emit BeneficiaryRemovalCancelled();
     }
 
     // ========== 管理员函数 ==========
@@ -346,10 +473,69 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     function emergencyWithdraw(address to) external onlyOwner {
         require(to != address(0), "VIBVesting: invalid recipient");
 
-        uint256 balance = vibeToken.balanceOf(address(this));
-        vibeToken.safeTransfer(to, balance);
+        // 如果有待生效的提取，先取消
+        if (pendingWithdrawRecipient != address(0)) {
+            delete pendingWithdrawRecipient;
+            delete withdrawEffectiveTime;
+            emit EmergencyWithdrawCancelled();
+        }
 
-        emit EmergencyWithdraw(to, balance);
+        // 设置待生效的提取
+        pendingWithdrawRecipient = to;
+        withdrawEffectiveTime = block.timestamp + EMERGENCY_WITHDRAW_DELAY;
+
+        emit EmergencyWithdrawInitiated(to, withdrawEffectiveTime);
+    }
+
+    /**
+     * @notice 确认紧急提取（在延迟期过后）
+     * @dev 只能提取未归属的代币，已归属但未领取的代币受保护
+     */
+    function confirmEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawRecipient != address(0), "VIBVesting: no pending withdraw");
+        require(
+            block.timestamp >= withdrawEffectiveTime,
+            "VIBVesting: withdraw not yet effective"
+        );
+
+        address recipient = pendingWithdrawRecipient;
+        uint256 balance = vibeToken.balanceOf(address(this));
+
+        // 计算已归属但未领取的代币总额（这些代币受保护）
+        uint256 totalVestedUnclaimed = 0;
+        for (uint256 i = 0; i < beneficiaryList.length; i++) {
+            address beneficiary = beneficiaryList[i];
+            if (beneficiaries[beneficiary].isActive) {
+                totalVestedUnclaimed += _releasableAmount(beneficiary);
+            }
+        }
+
+        // 只能提取未归属的代币
+        uint256 withdrawable = balance > totalVestedUnclaimed
+            ? balance - totalVestedUnclaimed
+            : 0;
+
+        // 清除状态
+        delete pendingWithdrawRecipient;
+        delete withdrawEffectiveTime;
+
+        if (withdrawable > 0) {
+            vibeToken.safeTransfer(recipient, withdrawable);
+        }
+
+        emit EmergencyWithdraw(recipient, withdrawable);
+    }
+
+    /**
+     * @notice 取消待生效的紧急提取
+     */
+    function cancelEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawRecipient != address(0), "VIBVesting: no pending withdraw");
+
+        delete pendingWithdrawRecipient;
+        delete withdrawEffectiveTime;
+
+        emit EmergencyWithdrawCancelled();
     }
 
     // ========== 公共视图函数 ==========

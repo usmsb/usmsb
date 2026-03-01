@@ -39,10 +39,19 @@ contract MockPriceOracle {
 contract MockDEXRouter {
     address payable public weth;
     address public vibeToken;
+    address public factory;
+    address public pair;
 
     constructor(address _vibeToken) {
         vibeToken = _vibeToken;
         weth = payable(address(new MockWETH()));
+
+        // 创建工厂和配对
+        MockDEXFactory _factory = new MockDEXFactory();
+        factory = address(_factory);
+
+        // 创建 VIBE-WETH 配对
+        pair = _factory.createPair(_vibeToken, weth);
     }
 
     function getWETH() external view returns (address) {

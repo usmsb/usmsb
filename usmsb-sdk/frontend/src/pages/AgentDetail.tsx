@@ -24,9 +24,15 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Star,
+  Shield,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { getStatusColor } from '@/utils/statusColors'
+import { APIKeyManager } from '@/components/APIKeyManager'
+import { StakingPanel } from '@/components/StakingPanel'
+import { ReputationDisplay } from '@/components/ReputationDisplay'
+import { TransactionList } from '@/components/WalletBalance'
+import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -83,24 +89,98 @@ export default function AgentDetail() {
   const [testInput, setTestInput] = useState('')
   const [testResult, setTestResult] = useState<{ success: boolean; output: string; time: number } | null>(null)
   const [isTesting, setIsTesting] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'demands' | 'services' | 'transactions'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'demands' | 'services' | 'transactions' | 'staking' | 'apikeys'>('overview')
+
+  // Wallet binding state
+  const [showBindForm, setShowBindForm] = useState(false)
+  const [bindWalletAddress, setBindWalletAddress] = useState('')
+  const [bindOwnerId, setBindOwnerId] = useState('')
+  const [bindMaxTx, setBindMaxTx] = useState(100)
+  const [bindDailyLimit, setBindDailyLimit] = useState(1000)
+  const [bindLoading, setBindLoading] = useState(false)
+  const [unbindLoading, setUnbindLoading] = useState(false)
 
   // Fetch AI agent data
   const { data: agent, isLoading, error, refetch } = useQuery({
     queryKey: ['ai-agent', id],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/agents/${id}`)
+      const response = await authFetch(`${API_BASE}/agents/${id}`)
       if (!response.ok) throw new Error('Agent not found')
       return response.json() as Promise<AIAgent>
     },
     enabled: !!id,
   })
 
+  // Fetch agent wallet data
+  const { data: wallet, isLoading: walletLoading, refetch: refetchWallet } = useQuery({
+    queryKey: ['agent-wallet', id],
+    queryFn: async () => {
+      const response = await authFetch(`${API_BASE}/agents/${id}/wallet`)
+      if (response.status === 404) return null
+      if (!response.ok) throw new Error('Failed to fetch wallet')
+      return response.json()
+    },
+    enabled: !!id,
+  })
+
+  // Bind wallet handler
+  const handleBindWallet = async () => {
+    if (!id || !bindWalletAddress || !bindOwnerId) return
+    setBindLoading(true)
+    try {
+      const response = await authFetch(`${API_BASE}/agents/${id}/wallet`, {
+        method: 'POST',
+        body: JSON.stringify({
+          wallet_address: bindWalletAddress,
+          owner_id: bindOwnerId,
+          max_per_tx: bindMaxTx,
+          daily_limit: bindDailyLimit,
+        }),
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to bind wallet')
+      }
+      setShowBindForm(false)
+      setBindWalletAddress('')
+      setBindOwnerId('')
+      refetchWallet()
+      refetch()
+    } catch (err) {
+      console.error('Failed to bind wallet:', err)
+      alert(err instanceof Error ? err.message : 'Failed to bind wallet')
+    } finally {
+      setBindLoading(false)
+    }
+  }
+
+  // Unbind wallet handler
+  const handleUnbindWallet = async () => {
+    if (!id || !confirm('Are you sure you want to unbind the wallet? This will remove auto-unregister protection.')) return
+    setUnbindLoading(true)
+    try {
+      const response = await authFetch(`${API_BASE}/agents/${id}/wallet`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to unbind wallet')
+      }
+      refetchWallet()
+      refetch()
+    } catch (err) {
+      console.error('Failed to unbind wallet:', err)
+      alert(err instanceof Error ? err.message : 'Failed to unbind wallet')
+    } finally {
+      setUnbindLoading(false)
+    }
+  }
+
   // Fetch agent's demands
   const { data: demands } = useQuery({
     queryKey: ['agent-demands', id],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/demands?agent_id=${id}`)
+      const response = await authFetch(`${API_BASE}/demands?agent_id=${id}`)
       if (!response.ok) return []
       return response.json() as Promise<Demand[]>
     },
@@ -111,7 +191,7 @@ export default function AgentDetail() {
   const { data: services } = useQuery({
     queryKey: ['agent-services', id],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/services?agent_id=${id}`)
+      const response = await authFetch(`${API_BASE}/services?agent_id=${id}`)
       if (!response.ok) return []
       return response.json() as Promise<Service[]>
     },
@@ -121,9 +201,8 @@ export default function AgentDetail() {
   // Fetch behavior prediction
   const { data: prediction, mutate: predictBehavior, isPending: isPredicting } = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${API_BASE}/predict/behavior`, {
+      const response = await authFetch(`${API_BASE}/predict/behavior`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: id }),
       })
       if (!response.ok) throw new Error('Prediction failed')
@@ -135,14 +214,14 @@ export default function AgentDetail() {
   const { data: transactions } = useQuery({
     queryKey: ['agent-transactions', id],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/agents/${id}/transactions`)
+      const response = await authFetch(`${API_BASE}/agents/${id}/transactions`)
       if (!response.ok) return []
       return response.json() as Promise<Transaction[]>
     },
     enabled: !!id,
   })
 
-  // Test agent endpoint - P2P direct communication
+  // Test agent via platform API
   const handleTestAgent = async () => {
     if (!agent || !testInput.trim()) return
 
@@ -151,24 +230,9 @@ export default function AgentDetail() {
     const startTime = Date.now()
 
     try {
-      // P2P: Call agent's endpoint directly
-      const agentEndpoint = agent.endpoint
-
-      if (!agentEndpoint) {
-        setTestResult({
-          success: false,
-          output: 'Agent endpoint not configured',
-          time: 0,
-        })
-        return
-      }
-
-      // Try direct P2P call to agent
-      const response = await fetch(`${agentEndpoint}/invoke`, {
+      // Use platform API for all agents
+      const response = await authFetch(`${API_BASE}/agents/${id}/invoke`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           method: 'chat',
           params: {
@@ -181,10 +245,10 @@ export default function AgentDetail() {
       const latency = Date.now() - startTime
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         setTestResult({
           success: true,
-          output: typeof data.result === 'string' ? data.result : JSON.stringify(data.result || data, null, 2),
+          output: data.result?.response || JSON.stringify(data.result, null, 2),
           time: latency,
         })
       } else {
@@ -197,71 +261,28 @@ export default function AgentDetail() {
     } catch (err) {
       const latency = Date.now() - startTime
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-
-      // Check if it's a CORS error
-      if (errorMessage.includes('CORS') || errorMessage.includes('fetch')) {
-        setTestResult({
-          success: false,
-          output: `P2P连接失败: 无法直接连接到Agent (${agent.endpoint})。\n可能原因:\n1. Agent服务未启动\n2. CORS跨域限制\n3. 网络不可达\n\n请确保Agent服务正在运行并支持CORS。`,
-          time: latency,
-        })
-      } else {
-        setTestResult({
-          success: false,
-          output: `请求失败: ${errorMessage}`,
-          time: latency,
-        })
-      }
+      setTestResult({
+        success: false,
+        output: `请求失败: ${errorMessage}`,
+        time: latency,
+      })
     } finally {
       setIsTesting(false)
     }
   }
 
-  // Send heartbeat - P2P direct communication
+  // Send heartbeat via platform API
   const handleHeartbeat = async () => {
     if (!agent) return
 
     try {
-      const agentEndpoint = agent.endpoint
-
-      if (!agentEndpoint) {
-        console.error('Agent endpoint not configured')
-        return
-      }
-
-      // P2P: Call agent's heartbeat endpoint directly
-      const response = await fetch(`${agentEndpoint}/heartbeat`, {
+      // Use platform API for heartbeat
+      await authFetch(`${API_BASE}/agents/${id}/heartbeat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          timestamp: Date.now(),
-          status: 'online',
-        }),
       })
-
-      if (response.ok) {
-        console.log('P2P Heartbeat successful')
-        // Also notify the platform
-        await fetch(`${API_BASE}/agent-auth/agents/${id}/heartbeat`, {
-          method: 'POST',
-        })
-        refetch()
-      } else {
-        console.error('P2P Heartbeat failed:', response.status)
-      }
+      refetch()
     } catch (err) {
-      console.error('P2P Heartbeat error:', err)
-      // Fallback: notify platform only
-      try {
-        await fetch(`${API_BASE}/agent-auth/agents/${id}/heartbeat`, {
-          method: 'POST',
-        })
-        refetch()
-      } catch (fallbackErr) {
-        console.error('Fallback heartbeat also failed:', fallbackErr)
-      }
+      console.error('Heartbeat error:', err)
     }
   }
 
@@ -270,7 +291,7 @@ export default function AgentDetail() {
     if (!confirm('Are you sure you want to delete this agent?')) return
 
     try {
-      const response = await fetch(`${API_BASE}/agents/${id}`, {
+      const response = await authFetch(`${API_BASE}/agents/${id}`, {
         method: 'DELETE',
       })
       if (response.ok) {
@@ -414,6 +435,8 @@ export default function AgentDetail() {
             { id: 'demands', label: 'Demands', icon: ShoppingCart },
             { id: 'services', label: 'Services', icon: Package },
             { id: 'transactions', label: 'Transactions', icon: TrendingUp },
+            { id: 'staking', label: 'Staking', icon: TrendingUp },
+            { id: 'apikeys', label: 'API Keys', icon: Shield },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -595,6 +618,130 @@ export default function AgentDetail() {
               </div>
             </div>
 
+            {/* Wallet Info */}
+            <div className="card">
+              <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4 flex items-center gap-2">
+                <Wallet size={18} />
+                Wallet Binding
+              </h2>
+              {walletLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <RefreshCw className="animate-spin text-secondary-400" size={20} />
+                </div>
+              ) : wallet ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
+                    <CheckCircle size={16} />
+                    <span className="text-sm font-medium">Wallet Bound</span>
+                  </div>
+                  <div>
+                    <label className="text-xs text-secondary-500 dark:text-secondary-400 uppercase">Wallet Address</label>
+                    <p className="font-mono text-xs text-secondary-700 dark:text-secondary-300 break-all">{wallet.wallet_address}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-secondary-500 dark:text-secondary-400 uppercase">VIBE Balance</label>
+                    <p className="font-semibold text-light-text-primary dark:text-secondary-100">{wallet.vibe_balance} VIBE</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <label className="text-xs text-secondary-500 dark:text-secondary-400 uppercase">Daily Limit</label>
+                      <p className="text-secondary-700 dark:text-secondary-300">{wallet.daily_limit} VIBE</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-secondary-500 dark:text-secondary-400 uppercase">Daily Spent</label>
+                      <p className="text-secondary-700 dark:text-secondary-300">{wallet.daily_spent} VIBE</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleUnbindWallet}
+                    disabled={unbindLoading}
+                    className="w-full mt-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg flex items-center justify-center gap-2"
+                  >
+                    {unbindLoading ? <RefreshCw className="animate-spin" size={14} /> : <XCircle size={14} />}
+                    Unbind Wallet
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 mb-2">
+                    <AlertCircle size={16} />
+                    <span className="text-sm font-medium">No Wallet Binding</span>
+                  </div>
+                  <p className="text-xs text-secondary-500 dark:text-secondary-400">
+                    Bind a wallet to protect this agent from auto-unregistration and enable on-chain transactions.
+                  </p>
+                  {!showBindForm ? (
+                    <button
+                      onClick={() => setShowBindForm(true)}
+                      className="btn btn-primary btn-sm w-full flex items-center justify-center gap-2"
+                    >
+                      <Wallet size={16} />
+                      Bind Wallet
+                    </button>
+                  ) : (
+                    <div className="space-y-3 p-3 bg-secondary-50 dark:bg-secondary-800 rounded-lg">
+                      <div>
+                        <label className="text-xs text-secondary-500 dark:text-secondary-400">Wallet Address</label>
+                        <input
+                          type="text"
+                          placeholder="0x..."
+                          value={bindWalletAddress}
+                          onChange={(e) => setBindWalletAddress(e.target.value)}
+                          className="input w-full text-sm mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-secondary-500 dark:text-secondary-400">Owner ID</label>
+                        <input
+                          type="text"
+                          placeholder="user_..."
+                          value={bindOwnerId}
+                          onChange={(e) => setBindOwnerId(e.target.value)}
+                          className="input w-full text-sm mt-1"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-secondary-500 dark:text-secondary-400">Max/Tx</label>
+                          <input
+                            type="number"
+                            value={bindMaxTx}
+                            onChange={(e) => setBindMaxTx(parseFloat(e.target.value) || 0)}
+                            className="input w-full text-sm mt-1"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-secondary-500 dark:text-secondary-400">Daily Limit</label>
+                          <input
+                            type="number"
+                            value={bindDailyLimit}
+                            onChange={(e) => setBindDailyLimit(parseFloat(e.target.value) || 0)}
+                            className="input w-full text-sm mt-1"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowBindForm(false)}
+                          className="btn btn-secondary btn-sm flex-1"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleBindWallet}
+                          disabled={bindLoading || !bindWalletAddress || !bindOwnerId}
+                          className="btn btn-primary btn-sm flex-1 flex items-center justify-center gap-2"
+                        >
+                          {bindLoading ? <RefreshCw className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                          Bind
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Quick Actions */}
             <div className="card">
               <h2 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">Quick Actions</h2>
@@ -623,6 +770,21 @@ export default function AgentDetail() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Staking Tab */}
+      {activeTab === 'staking' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <StakingPanel onStakeChange={() => { refetch(); refetchWallet(); }} />
+          <ReputationDisplay showHistory={true} />
+        </div>
+      )}
+
+      {/* API Keys Tab */}
+      {activeTab === 'apikeys' && (
+        <div className="max-w-2xl">
+          <APIKeyManager agentId={agent.agent_id} />
         </div>
       )}
 

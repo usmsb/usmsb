@@ -3,8 +3,17 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+
+/**
+ * @title IVIBDividend
+ * @notice VIBDividend 接口 - STK-006修复
+ */
+interface IVIBDividend {
+    function notifyDividendReceived(uint256 amount) external;
+}
 
 /**
  * @title VIBEToken
@@ -14,19 +23,19 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
  *      支持交易税 (0.8%) 和销毁机制 (50%)
  */
 contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
+    using SafeERC20 for IERC20;
+
     // ========== 常量 ==========
 
     /// @notice 代币总供应量 (10 亿 * 10^18)
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 10**18;
 
-    /// @notice 初始铸造比例 (8% = 80,000,000 VIBE)
-    uint256 public constant INITIAL_MINT_RATIO = 8; // 8%
-
-    /// @notice 剩余代币保留比例
+    /// @notice 国库保留比例（用于mintTreasury旧方案，不推荐使用）
+    /// @dev 推荐使用 distributeToPools() 进行完全去中心化分配
     uint256 public constant TREASURY_RATIO = 92; // 92%
 
     /// @notice 交易手续费比例 (0.8%)
-    uint256 public constant TRANSACTION_TAX_RATE = 8; // 0.8% = 8/1000
+    uint256 public constant TRANSACTION_TAX_RATE = 80; // 0.8% = 80/10000
 
     /// @notice 销毁比例 (50% = 手续费中的 50% 销毁)
     uint256 public constant BURN_RATIO = 5000; // 50% = 5000/10000
@@ -34,11 +43,11 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     /// @notice 分红池比例 (20% = 交易费的 20% 进入分红池)
     uint256 public constant DIVIDEND_RATIO = 2000; // 20% = 2000/10000
 
-    /// @notice 生态基金比例 (20% = 交易费的 20% 进入生态基金)
-    uint256 public constant ECOSYSTEM_FUND_RATIO = 2000; // 20% = 2000/10000
+    /// @notice 生态基金比例 (15% = 交易费的 15% 进入生态基金)
+    uint256 public constant ECOSYSTEM_FUND_RATIO = 1500; // 15% = 1500/10000
 
-    /// @notice 协议运营比例 (10% = 交易费的 10% 用于协议运营)
-    uint256 public constant PROTOCOL_FUND_RATIO = 1000; // 10% = 1000/10000
+    /// @notice 协议运营比例 (15% = 交易费的 15% 用于协议运营)
+    uint256 public constant PROTOCOL_FUND_RATIO = 1500; // 15% = 1500/10000
 
     /// @notice 精度因子 (处理百分比计算)
     uint256 public constant TAX_PRECISION = 10000;
@@ -187,6 +196,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      * @param _name 代币名称
      * @param _symbol 代币符号
      * @param _treasury 国库地址
+     * @dev 注意: 所有代币通过 distributeToPools() 分配，构造函数不再预铸造
      */
     constructor(
         string memory _name,
@@ -197,16 +207,9 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
         treasury = _treasury;
 
-        // 构造函数期间禁用交易税，确保初始铸造成功
-        bool originalTaxStatus = transactionTaxEnabled;
-        transactionTaxEnabled = false;
-
-        // 初始铸造 8% 到部署者地址
-        uint256 initialAmount = (TOTAL_SUPPLY * INITIAL_MINT_RATIO) / 100;
-        _mint(msg.sender, initialAmount);
-
-        // 恢复交易税设置
-        transactionTaxEnabled = originalTaxStatus;
+        // 注意: 不再在构造函数中预铸造代币
+        // 所有代币通过 distributeToPools() 分配到各池
+        // 这样确保团队8%通过归属合约锁定
 
         // 默认免税地址：owner、treasury、合约自己
         taxExemptedAddresses[msg.sender] = true;
@@ -243,27 +246,28 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
     /// @notice 代币分配事件
     event TokensDistributed(
-        address indexed teamVesting,      // 早期支持者锁仓合约 (4%)
+        address indexed teamVesting,      // 团队锁仓合约 (8%)
+        address indexed earlySupporterVesting, // 早期支持者锁仓合约 (4%)
         address indexed stableFund,       // 社区稳定基金 (6%)
-        address indexed liquidityManager, // 流动性池 (12%)
+        address liquidityManager,         // 流动性池 (12%)
         address airdropDistributor,       // 空投分发 (7%)
-        address emissionController       // 激励池 (63%)
+        address emissionController        // 激励池 (63%)
     );
 
     /**
-     * @notice 将剩余 92% 代币分配到各池合约（完全去中心化）
+     * @notice 将 100% 代币分配到各池合约（完全去中心化）
      * @dev 只能由 owner 调用一次，部署脚本中自动调用
      *
      * 分配比例（占总供应量）:
-     * - 早期支持者: 4% → teamVestingContract
+     * - 团队: 8% → teamVestingContract (4年归属，1年悬崖)
+     * - 早期支持者: 4% → earlySupporterVestingContract (2年归属)
      * - 社区稳定基金: 6% → communityStableFund
      * - 流动性池: 12% → liquidityManager
      * - 社区空投: 7% → airdropDistributor
      * - 激励池: 63% → emissionController
      *
-     * 注意: 团队 8% 已在构造函数中铸造给部署者
-     *
-     * @param teamVestingContract 早期支持者锁仓合约地址（独立于团队锁仓）
+     * @param teamVestingContract 团队锁仓合约地址（VIBVesting，TEAM类型）
+     * @param earlySupporterVestingContract 早期支持者锁仓合约地址（VIBVesting，EARLY_SUPPORTER类型）
      * @param communityStableFund 社区稳定基金合约地址
      * @param liquidityManager 流动性管理合约地址
      * @param airdropDistributor 空投分发合约地址
@@ -271,6 +275,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      */
     function distributeToPools(
         address teamVestingContract,
+        address earlySupporterVestingContract,
         address communityStableFund,
         address liquidityManager,
         address airdropDistributor,
@@ -282,6 +287,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
         // 验证地址不为零
         require(teamVestingContract != address(0), "VIBEToken: invalid team vesting");
+        require(earlySupporterVestingContract != address(0), "VIBEToken: invalid early supporter vesting");
         require(communityStableFund != address(0), "VIBEToken: invalid stable fund");
         require(liquidityManager != address(0), "VIBEToken: invalid liquidity manager");
         require(airdropDistributor != address(0), "VIBEToken: invalid airdrop distributor");
@@ -291,8 +297,9 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         bool originalTaxStatus = transactionTaxEnabled;
         transactionTaxEnabled = false;
 
-        // 计算各池金额
-        uint256 teamVestingAmount = (TOTAL_SUPPLY * 4) / 100;      // 4% = 早期支持者
+        // 计算各池金额 (总计100%)
+        uint256 teamVestingAmount = (TOTAL_SUPPLY * 8) / 100;       // 8% = 团队 (4年归属)
+        uint256 earlySupporterAmount = (TOTAL_SUPPLY * 4) / 100;   // 4% = 早期支持者 (2年归属)
         uint256 stableFundAmount = (TOTAL_SUPPLY * 6) / 100;       // 6% = 社区稳定基金
         uint256 liquidityAmount = (TOTAL_SUPPLY * 12) / 100;       // 12% = 流动性池
         uint256 airdropAmount = (TOTAL_SUPPLY * 7) / 100;          // 7% = 空投
@@ -300,6 +307,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
         // 铸造代币到各池
         _mint(teamVestingContract, teamVestingAmount);
+        _mint(earlySupporterVestingContract, earlySupporterAmount);
         _mint(communityStableFund, stableFundAmount);
         _mint(liquidityManager, liquidityAmount);
         _mint(airdropDistributor, airdropAmount);
@@ -307,6 +315,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
         // 设置免税地址
         taxExemptedAddresses[teamVestingContract] = true;
+        taxExemptedAddresses[earlySupporterVestingContract] = true;
         taxExemptedAddresses[communityStableFund] = true;
         taxExemptedAddresses[liquidityManager] = true;
         taxExemptedAddresses[airdropDistributor] = true;
@@ -323,6 +332,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
         emit TokensDistributed(
             teamVestingContract,
+            earlySupporterVestingContract,
             communityStableFund,
             liquidityManager,
             airdropDistributor,
@@ -338,6 +348,10 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         require(
             _stakingContract != address(0),
             "VIBEToken: invalid staking contract"
+        );
+        require(
+            _stakingContract == address(this) || _stakingContract.code.length > 0,
+            "VIBEToken: must be contract"
         );
         emit StakingContractUpdated(stakingContract, _stakingContract);
         stakingContract = _stakingContract;
@@ -469,6 +483,123 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         _unpause();
     }
 
+    // ========== LQ-02修复: 紧急提取时间锁 ==========
+
+    /// @notice 紧急提取延迟时间 (2天)
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 2 days;
+
+    /// @notice 待提取的代币
+    address public pendingWithdrawToken;
+
+    /// @notice 待提取金额
+    uint256 public pendingWithdrawAmount;
+
+    /// @notice 待提取接收者
+    address public pendingWithdrawRecipient;
+
+    /// @notice 提取生效时间
+    uint256 public withdrawEffectiveTime;
+
+    /// @notice 紧急提取初始化事件
+    event EmergencyWithdrawInitiated(
+        address indexed token,
+        address indexed recipient,
+        uint256 amount,
+        uint256 effectiveTime
+    );
+
+    /// @notice 紧急提取执行事件
+    event EmergencyWithdrawExecuted(
+        address indexed token,
+        address indexed recipient,
+        uint256 amount
+    );
+
+    /// @notice 紧急提取取消事件
+    event EmergencyWithdrawCancelled();
+
+    /**
+     * @notice 初始化紧急提取（仅owner）
+     * @param token 代币地址 (address(0) 表示 ETH)
+     * @param to 接收者地址
+     * @param amount 提取金额
+     * @dev LQ-02修复: 添加2天时间锁
+     */
+    function initiateEmergencyWithdraw(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        require(to != address(0), "VIBEToken: invalid recipient");
+        require(amount > 0, "VIBEToken: amount must be greater than 0");
+
+        // 验证余额
+        if (token == address(0)) {
+            require(address(this).balance >= amount, "VIBEToken: insufficient ETH balance");
+        } else {
+            require(IERC20(token).balanceOf(address(this)) >= amount, "VIBEToken: insufficient token balance");
+        }
+
+        // 如果有待生效的提取，先取消
+        if (pendingWithdrawAmount > 0) {
+            delete pendingWithdrawToken;
+            delete pendingWithdrawAmount;
+            delete pendingWithdrawRecipient;
+            delete withdrawEffectiveTime;
+            emit EmergencyWithdrawCancelled();
+        }
+
+        // 设置待生效的提取
+        pendingWithdrawToken = token;
+        pendingWithdrawAmount = amount;
+        pendingWithdrawRecipient = to;
+        withdrawEffectiveTime = block.timestamp + EMERGENCY_WITHDRAW_DELAY;
+
+        emit EmergencyWithdrawInitiated(token, to, amount, withdrawEffectiveTime);
+    }
+
+    /**
+     * @notice 执行紧急提取（仅owner）
+     * @dev LQ-02修复: 必须等待时间锁过期
+     */
+    function executeEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawAmount > 0, "VIBEToken: no pending withdraw");
+        require(block.timestamp >= withdrawEffectiveTime, "VIBEToken: timelock not expired");
+
+        address token = pendingWithdrawToken;
+        uint256 amount = pendingWithdrawAmount;
+        address to = pendingWithdrawRecipient;
+
+        // 清除状态
+        delete pendingWithdrawToken;
+        delete pendingWithdrawAmount;
+        delete pendingWithdrawRecipient;
+        delete withdrawEffectiveTime;
+
+        // 执行提取
+        if (token == address(0)) {
+            payable(to).transfer(amount);
+        } else {
+            IERC20(token).safeTransfer(to, amount);
+        }
+
+        emit EmergencyWithdrawExecuted(token, to, amount);
+    }
+
+    /**
+     * @notice 取消紧急提取（仅owner）
+     */
+    function cancelEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawAmount > 0, "VIBEToken: no pending withdraw");
+
+        delete pendingWithdrawToken;
+        delete pendingWithdrawAmount;
+        delete pendingWithdrawRecipient;
+        delete withdrawEffectiveTime;
+
+        emit EmergencyWithdrawCancelled();
+    }
+
     /**
      * @notice 质押合约铸造奖励
      * @param to 接收者地址
@@ -482,23 +613,16 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         _mint(to, amount);
     }
 
-    /**
-     * @notice 锁仓合约释放代币
-     * @param to 接收者地址
-     * @param amount 释放数量
-     */
-    function releaseVesting(address to, uint256 amount) external onlyVestingContract {
-        _transfer(address(this), to, amount);
-    }
-
-    /**
-     * @notice 分红合约分配奖励
-     * @param to 接收者地址
-     * @param amount 奖励数量
-     */
-    function dividendDistribution(address to, uint256 amount) external onlyDividendContract {
-        _transfer(address(this), to, amount);
-    }
+    // ========== 安全修复 VULN-001/VULN-002 ==========
+    // 已删除无效的 releaseVesting 和 dividendDistribution 函数
+    // 原因：这两个函数从合约自身转账，但合约从未预留代币
+    //
+    // 正确的流程：
+    // - VIBVesting: 通过 addBeneficiary 时 safeTransferFrom 转入代币，
+    //               release 时从合约余额 safeTransfer 转给用户
+    // - VIBDividend: 通过交易税直接收到代币，claimReward 时转给用户
+    //
+    // 这些函数是遗留代码，已删除以避免混淆和潜在错误调用
 
     /**
      * @notice 生态基金提取代币
@@ -513,10 +637,15 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      * @notice 协议基金提取代币
      * @param to 接收者地址
      * @param amount 提取数量
+     * @dev 安全增强: 添加零地址检查和额度验证
      */
     function protocolFundWithdraw(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "VIBEToken: invalid recipient");
+        require(amount > 0, "VIBEToken: amount must be greater than 0");
         require(protocolFundContract != address(0), "VIBEToken: protocol fund not set");
-        _transfer(protocolFundContract, to, amount);
+        // 从协议基金合约转移代币到接收者
+        // 注意: protocolFundContract 需要先授权本合约 (VIBEToken) 为 spender
+        IERC20(address(this)).safeTransferFrom(protocolFundContract, to, amount);
     }
 
     /**
@@ -570,9 +699,11 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
                 totalBurned += burnAmount;
             }
 
-            // 分红池
+            // 分红池 - STK-006修复: 转账后通知分红合约更新累计
             if (dividendAmount > 0 && dividendContract != address(0)) {
                 super._update(from, dividendContract, dividendAmount);
+                // 通知分红合约更新分红累计
+                IVIBDividend(dividendContract).notifyDividendReceived(dividendAmount);
             }
 
             // 生态基金

@@ -84,7 +84,18 @@
       "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test test/VIBDispute.test.js 2>&1)",
       "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test test/VIBDispute.test.js --grep \"Should allow defendant to respond\" 2>&1)",
       "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test test/GovernanceEnhancements.test.js test/DynamicAPY.test.js test/VIBDispute.test.js 2>&1)",
-      "Bash(env:*)"
+      "Bash(env:*)",
+      "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test test/DynamicAPY.test.js 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test test/VIBEToken.test.js test/VIBEToken.distribute.test.js 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\1\\\\Documents\\\\vibecode\\\\usmsb-sdk\\\\contracts\" && npx hardhat test test/DynamicAPY.test.js test/VIBEToken.test.js test/VIBEToken.distribute.test.js 2>&1)",
+      "Bash(cd C:/Users/1/Documents/vibecode/usmsb-sdk/contracts && npx hardhat test test/VIBE.test.js 2>&1)",
+      "Bash(tasklist:*)",
+      "Bash(done)",
+      "Bash(git:*)",
+      "Bash(cd /c/Users/1/Documents/vibecode/usmsb-sdk/contracts && npx hardhat compile --force 2>&1)",
+      "Bash(cd C:/Users/1/Documents/vibecode/usmsb-sdk/contracts && npx hardhat clean && npm run compile 2>&1)",
+      "Bash(curl:*)"
     ]
   }
 }

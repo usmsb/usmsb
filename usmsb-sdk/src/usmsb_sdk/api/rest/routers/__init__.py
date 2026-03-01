@@ -19,6 +19,10 @@ from usmsb_sdk.api.rest.routers.system import router as system_router
 from usmsb_sdk.api.rest.routers.gene_capsule import router as gene_capsule_router
 from usmsb_sdk.api.rest.routers.pre_match_negotiation import router as pre_match_negotiation_router
 from usmsb_sdk.api.rest.routers.meta_agent_matching import router as meta_agent_matching_router
+from usmsb_sdk.api.rest.routers.staking import router as staking_router
+from usmsb_sdk.api.rest.routers.reputation import router as reputation_router
+from usmsb_sdk.api.rest.routers.wallet import router as wallet_router
+from usmsb_sdk.api.rest.routers.heartbeat import router as heartbeat_router
 
 __all__ = [
     "agents_router",
@@ -36,4 +40,8 @@ __all__ = [
     "gene_capsule_router",
     "pre_match_negotiation_router",
     "meta_agent_matching_router",
+    "staking_router",
+    "reputation_router",
+    "wallet_router",
+    "heartbeat_router",
 ]

@@ -6,11 +6,13 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "./libraries/BN128Pairing.sol";
 
 /**
  * @title ZKCredential
  * @notice zk-信用通行证合约 - 零知识证明信用凭证
- * @dev 使用zk-SNARK验证用户属性，同时保护隐私
+ * @dev 使用zk-SNARK Groth16验证用户属性，同时保护隐私
+ *      使用 BN128Pairing 库进行椭圆曲线配对验证
  */
 contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pausable {
 
@@ -18,6 +20,9 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
 
     uint256 public constant MAX_CREDENTIAL_DURATION = 365 days;
     uint256 public constant MIN_CREDENTIAL_DURATION = 1 days;
+
+    /// @notice Issuer 变更延迟时间 (7天)
+    uint256 public constant ISSUER_CHANGE_DELAY = 7 days;
 
     // ========== 枚举 ==========
 
@@ -91,6 +96,12 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
     address public issuer;
     address public verifier;
 
+    /// @notice 待生效的 issuer 地址
+    address public pendingIssuer;
+
+    /// @notice issuer 变更生效时间
+    uint256 public issuerChangeEffectiveTime;
+
     // ========== 事件 ==========
 
     event CredentialIssued(
@@ -124,6 +135,12 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
     );
 
     event IssuerUpdated(address indexed oldIssuer, address indexed newIssuer);
+
+    /// @notice 待生效 issuer 设置事件
+    event IssuerChangeInitiated(address indexed newIssuer, uint256 effectiveTime);
+
+    /// @notice issuer 变更取消事件
+    event IssuerChangeCancelled();
 
     // ========== 修饰符 ==========
 
@@ -191,7 +208,7 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
         require(!nullifierUsed[nullifierHash], "ZKCredential: nullifier used");
 
         // 验证zk证明
-        require(_verifyProof(credType, proof, commitment, nullifierHash, score), "ZKCredential: invalid proof");
+        require(_verifyProof(credType, proof, commitment, nullifierHash, score, holder), "ZKCredential: invalid proof");
 
         bytes32 credentialId = keccak256(
             abi.encodePacked(
@@ -427,29 +444,32 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
         ProofData calldata proof,
         bytes32 commitment,
         bytes32 nullifierHash,
-        uint256 score
+        uint256 score,
+        address holder
     ) internal view returns (bool) {
         VerificationKey storage vk = verificationKeys[credType];
-        
-        if (!vk.isSet) {
-            return true;
+
+        // 安全修复: 验证密钥必须已设置，禁用占位符实现
+        // 生产环境必须配置正确的Groth16验证密钥
+        require(vk.isSet, "ZKCredential: verification key not set");
+
+        // 验证 publicInputs 数据一致性
+        if (proof.publicInputs.length >= 3) {
+            require(
+                bytes32(proof.publicInputs[0]) == commitment,
+                "ZKCredential: commitment mismatch"
+            );
+            require(
+                bytes32(proof.publicInputs[1]) == nullifierHash,
+                "ZKCredential: nullifier mismatch"
+            );
+            require(
+                proof.publicInputs[2] == score,
+                "ZKCredential: score mismatch"
+            );
         }
 
-        require(proof.publicInputs.length >= 4, "ZKCredential: invalid inputs");
-        require(
-            bytes32(proof.publicInputs[0]) == commitment,
-            "ZKCredential: commitment mismatch"
-        );
-        require(
-            bytes32(proof.publicInputs[1]) == nullifierHash,
-            "ZKCredential: nullifier mismatch"
-        );
-        require(
-            proof.publicInputs[2] == score,
-            "ZKCredential: score mismatch"
-        );
-
-        return _verifySnark(vk, proof);
+        return _verifySnark(vk, proof, commitment, nullifierHash, score, holder);
     }
 
     function _verifyOwnership(
@@ -461,11 +481,58 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
                bytes32(proof.publicInputs[1]) == cred.nullifierHash;
     }
 
+    /// @dev 验证zk-SNARK证明 (Groth16)
+    /// 使用 BN128Pairing 库进行椭圆曲线配对验证
+    ///
+    /// Groth16 验证流程:
+    /// 1. 验证公共输入与承诺一致
+    /// 2. 使用椭圆曲线配对验证证明
+    ///
+    /// @param vk 验证密钥
+    /// @param proof 证明数据 (Groth16 格式: a, b, c)
+    /// @param commitment 承诺值
+    /// @param nullifierHash 无效符哈希
+    /// @param score 评分
+    /// @param holder 持有人地址
     function _verifySnark(
         VerificationKey storage vk,
-        ProofData calldata proof
+        ProofData calldata proof,
+        bytes32 commitment,
+        bytes32 nullifierHash,
+        uint256 score,
+        address holder
     ) internal view returns (bool) {
-        return proof.a[0] != 0 || proof.a[1] != 0;
+        // 验证证明数据结构完整性
+        require(vk.alpha[0] != 0 && vk.alpha[1] != 0, "ZKCredential: invalid vk alpha");
+        require(vk.beta[0][0] != 0 && vk.beta[0][1] != 0, "ZKCredential: invalid vk beta");
+        require(vk.gamma[0] != 0 && vk.gamma[1] != 0, "ZKCredential: invalid vk gamma");
+        require(vk.delta[0] != 0 && vk.delta[1] != 0, "ZKCredential: invalid vk delta");
+        require(vk.ic.length > 0, "ZKCredential: invalid vk ic");
+
+        // 检查证明数据完整性
+        require(proof.a[0] != 0 || proof.a[1] != 0, "ZKCredential: invalid proof a");
+        require(proof.b[0][0] != 0 || proof.b[0][1] != 0, "ZKCredential: invalid proof b");
+        require(proof.c[0] != 0 || proof.c[1] != 0, "ZKCredential: invalid proof c");
+
+        // 验证公共输入数量
+        require(proof.publicInputs.length >= 3, "ZKCredential: insufficient public inputs");
+
+        // 使用 BN128Pairing 库进行完整的 Groth16 验证
+        bool isValid = BN128Pairing.verifyProof(
+            vk.alpha,
+            vk.beta,
+            vk.gamma,
+            vk.delta,
+            vk.ic,
+            proof.a,
+            proof.b,
+            proof.c,
+            proof.publicInputs
+        );
+
+        require(isValid, "ZKCredential: proof verification failed");
+
+        return true;
     }
 
     // ========== 管理函数 ==========
@@ -489,10 +556,58 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
         emit VerificationKeyUpdated(credType);
     }
 
+    /**
+     * @notice 发起 issuer 变更（需要经过时间锁）
+     * @param _issuer 新的 issuer 地址
+     */
     function setIssuer(address _issuer) external onlyOwner {
         require(_issuer != address(0), "ZKCredential: invalid issuer");
-        emit IssuerUpdated(issuer, _issuer);
-        issuer = _issuer;
+        require(_issuer != issuer, "ZKCredential: same as current issuer");
+
+        // 如果有待生效的变更，先取消
+        if (pendingIssuer != address(0)) {
+            delete pendingIssuer;
+            delete issuerChangeEffectiveTime;
+            emit IssuerChangeCancelled();
+        }
+
+        // 设置待生效的 issuer
+        pendingIssuer = _issuer;
+        issuerChangeEffectiveTime = block.timestamp + ISSUER_CHANGE_DELAY;
+
+        emit IssuerChangeInitiated(_issuer, issuerChangeEffectiveTime);
+    }
+
+    /**
+     * @notice 确认 issuer 变更（在延迟期过后）
+     */
+    function confirmIssuerChange() external onlyOwner {
+        require(pendingIssuer != address(0), "ZKCredential: no pending issuer change");
+        require(
+            block.timestamp >= issuerChangeEffectiveTime,
+            "ZKCredential: issuer change not yet effective"
+        );
+
+        address oldIssuer = issuer;
+        issuer = pendingIssuer;
+
+        // 清除待生效状态
+        delete pendingIssuer;
+        delete issuerChangeEffectiveTime;
+
+        emit IssuerUpdated(oldIssuer, issuer);
+    }
+
+    /**
+     * @notice 取消待生效的 issuer 变更
+     */
+    function cancelIssuerChange() external onlyOwner {
+        require(pendingIssuer != address(0), "ZKCredential: no pending issuer change");
+
+        delete pendingIssuer;
+        delete issuerChangeEffectiveTime;
+
+        emit IssuerChangeCancelled();
     }
 
     function setVerifier(address _verifier) external onlyOwner {

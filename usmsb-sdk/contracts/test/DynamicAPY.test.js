@@ -38,6 +38,7 @@ describe("VIBStaking Dynamic APY", function () {
 
     // Setup approvals
     await vibeToken.connect(user1).approve(await staking.getAddress(), ethers.MaxUint256);
+    await vibeToken.connect(owner).approve(await staking.getAddress(), ethers.MaxUint256);
   });
 
   describe("Base APY", function () {
@@ -114,6 +115,12 @@ describe("VIBStaking Dynamic APY", function () {
       await staking.setPriceOracle(await priceOracle.getAddress());
       await staking.setBasePrice(ethers.parseUnits("0.01", 18));
       await priceOracle.setPrice(ethers.parseUnits("0.008", 18)); // 20% drop
+
+      // 安全修复: 调用者必须是活跃质押者才能更新价格
+      // Owner stakes tokens to become an active staker
+      const minStake = ethers.parseEther("100"); // Minimum stake amount
+      await vibeToken.connect(owner).approve(await staking.getAddress(), minStake);
+      await staking.connect(owner).stake(minStake, 0); // 0 = no lock
     });
 
     it("Should adjust APY after cooldown period", async function () {
@@ -128,7 +135,7 @@ describe("VIBStaking Dynamic APY", function () {
       await staking.updatePriceAndAdjustAPY();
 
       // Try to update again immediately
-      await expect(staking.updatePriceAndAdjustAPY()).to.be.revertedWith("VIBStaking: cooldown not expired");
+      await expect(staking.updatePriceAndAdjustAPY()).to.be.revertedWithCustomError(staking, "CooldownNotExpired");
     });
 
     it("Should allow update after cooldown", async function () {
@@ -144,7 +151,8 @@ describe("VIBStaking Dynamic APY", function () {
     it("Should update price history", async function () {
       await staking.updatePriceAndAdjustAPY();
 
-      const priceHistory = await staking.priceHistory(0);
+      // Price history is now stored in circular buffer
+      const priceHistory = await staking.priceHistoryBuffer(0);
       expect(priceHistory).to.equal(ethers.parseUnits("0.008", 18));
     });
 
@@ -166,6 +174,12 @@ describe("VIBStaking Dynamic APY", function () {
       await staking.setPriceOracle(await priceOracle.getAddress());
       await staking.setBasePrice(ethers.parseUnits("0.01", 18));
       await priceOracle.setPrice(ethers.parseUnits("0.008", 18));
+
+      // 安全修复: 调用者必须是活跃质押者才能更新价格
+      // Owner stakes tokens to become an active staker
+      const minStake = ethers.parseEther("100"); // Minimum stake amount
+      await vibeToken.connect(owner).approve(await staking.getAddress(), minStake);
+      await staking.connect(owner).stake(minStake, 0); // 0 = no lock
     });
 
     it("Should pay keeper reward on update", async function () {

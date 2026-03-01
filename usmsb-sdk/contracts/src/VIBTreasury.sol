@@ -67,8 +67,28 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
     /// @notice 时间锁时长 (24小时)
     uint256 public timelockDuration = 24 hours;
 
+    /// @notice 紧急解锁时间锁时长 (6小时)
+    uint256 public constant EMERGENCY_TIMELOCK_DURATION = 6 hours;
+
+    /// @notice 待提取结构
+    struct PendingWithdraw {
+        address token;
+        address to;
+        uint256 amount;
+        uint256 effectiveTime;
+    }
+
+    /// @notice 待生效的紧急提取
+    PendingWithdraw public pendingEmergencyWithdraw;
+
+    /// @notice 紧急解锁所需签名比例 (66%，即2/3)
+    uint256 public constant EMERGENCY_SIGNATURE_THRESHOLD = 66;
+
     /// @notice 时间锁释放时间
     mapping(bytes32 => uint256) public timelockReleaseTimes;
+
+    /// @notice 紧急解锁提案标记
+    mapping(bytes32 => bool) public emergencyExecuted;
 
     // ========== 结构体 ==========
 
@@ -119,6 +139,12 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
         address indexed executor
     );
 
+    /// @notice 紧急提案执行事件
+    event EmergencyProposalExecuted(
+        bytes32 indexed proposalId,
+        uint256 signatureCount
+    );
+
     /// @notice 提案取消事件
     event SpendProposalCancelled(
         bytes32 indexed proposalId,
@@ -133,6 +159,9 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 时间锁设置更新
     event TimelockUpdated(bool enabled, uint256 duration);
+    event EmergencyWithdrawInitiated(address indexed token, address indexed to, uint256 amount, uint256 effectiveTime);
+    event EmergencyWithdrawConfirmed(address indexed token, address indexed to, uint256 amount);
+    event EmergencyWithdrawCancelled();
 
     // ========== 修饰符 =========-
 
@@ -162,9 +191,14 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
         uint256 _requiredSignatures
     ) Ownable(msg.sender) {
         require(_vibeToken != address(0), "VIBTreasury: invalid token address");
+        // 安全修复: 要求至少3个签名者和至少2个必需签名
         require(
-            _signers.length > 0 && _requiredSignatures > 0,
-            "VIBTreasury: invalid params"
+            _signers.length >= 3,
+            "VIBTreasury: need at least 3 signers"
+        );
+        require(
+            _requiredSignatures >= 2,
+            "VIBTreasury: need at least 2 required signatures"
         );
         require(
             _requiredSignatures <= _signers.length,
@@ -176,6 +210,8 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
         requiredSignatures = _requiredSignatures;
 
         for (uint256 i = 0; i < _signers.length; i++) {
+            require(_signers[i] != address(0), "VIBTreasury: invalid signer address");
+            require(!isSigner[_signers[i]], "VIBTreasury: duplicate signer");
             isSigner[_signers[i]] = true;
         }
     }
@@ -316,6 +352,47 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
+     * @notice 紧急执行提案（需要超过2/3签名者同意，可绕过时间锁）
+     * @param proposalId 提案 ID
+     */
+    function executeEmergencyProposal(bytes32 proposalId)
+        external
+        onlySigner
+        nonReentrant
+        proposalExists(proposalId)
+    {
+        SpendProposal storage proposal = spendProposals[proposalId];
+
+        require(!proposal.executed, "VIBTreasury: already executed");
+        require(!proposal.cancelled, "VIBTreasury: already cancelled");
+        require(!emergencyExecuted[proposalId], "VIBTreasury: emergency already executed");
+
+        // 计算紧急解锁所需签名数 (超过2/3)
+        uint256 emergencyRequired = (signers.length * EMERGENCY_SIGNATURE_THRESHOLD + 99) / 100;
+        require(
+            proposal.signatureCount >= emergencyRequired,
+            "VIBTreasury: not enough emergency signatures"
+        );
+
+        // 检查资金是否足够
+        require(
+            fundBalances[proposal.fundType] >= proposal.amount,
+            "VIBTreasury: insufficient balance"
+        );
+
+        // 标记为已执行（紧急）
+        proposal.executed = true;
+        emergencyExecuted[proposalId] = true;
+        fundBalances[proposal.fundType] -= proposal.amount;
+
+        // 转账
+        vibeToken.safeTransfer(proposal.recipient, proposal.amount);
+
+        emit SpendProposalExecuted(proposalId, msg.sender);
+        emit EmergencyProposalExecuted(proposalId, proposal.signatureCount);
+    }
+
+    /**
      * @notice 取消提案
      * @param proposalId 提案 ID
      */
@@ -418,7 +495,7 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice 紧急提取代币
+     * @notice 紧急提取代币 (需要时间锁)
      * @param token 代币地址
      * @param to 目标地址
      * @param amount 金额
@@ -429,12 +506,51 @@ contract VIBTreasury is Ownable, ReentrancyGuard, Pausable {
         uint256 amount
     ) external onlyOwner {
         require(to != address(0), "VIBTreasury: invalid address");
+        require(amount > 0, "VIBTreasury: amount must be greater than 0");
 
-        if (token == address(0)) {
-            payable(to).transfer(amount);
-        } else {
-            IERC20(token).safeTransfer(to, amount);
+        // 如果有待生效的提取，先取消
+        if (pendingEmergencyWithdraw.to != address(0)) {
+            delete pendingEmergencyWithdraw;
+            emit EmergencyWithdrawCancelled();
         }
+
+        // 设置待生效的提取
+        pendingEmergencyWithdraw = PendingWithdraw({
+            token: token,
+            to: to,
+            amount: amount,
+            effectiveTime: block.timestamp + EMERGENCY_TIMELOCK_DURATION
+        });
+
+        emit EmergencyWithdrawInitiated(token, to, amount, pendingEmergencyWithdraw.effectiveTime);
+    }
+
+    /// @notice 确认紧急提取
+    function confirmEmergencyWithdraw() external onlyOwner nonReentrant {
+        PendingWithdraw memory pw = pendingEmergencyWithdraw;
+        require(pw.to != address(0), "VIBTreasury: no pending withdraw");
+        require(block.timestamp >= pw.effectiveTime, "VIBTreasury: withdraw not yet effective");
+
+        // 清除状态
+        delete pendingEmergencyWithdraw;
+
+        // 执行提取
+        if (pw.token == address(0)) {
+            require(address(this).balance >= pw.amount, "VIBTreasury: insufficient balance");
+            payable(pw.to).transfer(pw.amount);
+        } else {
+            require(IERC20(pw.token).balanceOf(address(this)) >= pw.amount, "VIBTreasury: insufficient balance");
+            IERC20(pw.token).safeTransfer(pw.to, pw.amount);
+        }
+
+        emit EmergencyWithdrawConfirmed(pw.token, pw.to, pw.amount);
+    }
+
+    /// @notice 取消紧急提取
+    function cancelEmergencyWithdraw() external onlyOwner {
+        require(pendingEmergencyWithdraw.to != address(0), "VIBTreasury: no pending withdraw");
+        delete pendingEmergencyWithdraw;
+        emit EmergencyWithdrawCancelled();
     }
 
     // ========== 视图函数 =========-

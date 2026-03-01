@@ -1,13 +1,18 @@
 """
 Workflow management endpoints.
+
+Stake Requirements:
+- create: No stake required
+- execute: 100 VIBE minimum
+- list: No stake required
 """
 
 import json
 import logging
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status, Depends
 
 from usmsb_sdk.api.database import (
     get_agent as db_get_agent,
@@ -16,6 +21,10 @@ from usmsb_sdk.api.database import (
 )
 from usmsb_sdk.api.rest.schemas.workflow import WorkflowCreate
 from usmsb_sdk.api.rest.services.utils import safe_json_loads, create_agent_from_db_data
+from usmsb_sdk.api.rest.unified_auth import (
+    get_current_user_unified,
+    require_stake_unified,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
@@ -31,13 +40,17 @@ def set_workflow_service(service):
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_workflow(workflow_create: WorkflowCreate):
-    """Create a new workflow."""
-    # Check if agent exists
-    agent_data = db_get_agent(workflow_create.agent_id)
-    if not agent_data:
-        raise HTTPException(status_code=404, detail="Agent not found")
+async def create_workflow(
+    workflow_create: WorkflowCreate,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Create a new workflow.
 
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - No stake required
+    """
     # Return mock workflow if service not available
     if not _workflow_service:
         workflow_id = f"wf-{uuid.uuid4().hex[:8]}"
@@ -45,7 +58,7 @@ async def create_workflow(workflow_create: WorkflowCreate):
         workflow_data = {
             'id': workflow_id,
             'name': workflow_create.task_description[:30],
-            'agent_id': workflow_create.agent_id,
+            'agent_id': user.get('agent_id') or user.get('user_id'),
             'task_description': workflow_create.task_description,
             'status': 'pending',
             'steps': json.dumps(workflow_create.available_tools or []),
@@ -56,15 +69,17 @@ async def create_workflow(workflow_create: WorkflowCreate):
             "name": workflow_create.task_description[:30],
             "steps_count": len(workflow_create.available_tools) if workflow_create.available_tools else 3,
             "status": "pending",
+            "creator_id": user.get('agent_id') or user.get('user_id'),
         }
 
     # Create domain object for service
-    agent = create_agent_from_db_data(agent_data)
+    agent_data = db_get_agent(user.get('agent_id') or user.get('user_id'))
+    agent_obj = create_agent_from_db_data(agent_data) if agent_data else None
 
     try:
         workflow = await _workflow_service.create_workflow(
             task_description=workflow_create.task_description,
-            agent=agent,
+            agent=agent_obj,
             available_tools=workflow_create.available_tools,
         )
 
@@ -73,6 +88,7 @@ async def create_workflow(workflow_create: WorkflowCreate):
             "name": workflow.name,
             "steps_count": len(workflow.steps),
             "status": workflow.status.value,
+            "creator_id": user.get('agent_id') or user.get('user_id'),
         }
     except Exception as e:
         logger.error(f"Workflow creation failed: {e}")
@@ -80,13 +96,17 @@ async def create_workflow(workflow_create: WorkflowCreate):
 
 
 @router.post("/{workflow_id}/execute")
-async def execute_workflow(workflow_id: str, agent_id: str = Query(...)):
-    """Execute a workflow."""
-    # Check if agent exists
-    agent_data = db_get_agent(agent_id)
-    if not agent_data:
-        raise HTTPException(status_code=404, detail="Agent not found")
+async def execute_workflow(
+    workflow_id: str,
+    user: Dict[str, Any] = Depends(require_stake_unified(100))
+):
+    """Execute a workflow.
 
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Minimum 100 VIBE stake
+    """
     # Return mock result if service not available
     if not _workflow_service:
         return {
@@ -96,16 +116,18 @@ async def execute_workflow(workflow_id: str, agent_id: str = Query(...)):
                 "output": "Workflow executed successfully",
                 "steps_completed": 3,
                 "execution_time": "2.5s",
-            }
+            },
+            "executor_id": user.get('agent_id') or user.get('user_id'),
         }
 
     # Create domain object for service
-    agent = create_agent_from_db_data(agent_data)
+    agent_data = db_get_agent(user.get('agent_id') or user.get('user_id'))
+    agent_obj = create_agent_from_db_data(agent_data) if agent_data else None
 
     try:
         result = await _workflow_service.execute_workflow(
             workflow_id=workflow_id,
-            agent=agent,
+            agent=agent_obj,
         )
 
         return {
@@ -116,6 +138,7 @@ async def execute_workflow(workflow_id: str, agent_id: str = Query(...)):
             "failed_steps": result.failed_steps,
             "execution_time": result.execution_time,
             "step_results": result.step_results,
+            "executor_id": user.get('agent_id') or user.get('user_id'),
         }
     except Exception as e:
         logger.error(f"Workflow execution failed: {e}")
@@ -123,8 +146,13 @@ async def execute_workflow(workflow_id: str, agent_id: str = Query(...)):
 
 
 @router.get("")
-async def list_workflows():
-    """List all workflows."""
+async def list_workflows(user: Dict[str, Any] = Depends(get_current_user_unified)):
+    """List all workflows for the authenticated agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
     # Get from database
     workflows_data = db_get_workflows()
 

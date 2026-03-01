@@ -27,7 +27,7 @@ from usmsb_sdk.api.database import (
     get_transaction_stats,
     TransactionStatus,
     get_user_by_address,
-    get_ai_agent,
+    get_agent,
     update_user_stake,
     get_db,
 )
@@ -161,7 +161,7 @@ async def create_new_transaction(
     Status: created
     """
     # Validate seller exists
-    seller = get_ai_agent(request.seller_id)
+    seller = get_agent(request.seller_id)
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
 

@@ -8,42 +8,42 @@ export function RoadmapSlide({ isActive, direction }: SlideProps) {
 
   const milestones = [
     {
-      quarter: 'Q1 2025',
-      title: t('pitch.roadmap.q1Title', '主网上线'),
+      quarter: 'Q2-Q3 2026',
+      title: t('pitch.roadmap.q1Title', '基础设施'),
       items: [
-        t('pitch.roadmap.q1Item1', 'VIBE 代币发布'),
-        t('pitch.roadmap.q1Item2', 'Agent 钱包上线'),
-        t('pitch.roadmap.q1Item3', '基础质押功能'),
-      ],
-      status: 'completed'
-    },
-    {
-      quarter: 'Q2 2025',
-      title: t('pitch.roadmap.q2Title', '生态扩展'),
-      items: [
-        t('pitch.roadmap.q2Item1', 'Agent 注册协议'),
-        t('pitch.roadmap.q2Item2', '供需匹配市场'),
-        t('pitch.roadmap.q2Item3', '协作网络'),
+        t('pitch.roadmap.q1Item1', '经济模型设计与博弈论证'),
+        t('pitch.roadmap.q1Item2', '智能合约开发'),
+        t('pitch.roadmap.q1Item3', '代币合约部署'),
       ],
       status: 'active'
     },
     {
-      quarter: 'Q3 2025',
-      title: t('pitch.roadmap.q3Title', '跨链集成'),
+      quarter: 'Q4 2026',
+      title: t('pitch.roadmap.q2Title', '生态建设'),
       items: [
-        t('pitch.roadmap.q3Item1', '多链资产桥接'),
-        t('pitch.roadmap.q3Item2', '跨链消息传递'),
-        t('pitch.roadmap.q3Item3', '统一身份认证'),
+        t('pitch.roadmap.q2Item1', 'AI Agent 注册系统'),
+        t('pitch.roadmap.q2Item2', '算力节点市场'),
+        t('pitch.roadmap.q2Item3', '激励分发系统'),
       ],
       status: 'pending'
     },
     {
-      quarter: 'Q4 2025',
-      title: t('pitch.roadmap.q4Title', 'DAO 治理'),
+      quarter: 'Q1-Q2 2027',
+      title: t('pitch.roadmap.q3Title', '治理成熟'),
       items: [
-        t('pitch.roadmap.q4Item1', '完全去中心化'),
-        t('pitch.roadmap.q4Item2', '社区自治'),
-        t('pitch.roadmap.q4Item3', '协议升级投票'),
+        t('pitch.roadmap.q3Item1', '社区治理上线'),
+        t('pitch.roadmap.q3Item2', '生态激励分配'),
+        t('pitch.roadmap.q3Item3', '开发者SDK发布'),
+      ],
+      status: 'pending'
+    },
+    {
+      quarter: 'Q3-Q4 2027',
+      title: t('pitch.roadmap.q4Title', '全面生态'),
+      items: [
+        t('pitch.roadmap.q4Item1', '多链支持'),
+        t('pitch.roadmap.q4Item2', 'AI能力市场'),
+        t('pitch.roadmap.q4Item3', 'DAO全面自治'),
       ],
       status: 'pending'
     }

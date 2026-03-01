@@ -63,6 +63,21 @@ class PermissionType(str, Enum):
     SYSTEM_METRICS = "system:metrics"  # 系统指标
     SYSTEM_LOGS = "system:logs"  # 日志访问
 
+    # NPM/NPX 开发工具
+    NPM_PUBLIC = "npm:public"  # npm view/search (公开操作)
+    NPM_INSTALL = "npm:install"  # npm install (本地安装)
+    NPM_RUN = "npm:run"  # npm run (运行脚本)
+    NPM_GLOBAL = "npm:global"  # npm install -g (全局安装)
+    NPM_DANGER = "npm:danger"  # 危险 npm 操作
+
+    # Git 版本控制
+    GIT_READ = "git:read"  # git status/log/diff (只读)
+    GIT_WRITE = "git:write"  # git add/commit (本地写入)
+    GIT_PUSH = "git:push"  # git push (推送到远程)
+    GIT_CLONE = "git:clone"  # git clone (克隆仓库)
+    GIT_FORCE = "git:force"  # git push --force (强制推送)
+    GIT_DANGER = "git:danger"  # 危险 git 操作
+
 
 @dataclass
 class Permission:
@@ -171,6 +186,19 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.SYSTEM_HEALTH,
         PermissionType.SYSTEM_METRICS,
         PermissionType.SYSTEM_LOGS,
+        # NPM/NPX 全权限
+        PermissionType.NPM_PUBLIC,
+        PermissionType.NPM_INSTALL,
+        PermissionType.NPM_RUN,
+        PermissionType.NPM_GLOBAL,
+        PermissionType.NPM_DANGER,
+        # Git 全权限
+        PermissionType.GIT_READ,
+        PermissionType.GIT_WRITE,
+        PermissionType.GIT_PUSH,
+        PermissionType.GIT_CLONE,
+        PermissionType.GIT_FORCE,
+        PermissionType.GIT_DANGER,
     ],
     UserRole.DEVELOPER: [
         PermissionType.PLATFORM_CONFIG,
@@ -185,6 +213,16 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.SYSTEM_HEALTH,
         PermissionType.SYSTEM_METRICS,
         PermissionType.SYSTEM_LOGS,
+        # NPM/NPX 权限
+        PermissionType.NPM_PUBLIC,
+        PermissionType.NPM_INSTALL,
+        PermissionType.NPM_RUN,
+        PermissionType.NPM_GLOBAL,
+        # Git 权限
+        PermissionType.GIT_READ,
+        PermissionType.GIT_WRITE,
+        PermissionType.GIT_PUSH,
+        PermissionType.GIT_CLONE,
     ],
     UserRole.NODE_ADMIN: [
         PermissionType.NODE_START,
@@ -199,6 +237,14 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
         PermissionType.SYSTEM_METRICS,
+        # NPM/NPX 权限
+        PermissionType.NPM_PUBLIC,
+        PermissionType.NPM_INSTALL,
+        PermissionType.NPM_RUN,
+        # Git 权限
+        PermissionType.GIT_READ,
+        PermissionType.GIT_WRITE,
+        PermissionType.GIT_CLONE,
     ],
     UserRole.NODE_OPERATOR: [
         PermissionType.NODE_MONITOR,
@@ -208,6 +254,13 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.DATA_QUERY,
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
+        # NPM/NPX 权限
+        PermissionType.NPM_PUBLIC,
+        PermissionType.NPM_INSTALL,
+        PermissionType.NPM_RUN,
+        # Git 权限
+        PermissionType.GIT_READ,
+        PermissionType.GIT_WRITE,
     ],
     UserRole.HUMAN: [
         PermissionType.WALLET_CREATE,
@@ -217,6 +270,14 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.DATA_QUERY,
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
+        # NPM/NPX 基础权限
+        PermissionType.NPM_PUBLIC,
+        PermissionType.NPM_INSTALL,
+        PermissionType.NPM_RUN,
+        # Git 基础权限
+        PermissionType.GIT_READ,
+        PermissionType.GIT_WRITE,
+        PermissionType.GIT_CLONE,
     ],
     UserRole.AI_OWNER: [
         PermissionType.AGENT_REGISTER,
@@ -226,12 +287,23 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.VOTE,
         PermissionType.DATA_QUERY,
         PermissionType.CHAT,
+        # NPM/NPX 权限
+        PermissionType.NPM_PUBLIC,
+        PermissionType.NPM_INSTALL,
+        PermissionType.NPM_RUN,
+        # Git 权限
+        PermissionType.GIT_READ,
+        PermissionType.GIT_WRITE,
     ],
     UserRole.AI_AGENT: [
         PermissionType.WALLET_BIND,
         PermissionType.DATA_QUERY,
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
+        # NPM/NPX 基础权限
+        PermissionType.NPM_PUBLIC,
+        # Git 只读权限
+        PermissionType.GIT_READ,
     ],
 }
 
@@ -283,6 +355,15 @@ TOOL_PERMISSIONS: Dict[str, List[PermissionType]] = {
     "delegate_vote": [PermissionType.VOTE],
     "get_vote_power": [PermissionType.VOTE],
     "list_proposals": [PermissionType.VOTE],
+    # NPM/NPX 开发工具
+    "npm_executor": [PermissionType.NPM_INSTALL],
+    "npm_public": [PermissionType.NPM_PUBLIC],
+    "npm_global": [PermissionType.NPM_GLOBAL],
+    # Git 版本控制工具
+    "git_executor": [PermissionType.GIT_READ],
+    "git_push": [PermissionType.GIT_PUSH],
+    "git_clone": [PermissionType.GIT_CLONE],
+    "git_force": [PermissionType.GIT_FORCE],
     # 通用
     "general_response": [PermissionType.CHAT],
 }

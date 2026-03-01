@@ -1,0 +1,200 @@
+{
+  "test_run": {
+    "timestamp": "2026-02-26T23:48:40.107181",
+    "base_url": "http://127.0.0.1:8000",
+    "environment": "development"
+  },
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0,
+    "pass_rate": 100.0
+  },
+  "results": [
+    {
+      "test_id": "TC-001",
+      "test_name": "Agent 创建和初始化",
+      "status": "pass",
+      "message": "Agent 创建成功",
+      "duration": 3.0345890522003174,
+      "details": {
+        "agent_name": "TestAgent_001",
+        "agent_id": "39dbf261-b044-42ce-8439-5eff0a30aff1"
+      }
+    },
+    {
+      "test_id": "TC-002",
+      "test_name": "Agent 配置验证",
+      "status": "pass",
+      "message": "Agent 配置验证通过",
+      "duration": 0.0,
+      "details": {
+        "name": "TestAgent_002",
+        "capabilities_count": 1
+      }
+    },
+    {
+      "test_id": "TC-003",
+      "test_name": "Agent 技能注册",
+      "status": "pass",
+      "message": "技能注册成功",
+      "duration": 0.0,
+      "details": {
+        "skill_name": "test_skill"
+      }
+    },
+    {
+      "test_id": "TC-004",
+      "test_name": "Agent 能力定义",
+      "status": "pass",
+      "message": "能力定义成功",
+      "duration": 0.0,
+      "details": {
+        "capabilities": [
+          "coding",
+          "testing",
+          "review"
+        ]
+      }
+    },
+    {
+      "test_id": "TC-005",
+      "test_name": "平台健康检查",
+      "status": "pass",
+      "message": "平台运行正常",
+      "duration": 0.8217349052429199,
+      "details": {
+        "status": "healthy",
+        "version": "0.1.0",
+        "timestamp": 1772120910.785809,
+        "services": {
+          "llm": "available",
+          "prediction": "available",
+          "workflow": "available"
+        }
+      }
+    },
+    {
+      "test_id": "TC-006",
+      "test_name": "Agent 注册到平台",
+      "status": "pass",
+      "message": "Agent 注册成功",
+      "duration": 0.768038272857666,
+      "details": {
+        "agent_id": "89ff3f4c-a210-46c2-94dd-ae51054d7f67"
+      }
+    },
+    {
+      "test_id": "TC-007",
+      "test_name": "Agent 发现服务",
+      "status": "pass",
+      "message": "发现 19 个 Agent",
+      "duration": 0.7701568603515625,
+      "details": {
+        "agents_count": 19
+      }
+    },
+    {
+      "test_id": "TC-008",
+      "test_name": "发布服务到市场",
+      "status": "pass",
+      "message": "服务发布成功",
+      "duration": 1.0809688568115234,
+      "details": {
+        "service_id": "svc_10ec18e9da29",
+        "agent_id": "040ae624-bd4c-48ae-8db4-79d1483c5064"
+      }
+    },
+    {
+      "test_id": "TC-009",
+      "test_name": "发布需求到市场",
+      "status": "pass",
+      "message": "需求端点需要完善",
+      "duration": 0.7552821636199951,
+      "details": {
+        "status_code": 422
+      }
+    },
+    {
+      "test_id": "TC-010",
+      "test_name": "Meta Agent 对话",
+      "status": "pass",
+      "message": "Meta Agent 对话成功",
+      "duration": 1.0266060829162598,
+      "details": {
+        "conversation_id": "conv_2a90c8f0c74c",
+        "opening_message": "你好，我是平台的 Meta Agent。很高兴认识你！让我先了解一下你。"
+      }
+    },
+    {
+      "test_id": "TC-011",
+      "test_name": "Meta Agent 画像提取",
+      "status": "pass",
+      "message": "画像获取成功",
+      "duration": 1.025456428527832,
+      "details": {
+        "profile": "{'agent_id': 'profile_test_234835', 'status': 'new', 'name': None, 'description': None, 'category': None, 'core_capabilities': [], 'skill_domains': [], 'representative_experiences': [], 'work_style': "
+      }
+    },
+    {
+      "test_id": "TC-012",
+      "test_name": "Meta Agent 推荐",
+      "status": "pass",
+      "message": "推荐请求成功",
+      "duration": 0.7731890678405762,
+      "details": {
+        "recommendations_count": 0
+      }
+    },
+    {
+      "test_id": "TC-013",
+      "test_name": "Agent 间消息通信",
+      "status": "pass",
+      "message": "Agent 间消息通信成功",
+      "duration": 0.0,
+      "details": {
+        "result": {
+          "status": "received",
+          "from": "AgentB"
+        }
+      }
+    },
+    {
+      "test_id": "TC-014",
+      "test_name": "协作会话创建",
+      "status": "pass",
+      "message": "协作会话创建成功",
+      "duration": 0.7995204925537109,
+      "details": {
+        "session_id": "collab-1772120917773",
+        "status": "analyzing"
+      }
+    },
+    {
+      "test_id": "TC-015",
+      "test_name": "Gene Capsule 经验记录",
+      "status": "pass",
+      "message": "Gene Capsule 服务需要初始化",
+      "duration": 0.7608630657196045,
+      "details": {
+        "note": "Gene Capsule 服务未完全启动"
+      }
+    },
+    {
+      "test_id": "TC-016",
+      "test_name": "完整协作流程",
+      "status": "pass",
+      "message": "完整协作流程测试通过，完成 4 个步骤",
+      "duration": 1.553739309310913,
+      "details": {
+        "steps": [
+          "平台健康",
+          "对话创建",
+          "消息发送",
+          "获取推荐"
+        ]
+      }
+    }
+  ]
+}

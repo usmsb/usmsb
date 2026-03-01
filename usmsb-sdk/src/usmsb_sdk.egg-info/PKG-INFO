@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: usmsb-sdk
-Version: 0.1.0
+Version: 0.9.0a0
 Summary: USMSB (Universal System Model of Social Behavior) SDK for AI Agent Platform
 Author-email: Felix Gu <felix@usmsb.ai>
 License: MIT
@@ -20,6 +20,7 @@ Requires-Dist: pydantic-settings>=2.0
 Requires-Dist: python-dotenv>=1.0
 Requires-Dist: pyyaml>=6.0
 Requires-Dist: aiohttp>=3.9
+Requires-Dist: httpx>=0.25
 Requires-Dist: openai>=1.0
 Requires-Dist: google-generativeai>=0.3
 Requires-Dist: langchain>=0.1
@@ -34,10 +35,24 @@ Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
 Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: pytest-mock>=3.12; extra == "dev"
+Requires-Dist: pytest-timeout>=2.2; extra == "dev"
 Requires-Dist: black>=23.0; extra == "dev"
 Requires-Dist: isort>=5.0; extra == "dev"
 Requires-Dist: mypy>=1.0; extra == "dev"
 Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: httpx>=0.25; extra == "dev"
+Requires-Dist: faker>=22.0; extra == "dev"
+Requires-Dist: freezegun>=1.4; extra == "dev"
+Provides-Extra: test
+Requires-Dist: pytest>=7.0; extra == "test"
+Requires-Dist: pytest-asyncio>=0.21; extra == "test"
+Requires-Dist: pytest-cov>=4.0; extra == "test"
+Requires-Dist: pytest-mock>=3.12; extra == "test"
+Requires-Dist: pytest-timeout>=2.2; extra == "test"
+Requires-Dist: httpx>=0.25; extra == "test"
+Requires-Dist: faker>=22.0; extra == "test"
+Requires-Dist: freezegun>=1.4; extra == "test"
 Provides-Extra: vector-db
 Requires-Dist: pinecone-client>=2.2; extra == "vector-db"
 Requires-Dist: weaviate-client>=3.25; extra == "vector-db"

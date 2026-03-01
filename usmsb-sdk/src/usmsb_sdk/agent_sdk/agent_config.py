@@ -336,9 +336,11 @@ class AgentConfig:
     # Runtime settings
     auto_register: bool = True
     auto_discover: bool = True
+    skip_http_auto_start: bool = False  # Skip auto-starting HTTP server
     log_level: str = "INFO"
     health_check_interval: int = 30
-    heartbeat_interval: int = 10
+    heartbeat_interval: int = 30  # Heartbeat interval in seconds
+    ttl: int = 90  # Time to live in seconds (3x heartbeat_interval recommended)
 
     def __post_init__(self):
         """Initialize default protocols if not specified"""
@@ -367,6 +369,7 @@ class AgentConfig:
             "log_level": self.log_level,
             "health_check_interval": self.health_check_interval,
             "heartbeat_interval": self.heartbeat_interval,
+            "ttl": self.ttl,
         }
 
     def to_json(self) -> str:
@@ -408,7 +411,8 @@ class AgentConfig:
             auto_discover=data.get("auto_discover", True),
             log_level=data.get("log_level", "INFO"),
             health_check_interval=data.get("health_check_interval", 30),
-            heartbeat_interval=data.get("heartbeat_interval", 10),
+            heartbeat_interval=data.get("heartbeat_interval", 30),
+            ttl=data.get("ttl", 90),
         )
 
     @classmethod

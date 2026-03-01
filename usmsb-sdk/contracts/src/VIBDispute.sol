@@ -6,6 +6,37 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// ========== Chainlink VRF 接口 ==========
+
+/**
+ * @dev Chainlink VRF v2 接口
+ */
+interface VRFCoordinatorV2Interface {
+    function requestRandomWords(
+        bytes32 keyHash,
+        uint64 subId,
+        uint16 minimumRequestConfirmations,
+        uint32 callbackGasLimit,
+        uint32 numWords
+    ) external returns (uint256 requestId);
+
+    function getRequestConfig()
+        external
+        view
+        returns (
+            uint16 minimumRequestConfirmations,
+            uint32 maxGasLimit,
+            uint32 minGasLimit,
+            uint32 maxNumWords
+        );
+
+    function addConsumer(uint64 subId, address consumer) external;
+
+    function createSubscription() external returns (uint64 subId);
+
+    function fundSubscription(uint64 subId, uint96 amount) external;
+}
+
 /**
  * @title VIBDispute
  * @notice 争议解决合约
@@ -29,6 +60,32 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  */
 contract VIBDispute is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    // ========== Chainlink VRF 配置 ==========
+
+    /// @notice VRF Coordinator 地址 (以太坊主网: 0x271682DEB8C4CA1209EE3E1EA
+    VRFCoordinatorV2Interface public vrfCoordinator;
+
+    /// @notice LINK 代币地址
+    address public linkToken;
+
+    /// @notice VRF Key Hash
+    bytes32 public vrfKeyHash;
+
+    /// @notice VRF Subscription ID
+    uint64 public vrfSubscriptionId;
+
+    /// @notice VRF Callback Gas Limit
+    uint32 public vrfCallbackGasLimit = 200000;
+
+    /// @notice VRF 请求确认数
+    uint16 public vrfRequestConfirmations = 3;
+
+    /// @notice VRF 随机数映射
+    mapping(uint256 => uint256) public vrfRequestIdToDisputeId;
+
+    /// @notice 待处理的 VRF 请求
+    mapping(uint256 => uint256) public vrfRandomWords;
 
     // ========== 常量 ==========
 
@@ -211,12 +268,50 @@ contract VIBDispute is Ownable, ReentrancyGuard {
     constructor(
         address _vibeToken,
         address _stakingContract,
-        address _governanceContract
+        address _governanceContract,
+        address _vrfCoordinator,
+        address _linkToken,
+        bytes32 _vrfKeyHash
     ) Ownable(msg.sender) {
         require(_vibeToken != address(0), "Invalid token");
         vibeToken = IERC20(_vibeToken);
         stakingContract = _stakingContract;
         governanceContract = _governanceContract;
+
+        // Chainlink VRF 配置
+        vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
+        linkToken = _linkToken;
+
+        // M-11修复: 默认禁用回退随机性（生产环境安全）
+        allowFallbackRandomness = false;
+        vrfKeyHash = _vrfKeyHash;
+    }
+
+    /**
+     * @notice 配置 Chainlink VRF
+     * @param _subscriptionId VRF 订阅 ID
+     */
+    function setVRFSubscription(uint64 _subscriptionId) external onlyOwner {
+        vrfSubscriptionId = _subscriptionId;
+    }
+
+    /**
+     * @notice M-11修复: 设置是否允许回退随机性
+     * @dev 生产环境应设为false，仅测试环境可设为true
+     */
+    function setAllowFallbackRandomness(bool _allow) external onlyOwner {
+        allowFallbackRandomness = _allow;
+    }
+
+    /**
+     * @notice 设置 VRF 参数
+     */
+    function setVRFParams(
+        uint32 _callbackGasLimit,
+        uint16 _requestConfirmations
+    ) external onlyOwner {
+        vrfCallbackGasLimit = _callbackGasLimit;
+        vrfRequestConfirmations = _requestConfirmations;
     }
 
     // ========== 外部函数 ==========
@@ -555,6 +650,7 @@ contract VIBDispute is Ownable, ReentrancyGuard {
 
     /**
      * @notice 检查是否符合仲裁员条件
+     * @dev D-01修复: 使用质押金额而非余额检查持币量，确保"利益绑定"
      */
     function _isEligibleArbitrator(address user) internal view returns (bool) {
         Arbitrator memory arb = arbitrators[user];
@@ -563,9 +659,10 @@ contract VIBDispute is Ownable, ReentrancyGuard {
             return false;
         }
 
-        // 检查持币量
-        uint256 balance = vibeToken.balanceOf(user);
-        if (balance < ARBITRATOR_MIN_STAKE) {
+        // D-01修复: 检查质押金额而非余额
+        // 白皮书承诺: 仲裁员需持有1000+ VIBE（应为质押）
+        uint256 stakedAmount = _getStakedAmount(user);
+        if (stakedAmount < ARBITRATOR_MIN_STAKE) {
             return false;
         }
 
@@ -583,9 +680,66 @@ contract VIBDispute is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice D-01修复: 获取用户质押金额
+     * @param user 用户地址
+     * @return 质押金额
+     */
+    function _getStakedAmount(address user) internal view returns (uint256) {
+        if (stakingContract != address(0)) {
+            // 尝试调用VIBStaking的getStakeInfo
+            (bool success, bytes memory data) = stakingContract.staticcall(
+                abi.encodeWithSignature("getStakeInfo(address)", user)
+            );
+            if (success && data.length > 0) {
+                // 解析StakeInfo结构，amount是第一个字段
+                (uint256 amount,,,,,,,) = abi.decode(data, (
+                    uint256, // amount
+                    uint256, // startTime
+                    uint256, // unlockTime
+                    uint256, // lockPeriodIndex
+                    uint8,   // tier
+                    uint256, // pendingReward
+                    uint256, // rewardDebt
+                    bool     // isActive
+                ));
+                return amount;
+            }
+        }
+        // Fallback: 使用余额作为后备
+        return vibeToken.balanceOf(user);
+    }
+
+    /// @notice M-11修复: 是否允许使用回退随机性（生产环境应设为false）
+    bool public allowFallbackRandomness;
+
+    /// @notice M-11修复: 回退随机性使用警告事件
+    event FallbackRandomnessUsed(uint256 indexed disputeId, string warning);
+
+    /**
      * @notice 分配仲裁员
+     * @dev 安全改进: 使用增强的随机性生成算法
+     *      M-11修复: 生产环境必须配置VRF，禁用回退随机性
      */
     function _assignArbitrators(uint256 disputeId) internal {
+        // 检查是否配置了 VRF
+        if (vrfSubscriptionId == 0) {
+            // M-11修复: 检查是否允许回退随机性
+            require(allowFallbackRandomness, "VRF not configured and fallback disabled");
+            // 回退到本地随机数（仅用于测试）
+            _assignArbitratorsFallback(disputeId);
+        } else {
+            // 请求 VRF 随机数
+            _requestVRFRandomness(disputeId);
+        }
+    }
+
+    /**
+     * @dev 回退: 使用本地伪随机数
+     *      M-11修复: 添加警告，仅用于测试环境
+     */
+    function _assignArbitratorsFallback(uint256 disputeId) internal {
+        // M-11修复: 发出警告事件
+        emit FallbackRandomnessUsed(disputeId, "WARNING: Using insecure pseudo-randomness. Configure Chainlink VRF for production.");
         // 获取符合条件的仲裁员
         address[] memory eligible = new address[](arbitratorPool.length);
         uint256 count = 0;
@@ -593,7 +747,6 @@ contract VIBDispute is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < arbitratorPool.length; i++) {
             address arb = arbitratorPool[i];
             if (_isEligibleArbitrator(arb)) {
-                // 排除争议双方
                 if (arb != disputes[disputeId].plaintiff &&
                     arb != disputes[disputeId].defendant) {
                     eligible[count++] = arb;
@@ -603,17 +756,99 @@ contract VIBDispute is Ownable, ReentrancyGuard {
 
         require(count >= ARBITRATOR_COUNT, "Not enough arbitrators");
 
-        // 伪随机选择3名仲裁员（生产环境应使用 Chainlink VRF）
         address[3] memory selected;
+
+        // 使用多个区块的哈希增加不可预测性
         uint256 seed = uint256(keccak256(abi.encodePacked(
+            blockhash(block.number - 1),
+            blockhash(block.number - 2),
             block.timestamp,
             block.prevrandao,
-            disputeId
+            disputeId,
+            msg.sender,
+            gasleft()
         )));
 
+        // Fisher-Yates 洗牌算法
         for (uint256 i = 0; i < ARBITRATOR_COUNT; i++) {
-            uint256 index = (seed + i) % count;
+            seed = uint256(keccak256(abi.encodePacked(seed, i)));
+            uint256 index = seed % (count - i);
+
             selected[i] = eligible[index];
+            eligible[index] = eligible[count - 1 - i];
+
+            disputeArbitrators[disputeId].push(selected[i]);
+        }
+
+        emit ArbitratorsAssigned(disputeId, selected);
+    }
+
+    /**
+     * @dev 请求 Chainlink VRF 随机数
+     */
+    function _requestVRFRandomness(uint256 disputeId) internal {
+        uint256 requestId = vrfCoordinator.requestRandomWords(
+            vrfKeyHash,
+            vrfSubscriptionId,
+            vrfRequestConfirmations,
+            vrfCallbackGasLimit,
+            1 // 只需要1个随机数
+        );
+
+        vrfRequestIdToDisputeId[requestId] = disputeId;
+    }
+
+    /**
+     * @notice Chainlink VRF 回调函数 (由 VRF Coordinator 调用)
+     * @dev 安全修复: 添加 onlyVRFCoordinator 访问控制
+     */
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] memory randomWords
+    ) external {
+        // 安全修复: 验证调用者是 VRF Coordinator
+        require(msg.sender == address(vrfCoordinator), "Only VRF Coordinator");
+
+        uint256 disputeId = vrfRequestIdToDisputeId[requestId];
+        require(disputeId > 0, "Invalid request");
+
+        _selectArbitratorsWithRandomness(disputeId, randomWords[0]);
+
+        // 清理
+        delete vrfRequestIdToDisputeId[requestId];
+    }
+
+    /**
+     * @dev 使用 VRF 随机数选择仲裁员
+     */
+    function _selectArbitratorsWithRandomness(uint256 disputeId, uint256 randomness) internal {
+        address[] memory eligible = new address[](arbitratorPool.length);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < arbitratorPool.length; i++) {
+            address arb = arbitratorPool[i];
+            if (_isEligibleArbitrator(arb)) {
+                if (arb != disputes[disputeId].plaintiff &&
+                    arb != disputes[disputeId].defendant) {
+                    eligible[count++] = arb;
+                }
+            }
+        }
+
+        require(count >= ARBITRATOR_COUNT, "Not enough arbitrators");
+
+        address[3] memory selected;
+
+        // 使用 VRF 随机数进行 Fisher-Yates 洗牌
+        uint256 seed = randomness;
+
+        for (uint256 i = 0; i < ARBITRATOR_COUNT; i++) {
+            seed = uint256(keccak256(abi.encodePacked(seed, i)));
+            uint256 index = seed % (count - i);
+
+            selected[i] = eligible[index];
+            eligible[index] = eligible[count - 1 - i];
+
             disputeArbitrators[disputeId].push(selected[i]);
         }
 

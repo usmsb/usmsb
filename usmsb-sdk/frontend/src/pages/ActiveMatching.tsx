@@ -19,6 +19,7 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { authFetch } from '@/lib/api'
 import type {
   Opportunity,
   NegotiationSession,
@@ -89,7 +90,7 @@ export default function ActiveMatching() {
   // Fetch opportunities from API
   const fetchOpportunities = async () => {
     try {
-      const response = await fetch(`${API_BASE}/matching/opportunities?agent_id=${agentId || 'anonymous'}`)
+      const response = await authFetch(`${API_BASE}/matching/opportunities`)
       if (response.ok) {
         const data: MatchingSearchResult[] = await response.json()
         const transformed: Opportunity[] = data.map((opp) => transformToOpportunity(opp))
@@ -107,7 +108,7 @@ export default function ActiveMatching() {
   // Fetch negotiations from API
   const fetchNegotiations = async () => {
     try {
-      const response = await fetch(`${API_BASE}/matching/negotiations?agent_id=${agentId || 'anonymous'}`)
+      const response = await authFetch(`${API_BASE}/matching/negotiations`)
       if (response.ok) {
         const data: NegotiationSession[] = await response.json()
         setNegotiations(data)
@@ -167,9 +168,8 @@ export default function ActiveMatching() {
             budget_max: searchForm.budget_max ? parseFloat(searchForm.budget_max) : undefined,
           }
 
-      const response = await fetch(endpoint, {
+      const response = await authFetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       })
 
@@ -200,9 +200,8 @@ export default function ActiveMatching() {
 
   const handleInitiateNegotiation = async (opportunity: Opportunity) => {
     try {
-      const response = await fetch(`${API_BASE}/matching/negotiate`, {
+      const response = await authFetch(`${API_BASE}/matching/negotiate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           initiator_id: agentId || 'anonymous',
           counterpart_id: opportunity.counterpart_agent_id,

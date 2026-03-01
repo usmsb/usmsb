@@ -383,14 +383,19 @@ class DiscoveryManager:
                 headers["Authorization"] = f"Bearer {self.config.security.api_key}"
 
             async with self._http_session.get(
-                f"{platform_url}/api/v1/agents/discover",
+                f"{platform_url}/agents/discover",
                 params=params,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    agents = [AgentInfo.from_dict(a) for a in data.get("agents", [])]
+                    # Handle both list response and dict with "agents" key
+                    if isinstance(data, list):
+                        agents_list = data
+                    else:
+                        agents_list = data.get("agents", [])
+                    agents = [AgentInfo.from_dict(a) for a in agents_list]
 
                     # Update cache
                     await self._update_cache(agents)
@@ -535,7 +540,7 @@ class DiscoveryManager:
                 headers["Authorization"] = f"Bearer {self.config.security.api_key}"
 
             async with self._http_session.get(
-                f"{platform_url}/api/v1/agents/{agent_id}",
+                f"{platform_url}/agents/{agent_id}",
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:

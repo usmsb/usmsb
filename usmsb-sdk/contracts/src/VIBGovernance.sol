@@ -37,6 +37,7 @@ interface IVIBStaking {
     );
     function getStakedDuration(address user) external view returns (uint256);
     function getTimeMultiplier(address user) external view returns (uint256);
+    function totalStaked() external view returns (uint256);
 }
 
 /**
@@ -68,7 +69,8 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         DEFEATED,
         SUCCEEDED,
         EXECUTED,
-        EXPIRED
+        EXPIRED,
+        PENDING_FINALIZATION  // 待完成最终化 (Gas优化)
     }
 
     /// @notice Layer 1: 资本权重上限 (10%)
@@ -105,11 +107,57 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @notice 一般提案门槛 (500 VIBE)
     uint256 public generalProposalThreshold = 500 * 10**18;
 
+    // ========== GOV-06修复: 三层治理互相否决机制 ==========
+
+    /// @notice 否决类型
+    enum VetoType {
+        INVESTOR_VETO,    // 投资者否决权：生产权重>50%的提案
+        PRODUCER_VETO,    // 生产者否决权：纯资本权重提案
+        COMMUNITY_VETO    // 社区否决权：社区反对率>60%
+    }
+
+    /// @notice 否决记录
+    struct VetoRecord {
+        uint256 proposalId;       // 被否决的提案ID
+        VetoType vetoType;        // 否决类型
+        address initiator;        // 发起人
+        uint256 initiatedTime;    // 发起时间
+        uint256 vetoVotes;        // 支持否决的票数
+        uint256 opposeVotes;      // 反对否决的票数
+        uint256 votingEndTime;    // 投票结束时间
+        bool executed;            // 是否已执行
+        bool passed;              // 是否通过
+    }
+
+    /// @notice 否决记录列表
+    VetoRecord[] public vetoRecords;
+
+    /// @notice 提案到否决记录的映射 (proposalId => vetoRecordIndex)
+    mapping(uint256 => uint256) public proposalVetoIndex;
+
+    /// @notice 用户是否已在否决中投票
+    mapping(uint256 => mapping(address => bool)) public vetoVoted;
+
+    /// @notice 否决投票期 (3天)
+    uint256 public constant VETO_VOTING_PERIOD = 3 days;
+
+    /// @notice 否决通过阈值 (50%)
+    uint256 public constant VETO_PASS_THRESHOLD = 5000; // 50%
+
+    /// @notice 生产权重阈值：超过此比例的提案可被投资者否决 (50%)
+    uint256 public constant PRODUCTION_WEIGHT_VETO_THRESHOLD = 5000; // 50%
+
+    /// @notice 社区反对率阈值：超过此比例自动触发社区否决 (60%)
+    uint256 public constant COMMUNITY_OPPOSITION_THRESHOLD = 6000; // 60%
+
     /// @notice 参数调整门槛 (5,000 VIBE)
     uint256 public parameterProposalThreshold = 5000 * 10**18;
 
     /// @notice 协议升级门槛 (50,000 VIBE)
     uint256 public upgradeProposalThreshold = 50000 * 10**18;
+
+    /// @notice 紧急提案门槛 (1,000 VIBE) - 安全增强
+    uint256 public emergencyProposalThreshold = 1000 * 10**18;
 
     // ========== 通过率要求 ==========
 
@@ -135,6 +183,9 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 协议升级时间锁 (60天)
     uint256 public upgradeTimelock = 60 days;
+
+    /// @notice 紧急提案时间锁 (1天) - 安全增强
+    uint256 public constant EMERGENCY_TIMELOCK = 1 days;
 
     // ========== 状态变量 ==========
 
@@ -168,8 +219,28 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @notice KYC 验证通过的用户
     mapping(address => bool) public kycVerified;
 
+    /// @notice KYC 验证通过的用户数量
+    uint256 public kycUserCount;
+
     /// @notice 贡献积分
     mapping(address => uint256) public contributionPoints;
+
+    // ========== GOV-03修复: 生产权重90天滚动窗口 ==========
+
+    /// @notice 滚动窗口期 (90天)
+    uint256 public constant PRODUCTION_WINDOW = 90 days;
+
+    /// @notice 用户带时间戳的积分记录
+    struct TimedPoints {
+        uint256 points;
+        uint256 timestamp;
+    }
+
+    /// @notice 用户积分历史记录
+    mapping(address => TimedPoints[]) public userPointsHistory;
+
+    /// @notice 用户最后清理时间
+    mapping(address => uint256) public lastCleanupTime;
 
     // ========== 贡献积分系统 ==========
 
@@ -338,6 +409,35 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     /// @notice 闪电贷防护：同一区块内投票权变动不计入
     bool public flashLoanProtectionEnabled = true;
 
+    /// @notice 闪电贷防护变更待生效时间
+    uint256 public flashLoanProtectionChangeTime;
+
+    /// @notice 最小投票权持有期（1天）
+    /// @dev 防止闪电贷攻击：用户必须持有投票权至少1天才能投票
+    uint256 public constant MIN_VOTING_HOLD_PERIOD = 1 days;
+
+    /// @notice 用户投票权首次获取时间
+    mapping(address => uint256) public votingPowerAcquireTime;
+
+    // ========== 治理执行白名单（安全修复：CRITICAL-SEC-03）==========
+
+    /// @notice 允许被治理调用的目标合约
+    mapping(address => bool) public allowedExecutionTargets;
+
+    /// @notice 允许被治理调用的函数选择器
+    mapping(bytes4 => bool) public allowedExecutionFunctions;
+
+    /// @notice 是否启用执行白名单（默认启用）
+    bool public executionWhitelistEnabled = true;
+
+    /// @notice 待生效的白名单变更
+    bool public pendingWhitelistChange;
+    uint256 public pendingWhitelistChangeTime;
+    uint256 public constant WHITELIST_CHANGE_DELAY = 7 days;
+
+    /// @notice 允许所有函数的目标合约（仅对可信合约）
+    mapping(address => bool) public allowAllFunctionsForTarget;
+
     // ========== 委托结构体 ==========
 
     struct PendingDelegation {
@@ -372,6 +472,7 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         uint256 totalVoters;           // 总投票人数
         bool executed;                 // 是否已执行
         bool cancelled;                // 是否已取消
+        uint256 lastProcessedDelegateIndex; // 最后处理的受托人索引 (Gas优化)
     }
 
     /**
@@ -437,6 +538,31 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice KYC 验证状态更新
     event KYCUpdated(address indexed user, bool isVerified);
+
+    // ========== GOV-06修复: 否决机制事件 ==========
+
+    /// @notice 否决发起事件
+    event VetoInitiated(
+        uint256 indexed vetoId,
+        uint256 indexed proposalId,
+        VetoType vetoType,
+        address indexed initiator
+    );
+
+    /// @notice 否决投票事件
+    event VetoVoteCast(
+        uint256 indexed vetoId,
+        address indexed voter,
+        bool support,
+        uint256 weight
+    );
+
+    /// @notice 否决执行事件
+    event VetoExecuted(
+        uint256 indexed vetoId,
+        uint256 indexed proposalId,
+        bool passed
+    );
 
     /// @notice 贡献积分更新
     event ContributionPointsUpdated(
@@ -554,6 +680,35 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         uint256 consecutiveCount
     );
 
+    // ========== 治理执行白名单事件 ==========
+
+    /// @notice 执行目标白名单更新事件
+    event ExecutionTargetUpdated(
+        address indexed target,
+        bool isAllowed
+    );
+
+    /// @notice 执行函数白名单更新事件
+    event ExecutionFunctionUpdated(
+        bytes4 indexed functionSelector,
+        bool isAllowed
+    );
+
+    /// @notice 执行白名单开关事件
+    event ExecutionWhitelistToggled(bool enabled);
+
+    /// @notice 白名单禁用发起事件
+    event WhitelistDisableInitiated(uint256 effectiveTime);
+
+    /// @notice 白名单变更取消事件
+    event WhitelistChangeCancelled();
+
+    /// @notice 目标合约允许所有函数事件
+    event TargetAllowAllFunctionsUpdated(
+        address indexed target,
+        bool allowAll
+    );
+
     // ========== 修饰符 ==========
 
     /// @notice 检查提案是否存在
@@ -600,16 +755,16 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         address target,
         bytes memory data
     ) external nonReentrant whenNotPaused returns (uint256) {
-        // 检查门槛
-        uint256 threshold = _getThreshold(proposalType);
-        require(
-            vibeToken.balanceOf(msg.sender) >= threshold,
-            "VIBGovernance: below proposal threshold"
-        );
-
-        // 检查投票权
+        // 检查投票权（使用投票权而非代币余额，更安全）
         uint256 votingPower = getVotingPower(msg.sender);
         require(votingPower > 0, "VIBGovernance: no voting power");
+
+        // 检查门槛（使用投票权）
+        uint256 threshold = _getThreshold(proposalType);
+        require(
+            votingPower >= threshold,
+            "VIBGovernance: below proposal threshold"
+        );
 
         // 创建提案
         uint256 proposalId = proposals.length;
@@ -636,7 +791,8 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
             abstainVotes: 0,
             totalVoters: 0,
             executed: false,
-            cancelled: false
+            cancelled: false,
+            lastProcessedDelegateIndex: 0
         }));
 
         proposalCount[msg.sender]++;
@@ -666,6 +822,9 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         require(support <= 2, "VIBGovernance: invalid support value");
         require(!hasVoted[proposalId][msg.sender], "VIBGovernance: already voted");
 
+        // 自动检查并处理过期委托
+        _autoCheckDelegationExpiry(msg.sender);
+
         Proposal storage proposal = proposals[proposalId];
 
         // 检查投票时间
@@ -681,6 +840,15 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
                 votingPowerLastUpdateBlock[msg.sender] < block.number,
                 "VIBGovernance: voting power changed in this block (flash loan protection)"
             );
+
+            // 检查最小持有期：用户必须持有投票权至少1天
+            uint256 acquireTime = votingPowerAcquireTime[msg.sender];
+            if (acquireTime > 0) {
+                require(
+                    block.timestamp >= acquireTime + MIN_VOTING_HOLD_PERIOD,
+                    "VIBGovernance: must hold voting power for minimum period"
+                );
+            }
         }
 
         // 获取投票权
@@ -752,6 +920,7 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice 执行提案
      * @param proposalId 提案 ID
+     * @dev 安全修复: 添加了目标合约和函数白名单验证，防止任意调用漏洞
      */
     function executeProposal(uint256 proposalId)
         external
@@ -770,6 +939,25 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
 
         // 如果有目标合约和调用数据，执行调用
         if (proposal.target != address(0) && proposal.data.length > 0) {
+            // 安全修复: 检查目标合约是否在白名单中
+            if (executionWhitelistEnabled) {
+                require(
+                    allowedExecutionTargets[proposal.target],
+                    "VIBGovernance: target not allowed"
+                );
+
+                // 如果目标合约未被标记为"允许所有函数"，则需要检查函数选择器
+                if (!allowAllFunctionsForTarget[proposal.target]) {
+                    require(proposal.data.length >= 4, "VIBGovernance: invalid data length");
+                    // 从 bytes 中提取前 4 字节作为函数选择器
+                    bytes4 functionSelector = _extractFunctionSelector(proposal.data);
+                    require(
+                        allowedExecutionFunctions[functionSelector],
+                        "VIBGovernance: function not allowed"
+                    );
+                }
+            }
+
             (bool success, ) = proposal.target.call(proposal.data);
             require(success, "VIBGovernance: execution failed");
         }
@@ -803,30 +991,50 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     {
         Proposal storage proposal = proposals[proposalId];
 
-        require(proposal.state == ProposalState.ACTIVE, "VIBGovernance: proposal not active");
-        require(block.timestamp > proposal.endTime, "VIBGovernance: voting still ongoing");
+        require(
+            proposal.state == ProposalState.ACTIVE || proposal.state == ProposalState.PENDING_FINALIZATION,
+            "VIBGovernance: proposal not active"
+        );
 
-        // 计算投票结果
-        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
-        uint256 requiredRate = _getRequiredPassRate(proposal.proposalType);
+        // 如果是第一次调用（ACTIVE状态），计算投票结果
+        if (proposal.state == ProposalState.ACTIVE) {
+            require(block.timestamp > proposal.endTime, "VIBGovernance: voting still ongoing");
 
-        if (totalVotes == 0) {
-            proposal.state = ProposalState.DEFEATED;
-        } else {
-            uint256 passRate = (proposal.forVotes * 10000) / totalVotes;
-            if (passRate >= requiredRate) {
-                proposal.state = ProposalState.SUCCEEDED;
-            } else {
+            // 计算投票结果
+            uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+            uint256 requiredRate = _getRequiredPassRate(proposal.proposalType);
+
+            if (totalVotes == 0) {
                 proposal.state = ProposalState.DEFEATED;
+            } else {
+                uint256 passRate = (proposal.forVotes * 10000) / totalVotes;
+                if (passRate >= requiredRate) {
+                    proposal.state = ProposalState.SUCCEEDED;
+                } else {
+                    proposal.state = ProposalState.DEFEATED;
+                }
             }
         }
 
         // ========== 检查受托人弃权情况 ==========
         // 遍历所有受托人（有收到委托的地址）
-        // 注意：这个操作可能很耗 gas，实际生产中可能需要分批处理
+        // 使用分批处理避免 gas 溢出，每次最多处理 100 个
         address[] memory allDelegates = _getAllActiveDelegates();
-        for (uint256 i = 0; i < allDelegates.length; i++) {
+        uint256 batchSize = 100;
+        uint256 processed = 0;
+
+        // 记录当前提案检查到的位置
+        uint256 lastProcessedKey = proposal.lastProcessedDelegateIndex;
+
+        for (uint256 i = lastProcessedKey; i < allDelegates.length && processed < batchSize; i++) {
             _checkDelegateeAbstention(proposalId, allDelegates[i]);
+            proposal.lastProcessedDelegateIndex = i + 1;
+            processed++;
+        }
+
+        // 如果还有未处理的受托人，标记提案需要继续处理
+        if (proposal.lastProcessedDelegateIndex < allDelegates.length) {
+            proposal.state = ProposalState.PENDING_FINALIZATION;
         }
     }
 
@@ -995,6 +1203,204 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         emit ProposalCancelled(proposalId, msg.sender);
     }
 
+    // ========== GOV-06修复: 三层治理互相否决机制 ==========
+
+    /**
+     * @notice 发起否决
+     * @param proposalId 被否决的提案ID
+     * @param vetoType 否决类型
+     * @dev 投资者可否决生产权重>50%的提案，生产者可否决纯资本权重提案
+     */
+    function initiateVeto(
+        uint256 proposalId,
+        VetoType vetoType
+    ) external nonReentrant whenNotPaused proposalExists(proposalId) {
+        Proposal storage proposal = proposals[proposalId];
+
+        // 验证提案状态
+        require(proposal.state == ProposalState.SUCCEEDED, "VIBGovernance: proposal not succeeded");
+        require(!proposal.executed, "VIBGovernance: proposal already executed");
+
+        // 验证没有已存在的否决
+        require(proposalVetoIndex[proposalId] == 0, "VIBGovernance: veto already exists");
+
+        // 验证否决条件
+        _validateVetoCondition(proposalId, vetoType);
+
+        // 创建否决记录
+        uint256 vetoId = vetoRecords.length;
+        vetoRecords.push(VetoRecord({
+            proposalId: proposalId,
+            vetoType: vetoType,
+            initiator: msg.sender,
+            initiatedTime: block.timestamp,
+            vetoVotes: 0,
+            opposeVotes: 0,
+            votingEndTime: block.timestamp + VETO_VOTING_PERIOD,
+            executed: false,
+            passed: false
+        }));
+
+        // 记录提案到否决的映射（+1 因为0表示不存在）
+        proposalVetoIndex[proposalId] = vetoId + 1;
+
+        emit VetoInitiated(vetoId, proposalId, vetoType, msg.sender);
+    }
+
+    /**
+     * @notice 对否决投票
+     * @param vetoId 否决记录ID
+     * @param support 是否支持否决
+     */
+    function voteOnVeto(
+        uint256 vetoId,
+        bool support
+    ) external nonReentrant whenNotPaused {
+        require(vetoId < vetoRecords.length, "VIBGovernance: invalid veto id");
+
+        VetoRecord storage vetoRecord = vetoRecords[vetoId];
+        require(!vetoRecord.executed, "VIBGovernance: veto already executed");
+        require(block.timestamp < vetoRecord.votingEndTime, "VIBGovernance: voting ended");
+        require(!vetoVoted[vetoId][msg.sender], "VIBGovernance: already voted");
+
+        // 根据否决类型获取投票权重
+        uint256 weight = _getVetoVotingWeight(vetoRecord.vetoType, msg.sender);
+        require(weight > 0, "VIBGovernance: no voting weight for this veto type");
+
+        vetoVoted[vetoId][msg.sender] = true;
+
+        if (support) {
+            vetoRecord.vetoVotes += weight;
+        } else {
+            vetoRecord.opposeVotes += weight;
+        }
+
+        emit VetoVoteCast(vetoId, msg.sender, support, weight);
+    }
+
+    /**
+     * @notice 执行否决结果
+     * @param vetoId 否决记录ID
+     */
+    function executeVeto(uint256 vetoId) external nonReentrant {
+        require(vetoId < vetoRecords.length, "VIBGovernance: invalid veto id");
+
+        VetoRecord storage vetoRecord = vetoRecords[vetoId];
+        require(!vetoRecord.executed, "VIBGovernance: veto already executed");
+        require(block.timestamp >= vetoRecord.votingEndTime, "VIBGovernance: voting not ended");
+
+        vetoRecord.executed = true;
+
+        // 计算否决是否通过
+        uint256 totalVotes = vetoRecord.vetoVotes + vetoRecord.opposeVotes;
+        if (totalVotes > 0) {
+            vetoRecord.passed = (vetoRecord.vetoVotes * 10000) / totalVotes >= VETO_PASS_THRESHOLD;
+        }
+
+        // 如果否决通过，取消提案
+        if (vetoRecord.passed) {
+            Proposal storage proposal = proposals[vetoRecord.proposalId];
+            proposal.state = ProposalState.CANCELLED;
+            proposal.cancelled = true;
+        }
+
+        emit VetoExecuted(vetoId, vetoRecord.proposalId, vetoRecord.passed);
+    }
+
+    /**
+     * @notice 检查社区否决条件（自动触发）
+     * @param proposalId 提案ID
+     * @return 是否应触发社区否决
+     * @dev GOV-06修复: 简化实现，使用整体反对率作为社区反对率的代理
+     */
+    function checkCommunityVetoCondition(uint256 proposalId) public view proposalExists(proposalId) returns (bool) {
+        Proposal storage proposal = proposals[proposalId];
+
+        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+        if (totalVotes == 0) return false;
+
+        uint256 oppositionRate = (proposal.againstVotes * 10000) / totalVotes;
+        return oppositionRate >= COMMUNITY_OPPOSITION_THRESHOLD;
+    }
+
+    /**
+     * @notice 验证否决条件
+     * @dev GOV-06修复: 简化实现，基于提案投票统计估算权重比例
+     */
+    function _validateVetoCondition(uint256 proposalId, VetoType vetoType) internal view {
+        Proposal storage proposal = proposals[proposalId];
+
+        // 获取总投票权
+        uint256 totalVP = _getTotalVotingPower();
+        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+
+        require(totalVotes > 0, "VIBGovernance: no votes cast");
+
+        if (vetoType == VetoType.INVESTOR_VETO) {
+            // 投资者否决权：生产权重>50%的提案
+            // 估算：如果投票参与度高且生产权重层参与，认为生产权重高
+            // 简化实现：检查提案支持率是否异常高（可能被生产权重主导）
+            uint256 supportRatio = (proposal.forVotes * 10000) / totalVotes;
+
+            // 如果支持率>70%且总投票>总投票权的5%，可能需要投资者否决
+            require(
+                supportRatio > 7000 && totalVotes > (totalVP * 500) / 10000,
+                "VIBGovernance: investor veto conditions not met"
+            );
+
+        } else if (vetoType == VetoType.PRODUCER_VETO) {
+            // 生产者否决权：纯资本权重提案
+            // 检查是否有足够的投票参与（如果参与度极低，可能只有资本方参与）
+            // 简化实现：检查投票人数是否少于KYC用户数的10%
+            uint256 minVoters = kycUserCount > 0 ? (kycUserCount * 10) / 100 : 1;
+
+            require(
+                proposal.totalVoters < minVoters && totalVotes > 0,
+                "VIBGovernance: not a pure capital weight proposal"
+            );
+
+        } else if (vetoType == VetoType.COMMUNITY_VETO) {
+            // 社区否决权：社区反对率>60%
+            uint256 oppositionRate = (proposal.againstVotes * 10000) / totalVotes;
+
+            require(
+                oppositionRate >= COMMUNITY_OPPOSITION_THRESHOLD,
+                "VIBGovernance: community opposition not exceeding threshold"
+            );
+        }
+    }
+
+    /**
+     * @notice 根据否决类型获取投票权重
+     */
+    function _getVetoVotingWeight(VetoType vetoType, address voter) internal view returns (uint256) {
+        if (vetoType == VetoType.INVESTOR_VETO) {
+            // 投资者否决：只有资本权重有效
+            return _getCapitalWeight(voter);
+        } else if (vetoType == VetoType.PRODUCER_VETO) {
+            // 生产者否决：只有生产权重有效
+            return _getProductionWeight(voter);
+        } else {
+            // 社区否决：只有社区权重有效
+            return _getCommunityWeight(voter);
+        }
+    }
+
+    /**
+     * @notice 获取否决记录数量
+     */
+    function getVetoCount() external view returns (uint256) {
+        return vetoRecords.length;
+    }
+
+    /**
+     * @notice 获取否决记录
+     */
+    function getVetoRecord(uint256 vetoId) external view returns (VetoRecord memory) {
+        require(vetoId < vetoRecords.length, "VIBGovernance: invalid veto id");
+        return vetoRecords[vetoId];
+    }
+
     // ========== 委托函数 ==========
 
     /**
@@ -1011,6 +1417,9 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         require(to != msg.sender, "VIBGovernance: cannot delegate to self");
         require(duration > 0 && duration <= MAX_DELEGATION_DURATION, "VIBGovernance: invalid duration");
 
+        // 自动检查并处理过期委托（允许重新委托）
+        _autoCheckDelegationExpiry(msg.sender);
+
         // 检查是否已委托
         require(delegates[msg.sender] == address(0), "VIBGovernance: already delegated");
 
@@ -1026,15 +1435,20 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         uint256 totalVotes = _getTotalVotingPower();
         uint256 maxAllowed = (totalVotes * MAX_DELEGATION_ACCEPT_RATIO) / 10000;
 
-        // 如果总票数为0，用当前票数作为基准
-        if (totalVotes == 0) {
-            maxAllowed = votingPower; // 允许第一笔委托
+        // 如果总票数为0或很小，用当前票数作为基准（避免小规模场景下的过度限制）
+        // 最小总投票权阈值：10000 VIBE
+        uint256 MIN_TOTAL_FOR_DELEGATION_LIMIT = 10000 * 10**18;
+        if (totalVotes == 0 || totalVotes < MIN_TOTAL_FOR_DELEGATION_LIMIT) {
+            maxAllowed = votingPower; // 允许委托
         }
 
         require(newDelegatedVotes <= maxAllowed, "VIBGovernance: exceeds 5% delegation limit");
 
         // 检查是否需要延迟生效（大额变动）
-        if (votingPower > (totalVotes * LARGE_VOTE_CHANGE_THRESHOLD) / 10000 && totalVotes > 0) {
+        // 只有当总投票权足够大时才应用延迟，避免小规模场景下的过度限制
+        if (votingPower > (totalVotes * LARGE_VOTE_CHANGE_THRESHOLD) / 10000 &&
+            totalVotes > 0 &&
+            totalVotes >= MIN_TOTAL_FOR_DELEGATION_LIMIT) {
             // 创建待生效委托
             pendingDelegations[msg.sender] = PendingDelegation({
                 from: msg.sender,
@@ -1149,6 +1563,32 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     // ========== 委托内部函数 ==========
 
     /**
+     * @notice 自动检查并处理过期委托（内部函数）
+     * @dev 在关键操作（如投票）前自动调用
+     * @param user 用户地址
+     */
+    function _autoCheckDelegationExpiry(address user) internal {
+        if (delegates[user] != address(0) && block.timestamp >= delegationExpiryTime[user]) {
+            address delegateAddr = delegates[user];
+            uint256 amount = delegatedOut[user];
+
+            // 更新状态
+            delegates[user] = address(0);
+            delegatedVotes[delegateAddr] -= amount;
+            delegatedOut[user] = 0;
+            delegationStartTime[user] = 0;
+            delegationExpiryTime[user] = 0;
+            totalDelegatedVotes -= amount;
+
+            // 移除委托来源记录
+            isDelegationSource[delegateAddr][user] = false;
+            receivedDelegationCount[delegateAddr]--;
+
+            emit DelegationExpired(user, delegateAddr);
+        }
+    }
+
+    /**
      * @notice 执行委托
      */
     function _executeDelegation(address from, address to, uint256 amount, uint256 duration) internal {
@@ -1185,9 +1625,28 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice 设置闪电贷防护开关
      * @param enabled 是否启用
+     * @dev 安全增强: 禁用需要7天时间锁
      */
     function setFlashLoanProtection(bool enabled) external onlyOwner {
-        flashLoanProtectionEnabled = enabled;
+        if (enabled) {
+            // 启用立即生效
+            flashLoanProtectionEnabled = true;
+            flashLoanProtectionChangeTime = 0;
+        } else {
+            // 禁用需要时间锁
+            flashLoanProtectionChangeTime = block.timestamp + 7 days;
+        }
+    }
+
+    /**
+     * @notice 确认禁用闪电贷防护
+     */
+    function confirmFlashLoanProtectionDisable() external onlyOwner {
+        require(flashLoanProtectionChangeTime > 0, "No pending change");
+        require(block.timestamp >= flashLoanProtectionChangeTime, "Timelock not elapsed");
+
+        flashLoanProtectionEnabled = false;
+        flashLoanProtectionChangeTime = 0;
     }
 
     /**
@@ -1201,6 +1660,11 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
             "VIBGovernance: unauthorized"
         );
         votingPowerLastUpdateBlock[user] = block.number;
+
+        // 如果用户之前没有投票权，记录获取时间（用于最小持有期检查）
+        if (votingPowerAcquireTime[user] == 0) {
+            votingPowerAcquireTime[user] = block.timestamp;
+        }
     }
 
     /**
@@ -1259,6 +1723,9 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         communityFund = _communityFund;
     }
 
+    /// @notice 批量更新最大数量
+    uint256 public constant MAX_BATCH_SIZE = 100;
+
     /**
      * @notice 批量更新 KYC 状态
      * @param users 用户地址列表
@@ -1266,21 +1733,173 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
      */
     function batchUpdateKYC(address[] calldata users, bool[] calldata statuses) external onlyOwner {
         require(users.length == statuses.length, "VIBGovernance: length mismatch");
+        require(users.length <= MAX_BATCH_SIZE, "VIBGovernance: batch size too large");
+
         for (uint256 i = 0; i < users.length; i++) {
+            bool wasVerified = kycVerified[users[i]];
             kycVerified[users[i]] = statuses[i];
+
+            // 更新计数器
+            if (statuses[i] && !wasVerified) {
+                kycUserCount++;
+            } else if (!statuses[i] && wasVerified) {
+                if (kycUserCount > 0) {
+                    kycUserCount--;
+                }
+            }
+
             emit KYCUpdated(users[i], statuses[i]);
         }
+    }
+
+    // ========== 治理执行白名单管理 ==========
+
+    /**
+     * @notice 设置执行目标合约白名单
+     * @param target 目标合约地址
+     * @param isAllowed 是否允许
+     */
+    function setExecutionTarget(address target, bool isAllowed) external onlyOwner {
+        require(target != address(0), "VIBGovernance: invalid target");
+        allowedExecutionTargets[target] = isAllowed;
+        emit ExecutionTargetUpdated(target, isAllowed);
+    }
+
+    /**
+     * @notice 批量设置执行目标合约白名单
+     * @param targets 目标合约地址列表
+     * @param isAllowed 是否允许
+     */
+    function batchSetExecutionTargets(address[] calldata targets, bool isAllowed) external onlyOwner {
+        for (uint256 i = 0; i < targets.length; i++) {
+            require(targets[i] != address(0), "VIBGovernance: invalid target");
+            allowedExecutionTargets[targets[i]] = isAllowed;
+            emit ExecutionTargetUpdated(targets[i], isAllowed);
+        }
+    }
+
+    /**
+     * @notice 设置执行函数选择器白名单
+     * @param functionSelector 函数选择器 (bytes4)
+     * @param isAllowed 是否允许
+     */
+    function setExecutionFunction(bytes4 functionSelector, bool isAllowed) external onlyOwner {
+        allowedExecutionFunctions[functionSelector] = isAllowed;
+        emit ExecutionFunctionUpdated(functionSelector, isAllowed);
+    }
+
+    /**
+     * @notice 批量设置执行函数选择器白名单
+     * @param functionSelectors 函数选择器列表
+     * @param isAllowed 是否允许
+     */
+    function batchSetExecutionFunctions(bytes4[] calldata functionSelectors, bool isAllowed) external onlyOwner {
+        for (uint256 i = 0; i < functionSelectors.length; i++) {
+            allowedExecutionFunctions[functionSelectors[i]] = isAllowed;
+            emit ExecutionFunctionUpdated(functionSelectors[i], isAllowed);
+        }
+    }
+
+    /**
+     * @notice 设置目标合约允许所有函数（仅对高度可信的合约）
+     * @param target 目标合约地址
+     * @param allowAll 是否允许所有函数
+     * @dev 谨慎使用，仅对经过严格审计的可信合约启用
+     */
+    function setTargetAllowAllFunctions(address target, bool allowAll) external onlyOwner {
+        require(target != address(0), "VIBGovernance: invalid target");
+        require(allowedExecutionTargets[target], "VIBGovernance: target not in whitelist");
+        allowAllFunctionsForTarget[target] = allowAll;
+        emit TargetAllowAllFunctionsUpdated(target, allowAll);
+    }
+
+    /**
+     * @notice 发起切换执行白名单开关（需要时间锁）
+     * @param enabled 是否启用
+     * @dev 警告：禁用白名单会降低安全性，仅用于紧急情况
+     *      变更需要7天时间锁才能生效
+     */
+    function setExecutionWhitelistEnabled(bool enabled) external onlyOwner {
+        // 安全修复: 如果是要禁用白名单，记录变更等待生效
+        // 如果是要启用白名单，立即生效
+        if (enabled) {
+            // 启用白名单立即生效
+            executionWhitelistEnabled = true;
+            pendingWhitelistChange = false;
+            pendingWhitelistChangeTime = 0;
+            emit ExecutionWhitelistToggled(true);
+        } else {
+            // 禁用白名单需要时间锁
+            pendingWhitelistChange = false;
+            pendingWhitelistChangeTime = block.timestamp + WHITELIST_CHANGE_DELAY;
+            emit WhitelistDisableInitiated(pendingWhitelistChangeTime);
+        }
+    }
+
+    /**
+     * @notice 确认禁用白名单（时间锁到期后）
+     */
+    function confirmWhitelistDisable() external onlyOwner {
+        require(pendingWhitelistChangeTime > 0, "No pending change");
+        require(block.timestamp >= pendingWhitelistChangeTime, "Timelock not elapsed");
+
+        executionWhitelistEnabled = false;
+        pendingWhitelistChangeTime = 0;
+        emit ExecutionWhitelistToggled(false);
+    }
+
+    /**
+     * @notice 取消待生效的白名单变更
+     */
+    function cancelWhitelistChange() external onlyOwner {
+        require(pendingWhitelistChangeTime > 0, "No pending change");
+        pendingWhitelistChangeTime = 0;
+        emit WhitelistChangeCancelled();
+    }
+
+    /**
+     * @notice 检查提案是否可以执行（白名单检查）
+     * @param target 目标合约
+     * @param data 调用数据
+     * @return 是否可以通过白名单检查
+     */
+    function canExecuteProposal(address target, bytes calldata data) external view returns (bool) {
+        if (!executionWhitelistEnabled) {
+            return true;
+        }
+        if (!allowedExecutionTargets[target]) {
+            return false;
+        }
+        if (allowAllFunctionsForTarget[target]) {
+            return true;
+        }
+        if (data.length < 4) {
+            return false;
+        }
+        bytes4 functionSelector = bytes4(data[:4]);
+        return allowedExecutionFunctions[functionSelector];
     }
 
     /**
      * @notice 更新用户贡献积分
      * @param user 用户地址
      * @param points 贡献积分
+     * @dev GOV-03修复: 同时添加带时间戳的积分记录
      */
     function updateContributionPoints(address user, uint256 points) external onlyOwner {
         require(user != address(0), "VIBGovernance: invalid address");
         uint256 oldPoints = contributionPoints[user];
         contributionPoints[user] = points;
+
+        // 更新总贡献积分
+        if (points > oldPoints) {
+            totalContributionPoints += (points - oldPoints);
+            // GOV-03修复: 如果是增加积分，添加时间记录
+            _addTimedPoints(user, points - oldPoints);
+        } else if (oldPoints > points) {
+            totalContributionPoints -= (oldPoints - points);
+        }
+
         emit ContributionPointsUpdated(user, oldPoints, points);
     }
 
@@ -1428,6 +2047,12 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
                 uint256 oldPoints = contributionPoints[record.contributor];
                 contributionPoints[record.contributor] += allowedPoints;
                 monthlyPointsEarned[record.contributor][currentMonth] += allowedPoints;
+
+                // 更新总贡献积分
+                totalContributionPoints += allowedPoints;
+
+                // GOV-03修复: 添加带时间戳的积分记录
+                _addTimedPoints(record.contributor, allowedPoints);
 
                 emit ContributionPointsUpdated(record.contributor, oldPoints, contributionPoints[record.contributor]);
             }
@@ -1726,17 +2351,86 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         // Layer 3: 社区共识
         uint256 communityPower = _getCommunityWeight(user);
 
+        // GOV-01修复: 使用实际总投票权计算上限，而非代币总供应量
+        uint256 totalVotingPower = _getTotalVotingPower();
+
+        // 只有当总投票权足够大时才应用上限（避免小规模治理场景下的过度限制）
+        // 最小总投票权阈值：10000 VIBE
+        uint256 MIN_TOTAL_FOR_CAPS = 10000 * 10**18;
+
+        if (totalVotingPower >= MIN_TOTAL_FOR_CAPS) {
+            // 资本权重上限：最多占总投票权的 10%
+            uint256 capitalCap = (totalVotingPower * CAPITAL_WEIGHT_MAX) / 100;
+            if (capitalPower > capitalCap) {
+                capitalPower = capitalCap;
+            }
+
+            // 生产权重上限：最多占总投票权的 15%
+            uint256 productionCap = (totalVotingPower * PRODUCTION_WEIGHT_MAX) / 100;
+            if (productionPower > productionCap) {
+                productionPower = productionCap;
+            }
+        }
+
         return capitalPower + productionPower + communityPower;
     }
 
     /**
-     * @notice 获取总投票权
-     * @return 总投票权
+     * @notice GOV-04修复: 获取实际总投票权
+     * @return 总投票权 = 质押总额 + 估计生产权重 + 社区权重
+     * @dev 使用缓存机制避免每次调用都重新计算
      */
     function _getTotalVotingPower() internal view returns (uint256) {
-        // 使用代币总供应量作为基准估算
-        uint256 totalSupply = vibeToken.totalSupply();
-        return totalSupply;
+        // 如果有缓存的值且未过期（1小时内），使用缓存
+        if (cachedTotalVotingPower > 0 &&
+            block.timestamp < totalVotingPowerCacheTime + 1 hours) {
+            return cachedTotalVotingPower;
+        }
+
+        // 基础: 质押总额（资本权重）
+        uint256 basePower = _getTotalStakedAmount();
+
+        // 估计生产权重：使用总贡献积分
+        uint256 estimatedProduction = (totalContributionPoints * PRODUCTION_WEIGHT_RATIO) / 100;
+
+        // 社区权重固定为基础+生产的10%
+        uint256 communityWeight = ((basePower + estimatedProduction) * 10) / 100;
+
+        return basePower + estimatedProduction + communityWeight;
+    }
+
+    /// @notice 缓存的总投票权
+    uint256 public cachedTotalVotingPower;
+
+    /// @notice 缓存时间
+    uint256 public totalVotingPowerCacheTime;
+
+    /// @notice 总贡献积分
+    uint256 public totalContributionPoints;
+
+    /**
+     * @notice 更新总投票权缓存
+     */
+    function updateTotalVotingPowerCache() external {
+        uint256 basePower = _getTotalStakedAmount();
+        uint256 estimatedProduction = (totalContributionPoints * PRODUCTION_WEIGHT_RATIO) / 100;
+        uint256 communityWeight = ((basePower + estimatedProduction) * 10) / 100;
+
+        cachedTotalVotingPower = basePower + estimatedProduction + communityWeight;
+        totalVotingPowerCacheTime = block.timestamp;
+    }
+
+    /**
+     * @notice 获取总质押金额
+     */
+    function _getTotalStakedAmount() internal view returns (uint256) {
+        if (address(vibStaking) != address(0)) {
+            try vibStaking.totalStaked() returns (uint256 total) {
+                return total;
+            } catch {}
+        }
+        // Fallback: 使用代币总供应量的80%作为估计
+        return (vibeToken.totalSupply() * 80) / 100;
     }
 
     /**
@@ -1769,23 +2463,126 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
      * @notice 获取生产权重（基于贡献积分）
      * @param user 用户地址
      * @return 生产权重
-     * @dev 生产权重 = 贡献积分 × 转换比例
+     * @dev GOV-03修复: 使用90天滚动窗口计算有效积分
+     *      生产权重 = 有效积分 × 转换比例
+     *      有效积分 = 过去90天内的积分总和（按时间线性衰减）
      */
     function _getProductionWeight(address user) internal view returns (uint256) {
-        uint256 points = contributionPoints[user];
+        uint256 effectivePoints = _getEffectiveContributionPoints(user);
         // 贡献积分转换为投票权：1 积分 = 0.01 投票权
-        return (points * PRODUCTION_WEIGHT_RATIO) / 100;
+        return (effectivePoints * PRODUCTION_WEIGHT_RATIO) / 100;
+    }
+
+    /**
+     * @notice 获取用户有效贡献积分（90天滚动窗口）
+     * @param user 用户地址
+     * @return 有效积分
+     * @dev GOV-03修复: 只计算90天内的积分，超过90天的积分按线性衰减
+     */
+    function _getEffectiveContributionPoints(address user) internal view returns (uint256) {
+        TimedPoints[] storage history = userPointsHistory[user];
+        uint256 effectivePoints = 0;
+        uint256 currentTime = block.timestamp;
+        uint256 windowStart = currentTime > PRODUCTION_WINDOW ? currentTime - PRODUCTION_WINDOW : 0;
+
+        for (uint256 i = 0; i < history.length; i++) {
+            TimedPoints storage entry = history[i];
+            if (entry.timestamp >= windowStart) {
+                // 在窗口期内，全额计入
+                effectivePoints += entry.points;
+            } else if (entry.timestamp > 0) {
+                // 超出窗口期但未清理，按距离窗口的时间线性衰减
+                uint256 age = windowStart - entry.timestamp;
+                // 衰减率 = age / PRODUCTION_WINDOW，最大100%
+                if (age < PRODUCTION_WINDOW * 2) {
+                    uint256 decayRate = (age * 100) / (PRODUCTION_WINDOW * 2);
+                    uint256 remainingPoints = (entry.points * (100 - decayRate)) / 100;
+                    effectivePoints += remainingPoints;
+                }
+                // 超过180天的完全衰减，不计入
+            }
+        }
+
+        return effectivePoints;
+    }
+
+    /**
+     * @notice 清理用户过期的积分记录（节省存储）
+     * @param user 用户地址
+     * @dev GOV-03修复: 删除超过180天的记录
+     */
+    function cleanupExpiredPoints(address user) external {
+        TimedPoints[] storage history = userPointsHistory[user];
+        uint256 currentTime = block.timestamp;
+        uint256 cutoffTime = currentTime > (PRODUCTION_WINDOW * 2) ? currentTime - (PRODUCTION_WINDOW * 2) : 0;
+
+        // 从后向前遍历，删除过期记录
+        uint256 writeIndex = 0;
+        for (uint256 i = 0; i < history.length; i++) {
+            if (history[i].timestamp >= cutoffTime) {
+                if (writeIndex != i) {
+                    history[writeIndex] = history[i];
+                }
+                writeIndex++;
+            }
+        }
+
+        // 删除多余的元素
+        while (history.length > writeIndex) {
+            history.pop();
+        }
+
+        lastCleanupTime[user] = currentTime;
+    }
+
+    /**
+     * @notice 添加带时间戳的积分记录
+     * @param user 用户地址
+     * @param points 积分数量
+     * @dev GOV-03修复: 内部函数，由贡献积分系统调用
+     */
+    function _addTimedPoints(address user, uint256 points) internal {
+        userPointsHistory[user].push(TimedPoints({
+            points: points,
+            timestamp: block.timestamp
+        }));
+    }
+
+    /**
+     * @notice 获取用户有效贡献积分（外部视图）
+     * @param user 用户地址
+     * @return 有效积分
+     */
+    function getEffectiveContributionPoints(address user) external view returns (uint256) {
+        return _getEffectiveContributionPoints(user);
     }
 
     /**
      * @notice 获取社区共识权重
      * @param user 用户地址
      * @return 社区共识权重
+     * @dev GOV-02修复: 社区权重 = 总投票权的10% / KYC用户数，使用实际总投票权
      */
     function _getCommunityWeight(address user) internal view returns (uint256) {
         if (!kycVerified[user]) return 0;
-        // KYC 验证后一人一票，权重占比 10%
-        return 1000; // 固定权重
+        if (kycUserCount == 0) return 0;
+
+        // GOV-02修复: 使用实际总投票权
+        uint256 totalVotingPower = _getTotalVotingPower();
+        uint256 totalCommunityWeight = (totalVotingPower * 10) / 100;
+
+        // 每个KYC用户获得均等的权重
+        return totalCommunityWeight / kycUserCount;
+    }
+
+    /**
+     * @notice 从字节数组中提取函数选择器
+     * @param data 字节数组
+     * @return 函数选择器 (bytes4)
+     */
+    function _extractFunctionSelector(bytes memory data) internal pure returns (bytes4) {
+        require(data.length >= 4, "VIBGovernance: data too short");
+        return bytes4(data[0]) | (bytes4(data[1]) >> 8) | (bytes4(data[2]) >> 16) | (bytes4(data[3]) >> 24);
     }
 
     /**
@@ -1801,7 +2598,7 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         } else if (proposalType == ProposalType.UPGRADE) {
             return upgradeProposalThreshold;
         }
-        return 0; // 紧急提案无门槛
+        return emergencyProposalThreshold; // 紧急提案有门槛 - 安全增强
     }
 
     /**
@@ -1833,7 +2630,7 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
         } else if (proposalType == ProposalType.UPGRADE) {
             return upgradeTimelock;
         }
-        return 0; // 紧急提案无时间锁
+        return EMERGENCY_TIMELOCK; // 紧急提案有1天时间锁 - 安全增强
     }
 
     /**
@@ -2049,3 +2846,5 @@ contract VIBGovernance is Ownable, ReentrancyGuard, Pausable {
             : 0;
     }
 }
+
+

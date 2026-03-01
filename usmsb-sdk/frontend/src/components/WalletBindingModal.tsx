@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Wallet, User, Bot, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useSignMessage } from 'wagmi'
 import { useAuthStore, UserRole, USER_ROLE_LABELS } from '@/stores/authStore'
-import { getUserInfo, updateUserRole } from '@/lib/api'
+import { getUserInfo, updateUserRole, signInWithEthereum } from '@/lib/api'
 
 interface WalletBindingModalProps {
   isOpen: boolean
@@ -13,10 +13,11 @@ interface WalletBindingModalProps {
 
 export default function WalletBindingModal({ isOpen, onClose, defaultRole = 'human' }: WalletBindingModalProps) {
   const { t } = useTranslation()
-  const { address: wagmiAddress, isConnected: wagmiConnected } = useAccount()
+  const { address: wagmiAddress, isConnected: wagmiConnected, chain } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
-  
+  const { signMessageAsync } = useSignMessage()
+
   const { 
     address, 
     isConnected, 
@@ -109,13 +110,35 @@ export default function WalletBindingModal({ isOpen, onClose, defaultRole = 'hum
     setError(null)
 
     try {
-      const info = await getUserInfo(wagmiAddress)
-      setWallet(wagmiAddress, 1) // Default chain ID
-      setUserRole(info.role as UserRole)
-      setPermissions(info.permissions, info.voting_power)
+      // Step 1: Complete SIWE authentication
+      const authResponse = await signInWithEthereum(
+        wagmiAddress,
+        async (message: string) => {
+          return await signMessageAsync({ message })
+        },
+        chain?.id || 1
+      )
+
+      // Step 2: Save session to authStore
+      const { setSession } = useAuthStore.getState()
+      setSession(authResponse.sessionId, authResponse.accessToken)
+      setWallet(wagmiAddress, chain?.id || 1)
+
+      // Step 3: Get user info
+      try {
+        const info = await getUserInfo(wagmiAddress)
+        setUserRole(info.role as UserRole)
+        setPermissions(info.permissions, info.voting_power)
+      } catch {
+        // If getUserInfo fails, set default role
+        setUserRole('human')
+        setPermissions([], 0)
+      }
+
       setSuccess(true)
       setTimeout(() => onClose(), 1000)
     } catch (err) {
+      console.error('Wallet binding error:', err)
       setError(err instanceof Error ? err.message : 'Failed to bind wallet')
     } finally {
       setIsLoading(false)

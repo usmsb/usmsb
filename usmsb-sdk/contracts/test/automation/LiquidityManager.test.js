@@ -36,6 +36,10 @@ describe("LiquidityManager", function () {
       await mockFactory.getAddress()
     );
     await liquidityManager.waitForDeployment();
+
+    // 模拟 distributeToPools：铸造 VIBE 到 LiquidityManager 合约
+    // 新initializeLiquidity使用合约中已有的VIBE
+    await vibeToken.transfer(await liquidityManager.getAddress(), LIQUIDITY_AMOUNT);
   });
 
   describe("Deployment", function () {
@@ -64,17 +68,16 @@ describe("LiquidityManager", function () {
       await vibeToken.connect(user1).approve(await liquidityManager.getAddress(), vibeAmount);
 
       await expect(
-        liquidityManager.connect(user1).initializeLiquidity(vibeAmount, ethAmount)
+        liquidityManager.connect(user1).initializeLiquidity({ value: ethAmount })
       ).to.be.revertedWithCustomError(liquidityManager, "OwnableUnauthorizedAccount");
     });
 
     it("Should initialize liquidity successfully", async function () {
-      const vibeAmount = ethers.parseEther("1000000");
+      // 合约中已有VIBE余额（通过distributeToPools）
       const ethAmount = ethers.parseEther("100");
 
-      await vibeToken.approve(await liquidityManager.getAddress(), vibeAmount);
-
-      await liquidityManager.initializeLiquidity(vibeAmount, 0, { value: ethAmount });
+      // 新签名：只需要ethAmount
+      await liquidityManager.initializeLiquidity({ value: ethAmount });
 
       expect(await liquidityManager.initialized()).to.equal(true);
       expect(await liquidityManager.totalVibeAdded()).to.be.gt(0);
@@ -82,26 +85,21 @@ describe("LiquidityManager", function () {
     });
 
     it("Should fail if already initialized", async function () {
-      const vibeAmount = ethers.parseEther("1000000");
       const ethAmount = ethers.parseEther("100");
 
-      await vibeToken.approve(await liquidityManager.getAddress(), vibeAmount * 2n);
-
-      await liquidityManager.initializeLiquidity(vibeAmount, 0, { value: ethAmount });
+      await liquidityManager.initializeLiquidity({ value: ethAmount });
 
       await expect(
-        liquidityManager.initializeLiquidity(vibeAmount, 0, { value: ethAmount })
+        liquidityManager.initializeLiquidity({ value: ethAmount })
       ).to.be.revertedWith("Already initialized");
     });
   });
 
   describe("Add More Liquidity", function () {
     beforeEach(async function () {
-      // 先初始化
-      const vibeAmount = ethers.parseEther("1000000");
+      // 先初始化 - 新签名只需要ethAmount
       const ethAmount = ethers.parseEther("100");
-      await vibeToken.approve(await liquidityManager.getAddress(), vibeAmount);
-      await liquidityManager.initializeLiquidity(vibeAmount, 0, { value: ethAmount });
+      await liquidityManager.initializeLiquidity({ value: ethAmount });
     });
 
     it("Should add more liquidity", async function () {
@@ -120,11 +118,9 @@ describe("LiquidityManager", function () {
 
   describe("Reinvest", function () {
     beforeEach(async function () {
-      // 初始化
-      const vibeAmount = ethers.parseEther("1000000");
+      // 初始化 - 新签名只需要ethAmount
       const ethAmount = ethers.parseEther("100");
-      await vibeToken.approve(await liquidityManager.getAddress(), vibeAmount);
-      await liquidityManager.initializeLiquidity(vibeAmount, 0, { value: ethAmount });
+      await liquidityManager.initializeLiquidity({ value: ethAmount });
     });
 
     it("Should not reinvest too frequently", async function () {
@@ -160,11 +156,24 @@ describe("LiquidityManager", function () {
       const testToken = await TestToken.deploy("Test", "TEST", owner.address);
       await testToken.waitForDeployment();
 
+      // Mint tokens first (required for VIBEToken)
+      await testToken.mintTreasury();
+
       const amount = ethers.parseEther("1000");
       await testToken.transfer(await liquidityManager.getAddress(), amount);
 
       const balanceBefore = await testToken.balanceOf(owner.address);
+
+      // Step 1: Initiate emergency withdraw
       await liquidityManager.emergencyWithdraw(await testToken.getAddress());
+
+      // Step 2: Fast forward 2 days
+      await ethers.provider.send("evm_increaseTime", [2 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+
+      // Step 3: Confirm emergency withdraw
+      await liquidityManager.confirmEmergencyWithdraw();
+
       const balanceAfter = await testToken.balanceOf(owner.address);
 
       expect(balanceAfter - balanceBefore).to.equal(amount);
@@ -177,8 +186,16 @@ describe("LiquidityManager", function () {
         value: ethers.parseEther("1")
       });
 
-      const balanceBefore = await ethers.provider.getBalance(owner.address);
+      // Step 1: Initiate emergency withdraw
       await liquidityManager.emergencyWithdrawETH();
+
+      // Step 2: Fast forward 2 days
+      await ethers.provider.send("evm_increaseTime", [2 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+
+      // Step 3: Confirm emergency withdraw
+      const balanceBefore = await ethers.provider.getBalance(owner.address);
+      await liquidityManager.confirmEmergencyWithdrawETH();
       const balanceAfter = await ethers.provider.getBalance(owner.address);
 
       expect(balanceAfter).to.be.gt(balanceBefore);
@@ -192,6 +209,58 @@ describe("LiquidityManager", function () {
 
       await liquidityManager.unpause();
       expect(await liquidityManager.paused()).to.equal(false);
+    });
+  });
+
+  describe("Investor Add Liquidity (addLiquidityAndGetLP)", function () {
+    beforeEach(async function () {
+      // 先初始化
+      const ethAmount = ethers.parseEther("100");
+      await liquidityManager.initializeLiquidity({ value: ethAmount });
+    });
+
+    it("Should reject below minimum ETH", async function () {
+      const tooLittleEth = ethers.parseEther("0.05"); // 小于0.1 ETH
+      const deadline = (await time.latest()) + 300; // 使用区块链时间
+
+      await expect(
+        liquidityManager.connect(user1).addLiquidityAndGetLP(0, 0, deadline, { value: tooLittleEth })
+      ).to.be.revertedWith("Below minimum 0.1 ETH");
+    });
+
+    it("Should reject when paused", async function () {
+      await liquidityManager.pause();
+      const deadline = (await time.latest()) + 300;
+
+      await expect(
+        liquidityManager.connect(user1).addLiquidityAndGetLP(0, 0, deadline, { value: ethers.parseEther("1") })
+      ).to.be.revertedWithCustomError(liquidityManager, "EnforcedPause");
+    });
+
+    it("Should reject before initialization", async function () {
+      // 部署新的LiquidityManager（未初始化）
+      const LiquidityManager2 = await ethers.getContractFactory("LiquidityManager");
+      const liquidityManager2 = await LiquidityManager2.deploy(
+        await vibeToken.getAddress(),
+        await mockRouter.getWETH(),
+        await mockRouter.getAddress(),
+        await mockFactory.getAddress()
+      );
+      await liquidityManager2.waitForDeployment();
+
+      const deadline = (await time.latest()) + 300;
+
+      await expect(
+        liquidityManager2.connect(user1).addLiquidityAndGetLP(0, 0, deadline, { value: ethers.parseEther("1") })
+      ).to.be.revertedWith("Not initialized");
+    });
+
+    it("Should reject expired deadline (front-running protection)", async function () {
+      const expiredDeadline = (await time.latest()) - 100; // 使用区块链时间
+
+      await expect(
+        liquidityManager.connect(user1).addLiquidityAndGetLP(0, 0, expiredDeadline, { value: ethers.parseEther("1") })
+      ).to.be.revertedWith("Transaction expired");
     });
   });
 });

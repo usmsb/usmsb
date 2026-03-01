@@ -98,12 +98,42 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
         // 从调用者转账代币到合约
         vibeToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        // 更新全局分红
-        _updateDividend();
-
-        dividendBalance += amount;
+        // 更新分红累计
+        _updateDividendAccumulation(amount);
 
         emit DividendDeposited(msg.sender, amount, dividendPerTokenStored);
+    }
+
+    /**
+     * @notice STK-006修复: 通知分红已到账（由VIBEToken在直接转账后调用）
+     * @dev 当VIBEToken通过_update直接转账到本合约时，调用此函数更新分红累计
+     * @param amount 分红金额
+     */
+    function notifyDividendReceived(uint256 amount) external {
+        require(amount > 0, "VIBDividend: amount must be greater than 0");
+        require(
+            msg.sender == address(vibeToken) || msg.sender == owner(),
+            "VIBDividend: unauthorized"
+        );
+
+        // 更新分红累计（代币已经通过VIBEToken._update转入）
+        _updateDividendAccumulation(amount);
+
+        emit DividendDeposited(msg.sender, amount, dividendPerTokenStored);
+    }
+
+    /**
+     * @dev 内部函数：更新分红累计
+     */
+    function _updateDividendAccumulation(uint256 amount) internal {
+        // 更新全局分红（按当前质押量计算每代币分红）
+        uint256 totalStaked = _getTotalStaked();
+        if (totalStaked > 0) {
+            // 修复: 正确更新 dividendPerTokenStored
+            dividendPerTokenStored += (amount * PRECISION) / totalStaked;
+        }
+
+        dividendBalance += amount;
     }
 
     /**
@@ -194,8 +224,9 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
         address token,
         address to,
         uint256 amount
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
         require(to != address(0), "VIBDividend: invalid address");
+        require(amount > 0, "VIBDividend: amount must be greater than 0");
 
         if (token == address(0)) {
             payable(to).transfer(amount);
@@ -254,6 +285,27 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
         return 0;
     }
 
+    /**
+     * @notice 获取用户质押量
+     * @param user 用户地址
+     * @return 用户质押量
+     */
+    function _getUserStake(address user) internal view returns (uint256) {
+        if (stakingContract != address(0) && user != address(0)) {
+            // 优先尝试调用 getStakeInfo
+            (bool success, bytes memory data) = stakingContract.staticcall(
+                abi.encodeWithSignature("getStakeInfo(address)", user)
+            );
+            if (success) {
+                // getStakeInfo returns StakeInfo:
+                // (amount, tier, lockPeriod, stakeTime, unlockTime, rewardPerTokenPaid, isActive)
+                (uint256 amount,,,,,,) = abi.decode(data, (uint256, uint256, uint256, uint256, uint256, uint256, bool));
+                return amount;
+            }
+        }
+        return 0;
+    }
+
     // ========== 视图函数 ==========
 
     /**
@@ -262,17 +314,19 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
      * @return 可领取分红金额
      */
     function getPendingDividend(address user) external view returns (uint256) {
-        uint256 totalStaked = _getTotalStaked();
-        if (totalStaked == 0) {
+        // 修复: 正确获取用户质押量
+        uint256 userStake = _getUserStake(user);
+        if (userStake == 0) {
             return pendingDividends[user];
         }
 
         uint256 dividendPerToken = dividendPerTokenStored;
         uint256 pending = pendingDividends[user];
 
-        // 计算自上次领取后的新增分红
+        // 修复: 正确公式 - 使用用户质押量而非总量
+        // pending = 用户已记录的待领取 + (当前每代币分红 - 上次领取时的每代币分红) * 用户质押量 / 精度
         uint256 newDividend = ((dividendPerToken - dividendPerTokenPaid[user]) *
-            totalStaked) / PRECISION;
+            userStake) / PRECISION;
 
         return pending + newDividend;
     }

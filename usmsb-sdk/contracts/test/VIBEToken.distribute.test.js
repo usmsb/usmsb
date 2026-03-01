@@ -87,21 +87,22 @@ describe("VIBEToken DistributeToPools", function () {
   });
 
   describe("Deployment", function () {
-    it("Should mint 8% to deployer", async function () {
+    it("Should have zero initial supply (tokens minted on distribution)", async function () {
       const balance = await vibeToken.balanceOf(owner.address);
-      expect(balance).to.equal(TEAM_AMOUNT);
+      expect(balance).to.equal(0);
     });
 
-    it("Should have correct total supply after deployment", async function () {
+    it("Should have zero total supply after deployment", async function () {
       const totalSupply = await vibeToken.totalSupply();
-      expect(totalSupply).to.equal(TEAM_AMOUNT); // Only 8% minted initially
+      expect(totalSupply).to.equal(0); // No tokens minted initially
     });
   });
 
   describe("distributeToPools", function () {
     it("Should distribute tokens to all pools correctly", async function () {
-      // 执行分配
+      // 执行分配 - 现在 distributeToPools 需要6个参数
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),
@@ -110,6 +111,7 @@ describe("VIBEToken DistributeToPools", function () {
       );
 
       // 验证各池余额
+      expect(await vibeToken.balanceOf(await teamVesting.getAddress())).to.equal(TEAM_AMOUNT);
       expect(await vibeToken.balanceOf(await earlyVesting.getAddress())).to.equal(EARLY_AMOUNT);
       expect(await vibeToken.balanceOf(await communityStableFund.getAddress())).to.equal(STABLE_FUND_AMOUNT);
       expect(await vibeToken.balanceOf(await liquidityManager.getAddress())).to.equal(LIQUIDITY_AMOUNT);
@@ -121,6 +123,7 @@ describe("VIBEToken DistributeToPools", function () {
       expect(await vibeToken.tokensDistributed()).to.be.false;
 
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),
@@ -133,6 +136,7 @@ describe("VIBEToken DistributeToPools", function () {
 
     it("Should set emission controller address", async function () {
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),
@@ -145,6 +149,7 @@ describe("VIBEToken DistributeToPools", function () {
 
     it("Should set tax exempt for all pool addresses", async function () {
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),
@@ -152,6 +157,7 @@ describe("VIBEToken DistributeToPools", function () {
         await emissionController.getAddress()
       );
 
+      expect(await vibeToken.taxExemptedAddresses(await teamVesting.getAddress())).to.be.true;
       expect(await vibeToken.taxExemptedAddresses(await earlyVesting.getAddress())).to.be.true;
       expect(await vibeToken.taxExemptedAddresses(await communityStableFund.getAddress())).to.be.true;
       expect(await vibeToken.taxExemptedAddresses(await liquidityManager.getAddress())).to.be.true;
@@ -161,6 +167,7 @@ describe("VIBEToken DistributeToPools", function () {
 
     it("Should fail if called twice", async function () {
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),
@@ -170,6 +177,7 @@ describe("VIBEToken DistributeToPools", function () {
 
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
@@ -184,6 +192,7 @@ describe("VIBEToken DistributeToPools", function () {
 
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
@@ -194,9 +203,11 @@ describe("VIBEToken DistributeToPools", function () {
     });
 
     it("Should fail if any address is zero", async function () {
+      // Team vesting is zero
       await expect(
         vibeToken.distributeToPools(
           ethers.ZeroAddress,
+          await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
           await airdropDistributor.getAddress(),
@@ -204,8 +215,22 @@ describe("VIBEToken DistributeToPools", function () {
         )
       ).to.be.revertedWith("VIBEToken: invalid team vesting");
 
+      // Early supporter vesting is zero
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
+          ethers.ZeroAddress,
+          await communityStableFund.getAddress(),
+          await liquidityManager.getAddress(),
+          await airdropDistributor.getAddress(),
+          await emissionController.getAddress()
+        )
+      ).to.be.revertedWith("VIBEToken: invalid early supporter vesting");
+
+      // Stable fund is zero
+      await expect(
+        vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           ethers.ZeroAddress,
           await liquidityManager.getAddress(),
@@ -214,8 +239,10 @@ describe("VIBEToken DistributeToPools", function () {
         )
       ).to.be.revertedWith("VIBEToken: invalid stable fund");
 
+      // Liquidity manager is zero
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           ethers.ZeroAddress,
@@ -224,8 +251,10 @@ describe("VIBEToken DistributeToPools", function () {
         )
       ).to.be.revertedWith("VIBEToken: invalid liquidity manager");
 
+      // Airdrop distributor is zero
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
@@ -234,8 +263,10 @@ describe("VIBEToken DistributeToPools", function () {
         )
       ).to.be.revertedWith("VIBEToken: invalid airdrop distributor");
 
+      // Emission controller is zero
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
@@ -248,6 +279,7 @@ describe("VIBEToken DistributeToPools", function () {
     it("Should fail if called by non-owner", async function () {
       await expect(
         vibeToken.connect(addr1).distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
@@ -259,6 +291,7 @@ describe("VIBEToken DistributeToPools", function () {
 
     it("Should have correct total supply after distribution", async function () {
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),
@@ -273,6 +306,7 @@ describe("VIBEToken DistributeToPools", function () {
     it("Should emit TokensDistributed event", async function () {
       await expect(
         vibeToken.distributeToPools(
+          await teamVesting.getAddress(),
           await earlyVesting.getAddress(),
           await communityStableFund.getAddress(),
           await liquidityManager.getAddress(),
@@ -286,6 +320,7 @@ describe("VIBEToken DistributeToPools", function () {
   describe("mintTreasury", function () {
     it("Should fail after distributeToPools", async function () {
       await vibeToken.distributeToPools(
+        await teamVesting.getAddress(),
         await earlyVesting.getAddress(),
         await communityStableFund.getAddress(),
         await liquidityManager.getAddress(),

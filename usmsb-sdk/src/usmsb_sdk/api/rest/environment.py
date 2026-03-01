@@ -11,7 +11,6 @@ import time
 
 from usmsb_sdk.api.database import (
     get_all_agents,
-    get_all_ai_agents,
     get_metrics,
     get_db,
 )
@@ -47,25 +46,24 @@ class EnvironmentBroadcast(BaseModel):
 
 def _calculate_environment_state() -> Dict[str, Any]:
     """Calculate current environment state from database."""
-    # Get all agents
+    # Get all agents from unified table
     all_agents = get_all_agents(limit=1000)
-    ai_agents = get_all_ai_agents()
     metrics = get_metrics()
 
     # Calculate statistics
-    total_agents = len(all_agents) + len(ai_agents)
-    active_agents = sum(1 for a in ai_agents if a.get('status') == 'online')
+    total_agents = len(all_agents)
+    active_agents = sum(1 for a in all_agents if a.get('status') == 'online')
 
     # Count by type
-    human_count = sum(1 for a in all_agents if a.get('type') == 'human')
-    ai_count = len(ai_agents)
-    external_count = sum(1 for a in ai_agents if a.get('agent_type') == 'external_agent')
+    human_count = sum(1 for a in all_agents if a.get('agent_type') == 'human_agent')
+    ai_count = sum(1 for a in all_agents if a.get('agent_type') == 'ai_agent')
+    external_count = sum(1 for a in all_agents if a.get('agent_type') == 'external_agent')
 
     # Calculate total stake and reputation
-    total_stake = sum(a.get('stake', 0) for a in ai_agents)
+    total_stake = sum(a.get('stake', 0) for a in all_agents)
     avg_reputation = 0.5
-    if ai_agents:
-        avg_reputation = sum(a.get('reputation', 0.5) for a in ai_agents) / len(ai_agents)
+    if all_agents:
+        avg_reputation = sum(a.get('reputation', 0.5) for a in all_agents) / len(all_agents)
 
     # Get transaction stats
     active_demands = metrics.get('active_demands', 0)
@@ -78,7 +76,7 @@ def _calculate_environment_state() -> Dict[str, Any]:
 
     # Extract hot skills from agents
     skill_counts: Dict[str, int] = {}
-    for agent in ai_agents:
+    for agent in all_agents:
         import json
         skills = json.loads(agent.get('skills', '[]')) if isinstance(agent.get('skills'), str) else agent.get('skills', [])
         for skill in skills:

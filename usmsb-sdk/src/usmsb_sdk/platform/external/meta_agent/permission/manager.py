@@ -27,6 +27,16 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
+def _get_event_loop():
+    """获取事件循环，处理没有运行中的循环的情况"""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+
 class PermissionManager:
     """
     权限管理器
@@ -48,7 +58,12 @@ class PermissionManager:
         if self._initialized:
             return
 
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
         await loop.run_in_executor(None, self._init_db)
         self._initialized = True
         logger.info("Permission Manager initialized")
@@ -148,19 +163,27 @@ class PermissionManager:
 
     async def get_user(self, wallet_address: str) -> Optional[UserPermission]:
         """获取用户权限信息"""
+        import sys
+        import traceback
+
         # 检查缓存
         if wallet_address in self._user_cache:
             return self._user_cache[wallet_address]
 
-        # 从数据库加载
-        user = await self._load_user(wallet_address)
-        if user:
-            self._user_cache[wallet_address] = user
-        else:
-            # 自动注册为新用户
-            user = await self.register_user(wallet_address, UserRole.HUMAN)
-
-        return user
+        try:
+            # 从数据库加载
+            user = await self._load_user(wallet_address)
+            if user:
+                self._user_cache[wallet_address] = user
+                return user
+            else:
+                # 自动注册为新用户
+                user = await self.register_user(wallet_address, UserRole.HUMAN)
+                return user
+        except RecursionError:
+            logger.error(f"RecursionError in get_user for {wallet_address}")
+            logger.error(f"Call stack: {traceback.format_exc()}")
+            return None
 
     async def update_role(
         self,
@@ -305,7 +328,7 @@ class PermissionManager:
 
     async def get_users_by_role(self, role: UserRole) -> List[UserPermission]:
         """获取指定角色的所有用户"""
-        loop = asyncio.get_event_loop()
+        loop = _get_event_loop()
         return await loop.run_in_executor(None, self._query_users_by_role, role)
 
     def _query_users_by_role(self, role: UserRole) -> List[UserPermission]:
@@ -324,7 +347,7 @@ class PermissionManager:
 
     async def get_all_users(self, limit: int = 100) -> List[UserPermission]:
         """获取所有用户"""
-        loop = asyncio.get_event_loop()
+        loop = _get_event_loop()
         return await loop.run_in_executor(None, self._query_all_users, limit)
 
     def _query_all_users(self, limit: int) -> List[UserPermission]:
@@ -343,7 +366,11 @@ class PermissionManager:
 
     async def _load_user(self, wallet_address: str) -> Optional[UserPermission]:
         """加载用户"""
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         return await loop.run_in_executor(None, self._query_user, wallet_address)
 
     def _query_user(self, wallet_address: str) -> Optional[UserPermission]:
@@ -389,7 +416,7 @@ class PermissionManager:
 
     async def _save_user(self, user: UserPermission):
         """保存用户"""
-        loop = asyncio.get_event_loop()
+        loop = _get_event_loop()
         await loop.run_in_executor(None, self._insert_user, user)
 
     def _insert_user(self, user: UserPermission):
@@ -430,7 +457,7 @@ class PermissionManager:
         reason: Optional[str],
     ):
         """记录角色变更历史"""
-        loop = asyncio.get_event_loop()
+        loop = _get_event_loop()
         await loop.run_in_executor(
             None,
             self._insert_role_change,

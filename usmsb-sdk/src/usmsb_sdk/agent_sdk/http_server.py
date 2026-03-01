@@ -198,9 +198,14 @@ class HTTPServer:
         @self.app.post("/invoke")
         async def invoke(request: Request):
             """Invoke skill endpoint"""
+            # 添加调试日志
+            logger.info(f"[DEBUG] /invoke called - headers: {dict(request.headers)}")
+
             try:
                 data = await request.json()
+                logger.info(f"[DEBUG] /invoke data: {data}")
             except:
+                logger.error(f"[DEBUG] /invoke - invalid JSON")
                 raise HTTPException(status_code=400, detail="Invalid JSON")
 
             method = data.get("method", "chat")

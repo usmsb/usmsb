@@ -25,9 +25,11 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-import { getMetrics, getAgents, getWorkflows } from '@/lib/api'
+import { getMetrics, getAgents, getWorkflows, getStatsSummary, getSystemStatus, authFetch } from '@/lib/api'
 import { WelcomeGuide } from '@/components/WelcomeGuide'
 import { ListItemSkeleton } from '@/components/ui/EmptyState'
+import { WalletBalanceCard, TransactionList } from '@/components/WalletBalance'
+import { ReputationDisplay } from '@/components/ReputationDisplay'
 import { useAppStore } from '@/store'
 import clsx from 'clsx'
 
@@ -54,10 +56,20 @@ export default function Dashboard() {
     queryFn: getWorkflows,
   })
 
+  const { data: statsSummary } = useQuery({
+    queryKey: ['stats-summary'],
+    queryFn: getStatsSummary,
+  })
+
+  const { data: systemStatus } = useQuery({
+    queryKey: ['system-status'],
+    queryFn: getSystemStatus,
+  })
+
   const { data: environmentState } = useQuery({
     queryKey: ['environment'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/environment/state`)
+      const response = await authFetch(`${API_BASE}/environment/state`)
       if (!response.ok) throw new Error('Failed to fetch environment state')
       return response.json()
     },
@@ -90,23 +102,23 @@ export default function Dashboard() {
   const stats = [
     {
       name: t('dashboard.totalAgents'),
-      value: totalAgentsCount,
+      value: statsSummary?.total_agents || totalAgentsCount,
       icon: Users,
-      change: environmentState?.market_trend === 'demand_surplus' ? 'Growing' : 'Stable',
+      change: `${statsSummary?.online_agents || 0} online`,
       changeType: 'increase' as const,
       neonColor: 'neon-blue',
     },
     {
       name: t('dashboard.activeAgents'),
-      value: activeAgentsCount,
+      value: statsSummary?.online_agents || activeAgentsCount,
       icon: FlaskConical,
-      change: activeAgentsCount > 0 ? 'Active' : 'No activity',
+      change: `${statsSummary?.bound_agents || 0} bound`,
       changeType: 'increase' as const,
       neonColor: 'neon-purple',
     },
     {
       name: t('dashboard.pendingTasks'),
-      value: activeDemands,
+      value: statsSummary?.active_demands || activeDemands,
       icon: Activity,
       change: 'Open demands',
       changeType: 'increase' as const,
@@ -114,9 +126,9 @@ export default function Dashboard() {
     },
     {
       name: t('dashboard.completedTasks'),
-      value: activeServices,
+      value: statsSummary?.active_collaborations || activeServices,
       icon: DollarSign,
-      change: 'Active services',
+      change: `${statsSummary?.total_stake?.toLocaleString() || 0} VIBE staked`,
       changeType: 'increase' as const,
       neonColor: 'neon-pink',
     },
@@ -519,6 +531,66 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Wallet & Reputation Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <WalletBalanceCard />
+        <ReputationDisplay showHistory={true} />
+        <div className="card">
+          <h3 className={clsx(
+            'text-lg font-semibold mb-4',
+            'text-light-text-primary',
+            isDark && 'text-neon-blue font-cyber'
+          )}>{t('dashboard.recentTransactions', 'Recent Transactions')}</h3>
+          <TransactionList limit={5} />
+        </div>
+      </div>
+
+      {/* System Status */}
+      {systemStatus && (
+        <div className="card">
+          <h3 className={clsx(
+            'text-lg font-semibold mb-4',
+            'text-light-text-primary',
+            isDark && 'text-neon-green font-cyber'
+          )}>{t('dashboard.systemStatus', 'System Status')}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-gray-800/30 rounded-lg">
+              <p className="text-sm text-gray-400">Version</p>
+              <p className="text-lg font-bold text-white">{systemStatus.version}</p>
+            </div>
+            <div className="p-4 bg-gray-800/30 rounded-lg">
+              <p className="text-sm text-gray-400">Uptime</p>
+              <p className="text-lg font-bold text-white">{systemStatus.uptime.days}d {Math.floor(systemStatus.uptime.hours % 24)}h</p>
+            </div>
+            <div className="p-4 bg-gray-800/30 rounded-lg">
+              <p className="text-sm text-gray-400">Services</p>
+              <div className="flex items-center gap-2">
+                <span className={clsx(
+                  'w-2 h-2 rounded-full',
+                  systemStatus.services.llm ? 'bg-green-400' : 'bg-red-400'
+                )} />
+                <span className={clsx(
+                  'w-2 h-2 rounded-full',
+                  systemStatus.services.meta_agent ? 'bg-green-400' : 'bg-red-400'
+                )} />
+                <span className={clsx(
+                  'w-2 h-2 rounded-full',
+                  systemStatus.services.prediction ? 'bg-green-400' : 'bg-red-400'
+                )} />
+                <span className={clsx(
+                  'w-2 h-2 rounded-full',
+                  systemStatus.services.workflow ? 'bg-green-400' : 'bg-red-400'
+                )} />
+              </div>
+            </div>
+            <div className="p-4 bg-gray-800/30 rounded-lg">
+              <p className="text-sm text-gray-400">Platform</p>
+              <p className="text-lg font-bold text-white">{systemStatus.platform.system}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

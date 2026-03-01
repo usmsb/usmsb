@@ -1,12 +1,19 @@
 """
 Collaborative Matching API endpoints.
+
+Stake Requirements:
+- create: 100 VIBE minimum
+- join: No stake required
+- contribute: 100 VIBE minimum
+- execute: 100 VIBE minimum
+- list/get/stats: No stake required
 """
 
 import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body, Depends
 
 from usmsb_sdk.api.database import (
     create_collaboration as db_create_collaboration,
@@ -14,13 +21,29 @@ from usmsb_sdk.api.database import (
     get_collaboration as db_get_collaboration,
 )
 from usmsb_sdk.api.rest.schemas.collaboration import CollaborationCreateRequest
+from usmsb_sdk.api.rest.unified_auth import (
+    get_current_user_unified,
+    get_optional_user_unified,
+    require_stake_unified,
+    verify_agent_access,
+)
 
 router = APIRouter(prefix="/collaborations", tags=["Collaborations"])
 
 
 @router.post("")
-async def create_collaboration_endpoint(request: CollaborationCreateRequest):
-    """Create a new collaboration session."""
+async def create_collaboration_endpoint(
+    request: CollaborationCreateRequest,
+    user: Dict[str, Any] = Depends(require_stake_unified(100))
+):
+    """Create a new collaboration session.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Minimum 100 VIBE stake
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
     session_id = f"collab-{int(datetime.now().timestamp() * 1000)}"
 
     # Create goal data
@@ -53,6 +76,7 @@ async def create_collaboration_endpoint(request: CollaborationCreateRequest):
         "participants": [],
         "status": "analyzing",
         "coordinator_id": request.coordinator_agent_id,
+        "creator_id": agent_id,
     }
 
     db_create_collaboration(collab_data)
@@ -64,6 +88,7 @@ async def create_collaboration_endpoint(request: CollaborationCreateRequest):
         "status": "analyzing",
         "participants": [],
         "coordinator_id": request.coordinator_agent_id,
+        "creator_id": agent_id,
     }
 
 
@@ -110,8 +135,17 @@ async def get_collaboration_endpoint(session_id: str):
 
 
 @router.post("/{session_id}/execute")
-async def execute_collaboration(session_id: str):
-    """Execute a collaboration session."""
+async def execute_collaboration(
+    session_id: str,
+    user: Dict[str, Any] = Depends(require_stake_unified(100))
+):
+    """Execute a collaboration session.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Minimum 100 VIBE stake
+    """
     session = db_get_collaboration(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Collaboration not found")
@@ -141,4 +175,140 @@ async def get_collaboration_stats():
         "completed_sessions": completed,
         "failed_sessions": failed,
         "success_rate": completed / total if total > 0 else 0,
+    }
+
+
+@router.post("/{session_id}/join")
+async def join_collaboration(
+    session_id: str,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Join a collaboration session.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - No stake required
+    """
+    session = db_get_collaboration(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+
+    # Parse participants
+    participants = session.get('participants', [])
+    if isinstance(participants, str):
+        participants = json.loads(participants)
+
+    # Check if already joined
+    agent_id = user.get('agent_id') or user.get('user_id')
+    for p in participants:
+        if p.get('agent_id') == agent_id:
+            raise HTTPException(status_code=400, detail="Already joined this collaboration")
+
+    # Add agent to participants
+    participants.append({
+        "agent_id": agent_id,
+        "joined_at": datetime.now().timestamp(),
+        "status": "active",
+        "contributions": []
+    })
+
+    # Update session
+    with __import__('usmsb_sdk.api.database', fromlist=['get_db']).get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE collaborations SET participants = ?, updated_at = ? WHERE session_id = ?',
+            (json.dumps(participants), datetime.now().timestamp(), session_id)
+        )
+
+    return {
+        "session_id": session_id,
+        "agent_id": agent_id,
+        "status": "joined",
+        "participants": participants
+    }
+
+
+@router.post("/{session_id}/contribute")
+async def submit_contribution(
+    session_id: str,
+    contribution: dict = Body(...),
+    user: Dict[str, Any] = Depends(require_stake_unified(100))
+):
+    """Submit contribution to a collaboration session.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Minimum 100 VIBE stake
+    """
+    session = db_get_collaboration(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+
+    agent_id = user.get('agent_id') or user.get('user_id')
+
+    # Parse participants
+    participants = session.get('participants', [])
+    if isinstance(participants, str):
+        participants = json.loads(participants)
+
+    # Find the agent in participants
+    found = False
+    for p in participants:
+        if p.get('agent_id') == agent_id:
+            found = True
+            if 'contributions' not in p:
+                p['contributions'] = []
+            p['contributions'].append({
+                "content": contribution,
+                "submitted_at": datetime.now().timestamp()
+            })
+            break
+
+    if not found:
+        raise HTTPException(status_code=400, detail="Must join collaboration before contributing")
+
+    # Update session
+    with __import__('usmsb_sdk.api.database', fromlist=['get_db']).get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE collaborations SET participants = ?, updated_at = ? WHERE session_id = ?',
+            (json.dumps(participants), datetime.now().timestamp(), session_id)
+        )
+
+    return {
+        "session_id": session_id,
+        "agent_id": agent_id,
+        "contribution": contribution,
+        "status": "contributed"
+    }
+
+
+@router.post("/{session_id}/complete")
+async def complete_collaboration(
+    session_id: str,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Complete a collaboration session.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    session = db_get_collaboration(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Collaboration not found")
+
+    # Update status
+    with __import__('usmsb_sdk.api.database', fromlist=['get_db']).get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE collaborations SET status = ?, updated_at = ? WHERE session_id = ?',
+            ("completed", datetime.now().timestamp(), session_id)
+        )
+
+    return {
+        "session_id": session_id,
+        "status": "completed"
     }

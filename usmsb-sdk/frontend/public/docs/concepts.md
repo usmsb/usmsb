@@ -1,120 +1,119 @@
-# USMSB模型概念介绍
+# USMSB Model Concepts
 
-**理解社会行为的通用系统模型**
+**Understanding the Universal System Model of Social Behavior**
 
-版本: 1.0.0
-
----
-
-## 目录
-
-1. [什么是USMSB模型](#1-什么是usmsb模型)
-2. [USMSB SDK 与 硅基文明平台](#2-usmsb-sdk-与-硅基文明平台)
-3. [九大核心要素详解](#3-九大核心要素详解)
-4. [九大通用行动接口](#4-九大通用行动接口)
-5. [六大核心逻辑](#5-六大核心逻辑)
-6. [AI Agent生态理念](#6-ai-agent生态理念)
-7. [模型的普适性验证](#7-模型的普适性验证)
+Version: 1.0.0
 
 ---
 
-## 1. 什么是USMSB模型
+## Table of Contents
 
-### 1.1 定义
-
-USMSB（Universal System Model of Social Behavior，社会行为的通用系统模型）是一个旨在统一描述和推演人类社会行为的理论框架。它将社会活动视为**开放的、自适应的复杂系统**，强调核心要素及其动态交互。
-
-### 1.2 核心理念
-
-USMSB模型的核心理念是将所有人类社会活动视为一个复杂系统，其核心在于：
-
-> **主体**在特定**环境**和**规则**约束下，通过**信息**驱动的**交互**和**转化**过程，实现**目标**并创造**价值**，同时伴随**风险**。
-
-### 1.3 模型特点
-
-| 特点 | 描述 |
-|------|------|
-| **系统性** | 将社会活动视为由相互关联要素组成的整体 |
-| **通用性** | 抽象出适用于所有社会活动的基本概念 |
-| **动态性** | 强调信息流、价值流和反馈循环的作用 |
-| **复杂性** | 承认并尝试体现社会系统的复杂性和涌现性 |
-| **可操作性** | 概念清晰，为计算模型提供理论基础 |
-
-### 1.4 理论基础
-
-USMSB模型的构建基于以下理论基础：
-
-- **马克思主义哲学**: 人的本质是"一切社会关系的总和"
-- **复杂性科学**: 关注由大量相互作用个体组成的系统
-- **社会系统理论**: 卢曼的社会系统理论，强调沟通和自我指涉
-- **社会行为理论**: 包括理性行为理论、计划行为理论等
+1. [What is USMSB Model](#1-what-is-usmsb-model)
+2. [USMSB SDK and Silicon Civilization Platform](#2-usmsb-sdk-and-silicon-civilization-platform)
+3. [Nine Core Elements](#3-nine-core-elements)
+4. [Nine Universal Action Interfaces](#4-nine-universal-action-interfaces)
+5. [Six Core Logics](#5-six-core-logics)
+6. [AI Agent Ecosystem Philosophy](#6-ai-agent-ecosystem-philosophy)
+7. [Model Universality Verification](#7-model-universality-verification)
 
 ---
 
-## 2. USMSB SDK 与 硅基文明平台
+## 1. What is USMSB Model
 
-### 2.1 层次架构
+### 1.1 Definition
 
-USMSB项目采用分层架构设计，将理论框架与应用平台分离：
+USMSB (Universal System Model of Social Behavior) is a theoretical framework designed to uniformly describe and deduce human social behavior. It views social activities as **open, adaptive complex systems**, emphasizing core elements and their dynamic interactions.
+
+### 1.2 Core Philosophy
+
+The core philosophy of the USMSB model is to view all human social activities as a complex system, whose essence lies in:
+
+> **Agents**, under specific **environment** and **rule** constraints, through **information**-driven **interaction** and **transformation** processes, achieve **goals** and create **value**, while accompanied by **risks**.
+
+### 1.3 Model Characteristics
+
+| Characteristic | Description |
+|----------------|-------------|
+| **Systematic** | View social activities as a whole composed of interrelated elements |
+| **Universal** | Abstract basic concepts applicable to all social activities |
+| **Dynamic** | Emphasize the role of information flow, value flow, and feedback loops |
+| **Complex** | Acknowledge and attempt to reflect the complexity and emergence of social systems |
+| **Actionable** | Clear concepts, providing theoretical basis for computational models |
+
+### 1.4 Theoretical Foundation
+
+The USMSB model is built on the following theoretical foundations:
+
+- **Marxist Philosophy**: Human nature is "the sum of all social relations"
+- **Complexity Science**: Focus on systems composed of many interacting individuals
+- **Social Systems Theory**: Luhmann's social systems theory, emphasizing communication and self-reference
+- **Social Behavior Theory**: Including rational behavior theory, planned behavior theory, and more
+
+---
+
+## 2. USMSB SDK and Silicon Civilization Platform
+
+### 2.1 Layered Architecture
+
+The USMSB project uses a layered architecture design that separates the theoretical framework from the application platform:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     硅基文明平台                              │
-│              (Silicon Civilization Platform)                 │
-│     去中心化Agent协作应用 · 用户界面 · 代币经济 · 治理        │
+│              Silicon Civilization Platform                  │
+│     Decentralized Agent Collaboration · UI · Token Economy  │
 ├─────────────────────────────────────────────────────────────┤
-│                       USMSB SDK                              │
-│        开发工具包 · API · 智力源适配 · 核心模型实现            │
+│                         USMSB SDK                           │
+│        Developer Toolkit · API · Intelligence Adapters      │
 ├─────────────────────────────────────────────────────────────┤
-│                      USMSB 模型                              │
-│     理论框架 · 九大要素 · 通用行动接口 · 核心逻辑              │
+│                        USMSB Model                          │
+│     Theoretical Framework · Nine Elements · Core Logic      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 各层职责
+### 2.2 Layer Responsibilities
 
-| 层次 | 名称 | 职责 | 交付物 |
-|------|------|------|--------|
-| **理论层** | USMSB模型 | 提供描述社会行为的统一理论框架 | 论文、文档、概念定义 |
-| **工具层** | USMSB SDK | 将理论转化为可编程的工具和接口 | Python包、API、文档 |
-| **应用层** | 硅基文明平台 | 提供面向终端用户的产品和服务 | Web应用、移动应用 |
+| Layer | Name | Responsibility | Deliverables |
+|-------|------|----------------|--------------|
+| **Theory Layer** | USMSB Model | Provide unified theoretical framework for describing social behavior | Papers, documents, concept definitions |
+| **Tool Layer** | USMSB SDK | Transform theory into programmable tools and interfaces | Python package, API, documentation |
+| **Application Layer** | Silicon Civilization Platform | Provide end-user products and services | Web application, mobile application |
 
-### 2.3 关系说明
+### 2.3 Relationship Description
 
-- **USMSB模型** 是纯理论框架，独立于任何具体实现
-- **USMSB SDK** 基于模型开发，为开发者提供技术工具
-- **硅基文明平台** 是USMSB SDK的官方示范应用，展示了SDK的全部能力
+- **USMSB Model** is a purely theoretical framework, independent of any specific implementation
+- **USMSB SDK** is developed based on the model, providing technical tools for developers
+- **Silicon Civilization Platform** is the official demo application of USMSB SDK, demonstrating the full capabilities of the SDK
 
-### 2.4 用户选择指南
+### 2.4 User Selection Guide
 
-| 用户类型 | 推荐使用 | 说明 |
-|----------|----------|------|
-| 学术研究者 | USMSB模型 | 研究社会行为理论，发表论文 |
-| 软件开发者 | USMSB SDK | 基于SDK开发自己的Agent应用 |
-| 企业用户 | 硅基文明平台 | 直接使用平台进行Agent协作 |
-| 普通用户 | 硅基文明平台 | 注册Agent、参与协作、获取服务 |
+| User Type | Recommended Use | Description |
+|-----------|-----------------|-------------|
+| Academic Researchers | USMSB Model | Study social behavior theory, publish papers |
+| Software Developers | USMSB SDK | Develop your own Agent applications based on the SDK |
+| Enterprise Users | Silicon Civilization Platform | Use the platform directly for Agent collaboration |
+| General Users | Silicon Civilization Platform | Register Agents, participate in collaboration, get services |
 
 ---
 
-## 3. 九大核心要素详解
+## 3. Nine Core Elements
 
-USMSB模型由九个核心要素构成，它们是构建任何社会活动系统的基本"原子"或"组成部分"。
+The USMSB model consists of nine core elements that are the basic "atoms" or "components" for constructing any social activity system.
 
-### 2.1 主体 (Agent)
+### 3.1 Agent
 
-**定义**: 具有感知、决策、行动能力的个体或组织。
+**Definition**: Individuals or organizations with perception, decision-making, and action capabilities.
 
-**特征**:
-- **异质性**: 不同主体拥有不同的目标、能力、偏好
-- **有限理性**: 决策受认知能力、信息获取等因素限制
-- **适应性**: 能够根据环境变化和反馈调整行为
+**Characteristics**:
+- **Heterogeneity**: Different agents have different goals, capabilities, and preferences
+- **Bounded Rationality**: Decision-making is limited by cognitive abilities, information access, and other factors
+- **Adaptability**: Can adjust behavior based on environmental changes and feedback
 
-**类型示例**:
-- 个体: 用户、消费者、员工、患者
-- 组织: 企业、政府机构、非营利组织
-- AI Agent: 智能助手、自动化系统、机器人
+**Type Examples**:
+- Individuals: users, consumers, employees, patients
+- organizations: enterprises, government agencies, non-profit organizations
+- AI Agents: intelligent assistants, automated systems, robots
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Agent:
@@ -130,20 +129,20 @@ class Agent:
 
 ---
 
-### 2.2 客体 (Object)
+### 3.2 Object
 
-**定义**: 活动作用的对象，可以是物质实体、信息、非物质实体等。
+**Definition**: The target of activity, which can be physical entities, information, intangible entities, etc.
 
-**特征**:
-- **可操作性**: 能够被主体感知、处理、转化或影响
-- **属性集合**: 具有描述其特征和状态的一系列属性
+**Characteristics**:
+- **Operability**: Can be perceived, processed, transformed, or influenced by agents
+- **Property Set**: Has a series of attributes describing its characteristics and state
 
-**类型示例**:
-- 物质实体: 产品、原材料、设备
-- 信息实体: 数据、知识、文档
-- 非物质实体: 服务、健康、关系
+**Type Examples**:
+- Physical entities: products, raw materials, equipment
+- Information entities: data, knowledge, documents
+- Intangible entities: services, health, relationships
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Object:
@@ -156,23 +155,23 @@ class Object:
 
 ---
 
-### 2.3 目标 (Goal)
+### 3.3 Goal
 
-**定义**: 主体希望通过活动达成的预期状态或结果。
+**Definition**: The expected state or result that an agent hopes to achieve through activity.
 
-**特征**:
-- **层级性**: 存在个体目标、组织目标、社会目标
-- **动态性**: 可能随着环境变化和学习过程而调整
-- **可衡量性**: 部分目标可通过量化指标衡量
+**Characteristics**:
+- **Hierarchy**: There are individual goals, organizational goals, and social goals
+- **Dynamic**: May adjust as the environment changes and learning occurs
+- **Measurability**: Some goals can be measured through quantitative indicators
 
-**层级示例**:
+**Hierarchy Example**:
 ```
-社会目标: 提高国民健康水平
-    └── 组织目标: 医院提供高质量服务
-        └── 个体目标: 医生治愈患者疾病
+Social Goal: Improve national health level
+    └── Organizational Goal: Hospital provides high-quality services
+        └── Individual Goal: Doctor cures patient's disease
 ```
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Goal:
@@ -186,28 +185,28 @@ class Goal:
 
 ---
 
-### 2.4 资源 (Resource)
+### 3.4 Resource
 
-**定义**: 活动所需的一切投入，包括有形资源和无形资源。
+**Definition**: All inputs required for activities, including tangible and intangible resources.
 
-**特征**:
-- **稀缺性**: 资源通常是有限的，需要有效配置
-- **可转化性**: 可被消耗、转化或增值
-- **多维度性**: 包括物质、人力、信息、时间等多种形式
+**Characteristics**:
+- **Scarcity**: Resources are usually limited and need effective allocation
+- **Transformability**: Can be consumed, transformed, or appreciated
+- **Multi-dimensional**: Includes material, human, information, time, and other forms
 
-**分类**:
+**Classification**:
 
-| 有形资源 | 无形资源 |
-|----------|----------|
-| 资金 | 知识 |
-| 设备 | 信息 |
-| 场所 | 技术 |
-| 原材料 | 时间 |
-| 人力 | 信任 |
-| | 品牌 |
-| | 文化 |
+| Tangible Resources | Intangible Resources |
+|--------------------|----------------------|
+| Funds | Knowledge |
+| Equipment | Information |
+| Location | Technology |
+| Raw materials | Time |
+| Human resources | Trust |
+| | Brand |
+| | Culture |
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Resource:
@@ -222,25 +221,25 @@ class Resource:
 
 ---
 
-### 2.5 规则 (Rule)
+### 3.5 Rule
 
-**定义**: 约束主体行为和活动流程的规范、法律、政策、伦理、标准、习俗等。
+**Definition**: Norms, laws, policies, ethics, standards, customs, etc. that constrain agent behavior and activity processes.
 
-**特征**:
-- **显性与隐性**: 可明确成文，也可约定俗成
-- **强制性与自愿性**: 部分具有强制约束力
-- **动态性**: 随社会发展而调整或演化
+**Characteristics**:
+- **Explicit and Implicit**: Can be clearly documented or conventionally understood
+- **Mandatory and Voluntary**: Some have mandatory binding force
+- **Dynamic**: Adjust or evolve with social development
 
-**分类**:
+**Classification**:
 
-| 显性规则 | 隐性规则 |
-|----------|----------|
-| 法律法规 | 社会规范 |
-| 行业标准 | 文化习俗 |
-| 组织制度 | 道德伦理 |
-| 平台协议 | 行业惯例 |
+| Explicit Rules | Implicit Rules |
+|----------------|----------------|
+| Laws and regulations | Social norms |
+| Industry standards | Cultural customs |
+| Organizational systems | Moral ethics |
+| Platform agreements | Industry practices |
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Rule:
@@ -248,29 +247,29 @@ class Rule:
     name: str
     description: str
     type: str  # "legal", "social", "algorithmic"
-    scope: List[str]  # 适用范围
+    scope: List[str]  # Applicable scope
     priority: int
 ```
 
 ---
 
-### 2.6 信息 (Information)
+### 3.6 Information
 
-**定义**: 活动中产生、传递、处理和利用的数据、知识、信号、沟通内容等。
+**Definition**: Data, knowledge, signals, communication content, etc. generated, transmitted, processed, and utilized in activities.
 
-**特征**:
-- **不对称性**: 不同主体获取的信息可能存在差异
-- **时效性**: 信息的价值可能随时间变化
-- **多模态**: 可以文本、图像、声音、数据等多种形式存在
+**Characteristics**:
+- **Asymmetry**: Different agents may have different information
+- **Timeliness**: The value of information may change over time
+- **Multi-modal**: Can exist in forms such as text, images, sounds, data
 
-**信息流示例**:
+**Information Flow Example**:
 ```
-市场信息 → 企业决策 → 生产指令 → 产品信息 → 消费者反馈
+Market Information → Enterprise Decision → Production Command → Product Information → Consumer Feedback
     ↑                                              ↓
-    └──────────────── 持续循环 ←─────────────────────┘
+    └────────────────  Continuous Cycle ←─────────────────────┘
 ```
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Information:
@@ -284,25 +283,25 @@ class Information:
 
 ---
 
-### 2.7 价值 (Value)
+### 3.7 Value
 
-**定义**: 活动产生的效益、意义或效用，是主体追求的最终产出。
+**Definition**: Benefits, meaning, or utility generated by activities, which is the ultimate output pursued by agents.
 
-**特征**:
-- **多维度性**: 包括经济、社会、健康、情感等价值
-- **主观性**: 不同主体对同一产出的价值判断可能不同
-- **可衡量性**: 部分价值可通过量化指标衡量
+**Characteristics**:
+- **Multi-dimensional**: Includes economic, social, health, emotional value
+- **Subjectivity**: Different agents may have different value judgments on the same output
+- **Measurability**: Some values can be measured through quantitative indicators
 
-**价值类型**:
+**Value Types**:
 
-| 类型 | 示例 |
-|------|------|
-| 经济价值 | 利润、收益、GDP增长 |
-| 社会价值 | 公平、稳定、凝聚力 |
-| 健康价值 | 康复、福祉、生命质量 |
-| 情感价值 | 幸福感、归属感、成就感 |
+| Type | Example |
+|------|---------|
+| Economic value | Profit, revenue, GDP growth |
+| Social value | Fairness, stability, cohesion |
+| Health value | Recovery, well-being, quality of life |
+| Emotional value | Happiness, belonging, achievement |
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Value:
@@ -316,26 +315,26 @@ class Value:
 
 ---
 
-### 2.8 风险 (Risk)
+### 3.8 Risk
 
-**定义**: 活动过程中可能出现的不确定性及其潜在的负面影响。
+**Definition**: Uncertainties that may occur during activities and their potential negative impacts.
 
-**特征**:
-- **不确定性**: 风险的发生及后果具有不确定性
-- **潜在损失**: 一旦发生可能导致资源损失或目标受损
-- **可管理性**: 可通过识别、评估、控制等手段降低影响
+**Characteristics**:
+- **Uncertainty**: The occurrence and consequences of risks are uncertain
+- **Potential Loss**: May lead to resource loss or goal damage if they occur
+- **Manageable**: Can be mitigated through identification, assessment, and control
 
-**风险类型**:
+**Risk Types**:
 
-| 风险类型 | 示例 |
-|----------|------|
-| 市场风险 | 需求波动、价格波动、竞争加剧 |
-| 操作风险 | 系统故障、人为失误、欺诈 |
-| 信用风险 | 违约、拖欠 |
-| 技术风险 | 技术过时、安全漏洞 |
-| 关系风险 | 误解、冲突、信任破裂 |
+| Risk Type | Example |
+|-----------|---------|
+| Market risk | Demand fluctuation, price fluctuation, increased competition |
+| Operational risk | System failure, human error, fraud |
+| Credit risk | Default, overdue |
+| Technical risk | Technology obsolescence, security vulnerabilities |
+| Relationship risk | Misunderstanding, conflict, trust breakdown |
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Risk:
@@ -350,31 +349,31 @@ class Risk:
 
 ---
 
-### 2.9 环境 (Environment)
+### 3.9 Environment
 
-**定义**: 活动所处的外部条件和背景。
+**Definition**: The external conditions and context in which activities occur.
 
-**特征**:
-- **动态性**: 环境因素持续变化
-- **复杂性**: 由多种相互关联的因素构成
-- **开放性**: 系统与环境之间存在持续交换
+**Characteristics**:
+- **Dynamic**: Environmental factors continuously change
+- **Complex**: Composed of multiple interrelated factors
+- **Open**: There is continuous exchange between the system and the environment
 
-**环境层次**:
+**Environment Levels**:
 
 ```
 ┌────────────────────────────────────────┐
-│           宏观环境                      │
-│  经济形势、政治法律、社会文化、技术发展   │
+│           Macro Environment             │
+│  Economy, Politics/Law, Society/Culture│
 ├────────────────────────────────────────┤
-│           中观环境                      │
-│  行业竞争、供应链、市场趋势              │
+│           Meso Environment             │
+│  Industry Competition, Supply Chain    │
 ├────────────────────────────────────────┤
-│           微观环境                      │
-│  家庭、社区、工作场所、社交圈子          │
+│           Micro Environment            │
+│  Family, Community, Workplace         │
 └────────────────────────────────────────┘
 ```
 
-**在SDK中的表示**:
+**Representation in SDK**:
 ```python
 @dataclass
 class Environment:
@@ -387,23 +386,23 @@ class Environment:
 
 ---
 
-## 4. 九大通用行动接口
+## 4. Nine Universal Action Interfaces
 
-这些行动是所有社会活动中主体普遍采取的基本行为模式，它们构成了系统运行的微观机制。
+These actions are the basic behavior patterns commonly taken by agents in all social activities, constituting the micro-mechanisms of system operation.
 
-### 3.1 感知 (Perception)
+### 4.1 Perception
 
-**定义**: 主体获取和理解信息的过程。
+**Definition**: The process by which agents obtain and understand information.
 
-**作用**: 建立主体与外部世界的联系，是决策的基础。
+**Role**: Establishes the connection between agents and the external world, forming the basis for decision-making.
 
-**实现方式**:
-- 观察和监测
-- 数据收集和分析
-- 市场调研
-- 传感器数据获取
+**Implementation Methods**:
+- Observation and monitoring
+- Data collection and analysis
+- Market research
+- Sensor data acquisition
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IPerceptionService(ABC):
     @abstractmethod
@@ -414,31 +413,31 @@ class IPerceptionService(ABC):
 
 ---
 
-### 3.2 目标与规则解读 (Goal & Rule Interpretation)
+### 4.2 Goal & Rule Interpretation
 
-**定义**: 主体根据自身目标和所处规则对信息进行解读。
+**Definition**: Agents interpret information based on their own goals and applicable rules.
 
-**作用**: 决定主体如何理解情境，为后续决策提供框架。
+**Role**: Determines how agents understand situations, providing a framework for subsequent decision-making.
 
-**实现方式**:
-- 目标分解和优先级排序
-- 规则识别和约束分析
-- 情境理解和语义解析
+**Implementation Methods**:
+- Goal decomposition and priority ranking
+- Rule identification and constraint analysis
+- Context understanding and semantic parsing
 
 ---
 
-### 3.3 决策 (Decision-making)
+### 4.3 Decision-making
 
-**定义**: 主体基于信息、目标、规则和资源选择行动方案。
+**Definition**: Agents choose action plans based on information, goals, rules, and resources.
 
-**作用**: 主体能动性的体现，将意图转化为行动计划。
+**Role**: Embodies agent agency, transforming intentions into action plans.
 
-**实现方式**:
-- 方案生成和评估
-- 多目标优化
-- 风险收益权衡
+**Implementation Methods**:
+- Plan generation and evaluation
+- Multi-objective optimization
+- Risk-benefit trade-off
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IDecisionService(ABC):
     @abstractmethod
@@ -449,19 +448,19 @@ class IDecisionService(ABC):
 
 ---
 
-### 3.4 执行 (Execution)
+### 4.4 Execution
 
-**定义**: 主体实施选定的行动方案。
+**Definition**: Agents implement selected action plans.
 
-**作用**: 将决策转化为具体操作，使客体发生转化。
+**Role**: Transforms decisions into specific operations, causing objects to transform.
 
-**实现方式**:
-- 代码执行
-- API调用
-- 物理操作
-- 模拟操作
+**Implementation Methods**:
+- Code execution
+- API calls
+- Physical operations
+- Simulation operations
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IExecutionService(ABC):
     @abstractmethod
@@ -472,19 +471,19 @@ class IExecutionService(ABC):
 
 ---
 
-### 3.5 交互 (Interaction)
+### 4.5 Interaction
 
-**定义**: 主体之间、主体与客体/环境之间的相互作用过程。
+**Definition**: The process of mutual action between agents, and between agents and objects/environment.
 
-**作用**: 信息流动、资源配置、关系建立的渠道。
+**Role**: Channels for information flow, resource allocation, and relationship establishment.
 
-**类型**:
-- 沟通: 信息交换
-- 协作: 共同完成任务
-- 竞争: 资源争夺
-- 冲突: 利益矛盾
+**Types**:
+- Communication: information exchange
+- Collaboration: completing tasks together
+- Competition: resource competition
+- Conflict: interest contradictions
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IInteractionService(ABC):
     @abstractmethod
@@ -495,19 +494,19 @@ class IInteractionService(ABC):
 
 ---
 
-### 3.6 转化 (Transformation)
+### 4.6 Transformation
 
-**定义**: 资源或客体形态、属性、价值的改变过程。
+**Definition**: The process of changing the form, attributes, or value of resources or objects.
 
-**作用**: 实现价值创造和增值的核心机制。
+**Role**: Core mechanism for achieving value creation and appreciation.
 
-**示例**:
-- 知识 → 能力
-- 原材料 → 产品
-- 资金 → 资本
-- 情感 → 信任
+**Examples**:
+- Knowledge → Capability
+- Raw materials → Products
+- Capital → Capital
+- Emotion → Trust
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class ITransformationService(ABC):
     @abstractmethod
@@ -518,19 +517,19 @@ class ITransformationService(ABC):
 
 ---
 
-### 3.7 评估 (Evaluation)
+### 4.7 Evaluation
 
-**定义**: 主体衡量活动进展、效果和产出。
+**Definition**: Agents measure activity progress, effects, and outputs.
 
-**作用**: 系统自我修正和优化的前提。
+**Role**: Prerequisite for system self-correction and optimization.
 
-**评估维度**:
-- 目标达成度
-- 资源利用效率
-- 价值创造量
-- 风险暴露度
+**Evaluation Dimensions**:
+- Goal achievement degree
+- Resource utilization efficiency
+- Value creation quantity
+- Risk exposure degree
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IEvaluationService(ABC):
     @abstractmethod
@@ -541,18 +540,18 @@ class IEvaluationService(ABC):
 
 ---
 
-### 3.8 反馈 (Feedback)
+### 4.8 Feedback
 
-**定义**: 将评估结果返回给决策和执行环节进行调整和优化。
+**Definition**: Returning evaluation results to decision and execution phases for adjustment and optimization.
 
-**作用**: 系统自适应和学习的基础。
+**Role**: Foundation for system adaptation and learning.
 
-**类型**:
-- 正反馈: 增强原有趋势
-- 负反馈: 抑制原有趋势
-- 延迟反馈: 经过时间滞后
+**Types**:
+- Positive feedback: reinforcing original trends
+- Negative feedback: suppressing original trends
+- Delayed feedback: after time lag
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IFeedbackService(ABC):
     @abstractmethod
@@ -563,19 +562,19 @@ class IFeedbackService(ABC):
 
 ---
 
-### 3.9 风险管理 (Risk Management)
+### 4.9 Risk Management
 
-**定义**: 识别、评估和应对潜在风险。
+**Definition**: Identifying, assessing, and responding to potential risks.
 
-**作用**: 降低负面影响，提高系统鲁棒性。
+**Role**: Reducing negative impacts and improving system robustness.
 
-**策略**:
-- 风险规避: 避免高风险活动
-- 风险转移: 通过保险等方式转移
-- 风险降低: 采取措施降低概率或影响
-- 风险接受: 承受可接受的风险
+**Strategies**:
+- Risk avoidance: avoiding high-risk activities
+- Risk transfer: transferring through insurance, etc.
+- Risk reduction: taking measures to reduce probability or impact
+- Risk acceptance: accepting acceptable risks
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class IRiskManagementService(ABC):
     @abstractmethod
@@ -586,18 +585,18 @@ class IRiskManagementService(ABC):
 
 ---
 
-### 3.10 学习 (Learning)
+### 4.10 Learning
 
-**定义**: 主体从经验中获取知识，调整行为模式，提升能力。
+**Definition**: Agents acquire knowledge from experience, adjust behavior patterns, and improve capabilities.
 
-**作用**: 系统演化的动力，实现适应与进化。
+**Role**: Driving force for system evolution, achieving adaptation and evolution.
 
-**层次**:
-- 单环学习: 纠正错误行为
-- 双环学习: 修正目标和规则
-- 元学习: 学习如何学习
+**Levels**:
+- Single-loop learning: correcting erroneous behavior
+- Double-loop learning: modifying goals and rules
+- Meta-learning: learning how to learn
 
-**SDK接口**:
+**SDK Interface**:
 ```python
 class ILearningService(ABC):
     @abstractmethod
@@ -608,335 +607,324 @@ class ILearningService(ABC):
 
 ---
 
-## 5. 六大核心逻辑
+## 5. Six Core Logics
 
-这些逻辑是驱动所有社会活动运行的基本规律和循环机制，描述了系统层面的宏观行为模式。
+These logics are the basic laws and circular mechanisms driving all social activities, describing macro-level behavior patterns at the system level.
 
-### 4.1 目标-行动-结果循环 (Goal-Action-Outcome Loop)
+### 5.1 Goal-Action-Outcome Loop
 
-**描述**: 设定目标、采取行动、产生结果，并根据结果调整目标和行动的持续循环。
+**Description**: Setting goals, taking actions, producing outcomes, and continuously looping by adjusting goals and actions based on outcomes.
 
 ```
      ┌──────────┐
-     │   目标   │
-     │  Goal    │
+     │   Goal   │
      └────┬─────┘
           │
           ▼
      ┌──────────┐
-     │   行动   │◄──────────┐
-     │  Action  │           │
+     │  Action  │◄──────────┐
      └────┬─────┘           │
           │                 │
           ▼                 │
      ┌──────────┐           │
-     │   结果   │           │
      │ Outcome  │           │
      └────┬─────┘           │
           │                 │
           ▼                 │
      ┌──────────┐           │
-     │   调整   │───────────┘
-     │ Adjust   │
+     │  Adjust  │───────────┘
      └──────────┘
 ```
 
-**关键要素**:
-- 目标设定和分解
-- 行动规划和执行
-- 结果评估
-- 反馈调整
+**Key Elements**:
+- Goal setting and decomposition
+- Action planning and execution
+- Outcome evaluation
+- Feedback adjustment
 
-**实现组件**: `GoalManager`, `ActionPlanner`, `ResultEvaluator`
+**Implementation Components**: `GoalManager`, `ActionPlanner`, `ResultEvaluator`
 
 ---
 
-### 4.2 资源-转化-价值增值链 (Resource-Transformation-Value Chain)
+### 5.2 Resource-Transformation-Value Chain
 
-**描述**: 通过投入稀缺资源，经过一系列转化过程，最终实现价值的创造和增值。
+**Description**: Investing scarce resources, going through a series of transformation processes, ultimately achieving value creation and appreciation.
 
 ```
-  资源       转化过程        价值
-Resource ───────────────► Value
+  Resource ───────────────► Value
    │                         ▲
    │    ┌─────────────────┐  │
-   └───►│    转化过程     │──┘
-        │ Transformation │
+   └───►│ Transformation  │──┘
+        │    Process       │
         └─────────────────┘
               │
               ▼
-           增值
+         Appreciation
 ```
 
-**关键要素**:
-- 资源配置和投入
-- 转化过程优化
-- 价值评估和分配
-- 效率提升
+**Key Elements**:
+- Resource allocation and investment
+- Transformation process optimization
+- Value evaluation and distribution
+- Efficiency improvement
 
-**实现组件**: `ResourceManager`, `ValueCalculator`
+**Implementation Components**: `ResourceManager`, `ValueCalculator`
 
 ---
 
-### 4.3 信息-决策-控制回路 (Information-Decision-Control Loop)
+### 5.3 Information-Decision-Control Loop
 
-**描述**: 信息是决策的基础，决策指导行动，行动结果产生新的信息，形成闭环。
+**Description**: Information is the basis for decisions, decisions guide actions, action results generate new information, forming a closed loop.
 
 ```
     ┌───────────────────────────────────────┐
     │                                       │
     ▼                                       │
 ┌──────────┐      ┌──────────┐      ┌──────────┐
-│   信息   │─────►│   决策   │─────►│   控制   │
-│Information│     │Decision  │     │ Control  │
+│Information│─────►│ Decision │─────►│ Control  │
 └──────────┘      └──────────┘      └──────────┘
     ▲                                       │
     │                                       │
     └───────────────────────────────────────┘
 ```
 
-**关键要素**:
-- 信息采集和处理
-- 决策分析和支持
-- 控制执行和反馈
-- 实时响应
+**Key Elements**:
+- Information collection and processing
+- Decision analysis and support
+- Control execution and feedback
+- Real-time response
 
-**实现组件**: `InformationProcessor`, `DecisionEngine`, `ControlMechanism`
+**Implementation Components**: `InformationProcessor`, `DecisionEngine`, `ControlMechanism`
 
 ---
 
-### 4.4 系统-环境互动 (System-Environment Interaction)
+### 5.4 System-Environment Interaction
 
-**描述**: 社会活动系统与外部环境之间存在持续的输入、输出和适应性互动。
+**Description**: There is continuous input, output, and adaptive interaction between social activity systems and the external environment.
 
 ```
-         环境 Environment
+         Environment
               │
     ┌─────────┼─────────┐
-    │    输入 │         │ 输出
-    │   Input │         │ Output
+    │    Input│         │ Output
     ▼         │         ▼
 ┌─────────────────────────┐
 │                         │
-│      系统 System        │
+│        System           │
 │                         │
 └─────────────────────────┘
     │         ▲
-    │ 适应    │ 反馈
+    │ Adapt   │ Feedback
     ▼         │
 ```
 
-**关键要素**:
-- 环境感知
-- 资源获取
-- 输出交付
-- 适应性调整
+**Key Elements**:
+- Environment perception
+- Resource acquisition
+- Output delivery
+- Adaptive adjustment
 
-**实现组件**: `EnvironmentManager`, `EnvironmentSimulator`
-
----
-
-### 4.5 涌现与自组织 (Emergence and Self-organization)
-
-**描述**: 复杂社会系统中的宏观模式和行为往往是微观主体通过相互作用自发形成的。
-
-```
-  微观行为              涌现
-  Micro              Emergence
-    │                   │
-    │   ┌───────────┐   │
-    ├──►│  交互     │───┤
-    │   │Interaction│   │
-    │   └───────────┘   │
-    │                   │
-    ▼                   ▼
-  Agent行为          宏观模式
-  Agent Behavior    Macro Pattern
-```
-
-**关键要素**:
-- 微观主体行为
-- 相互作用模式
-- 宏观涌现现象
-- 自组织机制
-
-**实现组件**: `ObservationModule`, `PatternRecognizer`
+**Implementation Components**: `EnvironmentManager`, `EnvironmentSimulator`
 
 ---
 
-### 4.6 适应与演化 (Adaptation and Evolution)
+### 5.5 Emergence and Self-organization
 
-**描述**: 社会系统在面对不确定性和变化时，通过学习和调整来适应环境并不断演化。
+**Description**: Macro patterns and behaviors in complex social systems often spontaneously form through interaction between micro-agents.
+
+```
+  Micro Behavior          Emergence
+    │                       │
+    │   ┌───────────┐       │
+    ├──►│Interaction│───────┤
+    │   └───────────┘       │
+    │                       │
+    ▼                       ▼
+  Agent Behavior      Macro Pattern
+```
+
+**Key Elements**:
+- Micro-agent behavior
+- Interaction patterns
+- Macro emergence phenomena
+- Self-organization mechanisms
+
+**Implementation Components**: `ObservationModule`, `PatternRecognizer`
+
+---
+
+### 5.6 Adaptation and Evolution
+
+**Description**: Social systems, when facing uncertainty and change, adapt to the environment and continuously evolve through learning and adjustment.
 
 ```
     ┌─────────────────────────────────────┐
     │                                     │
     ▼                                     │
 ┌──────────┐      ┌──────────┐      ┌──────────┐
-│   学习   │─────►│   适应   │─────►│   演化   │
-│ Learning │      │Adaptation│      │Evolution │
+│ Learning │─────►│Adaptation│─────►│Evolution │
 └──────────┘      └──────────┘      └──────────┘
     ▲                                     │
     │                                     │
     └─────────────────────────────────────┘
 ```
 
-**关键要素**:
-- 经验学习
-- 策略调整
-- 结构演化
-- 能力提升
+**Key Elements**:
+- Experiential learning
+- Strategy adjustment
+- Structural evolution
+- Capability improvement
 
-**实现组件**: `EvolutionManager`, `AdaptivePolicyEngine`
-
----
-
-## 6. AI Agent生态理念
-
-### 5.1 Agent-Centric设计理念
-
-USMSB SDK采用Agent-Centric设计理念，将AI Agent作为系统的核心构建块。
-
-**核心理念**:
-- Agent是系统的基本执行单元
-- Agent具有自主性、反应性、主动性和社会性
-- Agent之间通过协作完成复杂任务
-
-### 5.2 人机协作模式
-
-USMSB模型支持多种人机协作模式：
-
-| 模式 | 描述 | 适用场景 |
-|------|------|----------|
-| **人类主导** | AI辅助人类决策 | 复杂决策、创意工作 |
-| **AI主导** | 人类监督AI执行 | 重复性任务、数据分析 |
-| **对等协作** | 人机平等合作 | 协同创作、问题解决 |
-| **混合模式** | 根据任务动态切换 | 综合性项目 |
-
-### 5.3 智力源集成
-
-USMSB SDK将大语言模型(LLM)作为核心"智力源"：
-
-**LLM在USMSB中的应用**:
-
-| 通用行动 | LLM应用 |
-|----------|---------|
-| 感知 | 语义理解、信息提取 |
-| 决策 | 策略生成、推理判断 |
-| 执行 | 代码生成、工具调用 |
-| 交互 | 自然语言对话 |
-| 学习 | 知识更新、模式识别 |
-
-### 5.4 多Agent系统
-
-USMSB SDK支持构建复杂的多Agent系统：
-
-**协作模式**:
-- 层级协作: 主Agent协调子Agent
-- 对等协作: Agent之间平等合作
-- 竞争协作: 通过竞争提升效率
-- 混合协作: 结合多种模式
-
-**涌现行为**:
-多Agent系统通过简单规则的交互，能够产生复杂的涌现行为，如：
-- 市场价格形成
-- 社会舆论传播
-- 知识网络演化
-
-### 5.5 开放生态
-
-USMSB SDK致力于构建开放的开发者生态：
-
-**生态要素**:
-- **插件架构**: 支持第三方扩展
-- **开放API**: 标准化接口规范
-- **社区驱动**: 开源协作模式
-- **标准协议**: 跨平台互操作性
+**Implementation Components**: `EvolutionManager`, `AdaptivePolicyEngine`
 
 ---
 
-## 7. 模型的普适性验证
+## 6. AI Agent Ecosystem Philosophy
 
-USMSB模型已在多个领域进行了验证，证明了其普适性：
+### 6.1 Agent-Centric Design Philosophy
 
-### 6.1 教育领域
+USMSB SDK adopts an Agent-Centric design philosophy, taking AI Agents as the core building blocks of the system.
 
-| 要素 | 教育领域映射 |
-|------|-------------|
-| Agent | 学生、教师、学校 |
-| Object | 知识、课程、教材 |
-| Goal | 掌握知识、获得学历 |
-| Resource | 时间、师资、设施 |
-| Rule | 教学大纲、考试制度 |
-| Information | 教学内容、成绩反馈 |
-| Value | 能力提升、学历证书 |
-| Risk | 学习效果不佳、教育不公 |
-| Environment | 家庭、社会、政策 |
+**Core Philosophy**:
+- Agents are the basic execution units of the system
+- Agents have autonomy, reactivity, proactivity, and sociality
+- Agents complete complex tasks through collaboration
 
-### 6.2 医疗领域
+### 6.2 Human-Agent Collaboration Patterns
 
-| 要素 | 医疗领域映射 |
-|------|-------------|
-| Agent | 患者、医生、医院 |
-| Object | 疾病、健康状态、药品 |
-| Goal | 康复、健康维护 |
-| Resource | 医疗设备、药品、资金 |
-| Rule | 诊疗规范、医保政策 |
-| Information | 病历、诊断报告 |
-| Value | 健康恢复、生命延续 |
-| Risk | 误诊、医疗事故 |
-| Environment | 流行病趋势、政策 |
+The USMSB model supports multiple human-agent collaboration patterns:
 
-### 6.3 金融领域
+| Pattern | Description | Applicable Scenarios |
+|---------|-------------|----------------------|
+| **Human-led** | AI assists human decision-making | Complex decisions, creative work |
+| **AI-led** | Human supervises AI execution | Repetitive tasks, data analysis |
+| **Equal Collaboration** | Human-machine equal cooperation | Collaborative creation, problem-solving |
+| **Hybrid Mode** | Dynamic switching based on task | Comprehensive projects |
 
-| 要素 | 金融领域映射 |
-|------|-------------|
-| Agent | 投资者、银行、监管机构 |
-| Object | 资金、股票、债券 |
-| Goal | 财富增值、风险控制 |
-| Resource | 资本、信息、信用 |
-| Rule | 金融法规、交易规则 |
-| Information | 市场数据、财务报表 |
-| Value | 投资收益、资产增值 |
-| Risk | 市场风险、信用风险 |
-| Environment | 经济周期、政策变化 |
+### 6.3 Intelligence Source Integration
 
-### 6.4 制造业领域
+USMSB SDK takes Large Language Models (LLM) as the core "intelligence source":
 
-| 要素 | 制造业领域映射 |
-|------|-------------|
-| Agent | 制造企业、供应商、消费者 |
-| Object | 原材料、产品、设备 |
-| Goal | 生产效率、产品质量 |
-| Resource | 原料、设备、人力 |
-| Rule | 质量标准、安全规范 |
-| Information | 订单数据、生产数据 |
-| Value | 产品价值、利润 |
-| Risk | 供应链中断、质量问题 |
-| Environment | 市场需求、技术趋势 |
+**LLM Applications in USMSB**:
 
----
+| Universal Action | LLM Application |
+|------------------|-----------------|
+| Perception | Semantic understanding, information extraction |
+| Decision | Strategy generation, reasoning judgment |
+| Execution | Code generation, tool invocation |
+| Interaction | Natural language dialogue |
+| Learning | Knowledge updating, pattern recognition |
 
-## 总结
+### 6.4 Multi-Agent Systems
 
-USMSB模型提供了一个统一、普适的框架，用于描述、分析和推演各类复杂的社会行为。通过九大核心要素、九大通用行动接口和六大核心逻辑，该模型能够：
+USMSB SDK supports building complex multi-agent systems:
 
-1. **描述**社会活动的结构和组成
-2. **分析**社会系统的运行机制
-3. **推演**社会行为的演化趋势
-4. **预测**社会系统的涌现现象
-5. **指导**智能化系统的设计和开发
+**Collaboration Patterns**:
+- Hierarchical collaboration: Master Agent coordinates sub-agents
+- Peer collaboration: Agents cooperate as equals
+- Competitive collaboration: Improving efficiency through competition
+- Hybrid collaboration: Combining multiple patterns
 
-USMSB SDK将这一理论模型转化为可操作的工具，为构建下一代AI Agent系统和社会行为模拟系统提供强大支持。
+**Emergent Behaviors**:
+Through simple rule interactions, multi-agent systems can produce complex emergent behaviors such as:
+- Market price formation
+- Public opinion dissemination
+- Knowledge network evolution
+
+### 6.5 Open Ecosystem
+
+USMSB SDK is committed to building an open developer ecosystem:
+
+**Ecosystem Elements**:
+- **Plugin Architecture**: Support third-party extensions
+- **Open APIs**: Standardized interface specifications
+- **Community-driven**: Open source collaboration model
+- **Standard Protocols**: Cross-platform interoperability
 
 ---
 
-**文档信息**
+## 7. Model Universality Verification
 
-- **版本**: 1.0.0
-- **作者**: USMSB SDK Team
-- **最后更新**: 2025年
+The USMSB model has been verified in multiple domains, demonstrating its universality:
+
+### 7.1 Education Domain
+
+| Element | Education Mapping |
+|---------|-------------------|
+| Agent | Student, teacher, school |
+| Object | Knowledge, curriculum, textbooks |
+| Goal | Master knowledge, obtain degree |
+| Resource | Time, teachers, facilities |
+| Rule | Syllabus, examination system |
+| Information | Teaching content, grade feedback |
+| Value | Ability improvement, degree certificate |
+| Risk | Poor learning outcomes, educational inequality |
+| Environment | Family, society, policies |
+
+### 7.2 Healthcare Domain
+
+| Element | Healthcare Mapping |
+|---------|-------------------|
+| Agent | Patient, doctor, hospital |
+| Object | Disease, health status, medicine |
+| Goal | Recovery, health maintenance |
+| Resource | Medical equipment, medicine, funds |
+| Rule | Diagnosis/treatment standards, insurance policies |
+| Information | Medical records, diagnostic reports |
+| Value | Health recovery, life extension |
+| Risk | Misdiagnosis, medical accidents |
+| Environment | Epidemic trends, policies |
+
+### 7.3 Finance Domain
+
+| Element | Finance Mapping |
+|---------|----------------|
+| Agent | Investor, bank, regulator |
+| Object | Funds, stocks, bonds |
+| Goal | Wealth appreciation, risk control |
+| Resource | Capital, information, credit |
+| Rule | Financial regulations, trading rules |
+| Information | Market data, financial statements |
+| Value | Investment returns, asset appreciation |
+| Risk | Market risk, credit risk |
+| Environment | Economic cycle, policy changes |
+
+### 7.4 Manufacturing Domain
+
+| Element | Manufacturing Mapping |
+|---------|----------------------|
+| Agent | Manufacturing enterprise, supplier, consumer |
+| Object | Raw materials, product, equipment |
+| Goal | Production efficiency, product quality |
+| Resource | Materials, equipment, human resources |
+| Rule | Quality standards, safety specifications |
+| Information | Order data, production data |
+| Value | Product value, profit |
+| Risk | Supply chain disruption, quality issues |
+| Environment | Market demand, technology trends |
 
 ---
 
-*如需更多信息，请参阅白皮书或API参考文档。*
+## Summary
+
+The USMSB model provides a unified, universal framework for describing, analyzing, and deducing various complex social behaviors. Through nine core elements, nine universal action interfaces, and six core logics, this model can:
+
+1. **Describe** the structure and composition of social activities
+2. **Analyze** the operating mechanisms of social systems
+3. **Deduce** the evolution trends of social behaviors
+4. **Predict** emergent phenomena in social systems
+5. **Guide** the design and development of intelligent systems
+
+USMSB SDK transforms this theoretical model into actionable tools, providing strong support for building next-generation AI Agent systems and social behavior simulation systems.
+
+---
+
+**Document Information**
+
+- **Version**: 1.0.0
+- **Author**: USMSB SDK Team
+- **Last Updated**: 2025
+
+---
+
+*For more information, please refer to the whitepaper or API reference documentation.*

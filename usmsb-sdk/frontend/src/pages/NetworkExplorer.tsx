@@ -19,6 +19,7 @@ import {
   Shield,
 } from 'lucide-react'
 import { getStatusColor } from '@/utils/statusColors'
+import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -99,7 +100,7 @@ export default function NetworkExplorer() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/network/stats?agent_id=${currentAgentId}`)
+      const response = await authFetch(`${API_BASE}/network/stats`)
       if (response.ok) {
         const data = await response.json()
         setStats(data)
@@ -113,7 +114,7 @@ export default function NetworkExplorer() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${API_BASE}/agents`)
+      const response = await authFetch(`${API_BASE}/agents`)
       if (response.ok) {
         const data = await response.json()
         const agents: NetworkAgent[] = data.map((a: Record<string, unknown>) => ({
@@ -138,9 +139,8 @@ export default function NetworkExplorer() {
 
   const fetchRecommendations = async (capability: string) => {
     try {
-      const response = await fetch(`${API_BASE}/network/recommendations`, {
+      const response = await authFetch(`${API_BASE}/network/recommendations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_id: currentAgentId,
           target_capability: capability,
@@ -159,9 +159,8 @@ export default function NetworkExplorer() {
     setIsExploring(true)
     setError(null)
     try {
-      const response = await fetch(`${API_BASE}/network/explore`, {
+      const response = await authFetch(`${API_BASE}/network/explore`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agent_id: currentAgentId,
           target_capabilities: targetCapability ? [targetCapability] : null,

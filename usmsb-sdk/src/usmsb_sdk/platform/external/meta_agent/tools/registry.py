@@ -31,6 +31,7 @@ class Tool:
         required_permissions: Optional[List[str]] = None,
         security_level: str = "low",  # low, medium, high
         requires_session: bool = False,
+        parameters: Optional[Dict[str, Any]] = None,
     ):
         self.name = name
         self.description = description
@@ -38,6 +39,7 @@ class Tool:
         self.required_permissions = required_permissions or []
         self.security_level = security_level
         self.requires_session = requires_session
+        self.parameters = parameters or {}
 
     async def execute(self, session: Optional["UserSession"] = None, **kwargs) -> Any:
         """执行工具
@@ -93,6 +95,9 @@ class Tool:
 
     def _get_parameters(self) -> Dict[str, Any]:
         """获取工具参数定义"""
+        if self.parameters:
+            return self.parameters
+
         params_map = {
             "execute_command": {
                 "command": {"type": "string", "description": "要执行的命令行命令"},
@@ -151,6 +156,9 @@ class Tool:
 
     def _get_required_parameters(self) -> List[str]:
         """获取必需的参数列表"""
+        if self.parameters and "required" in self.parameters:
+            return self.parameters.get("required", [])
+
         required_map = {
             "execute_command": ["command"],
             "run_program": ["program_path"],

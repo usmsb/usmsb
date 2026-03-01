@@ -30,6 +30,18 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
     /// @notice 精度
     uint256 public constant PRECISION = 10000;
 
+    /// @notice 投资人最小ETH贡献 (0.1 ETH)
+    uint256 public constant MIN_ETH_CONTRIBUTION = 0.1 ether;
+
+    /// @notice 投资人最大ETH贡献 (10 ETH)
+    uint256 public constant MAX_ETH_CONTRIBUTION = 10 ether;
+
+    /// @notice 滑点保护阈值 (95%) - L-06修复: 实际使用
+    uint256 public constant MIN_SLIPPAGE = 9500;
+
+    /// @notice 紧急提取时间锁延迟 (2天)
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 2 days;
+
     // ========== 状态变量 ==========
 
     /// @notice VIBE 代币
@@ -69,11 +81,28 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
     uint256 public totalManualLP;
 
     /// @notice 复投记录
-    ReinvesrRecord[] public reinvestRecords;
+    ReinvestRecord[] public reinvestRecords;
+
+    // ========== 紧急提取时间锁 ==========
+
+    /// @notice 待提取的代币
+    address public pendingWithdrawToken;
+
+    /// @notice 待提取金额
+    uint256 public pendingWithdrawAmount;
+
+    /// @notice 提取生效时间
+    uint256 public withdrawEffectiveTime;
+
+    /// @notice 待提取ETH金额
+    uint256 public pendingEthWithdrawAmount;
+
+    /// @notice ETH提取生效时间
+    uint256 public ethWithdrawEffectiveTime;
 
     // ========== 结构体 ==========
 
-    struct ReinvesrRecord {
+    struct ReinvestRecord {
         uint256 vibeAmount;
         uint256 ethAmount;
         uint256 lpReceived;
@@ -101,6 +130,36 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
         uint256 vibeFees,
         uint256 ethFees
     );
+
+    event EmergencyWithdrawInitiated(
+        address indexed token,
+        uint256 amount,
+        uint256 effectiveTime
+    );
+
+    event EmergencyWithdrawConfirmed(
+        address indexed token,
+        uint256 amount
+    );
+
+    event EmergencyWithdrawCancelled();
+
+    event EmergencyEthWithdrawInitiated(
+        uint256 amount,
+        uint256 effectiveTime
+    );
+
+    event EmergencyEthWithdrawConfirmed(
+        uint256 amount
+    );
+
+    event EmergencyEthWithdrawCancelled();
+
+    // L-08修复: 添加管理员函数事件
+    event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
+    event DexFactoryUpdated(address indexed oldFactory, address indexed newFactory);
+    event ContractPaused(address indexed by);
+    event ContractUnpaused(address indexed by);
 
     // ========== 构造函数 ==========
 
@@ -130,22 +189,19 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice 初始化添加流动性
      * @dev 只能调用一次，创建新的交易对
-     * @param vibeAmount VIBE 数量
-     * @param ethAmount ETH 数量
+     *      使用合约中已有的VIBE余额（来自distributeToPools）
+     *      通过msg.value发送ETH
      */
-    function initializeLiquidity(
-        uint256 vibeAmount,
-        uint256 ethAmount
-    ) external payable onlyOwner nonReentrant {
+    function initializeLiquidity() external payable onlyOwner nonReentrant {
         require(!initialized, "Already initialized");
-        require(vibeAmount > 0, "Invalid VIBE amount");
-        require(ethAmount > 0 || msg.value > 0, "Invalid ETH amount");
+        require(msg.value > 0, "Need ETH");
 
-        // 使用 msg.value 或传入的 ethAmount
-        uint256 ethToUse = msg.value > 0 ? msg.value : ethAmount;
+        // 使用 msg.value
+        uint256 ethToUse = msg.value;
 
-        // 转入 VIBE
-        vibeToken.safeTransferFrom(msg.sender, address(this), vibeAmount);
+        // 使用合约中已有的VIBE余额（来自distributeToPools铸造的1.2亿）
+        uint256 vibeAmount = vibeToken.balanceOf(address(this));
+        require(vibeAmount >= 120_000_000 * 10**18, "Insufficient VIBE in contract");
 
         // 获取或创建 LP 代币地址
         address lpTokenAddress = _getOrCreatePair();
@@ -159,8 +215,8 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
             IDEXRouter(dexRouter).addLiquidityETH{value: ethToUse}(
                 address(vibeToken),
                 vibeAmount,
-                vibeAmount * 95 / 100, // 最小95%
-                ethToUse * 95 / 100,
+                vibeAmount * MIN_SLIPPAGE / PRECISION, // L-06修复: 使用常量
+                ethToUse * MIN_SLIPPAGE / PRECISION,
                 address(this), // LP 发送到本合约（永久锁定）
                 block.timestamp + 300
             );
@@ -245,8 +301,8 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
             IDEXRouter(dexRouter).addLiquidityETH{value: msg.value}(
                 address(vibeToken),
                 vibeAmount,
-                vibeAmount * 95 / 100,
-                msg.value * 95 / 100,
+                vibeAmount * MIN_SLIPPAGE / PRECISION,
+                msg.value * MIN_SLIPPAGE / PRECISION,
                 address(this),
                 block.timestamp + 300
             );
@@ -261,6 +317,109 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
 
         emit LiquidityAdded(vibeUsed, ethUsed, lpReceived, false);
     }
+
+    /**
+     * @notice 投资人添加流动性并获得LP代币
+     * @dev 完全去中心化，任何人（包括AI/机器人）都可以参与
+     *      流程：ETH → 换VIBE → 添加流动性 → LP归投资人
+     *      安全修复 H-02: 添加deadline参数防止抢跑/三明治攻击
+     * @param minVibeOut 最小VIBE输出量（滑点保护）
+     * @param minLPOut 最小LP输出量（滑点保护）
+     * @param deadline 交易截止时间戳（防止抢跑攻击）
+     */
+    function addLiquidityAndGetLP(
+        uint256 minVibeOut,
+        uint256 minLPOut,
+        uint256 deadline
+    ) external payable nonReentrant whenNotPaused {
+        // H-02 修复: 检查deadline防止抢跑攻击
+        require(block.timestamp <= deadline, "Transaction expired");
+        require(initialized, "Not initialized");
+        require(msg.value >= MIN_ETH_CONTRIBUTION, "Below minimum 0.1 ETH");
+        require(msg.value <= MAX_ETH_CONTRIBUTION, "Above maximum 10 ETH");
+
+        // 将ETH分成两部分：一半用于换VIBE，一半用于添加流动性
+        uint256 ethForSwap = msg.value / 2;
+        uint256 ethForLiquidity = msg.value - ethForSwap;
+
+        // 安全检查：确保用于swap的ETH足够
+        require(ethForSwap > 0, "ETH amount too small");
+
+        // 第一步：用ETH换VIBE
+        address[] memory path = new address[](2);
+        path[0] = address(weth);
+        path[1] = address(vibeToken);
+
+        // 用swap获取VIBE
+        uint256 vibeReceived = _swapETHForVIBE(ethForSwap, minVibeOut, path);
+
+        // 安全检查：确保获得了VIBE
+        require(vibeReceived >= minVibeOut, "Slippage: VIBE output too low");
+        require(vibeReceived > 0, "No VIBE received");
+
+        // 第二步：添加流动性
+        // 使用换来的VIBE + 剩余ETH添加流动性
+        vibeToken.forceApprove(dexRouter, vibeReceived);
+
+        (uint256 vibeUsed, uint256 ethUsed, uint256 lpReceived) =
+            IDEXRouter(dexRouter).addLiquidityETH{value: ethForLiquidity}(
+                address(vibeToken),
+                vibeReceived,
+                vibeReceived * MIN_SLIPPAGE / PRECISION,
+                ethForLiquidity * MIN_SLIPPAGE / PRECISION,
+                msg.sender, // LP直接给投资人
+                block.timestamp + 300
+            );
+
+        vibeToken.forceApprove(dexRouter, 0);
+
+        // 安全检查：确保获得了LP
+        require(lpReceived >= minLPOut, "Slippage: LP output too low");
+        require(lpReceived > 0, "No LP received");
+
+        // 更新统计
+        totalVibeAdded += vibeUsed;
+        totalEthAdded += ethUsed;
+        totalManualLP += lpReceived;
+
+        emit LiquidityAdded(vibeUsed, ethUsed, lpReceived, false);
+        emit InvestorLPIssued(msg.sender, lpReceived, vibeUsed, ethUsed);
+    }
+
+    /**
+     * @notice 用ETH交换VIBE
+     */
+    function _swapETHForVIBE(
+        uint256 ethAmount,
+        uint256 minVibeOut,
+        address[] memory path
+    ) internal returns (uint256) {
+        if (ethAmount == 0) return 0;
+
+        // 如果weth不是eth，先wrap
+        // Uniswap V2需要先approve或使用ETH
+
+        uint256[] memory amounts = IDEXRouter(dexRouter).swapExactETHForTokens{
+            value: ethAmount
+        }(
+            minVibeOut,
+            path,
+            address(this),
+            block.timestamp + 300
+        );
+
+        return amounts[amounts.length - 1];
+    }
+
+    /**
+     * @notice 事件：投资人获得LP
+     */
+    event InvestorLPIssued(
+        address indexed investor,
+        uint256 lpReceived,
+        uint256 vibeUsed,
+        uint256 ethUsed
+    );
 
     /**
      * @notice 检查是否可以复投
@@ -288,44 +447,136 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
 
     function setDexRouter(address _router) external onlyOwner {
         require(_router != address(0), "Invalid router");
+        emit DexRouterUpdated(dexRouter, _router); // L-08修复
         dexRouter = _router;
     }
 
     function setDexFactory(address _factory) external onlyOwner {
         require(_factory != address(0), "Invalid factory");
+        emit DexFactoryUpdated(dexFactory, _factory); // L-08修复
         dexFactory = _factory;
     }
 
     function pause() external onlyOwner {
         _pause();
+        emit ContractPaused(msg.sender); // L-08修复
     }
 
     function unpause() external onlyOwner {
         _unpause();
+        emit ContractUnpaused(msg.sender); // L-08修复
     }
 
     /**
-     * @notice 紧急提取错误发送的代币（非 LP 代币）
+     * @notice 发起紧急提取代币（需要时间锁）
      * @dev LP 代币永远不能提取
+     * @param token 代币地址
      */
     function emergencyWithdraw(address token) external onlyOwner {
         require(token != address(lpToken), "Cannot withdraw LP");
         require(token != address(vibeToken) || !initialized, "Cannot withdraw VIBE after init");
 
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        if (balance > 0) {
-            IERC20(token).safeTransfer(owner(), balance);
+        // 如果有待生效的提取，先取消
+        if (pendingWithdrawToken != address(0)) {
+            delete pendingWithdrawToken;
+            delete pendingWithdrawAmount;
+            delete withdrawEffectiveTime;
+            emit EmergencyWithdrawCancelled();
         }
+
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance > 0, "No balance to withdraw");
+
+        pendingWithdrawToken = token;
+        pendingWithdrawAmount = balance;
+        withdrawEffectiveTime = block.timestamp + EMERGENCY_WITHDRAW_DELAY;
+
+        emit EmergencyWithdrawInitiated(token, balance, withdrawEffectiveTime);
     }
 
     /**
-     * @notice 紧急提取 ETH
+     * @notice 确认紧急提取代币（时间锁到期后）
+     */
+    function confirmEmergencyWithdraw() external onlyOwner nonReentrant {
+        require(pendingWithdrawToken != address(0), "No pending withdraw");
+        require(block.timestamp >= withdrawEffectiveTime, "Timelock not expired");
+
+        address token = pendingWithdrawToken;
+        uint256 amount = pendingWithdrawAmount;
+
+        // 清除状态
+        delete pendingWithdrawToken;
+        delete pendingWithdrawAmount;
+        delete withdrawEffectiveTime;
+
+        // 执行提取
+        IERC20(token).safeTransfer(owner(), amount);
+
+        emit EmergencyWithdrawConfirmed(token, amount);
+    }
+
+    /**
+     * @notice 取消紧急提取代币
+     */
+    function cancelEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawToken != address(0), "No pending withdraw");
+
+        delete pendingWithdrawToken;
+        delete pendingWithdrawAmount;
+        delete withdrawEffectiveTime;
+
+        emit EmergencyWithdrawCancelled();
+    }
+
+    /**
+     * @notice 发起紧急提取ETH（需要时间锁）
      */
     function emergencyWithdrawETH() external onlyOwner {
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            payable(owner()).transfer(balance);
+        // 如果有待生效的提取，先取消
+        if (pendingEthWithdrawAmount > 0) {
+            delete pendingEthWithdrawAmount;
+            delete ethWithdrawEffectiveTime;
+            emit EmergencyEthWithdrawCancelled();
         }
+
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No ETH balance to withdraw");
+
+        pendingEthWithdrawAmount = balance;
+        ethWithdrawEffectiveTime = block.timestamp + EMERGENCY_WITHDRAW_DELAY;
+
+        emit EmergencyEthWithdrawInitiated(balance, ethWithdrawEffectiveTime);
+    }
+
+    /**
+     * @notice 确认紧急提取ETH（时间锁到期后）
+     */
+    function confirmEmergencyWithdrawETH() external onlyOwner nonReentrant {
+        require(pendingEthWithdrawAmount > 0, "No pending ETH withdraw");
+        require(block.timestamp >= ethWithdrawEffectiveTime, "Timelock not expired");
+
+        uint256 amount = pendingEthWithdrawAmount;
+
+        // 清除状态
+        delete pendingEthWithdrawAmount;
+        delete ethWithdrawEffectiveTime;
+
+        // 执行提取
+        payable(owner()).transfer(amount);
+
+        emit EmergencyEthWithdrawConfirmed(amount);
+    }
+
+    /**
+     * @notice 取消紧急提取ETH
+     */
+    function cancelEmergencyWithdrawETH() external onlyOwner {
+        require(pendingEthWithdrawAmount > 0, "No pending ETH withdraw");
+
+        delete pendingEthWithdrawAmount;
+        delete ethWithdrawEffectiveTime;
+
+        emit EmergencyEthWithdrawCancelled();
     }
 
     // ========== 内部函数 ==========
@@ -360,9 +611,21 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
             if (reserve0 == 0 || reserve1 == 0) {
                 return 0;
             }
-            // reserve0 = ETH, reserve1 = VIBE
-            // vibeAmount = ethAmount * reserve1 / reserve0
-            return (ethAmount * uint256(reserve1)) / uint256(reserve0);
+
+            // 获取token0地址来确定储备顺序
+            address token0Addr = ISushiPair(address(lpToken)).token0();
+
+            // Uniswap按地址排序：token0 < token1
+            // 如果token0是WETH，则reserve0是ETH；否则reserve1是ETH
+            if (token0Addr == address(weth)) {
+                // reserve0 = ETH, reserve1 = VIBE
+                // vibeAmount = ethAmount * reserve1 / reserve0
+                return (ethAmount * uint256(reserve1)) / uint256(reserve0);
+            } else {
+                // reserve0 = VIBE, reserve1 = ETH
+                // vibeAmount = ethAmount * reserve0 / reserve1
+                return (ethAmount * uint256(reserve0)) / uint256(reserve1);
+            }
         } catch {
             return 0;
         }
@@ -380,8 +643,8 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
             IDEXRouter(dexRouter).addLiquidityETH{value: ethAmount}(
                 address(vibeToken),
                 vibeAmount,
-                vibeAmount * 95 / 100,
-                ethAmount * 95 / 100,
+                vibeAmount * MIN_SLIPPAGE / PRECISION,
+                ethAmount * MIN_SLIPPAGE / PRECISION,
                 address(this), // LP 继续锁定
                 block.timestamp + 300
             );
@@ -395,7 +658,7 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
         totalReinvestedLP += lpReceived;
 
         // 记录复投
-        reinvestRecords.push(ReinvesrRecord({
+        reinvestRecords.push(ReinvestRecord({
             vibeAmount: vibeUsed,
             ethAmount: ethUsed,
             lpReceived: lpReceived,
@@ -439,13 +702,14 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
         return reinvestRecords.length;
     }
 
-    function getReinvestRecord(uint256 index) external view returns (ReinvesrRecord memory) {
+    function getReinvestRecord(uint256 index) external view returns (ReinvestRecord memory) {
         require(index < reinvestRecords.length, "Index out of bounds");
         return reinvestRecords[index];
     }
 
     /**
      * @notice 获取 LP 价值（以 ETH 计）
+     * @dev LQ-01修复: 正确识别ETH储备，不假设reserve0一定是ETH
      */
     function getLPValueInETH() external view returns (uint256) {
         uint256 lpBalance = lpToken.balanceOf(address(this));
@@ -455,11 +719,21 @@ contract LiquidityManager is Ownable, ReentrancyGuard, Pausable {
             return 0;
         }
 
-        // 获取池子中的 ETH 储备
-        (uint112 reserve0,,) = ISushiPair(address(lpToken)).getReserves();
+        // 获取池子储备
+        (uint112 reserve0, uint112 reserve1,) = ISushiPair(address(lpToken)).getReserves();
+
+        // LQ-01修复: 检查token0是否为WETH
+        address token0 = ISushiPair(address(lpToken)).token0();
+        uint256 ethReserve;
+
+        if (token0 == address(weth)) {
+            ethReserve = uint256(reserve0);
+        } else {
+            ethReserve = uint256(reserve1);
+        }
 
         // LP 价值 ≈ 2 * (ETH 储备 * LP 份额 / 总 LP)
-        return (uint256(reserve0) * 2 * lpBalance) / totalLPSupply;
+        return (ethReserve * 2 * lpBalance) / totalLPSupply;
     }
 
     /**
@@ -497,6 +771,22 @@ interface IDEXRouter {
         uint256 amountToken,
         uint256 amountETH
     );
+
+    // 用于ETH换VIBE的swap函数
+    function swapExactETHForTokens(
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external payable returns (uint256[] memory amounts);
+
+    function swapExactTokensForETH(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
 }
 
 interface IDEXFactory {
@@ -510,4 +800,8 @@ interface ISushiPair {
         uint112 reserve1,
         uint32 blockTimestampLast
     );
+
+    function token0() external view returns (address);
+
+    function token1() external view returns (address);
 }

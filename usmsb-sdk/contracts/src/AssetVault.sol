@@ -354,8 +354,8 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
      * @notice 赎回NFT(需要持有全部碎片)
      * @param assetId 资产ID
      */
-    function redeemNFT(bytes32 assetId) 
-        external 
+    function redeemNFT(bytes32 assetId)
+        external
         nonReentrant
         assetExists(assetId)
         assetNotRedeemed(assetId)
@@ -363,7 +363,21 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
         AssetInfo storage asset = assets[assetId];
         Shareholder storage holder = shareholders[assetId][msg.sender];
 
+        // 检查是否持有全部份额
         require(holder.shares >= asset.totalShares, "AssetVault: insufficient shares");
+
+        // 检查 NFT 是否在合约中
+        require(
+            IERC721(asset.nftContract).ownerOf(asset.nftTokenId) == address(this),
+            "AssetVault: NFT not in vault"
+        );
+
+        // 检查合约是否有 NFT 转移权限
+        require(
+            IERC721(asset.nftContract).getApproved(asset.nftTokenId) == address(this) ||
+            IERC721(asset.nftContract).isApprovedForAll(msg.sender, address(this)),
+            "AssetVault: NFT transfer not approved"
+        );
 
         asset.isRedeemed = true;
 
@@ -492,7 +506,9 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
         address token,
         address to,
         uint256 amount
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
+        require(to != address(0), "AssetVault: invalid recipient");
+        require(amount > 0, "AssetVault: amount must be greater than 0");
         IERC20(token).safeTransfer(to, amount);
     }
 }

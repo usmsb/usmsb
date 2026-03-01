@@ -93,12 +93,27 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
     mapping(bytes32 => bytes32[]) public poolBids;
     mapping(address => bytes32[]) public userPools;
 
+    /// @notice 争议退款标记 (poolId => 是否处于退款模式)
+    mapping(bytes32 => bool) public refundPendingPools;
+
+    /// @notice 退款领取记录 (poolId => user => 已领取)
+    mapping(bytes32 => mapping(address => bool)) public refundClaimed;
+
     uint256 public totalPoolsCreated;
     uint256 public totalPoolsCompleted;
     uint256 public totalVolume;
 
     address public arbitrator;
     address public feeCollector;
+
+    /// @notice 信誉系统合约地址
+    address public reputationSystem;
+
+    /// @notice 信誉系统管理员（可签名信誉数据）
+    address public reputationSigner;
+
+    /// @notice 已验证的信誉记录 (user => reputationScore => timestamp)
+    mapping(address => mapping(uint256 => uint256)) public verifiedReputation;
 
     // ========== 事件 ==========
 
@@ -183,9 +198,27 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         uint256 providerPayout
     );
 
+    /// @notice 退款领取事件
+    event RefundClaimed(
+        bytes32 indexed poolId,
+        address indexed user,
+        uint256 amount
+    );
+
     event PoolCancelled(
         bytes32 indexed poolId,
         string reason
+    );
+
+    event ReputationVerified(
+        address indexed user,
+        uint256 reputationScore,
+        uint256 timestamp
+    );
+
+    event ReputationSystemUpdated(
+        address indexed reputationSystem,
+        address indexed reputationSigner
     );
 
     // ========== 修饰符 ==========
@@ -304,10 +337,10 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         uint256 budget,
         bytes32 demandId,
         bytes32 requirementsHash
-    ) 
-        external 
-        payable 
-        poolExists(poolId) 
+    )
+        external
+        nonReentrant
+        poolExists(poolId)
         poolInStatus(poolId, PoolStatus.CREATED)
         whenNotPaused
     {
@@ -377,8 +410,8 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         require(pool.bidCount < MAX_BIDS, "JointOrder: too many bids");
         require(reputationScore <= 100, "JointOrder: invalid reputation");
 
-        // 验证信誉签名 (简化版，实际应该验证签名)
-        // _verifyReputationSignature(msg.sender, reputationScore, reputationSignature);
+        // 验证信誉分数 (完整验证)
+        _verifyReputationScore(msg.sender, reputationScore, reputationSignature);
 
         bytes32 bidId = keccak256(
             abi.encodePacked(poolId, msg.sender, price, block.timestamp)
@@ -456,8 +489,9 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
     function confirmDelivery(
         bytes32 poolId,
         uint8 rating
-    ) 
-        external 
+    )
+        external
+        nonReentrant
         poolExists(poolId) 
         poolInStatus(poolId, PoolStatus.IN_PROGRESS)
         whenNotPaused
@@ -517,8 +551,9 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
     function cancelPool(
         bytes32 poolId,
         string calldata reason
-    ) 
-        external 
+    )
+        external
+        nonReentrant
         poolExists(poolId) 
         whenNotPaused
     {
@@ -536,18 +571,38 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
 
         pool.status = PoolStatus.CANCELLED;
 
-        // 退还所有参与者的资金
-        for (uint256 i = 0; i < pool.participantCount; i++) {
-            address participantAddr = poolParticipants[poolId][i];
-            Participant storage p = participants[poolId][participantAddr];
-            if (p.hasDeposited && !p.hasWithdrawn) {
-                p.hasWithdrawn = true;
-                vibeToken.safeTransfer(participantAddr, p.budget);
-                emit RefundWithdrawn(poolId, participantAddr, p.budget);
-            }
-        }
+        // 安全修复: 使用拉取模式而非推送模式
+        // 参与者需要调用 claimRefund() 来取回资金
+        // 这避免了大量参与者导致 gas 超限的 DoS 攻击
 
         emit PoolCancelled(poolId, reason);
+    }
+
+    /**
+     * @notice 领取退款（池取消后）
+     * @param poolId 池ID
+     * @dev 安全改进: 使用拉取模式防止 DoS
+     */
+    function claimRefund(bytes32 poolId)
+        external
+        nonReentrant
+        poolExists(poolId)
+        whenNotPaused
+    {
+        OrderPool storage pool = pools[poolId];
+
+        require(pool.status == PoolStatus.CANCELLED, "JointOrder: pool not cancelled");
+
+        Participant storage p = participants[poolId][msg.sender];
+        require(p.hasDeposited, "JointOrder: not a participant");
+        require(!p.hasWithdrawn, "JointOrder: already withdrawn");
+
+        p.hasWithdrawn = true;
+        uint256 amount = p.budget;
+
+        vibeToken.safeTransfer(msg.sender, amount);
+
+        emit RefundWithdrawn(poolId, msg.sender, amount);
     }
 
     /**
@@ -592,10 +647,10 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         bytes32 poolId,
         bool refundBuyers,
         string calldata resolution
-    ) 
-        external 
+    )
+        external
         onlyArbitrator
-        poolExists(poolId) 
+        poolExists(poolId)
         poolInStatus(poolId, PoolStatus.DISPUTED)
         nonReentrant
     {
@@ -605,16 +660,19 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         uint256 providerPayout = 0;
 
         if (refundBuyers) {
-            // 退款给所有参与者
+            // 修复: 使用拉取模式，避免 Gas 溢出
+            // 标记池为待退款状态，用户自行领取
+            refundPendingPools[poolId] = true;
+
+            // 计算总退款金额
             for (uint256 i = 0; i < pool.participantCount; i++) {
                 address participantAddr = poolParticipants[poolId][i];
                 Participant storage p = participants[poolId][participantAddr];
                 if (p.hasDeposited && !p.hasWithdrawn) {
-                    p.hasWithdrawn = true;
-                    vibeToken.safeTransfer(participantAddr, p.budget);
                     buyerRefund += p.budget;
                 }
             }
+
             pool.status = PoolStatus.CANCELLED;
         } else {
             // 支付给服务商
@@ -627,6 +685,32 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         }
 
         emit DisputeResolved(poolId, refundBuyers, buyerRefund, providerPayout);
+    }
+
+    /**
+     * @notice 领取争议退款（拉取模式，避免 Gas 溢出）
+     * @param poolId 池ID
+     */
+    function claimDisputeRefund(bytes32 poolId)
+        external
+        nonReentrant
+    {
+        require(refundPendingPools[poolId], "JointOrder: not a refund pool");
+        require(!refundClaimed[poolId][msg.sender], "JointOrder: already claimed");
+
+        Participant storage p = participants[poolId][msg.sender];
+        require(p.hasDeposited && !p.hasWithdrawn, "JointOrder: no refund available");
+
+        uint256 refundAmount = p.budget;
+
+        // 标记已领取
+        refundClaimed[poolId][msg.sender] = true;
+        p.hasWithdrawn = true;
+
+        // 转账
+        vibeToken.safeTransfer(msg.sender, refundAmount);
+
+        emit RefundClaimed(poolId, msg.sender, refundAmount);
     }
 
     // ========== 公共视图函数 ==========
@@ -665,6 +749,126 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
 
     // ========== 内部函数 ==========
 
+    /**
+     * @dev 验证信誉分数 (完整版)
+     * 支持三种验证模式:
+     * 1. 签名验证: 验证信誉签名的有效性
+     * 2. 链上验证: 查询信誉系统合约
+     * 3. 缓存验证: 使用已验证的信誉记录
+     *
+     * @param user 用户地址
+     * @param reputationScore 信誉分数
+     * @param signature 信誉签名数据
+     */
+    function _verifyReputationScore(
+        address user,
+        uint256 reputationScore,
+        bytes calldata signature
+    ) internal {
+        // 基本范围检查
+        require(reputationScore <= 100, "JointOrder: invalid reputation score");
+
+        // 如果未设置签名者，只接受范围检查（向后兼容）
+        if (reputationSigner == address(0)) {
+            return;
+        }
+
+        // 验证签名长度 (64字节 = r + s, 可选 + v)
+        // 或者尝试解析内嵌在signature中的数据
+        if (signature.length >= 64) {
+            // 尝试恢复签名者
+            _verifySignature(user, reputationScore, signature);
+        } else if (reputationSystem != address(0)) {
+            // 使用链上信誉系统验证
+            _verifyViaReputationSystem(user, reputationScore);
+        } else {
+            // 使用缓存的已验证信誉记录
+            _verifyViaCache(user, reputationScore);
+        }
+    }
+
+    /**
+     * @dev 通过签名验证信誉
+     */
+    function _verifySignature(
+        address user,
+        uint256 reputationScore,
+        bytes calldata signature
+    ) internal {
+        // 构建签名消息
+        bytes32 message = keccak256(abi.encodePacked(
+            user,
+            reputationScore,
+            block.chainid,
+            "JOINT_ORDER_REPUTATION"
+        ));
+
+        // 转换为 EIP-191 格式
+        bytes32 ethSignedMessage = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            message
+        ));
+
+        // 从签名中提取 r, s, v
+        require(signature.length >= 64, "Invalid signature length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+
+        // 如果 v < 27，调整为 27 或 28
+        if (v < 27) {
+            v += 27;
+        }
+
+        // 恢复签名者地址
+        address signer = ecrecover(ethSignedMessage, v, r, s);
+
+        // 验证签名者是否是授权的信誉签名者
+        require(signer == reputationSigner, "Invalid reputation signature");
+
+        // 记录验证时间和分数
+        verifiedReputation[user][reputationScore] = block.timestamp;
+
+        emit ReputationVerified(user, reputationScore, block.timestamp);
+    }
+
+    /**
+     * @dev 通过链上信誉系统验证
+     */
+    function _verifyViaReputationSystem(address user, uint256 reputationScore) internal {
+        // 调用信誉系统合约
+        IReputationSystem reputation = IReputationSystem(reputationSystem);
+        uint256 storedScore = reputation.getReputationScore(user);
+
+        // 验证分数匹配
+        require(storedScore == reputationScore, "Reputation mismatch");
+
+        // 验证信誉有效性
+        require(reputation.isReputationValid(user), "Invalid reputation");
+
+        emit ReputationVerified(user, reputationScore, block.timestamp);
+    }
+
+    /**
+     * @dev 通过缓存验证信誉
+     */
+    function _verifyViaCache(address user, uint256 reputationScore) internal {
+        // 检查是否有缓存的信誉记录
+        uint256 cachedTimestamp = verifiedReputation[user][reputationScore];
+
+        // 信誉记录必须在过去24小时内
+        require(cachedTimestamp > 0 && block.timestamp - cachedTimestamp < 24 hours, "No valid reputation");
+
+        emit ReputationVerified(user, reputationScore, cachedTimestamp);
+    }
+
     function _completePool(bytes32 poolId) internal {
         OrderPool storage pool = pools[poolId];
 
@@ -690,6 +894,28 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         feeCollector = _feeCollector;
     }
 
+    /**
+     * @notice 设置信誉系统合约
+     * @param _reputationSystem 信誉系统合约地址
+     * @param _reputationSigner 信誉签名管理员地址
+     */
+    function setReputationSystem(address _reputationSystem, address _reputationSigner) external onlyOwner {
+        require(_reputationSystem != address(0), "JointOrder: invalid reputation system");
+        require(_reputationSigner != address(0), "JointOrder: invalid signer");
+        reputationSystem = _reputationSystem;
+        reputationSigner = _reputationSigner;
+        emit ReputationSystemUpdated(_reputationSystem, _reputationSigner);
+    }
+
+    /**
+     * @notice 直接设置可信签名者（用于离线签名验证）
+     * @param _signer 签名者地址
+     */
+    function setReputationSigner(address _signer) external onlyOwner {
+        require(_signer != address(0), "JointOrder: invalid signer");
+        reputationSigner = _signer;
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
@@ -698,7 +924,35 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         _unpause();
     }
 
-    function emergencyWithdraw(address token, address to, uint256 amount) external onlyOwner {
+    /**
+     * @notice 紧急提取代币
+     * @dev 安全增强: 添加 nonReentrant 和零地址检查
+     */
+    function emergencyWithdraw(address token, address to, uint256 amount) external nonReentrant onlyOwner {
+        require(to != address(0), "JointOrder: invalid recipient");
+        require(amount > 0, "JointOrder: amount must be greater than 0");
         IERC20(token).safeTransfer(to, amount);
     }
+}
+
+// ========== 接口 ==========
+
+/**
+ * @title IReputationSystem
+ * @notice 链上信誉系统接口
+ */
+interface IReputationSystem {
+    /**
+     * @notice 获取用户信誉分数
+     * @param user 用户地址
+     * @return 信誉分数 (0-100)
+     */
+    function getReputationScore(address user) external view returns (uint256);
+
+    /**
+     * @notice 验证信誉是否有效
+     * @param user 用户地址
+     * @return 是否有效
+     */
+    function isReputationValid(address user) external view returns (bool);
 }
