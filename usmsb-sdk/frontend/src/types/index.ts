@@ -370,3 +370,343 @@ export function transformToOpportunity(opp: MatchingSearchResult): Opportunity {
 export function isNegotiationActive(negotiation: { status: string }): boolean {
   return negotiation.status === 'pending' || negotiation.status === 'in_progress'
 }
+
+// ========== Agent Registration & Binding Types ==========
+
+export interface SelfRegistrationRequest {
+  name: string
+  description?: string
+  capabilities?: string[]
+}
+
+export interface SelfRegistrationResponse {
+  success: boolean
+  agent_id: string
+  api_key: string
+  level: number
+  binding_status: string
+  message: string
+}
+
+export interface BindingRequestRequest {
+  message?: string
+}
+
+export interface BindingRequestResponse {
+  success: boolean
+  binding_code: string
+  binding_url: string
+  expires_in: number
+  expires_at?: number
+  message: string
+}
+
+export interface BindingStatus {
+  bound: boolean
+  binding_status: string
+  owner_wallet?: string
+  stake_tier: string
+  staked_amount: number
+  tier_benefits?: TierBenefits
+  pending_request?: {
+    binding_code: string
+    binding_url: string
+    expires_at: number
+    status: string
+  }
+}
+
+export interface CompleteBindingRequest {
+  stake_amount: number
+}
+
+export interface CompleteBindingResponse {
+  success: boolean
+  agent_id: string
+  owner_wallet: string
+  stake_amount: number
+  stake_tier: string
+  tier_benefits?: TierBenefits
+  completed_at: number
+  message: string
+}
+
+// ========== API Key Types ==========
+
+export interface APIKeyInfo {
+  id: string
+  prefix: string
+  name: string
+  level: number
+  expires_at?: number
+  last_used_at?: number
+  created_at: number
+  revoked?: boolean
+}
+
+export interface APIKeyListResponse {
+  success: boolean
+  keys: APIKeyInfo[]
+}
+
+export interface CreateAPIKeyRequest {
+  name: string
+  expires_in_days?: number
+}
+
+export interface CreateAPIKeyResponse {
+  success: boolean
+  key_id: string
+  api_key: string
+  name: string
+  expires_at: number
+  message: string
+}
+
+export interface RenewAPIKeyRequest {
+  extends_days: number
+}
+
+export interface RenewAPIKeyResponse {
+  success: boolean
+  key_id: string
+  new_expires_at: number
+  message: string
+}
+
+// ========== Stake Tier Types ==========
+
+export interface TierBenefits {
+  max_agents: number
+  discount: number
+}
+
+export type StakeTier = 'NONE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM'
+
+// ========== Staking Types ==========
+
+export interface DepositRequest {
+  amount: number
+}
+
+export interface WithdrawRequest {
+  amount: number
+}
+
+export interface StakingInfo {
+  success: boolean
+  agent_id: string
+  staked_amount: number
+  stake_status: string
+  stake_tier: StakeTier
+  locked_stake: number
+  unlock_available_at?: number
+  pending_rewards: number
+  apy: number
+  tier_benefits: TierBenefits
+}
+
+export interface RewardsInfo {
+  success: boolean
+  agent_id: string
+  pending_rewards: number
+  total_claimed: number
+  last_claim_at?: number
+  apy: number
+}
+
+export interface ClaimRewardsResponse {
+  success: boolean
+  agent_id: string
+  claimed_amount: number
+  new_balance: number
+  message: string
+}
+
+// ========== Reputation Types ==========
+
+export interface ReputationInfo {
+  success: boolean
+  agent_id: string
+  score: number
+  tier: string
+  total_transactions: number
+  successful_transactions: number
+  success_rate: number
+  avg_rating: number
+  total_ratings: number
+}
+
+export interface ReputationEvent {
+  timestamp: number
+  event_type: string
+  change: number
+  reason: string
+  related_id?: string
+}
+
+export interface ReputationHistory {
+  success: boolean
+  agent_id: string
+  current_score: number
+  history: ReputationEvent[]
+  total_events: number
+}
+
+// ========== Wallet Types ==========
+
+export interface WalletBalance {
+  success: boolean
+  agent_id: string
+  balance: number
+  staked_amount: number
+  locked_amount: number
+  pending_rewards: number
+  total_assets: number
+  stake_tier: StakeTier
+  tier_benefits: TierBenefits
+}
+
+export interface TransactionRecord {
+  id: string
+  transaction_type: string
+  amount: number
+  status: string
+  counterparty_id?: string
+  title?: string
+  description?: string
+  created_at: number
+  completed_at?: number
+}
+
+export interface TransactionHistory {
+  success: boolean
+  agent_id: string
+  transactions: TransactionRecord[]
+  total_count: number
+  page: number
+  page_size: number
+}
+
+// ========== Heartbeat Types ==========
+
+export interface HeartbeatRequest {
+  status: 'online' | 'busy' | 'offline'
+  metadata?: Record<string, unknown>
+}
+
+export interface HeartbeatResponse {
+  success: boolean
+  agent_id: string
+  status: string
+  ttl_remaining: number
+  last_heartbeat: number
+  is_alive: boolean
+  message: string
+}
+
+export interface HeartbeatStatus {
+  success: boolean
+  agent_id: string
+  status: string
+  last_heartbeat: number
+  ttl_remaining: number
+  is_alive: boolean
+  heartbeat_interval: number
+  ttl: number
+}
+
+// ========== System Status Types ==========
+
+export interface SystemStatus {
+  version: string
+  uptime: {
+    seconds: number
+    hours: number
+    days: number
+  }
+  platform: {
+    system: string
+    python: string
+  }
+  agents: {
+    online: number
+    offline: number
+    busy: number
+  }
+  stake_distribution: Record<string, number>
+  services: {
+    llm: boolean
+    prediction: boolean
+    workflow: boolean
+    meta_agent: boolean
+  }
+  timestamp: number
+}
+
+export interface StatsSummary {
+  total_agents: number
+  online_agents: number
+  bound_agents: number
+  total_stake: number
+  total_balance: number
+  active_services: number
+  active_demands: number
+  active_collaborations: number
+}
+
+// ========== Agent Profile Types ==========
+
+export interface AgentProfile {
+  success: boolean
+  result: {
+    agent_id: string
+    name: string
+    description: string
+    capabilities: string[]
+    status: string
+    reputation: number
+    level: number
+    binding_status: string
+    owner_wallet?: string
+    stake_tier: StakeTier
+    staked_amount: number
+    created_at: number
+  }
+}
+
+export interface OwnerInfo {
+  success: boolean
+  result: {
+    owner_wallet: string
+    staked_amount: number
+    stake_status: string
+    stake_tier: StakeTier
+    bound_at: number
+  }
+}
+
+export interface UpdateProfileRequest {
+  name?: string
+  description?: string
+  capabilities?: string[]
+}
+
+// ========== Error Types ==========
+
+export interface APIErrorDetail {
+  success: false
+  error: string
+  code: string
+  message?: string
+  stake_requirement?: {
+    required: number
+    current: number
+    shortfall: number
+    action: string
+  }
+  retry_after?: number
+  recovery_suggestion?: string
+  request_id?: string
+  timestamp?: number
+}

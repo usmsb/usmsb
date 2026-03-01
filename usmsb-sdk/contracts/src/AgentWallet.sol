@@ -9,6 +9,18 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/IAgentRegistry.sol";
 
 /**
+ * @title IVIBIdentity
+ * @notice VIBIdentity 接口 - M-08修复
+ */
+interface IVIBIdentity {
+    enum IdentityType { AI_AGENT, HUMAN_PROVIDER, NODE_OPERATOR, GOVERNANCE }
+
+    function isRegistered(address) external view returns (bool);
+    function getIdentityType(uint256 tokenId) external view returns (IdentityType);
+    function getTokenIdByAddress(address owner) external view returns (uint256);
+}
+
+/**
  * @title IVIBStaking
  * @notice VIBStaking 接口
  */
@@ -76,6 +88,20 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
     uint256 public constant GOLD_DISCOUNT = 10;
     uint256 public constant PLATINUM_DISCOUNT = 20;
 
+    /// @notice 紧急提取延迟时间 (2天)
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 2 days;
+
+    /// @notice 待提取结构
+    struct PendingWithdraw {
+        address token;
+        address to;
+        uint256 amount;
+        uint256 effectiveTime;
+    }
+
+    /// @notice 待生效的紧急提取
+    PendingWithdraw public pendingEmergencyWithdraw;
+
     // ========== 状态变量 ==========
 
     /// @notice VIBE 代币地址
@@ -86,6 +112,9 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 质押合约地址
     IVIBStaking public stakingContract;
+
+    /// @notice 身份合约地址 (M-08修复)
+    IVIBIdentity public identityContract;
 
     /// @notice Agent 地址 (后端服务地址)
     address public agent;
@@ -101,6 +130,9 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 上次重置时间
     uint256 public lastResetTime;
+
+    /// @notice 当前统计周期的开始时间戳
+    uint256 public currentPeriodStart;
 
     /// @notice 本地质押金额（用于未设置质押合约时的回退）
     uint256 public stakedAmount;
@@ -167,6 +199,9 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 白名单更新事件
     event WhitelistUpdated(address indexed addr, bool allowed);
+    event EmergencyWithdrawInitiated(address indexed token, address indexed to, uint256 amount, uint256 effectiveTime);
+    event EmergencyWithdrawConfirmed(address indexed token, address indexed to, uint256 amount);
+    event EmergencyWithdrawCancelled();
 
     // ========== 修饰符 ==========
 
@@ -216,6 +251,7 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
         maxPerTx = DEFAULT_MAX_PER_TX;
         dailyLimit = DEFAULT_DAILY_LIMIT;
         lastResetTime = block.timestamp;
+        currentPeriodStart = (block.timestamp / 1 days) * 1 days; // M-01修复
 
         whitelist[_owner] = true;
     }
@@ -362,8 +398,9 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
         require(lockPeriod < 5, "AgentWallet: invalid lock period");
 
         if (address(stakingContract) != address(0)) {
-            // 先将代币从合约批准给质押合约
-            vibeToken.forceApprove(address(stakingContract), amount);
+            // 修复: 使用 safeIncreaseAllowance 替代 forceApprove
+            // 先增加授权额度
+            vibeToken.safeIncreaseAllowance(address(stakingContract), amount);
 
             // 调用 VIBStaking 合约进行质押
             stakingContract.stake(amount, lockPeriod);
@@ -479,9 +516,23 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
      * @param _stakingContract 质押合约地址
      */
     function setStakingContract(address _stakingContract) external onlyOwner {
+        require(_stakingContract != address(0), "AgentWallet: invalid staking contract");
         stakingContract = IVIBStaking(_stakingContract);
         emit StakingContractUpdated(_stakingContract);
     }
+
+    /**
+     * @notice 设置身份合约地址 (仅主人) - M-08修复
+     * @param _identityContract 身份合约地址
+     */
+    function setIdentityContract(address _identityContract) external onlyOwner {
+        require(_identityContract != address(0), "AgentWallet: invalid identity contract");
+        identityContract = IVIBIdentity(_identityContract);
+        emit IdentityContractUpdated(_identityContract);
+    }
+
+    /// @notice 身份合约更新事件 - M-08修复
+    event IdentityContractUpdated(address indexed identityContract);
 
     // ========== 视图函数 ==========
 
@@ -562,6 +613,7 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 检查是否可以转账到目标地址
+     * @dev M-08修复: 添加VIBIdentity身份验证
      */
     function _canTransfer(address to) internal view returns (bool) {
         // 1. 白名单检查
@@ -573,6 +625,19 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
         // 3. 通过注册表验证是否为有效 Agent
         if (address(registry) != address(0)) {
             if (registry.isValidAgent(to)) return true;
+        }
+
+        // 4. M-08修复: 通过VIBIdentity验证是否为有效AI Agent
+        if (address(identityContract) != address(0)) {
+            if (identityContract.isRegistered(to)) {
+                uint256 tokenId = identityContract.getTokenIdByAddress(to);
+                IVIBIdentity.IdentityType idType = identityContract.getIdentityType(tokenId);
+                // 只允许AI_AGENT和HUMAN_PROVIDER类型
+                if (idType == IVIBIdentity.IdentityType.AI_AGENT ||
+                    idType == IVIBIdentity.IdentityType.HUMAN_PROVIDER) {
+                    return true;
+                }
+            }
         }
 
         return false;
@@ -591,10 +656,16 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 重置每日限额（如果新的一天）
+     * @dev M-01修复: 使用严格的UTC日边界，防止跨边界双花
      */
     function _resetDailyIfNeeded() internal {
-        if (block.timestamp - lastResetTime >= 1 days) {
+        // 计算当前UTC日的开始时间戳
+        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
+
+        // 如果是新的UTC日，重置
+        if (currentDayStart > currentPeriodStart) {
             dailySpent = 0;
+            currentPeriodStart = currentDayStart;
             lastResetTime = block.timestamp;
         }
     }
@@ -620,21 +691,61 @@ contract AgentWallet is Ownable, ReentrancyGuard, Pausable {
         _unpause();
     }
 
-    /// @notice 紧急提取代币
+    /// @notice 紧急提取代币 (需要时间锁)
+    /// @param token 代币地址 (address(0) 为 ETH)
+    /// @param to 接收地址
+    /// @param amount 提取金额
     function emergencyWithdraw(address token, address to, uint256 amount)
         external
         onlyOwner
         nonReentrant
     {
         require(to != address(0), "AgentWallet: invalid recipient");
+        require(amount > 0, "AgentWallet: amount must be greater than 0");
 
-        if (token == address(0)) {
-            // 提取 ETH
-            payable(to).transfer(amount);
-        } else {
-            // 提取 ERC20
-            IERC20(token).safeTransfer(to, amount);
+        // 如果有待生效的提取，先取消
+        if (pendingEmergencyWithdraw.to != address(0)) {
+            delete pendingEmergencyWithdraw;
+            emit EmergencyWithdrawCancelled();
         }
+
+        // 设置待生效的提取
+        pendingEmergencyWithdraw = PendingWithdraw({
+            token: token,
+            to: to,
+            amount: amount,
+            effectiveTime: block.timestamp + EMERGENCY_WITHDRAW_DELAY
+        });
+
+        emit EmergencyWithdrawInitiated(token, to, amount, pendingEmergencyWithdraw.effectiveTime);
+    }
+
+    /// @notice 确认紧急提取
+    function confirmEmergencyWithdraw() external onlyOwner {
+        PendingWithdraw memory pw = pendingEmergencyWithdraw;
+        require(pw.to != address(0), "AgentWallet: no pending withdraw");
+        require(block.timestamp >= pw.effectiveTime, "AgentWallet: withdraw not yet effective");
+
+        // 清除状态
+        delete pendingEmergencyWithdraw;
+
+        // 执行提取
+        if (pw.token == address(0)) {
+            require(address(this).balance >= pw.amount, "AgentWallet: insufficient balance");
+            payable(pw.to).transfer(pw.amount);
+        } else {
+            require(IERC20(pw.token).balanceOf(address(this)) >= pw.amount, "AgentWallet: insufficient balance");
+            IERC20(pw.token).safeTransfer(pw.to, pw.amount);
+        }
+
+        emit EmergencyWithdrawConfirmed(pw.token, pw.to, pw.amount);
+    }
+
+    /// @notice 取消紧急提取
+    function cancelEmergencyWithdraw() external onlyOwner {
+        require(pendingEmergencyWithdraw.to != address(0), "AgentWallet: no pending withdraw");
+        delete pendingEmergencyWithdraw;
+        emit EmergencyWithdrawCancelled();
     }
 
     // 接收 ETH

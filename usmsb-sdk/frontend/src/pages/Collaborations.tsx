@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { toast } from '../stores/toastStore'
 import { getStatusColor } from '@/utils/statusColors'
+import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -101,7 +102,7 @@ export default function Collaborations() {
   const { data: sessions, isLoading, error, refetch } = useQuery<CollaborationSession[]>({
     queryKey: ['collaborations'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/collaborations`)
+      const response = await authFetch(`${API_BASE}/collaborations`)
       if (!response.ok) throw new Error('Failed to fetch collaborations')
       return response.json()
     },

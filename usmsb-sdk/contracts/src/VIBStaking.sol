@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "./libraries/VIBEErrors.sol";
+import "./libraries/AddressValidation.sol";
 
 /**
  * @title IPriceOracle
@@ -24,6 +26,7 @@ interface IPriceOracle {
  */
 contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
+    using AddressValidation for address;
 
     // ========== 常量 ==========
 
@@ -108,11 +111,24 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     /// @notice 基准价格（用于计算价格变化）
     uint256 public basePrice;
 
+    /// @notice 待生效的基准价格变更
+    uint256 public pendingBasePrice;
+    uint256 public pendingBasePriceTime;
+
+    /// @notice 基准价格变更延迟 (3天)
+    uint256 public constant BASE_PRICE_CHANGE_DELAY = 3 days;
+
     /// @notice 上次价格更新时间
     uint256 public lastPriceUpdateTime;
 
-    /// @notice 价格历史记录（用于计算趋势）
-    uint256[] public priceHistory;
+    /// @notice 价格历史记录（循环缓冲区）
+    uint256[24] public priceHistoryBuffer;
+
+    /// @notice 价格历史当前索引
+    uint256 public priceHistoryIndex;
+
+    /// @notice 价格历史记录数量
+    uint256 public priceHistoryCount;
 
     /// @notice 最大价格历史记录数
     uint256 public constant MAX_PRICE_HISTORY = 24; // 24小时
@@ -123,6 +139,9 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     /// @notice 价格大幅下跌阈值（触发最大 APY）
     uint256 public constant PRICE_CRASH_THRESHOLD = 20; // 20%
 
+    /// @notice APY 调整最小阈值（防止小幅度价格波动导致频繁调整）
+    uint256 public constant MIN_APY_ADJUSTMENT_THRESHOLD = 10; // 10% - 安全增强
+
     /// @notice APY 调整冷却期（秒）
     uint256 public constant APY_ADJUSTMENT_COOLDOWN = 1 hours;
 
@@ -131,6 +150,9 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 已分配奖励总额
     uint256 public totalRewardsDistributed;
+
+    /// @notice 累计接收的 ETH 金额
+    uint256 public totalEthReceived;
 
     /// @notice 上次奖励计算时间
     uint256 public lastUpdateTime;
@@ -167,7 +189,15 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
 
     // ========== 事件 ==========
 
-    /// @notice 质押事件
+    /**
+     * @notice 质押事件
+     * @dev 当用户成功质押代币时触发
+     * @param user 质押用户地址
+     * @param amount 质押金额（wei）
+     * @param tier 质押等级（Bronze/Silver/Gold/Platinum）
+     * @param lockPeriod 锁仓期类型
+     * @param unlockTime 解锁时间戳
+     */
     event Staked(
         address indexed user,
         uint256 amount,
@@ -176,16 +206,39 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         uint256 unlockTime
     );
 
-    /// @notice 提取质押事件
+    /**
+     * @notice 提取质押事件
+     * @dev 当用户提取质押的代币时触发
+     * @param user 用户地址
+     * @param amount 提取金额（wei）
+     */
     event Unstaked(address indexed user, uint256 amount);
 
-    /// @notice 领取奖励事件
+    /**
+     * @notice 领取奖励事件
+     * @dev 当用户领取质押奖励时触发
+     * @param user 用户地址
+     * @param amount 奖励金额（wei）
+     */
     event RewardClaimed(address indexed user, uint256 amount);
 
-    /// @notice APY 更新事件
+    /**
+     * @notice APY 更新事件
+     * @dev 当APY手动更新时触发
+     * @param oldAPY 旧APY值（百分比）
+     * @param newAPY 新APY值（百分比）
+     */
     event APYUpdated(uint256 oldAPY, uint256 newAPY);
 
-    /// @notice 动态 APY 调整事件
+    /**
+     * @notice 动态 APY 调整事件
+     * @dev 当根据价格变化自动调整APY时触发
+     * @param oldAPY 调整前APY
+     * @param newAPY 调整后APY
+     * @param currentPrice 当前价格
+     * @param basePrice 基准价格
+     * @param priceChangePercent 价格变化百分比（正数上涨，负数下跌）
+     */
     event DynamicAPYAdjusted(
         uint256 oldAPY,
         uint256 newAPY,
@@ -194,32 +247,76 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         int256 priceChangePercent
     );
 
-    /// @notice 价格更新事件
+    /**
+     * @notice 价格更新事件
+     * @dev 当价格预言机更新价格时触发
+     * @param price 新价格
+     * @param timestamp 更新时间戳
+     */
     event PriceUpdated(uint256 price, uint256 timestamp);
 
-    /// @notice 价格预言机设置事件
+    /**
+     * @notice 价格预言机设置事件
+     * @dev 当管理员设置价格预言机地址时触发
+     * @param oracle 预言机合约地址
+     */
     event PriceOracleSet(address indexed oracle);
 
-    /// @notice 基准价格设置事件
+    /**
+     * @notice 基准价格设置事件
+     * @dev 当管理员设置基准价格时触发
+     * @param basePrice 基准价格
+     */
     event BasePriceSet(uint256 basePrice);
+    event BasePriceChangeInitiated(uint256 newPrice, uint256 effectiveTime);
+    event BasePriceChangeCancelled();
 
-    /// @notice 代币地址更新事件
+    /**
+     * @notice 代币地址更新事件
+     * @dev 当管理员更新VIBE代币地址时触发
+     * @param oldToken 旧代币地址
+     * @param newToken 新代币地址
+     */
     event TokenUpdated(address indexed oldToken, address indexed newToken);
 
-    /// @notice 紧急提取事件
+    /**
+     * @notice 紧急提取事件
+     * @dev 当用户紧急提取质押（放弃奖励）时触发
+     * @param user 用户地址
+     * @param amount 提取金额
+     */
     event EmergencyWithdraw(address indexed user, uint256 amount);
 
-    /// @notice 释放控制器更新事件
+    /**
+     * @notice 释放控制器更新事件
+     * @dev 当管理员更新释放控制器地址时触发
+     * @param oldAddress 旧地址
+     * @param newAddress 新地址
+     */
     event EmissionControllerUpdated(address indexed oldAddress, address indexed newAddress);
 
-    /// @notice 奖励接收事件
+    /**
+     * @notice 奖励接收事件
+     * @dev 当合约接收外部奖励时触发
+     * @param amount 奖励金额
+     * @param from 发送者地址
+     */
     event RewardsReceived(uint256 amount, address indexed from);
+
+    /**
+     * @notice Keeper奖励支付事件
+     * @dev 当Keeper因更新价格获得奖励时触发
+     * @param keeper Keeper地址
+     * @param reward 奖励金额
+     */
+    event KeeperRewardPaid(address indexed keeper, uint256 reward);
+    event EthReceived(address indexed from, uint256 amount);
 
     // ========== 修饰符 ==========
 
     /// @notice 检查用户是否已质押
     modifier isStaked(address user) {
-        require(stakeInfos[user].isActive, "VIBStaking: user not staked");
+        if (!stakeInfos[user].isActive) revert VIBEErrors.UserNotStaked();
         _;
     }
 
@@ -248,7 +345,7 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
      * @param _vibeToken VIBE 代币地址
      */
     constructor(address _vibeToken) Ownable(msg.sender) {
-        require(_vibeToken != address(0), "VIBStaking: invalid token address");
+        if (_vibeToken == address(0)) revert VIBEErrors.ZeroAddress();
         vibeToken = IERC20(_vibeToken);
         lastUpdateTime = block.timestamp;
 
@@ -274,8 +371,8 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         nonReentrant
         whenNotPaused
     {
-        require(amount >= TIER_MIN_AMOUNTS[0], "VIBStaking: amount below minimum");
-        require(lockPeriod < 5, "VIBStaking: invalid lock period");
+        if (amount < TIER_MIN_AMOUNTS[0]) revert VIBEErrors.StakeAmountBelowMinimum(TIER_MIN_AMOUNTS[0]);
+        if (lockPeriod >= 5) revert VIBEErrors.InvalidLockPeriod();
 
         // 更新全局奖励
         updateGlobalRewards();
@@ -387,8 +484,16 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice 设置价格预言机
      * @param _priceOracle 价格预言机地址
+     * @dev 安全增强: 验证是有效合约地址
      */
     function setPriceOracle(address _priceOracle) external onlyOwner {
+        require(_priceOracle != address(0), "VIBStaking: invalid oracle address");
+        // 验证是否为合约地址
+        uint256 size;
+        assembly {
+            size := extcodesize(_priceOracle)
+        }
+        require(size > 0, "VIBStaking: not a contract");
         priceOracle = _priceOracle;
         emit PriceOracleSet(_priceOracle);
     }
@@ -396,11 +501,47 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice 设置基准价格（用于计算价格变化）
      * @param _basePrice 基准价格
+     * @dev 安全增强: 需要3天时间锁
      */
     function setBasePrice(uint256 _basePrice) external onlyOwner {
         require(_basePrice > 0, "VIBStaking: invalid base price");
-        basePrice = _basePrice;
-        emit BasePriceSet(_basePrice);
+
+        // 如果没有待生效的变更，立即生效
+        if (pendingBasePriceTime == 0) {
+            basePrice = _basePrice;
+            emit BasePriceSet(_basePrice);
+        } else {
+            // 等待时间锁
+            require(
+                block.timestamp >= pendingBasePriceTime,
+                "VIBStaking: timelock not elapsed"
+            );
+            basePrice = pendingBasePrice;
+            pendingBasePrice = 0;
+            pendingBasePriceTime = 0;
+            emit BasePriceSet(basePrice);
+        }
+    }
+
+    /**
+     * @notice 发起基准价格变更（需要时间锁）
+     * @param _basePrice 新的基准价格
+     */
+    function initiateBasePriceChange(uint256 _basePrice) external onlyOwner {
+        require(_basePrice > 0, "VIBStaking: invalid base price");
+        pendingBasePrice = _basePrice;
+        pendingBasePriceTime = block.timestamp + BASE_PRICE_CHANGE_DELAY;
+        emit BasePriceChangeInitiated(_basePrice, pendingBasePriceTime);
+    }
+
+    /**
+     * @notice 取消待生效的基准价格变更
+     */
+    function cancelBasePriceChange() external onlyOwner {
+        require(pendingBasePriceTime > 0, "VIBStaking: no pending change");
+        pendingBasePrice = 0;
+        pendingBasePriceTime = 0;
+        emit BasePriceChangeCancelled();
     }
 
     // ========== Keeper 激励机制 ==========
@@ -414,35 +555,36 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     /// @notice Keeper 奖励最小间隔 (4小时)
     uint256 public constant KEEPER_REWARD_INTERVAL = 4 hours;
 
-    /// @notice Keeper 奖励事件
-    event KeeperRewardPaid(address indexed keeper, uint256 reward);
-
     /**
      * @notice 更新价格并调整 APY（反死螺旋机制）
-     * @dev 任何人都可以调用，有冷却期和奖励激励
+     * @dev 安全修复: 只有活跃质押者才能调用，防止价格操纵攻击
      */
     function updatePriceAndAdjustAPY() external {
-        require(priceOracle != address(0), "VIBStaking: oracle not set");
-        require(basePrice > 0, "VIBStaking: base price not set");
+        if (priceOracle == address(0)) revert VIBEErrors.OracleNotSet();
+        if (basePrice == 0) revert VIBEErrors.BasePriceNotSet();
+
+        // 安全修复: 只有活跃质押者才能调用此函数
+        if (!stakeInfos[msg.sender].isActive ||
+            stakeInfos[msg.sender].amount < TIER_MIN_AMOUNTS[0]) {
+            revert VIBEErrors.NotActiveStaker();
+        }
 
         // 检查冷却期
-        require(
-            block.timestamp >= lastPriceUpdateTime + APY_ADJUSTMENT_COOLDOWN,
-            "VIBStaking: cooldown not expired"
-        );
+        if (block.timestamp < lastPriceUpdateTime + APY_ADJUSTMENT_COOLDOWN) {
+            revert VIBEErrors.CooldownNotExpired(
+                lastPriceUpdateTime + APY_ADJUSTMENT_COOLDOWN - block.timestamp
+            );
+        }
 
         // 获取当前价格
         uint256 currentPrice = IPriceOracle(priceOracle).getPrice();
-        require(currentPrice > 0, "VIBStaking: invalid price");
+        if (currentPrice == 0) revert VIBEErrors.InvalidPrice();
 
-        // 更新价格历史
-        priceHistory.push(currentPrice);
-        if (priceHistory.length > MAX_PRICE_HISTORY) {
-            // 移除最旧的记录
-            for (uint256 i = 0; i < priceHistory.length - MAX_PRICE_HISTORY; i++) {
-                priceHistory[i] = priceHistory[i + 1];
-            }
-            priceHistory.pop();
+        // 更新价格历史（使用循环缓冲区，O(1)复杂度）
+        priceHistoryBuffer[priceHistoryIndex] = currentPrice;
+        priceHistoryIndex = (priceHistoryIndex + 1) % MAX_PRICE_HISTORY;
+        if (priceHistoryCount < MAX_PRICE_HISTORY) {
+            priceHistoryCount++;
         }
 
         lastPriceUpdateTime = block.timestamp;
@@ -455,13 +597,19 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         _adjustAPYBasedOnPrice(currentPrice, priceChangePercent);
 
         // ========== Keeper 激励 ==========
-        // 如果满足间隔要求且有足够余额，发放奖励
+        // 安全修复: 只有在有显著价格变化时才发放奖励
         if (block.timestamp >= lastKeeperRewardTime + KEEPER_REWARD_INTERVAL) {
-            uint256 balance = vibeToken.balanceOf(address(this));
-            if (balance >= KEEPER_REWARD) {
-                lastKeeperRewardTime = block.timestamp;
-                vibeToken.safeTransfer(msg.sender, KEEPER_REWARD);
-                emit KeeperRewardPaid(msg.sender, KEEPER_REWARD);
+            // 检查是否有显著价格变化（>=3%）
+            int256 absPriceChange = priceChangePercent >= 0 ? priceChangePercent : -priceChangePercent;
+            bool significantChange = absPriceChange >= 3; // 3% 阈值
+
+            if (significantChange) {
+                uint256 balance = vibeToken.balanceOf(address(this));
+                if (balance >= KEEPER_REWARD) {
+                    lastKeeperRewardTime = block.timestamp;
+                    vibeToken.safeTransfer(msg.sender, KEEPER_REWARD);
+                    emit KeeperRewardPaid(msg.sender, KEEPER_REWARD);
+                }
             }
         }
     }
@@ -484,6 +632,13 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
      * @param priceChangePercent 价格变化百分比
      */
     function _adjustAPYBasedOnPrice(uint256 currentPrice, int256 priceChangePercent) internal {
+        // 安全增强: 如果价格变化小于最小阈值，不调整 APY（防止前端运行攻击）
+        int256 absChange = priceChangePercent >= 0 ? priceChangePercent : -priceChangePercent;
+        if (absChange < int256(MIN_APY_ADJUSTMENT_THRESHOLD)) {
+            // 价格变化太小，不调整 APY
+            return;
+        }
+
         // 更新全局奖励
         updateGlobalRewards();
 
@@ -491,23 +646,33 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         uint256 newAPY = BASE_APY;
 
         // 反死螺旋机制：价格下跌时提升 APY
+        // STK-001修复: 严格按照白皮书公式实现
+        // - 下跌<10%:  APY = 3 + (下跌% / 10) × 3.5，范围3%~6.5%
+        // - 下跌10-20%: APY = 6.5 + ((下跌% - 10) / 10) × 3.5，范围6.5%~10%
+        // - 下跌≥20%: APY = 10%（最大）
+        //
+        // 使用精度100来保留1位小数: 3% = 300, 3.5% = 350, 6.5% = 650, 10% = 1000
         if (priceChangePercent < 0) {
             int256 dropPercent = -priceChangePercent; // 转为正数
 
             if (dropPercent >= int256(int256(PRICE_CRASH_THRESHOLD))) {
                 // 价格下跌 >= 20%：最大 APY (10%)
-                newAPY = BASE_APY + MAX_APY_BONUS;
+                newAPY = MAX_APY;
             } else if (dropPercent >= int256(int256(PRICE_DROP_THRESHOLD))) {
-                // 价格下跌 10-20%：按比例提升 APY
-                // APY 加成 = (下跌百分比 / 20%) * 最大加成
-                uint256 bonusRate = uint256(dropPercent - int256(PRICE_DROP_THRESHOLD)) * MAX_APY_BONUS /
-                                   (PRICE_CRASH_THRESHOLD - PRICE_DROP_THRESHOLD);
-                newAPY = BASE_APY + (MAX_APY_BONUS / 2) + bonusRate;
+                // 价格下跌 10-20%：
+                // 白皮书公式: APY = 6.5 + ((下跌% - 10) / 10) × 3.5
+                // 使用精度100: APY (精度100) = 650 + ((下跌% - 10) × 35)
+                uint256 excessDrop = uint256(dropPercent - int256(PRICE_DROP_THRESHOLD)); // 0-10
+                // 每跌1%加35个基点(0.35%)
+                uint256 apyWithPrecision = 650 + (excessDrop * 35); // 精度100
+                newAPY = apyWithPrecision / 100; // 转回百分比
+                if (newAPY > MAX_APY) newAPY = MAX_APY;
             } else {
-                // 价格下跌 < 10%：小幅提升 APY
-                // APY 加成 = (下跌百分比 / 10%) * (最大加成 / 2)
-                uint256 bonusRate = uint256(dropPercent) * (MAX_APY_BONUS / 2) / PRICE_DROP_THRESHOLD;
-                newAPY = BASE_APY + bonusRate;
+                // 价格下跌 < 10%：
+                // 白皮书公式: APY = 3 + (下跌% / 10) × 3.5
+                // 使用精度100: APY (精度100) = 300 + (下跌% × 35)
+                uint256 apyWithPrecision = 300 + (uint256(dropPercent) * 35); // 精度100
+                newAPY = apyWithPrecision / 100; // 转回百分比
             }
         } else {
             // 价格上涨或持平：恢复基础 APY
@@ -575,7 +740,7 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
      * @param _vibeToken 新的代币地址
      */
     function setVibeToken(address _vibeToken) external onlyOwner {
-        require(_vibeToken != address(0), "VIBStaking: invalid token address");
+        if (_vibeToken == address(0)) revert VIBEErrors.ZeroAddress();
         emit TokenUpdated(address(vibeToken), _vibeToken);
         vibeToken = IERC20(_vibeToken);
     }
@@ -595,10 +760,16 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice 向合约添加奖励（从外部资助）
+     * @notice 向合约添加奖励
+     * @dev 仅允许 owner 或 emissionController 调用
      * @param amount 奖励数量
      */
     function addRewards(uint256 amount) external {
+        require(
+            msg.sender == owner() || msg.sender == emissionController,
+            "VIBStaking: not authorized to add rewards"
+        );
+        require(amount > 0, "VIBStaking: amount must be greater than 0");
         vibeToken.safeTransferFrom(msg.sender, address(this), amount);
     }
 
@@ -607,7 +778,7 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
      * @param _emissionController 释放控制器地址
      */
     function setEmissionController(address _emissionController) external onlyOwner {
-        require(_emissionController != address(0), "VIBStaking: invalid address");
+        if (_emissionController == address(0)) revert VIBEErrors.ZeroAddress();
         emit EmissionControllerUpdated(emissionController, _emissionController);
         emissionController = _emissionController;
     }
@@ -786,6 +957,33 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
+     * @notice 获取价格历史记录
+     * @return prices 价格数组（按时间顺序，最新的在最后）
+     * @return count 有效记录数量
+     */
+    function getPriceHistory() external view returns (uint256[] memory prices, uint256 count) {
+        count = priceHistoryCount;
+        prices = new uint256[](count);
+
+        if (count == 0) {
+            return (prices, 0);
+        }
+
+        // 计算起始索引（最旧的记录）
+        uint256 startIndex;
+        if (count < MAX_PRICE_HISTORY) {
+            startIndex = 0;
+        } else {
+            startIndex = priceHistoryIndex; // 缓冲区已满，当前索引指向最旧的
+        }
+
+        // 按时间顺序填充数组
+        for (uint256 i = 0; i < count; i++) {
+            prices[i] = priceHistoryBuffer[(startIndex + i) % MAX_PRICE_HISTORY];
+        }
+    }
+
+    /**
      * @notice 获取用户质押详情（用于治理）
      * @param user 用户地址
      * @return amount 质押数量
@@ -901,10 +1099,12 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     // ========== 接收函数 ==========
 
     /**
-     * @notice 接收以太（仅用于资助奖励池）
+     * @notice 接收以太（用于资助奖励池）
      */
     receive() external payable {
-        // ETH 将转换为 VIBE 代币用于奖励
+        require(msg.value > 0, "VIBStaking: zero ETH");
+        totalEthReceived += msg.value;
+        emit EthReceived(msg.sender, msg.value);
     }
 
     /**

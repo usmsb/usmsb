@@ -1,10 +1,14 @@
 """
 Prediction endpoints.
+
+Authentication:
+- All endpoints require X-API-Key + X-Agent-ID headers
 """
 
 import logging
+from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from usmsb_sdk.api.database import (
     get_agent as db_get_agent,
@@ -12,6 +16,7 @@ from usmsb_sdk.api.database import (
 )
 from usmsb_sdk.api.rest.schemas.prediction import PredictionRequest
 from usmsb_sdk.api.rest.services.utils import safe_json_loads, create_agent_from_db_data
+from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 from usmsb_sdk.core.elements import Environment, EnvironmentType
 
 logger = logging.getLogger(__name__)
@@ -28,8 +33,26 @@ def set_prediction_service(service):
 
 
 @router.post("/behavior")
-async def predict_behavior(request: PredictionRequest):
-    """Predict agent behavior."""
+async def predict_behavior(
+    request: PredictionRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """
+    Predict agent behavior.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+    # Verify ownership - can only predict own behavior
+    if agent_id != request.agent_id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only predict your own agent's behavior"
+        )
+
     # Return mock prediction if service not available
     if not _prediction_service:
         # Try to get agent from database

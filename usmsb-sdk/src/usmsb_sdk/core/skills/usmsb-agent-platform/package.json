@@ -1,0 +1,53 @@
+{
+  "name": "usmsb-agent-platform",
+  "version": "1.0.0",
+  "description": "USMSB Agent Platform Skill - Collaboration, Marketplace, Discovery, Negotiation, Workflow capabilities for AI Agents",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint lib/**/*.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "skill",
+    "platform",
+    "collaboration",
+    "marketplace",
+    "discovery",
+    "negotiation",
+    "workflow"
+  ],
+  "author": "USMSB",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/usmsb/usmsb-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/usmsb/usmsb-sdk/issues"
+  },
+  "homepage": "https://github.com/usmsb/usmsb-sdk#readme",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "@types/node-fetch": "^2.6.13",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
+    "README.md"
+  ]
+}

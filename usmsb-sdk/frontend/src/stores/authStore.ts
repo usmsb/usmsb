@@ -58,6 +58,9 @@ export interface AuthState {
   sessionId: string | null
   accessToken: string | null
 
+  // API Key for agent authentication
+  apiKey: string | null
+
   // User state
   agentId: string | null
   stake: number
@@ -95,6 +98,7 @@ export interface AuthState {
   setUserRole: (role: UserRole) => void
   setDid: (did: string) => void
   setSession: (sessionId: string, accessToken: string) => void
+  setApiKey: (apiKey: string) => void
   setAgent: (agentId: string, stake: number, reputation: number) => void
   setRole: (role: 'supplier' | 'demander' | 'both') => void
   setProfile: (profile: {
@@ -126,6 +130,7 @@ export const useAuthStore = create<AuthState>()(
       did: null,
       sessionId: null,
       accessToken: null,
+      apiKey: null,
       agentId: null,
       stake: 0,
       reputation: 0,
@@ -187,6 +192,8 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
         }),
 
+      setApiKey: (apiKey) => set({ apiKey }),
+
       setAgent: (agentId, stake, reputation) =>
         set({
           agentId,
@@ -245,6 +252,7 @@ export const useAuthStore = create<AuthState>()(
           did: null,
           sessionId: null,
           accessToken: null,
+          apiKey: null,
           agentId: null,
           stake: 0,
           reputation: 0,
@@ -277,6 +285,7 @@ export const useAuthStore = create<AuthState>()(
         did: state.did,
         sessionId: state.sessionId,
         accessToken: state.accessToken,
+        apiKey: state.apiKey,
         agentId: state.agentId,
         stake: state.stake,
         reputation: state.reputation,

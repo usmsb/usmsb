@@ -45,6 +45,9 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
     /// @notice 精度
     uint256 public constant PRECISION = 10000;
 
+    /// @notice 紧急提取延迟时间 (7天)
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 7 days;
+
     // ========== 状态变量 ==========
 
     /// @notice VIBE 代币
@@ -64,12 +67,19 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 已释放总量
     uint256 public totalReleased;
+    uint256 public unallocatedRemainder; // 未分配余数 (整数除法截断)
 
     /// @notice 上次周期释放时间
     uint256 public lastEpochTime;
 
     /// @notice 上次触发时间
     uint256 public lastTriggerTime;
+
+    /// @notice 待紧急提取地址
+    address public pendingWithdrawRecipient;
+
+    /// @notice 紧急提取生效时间
+    uint256 public withdrawEffectiveTime;
 
     /// @notice 紧急补充最小阈值
     uint256 public minPoolBalance = 100_000 * 10**18; // 10万 VIBE
@@ -102,6 +112,9 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
     event PoolUpdated(string poolName, address newAddress);
     event MinPoolBalanceUpdated(uint256 newBalance);
     event GovernanceFundsRequested(uint256 amount, address governancePool);
+    event EmergencyWithdrawInitiated(address indexed to, uint256 effectiveTime);
+    event EmergencyWithdraw(address indexed to, uint256 tokenAmount, uint256 ethAmount);
+    event EmergencyWithdrawCancelled();
 
     // ========== 构造函数 ==========
 
@@ -215,6 +228,8 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 计算触发者奖励
+     * @dev 奖励 = 基础奖励 + Gas补贴 + 时间累积奖励
+     *      Gas补贴 = 估算Gas成本 × 120%
      */
     function getTriggerReward() public view returns (uint256) {
         uint256 hoursSinceLastTrigger = (block.timestamp - lastTriggerTime) / 1 hours;
@@ -223,9 +238,15 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
             hoursSinceLastTrigger = MAX_ACCUMULATED_HOURS;
         }
 
+        // 时间累积奖励
         uint256 timeBonus = hoursSinceLastTrigger * ACCUMULATION_RATE;
 
-        return BASE_REWARD + timeBonus;
+        // Gas补贴：估算约21000 Gas × 120%
+        // 估算值 = 21 Gas单价(30 gwei) × 21000 × 120% / 1e18 = 约 0.000756 ETH
+        uint256 estimatedGasCost = 21000 * 30 gwei;
+        uint256 gasBonus = (estimatedGasCost * (100 + GAS_BONUS_PERCENT)) / 100;
+
+        return BASE_REWARD + gasBonus + timeBonus;
     }
 
     /**
@@ -246,21 +267,25 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
     // ========== 管理员函数 ==========
 
     function setStakingPool(address _pool) external onlyOwner {
+        require(_pool != address(0), "EmissionController: invalid staking pool");
         stakingPool = _pool;
         emit PoolUpdated("staking", _pool);
     }
 
     function setEcosystemPool(address _pool) external onlyOwner {
+        require(_pool != address(0), "EmissionController: invalid ecosystem pool");
         ecosystemPool = _pool;
         emit PoolUpdated("ecosystem", _pool);
     }
 
     function setGovernancePool(address _pool) external onlyOwner {
+        require(_pool != address(0), "EmissionController: invalid governance pool");
         governancePool = _pool;
         emit PoolUpdated("governance", _pool);
     }
 
     function setReservePool(address _pool) external onlyOwner {
+        require(_pool != address(0), "EmissionController: invalid reserve pool");
         reservePool = _pool;
         emit PoolUpdated("reserve", _pool);
     }
@@ -310,17 +335,62 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice 紧急提取（仅限紧急情况）
+     * @notice 发起紧急提取（需要7天时间锁）
+     * @param to 接收地址
+     * @dev 安全增强: 需要7天时间锁才能生效
      */
     function emergencyWithdraw(address to) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+
+        // 如果有待生效的提取，先取消
+        if (pendingWithdrawRecipient != address(0)) {
+            delete pendingWithdrawRecipient;
+            delete withdrawEffectiveTime;
+            emit EmergencyWithdrawCancelled();
+        }
+
+        // 设置待生效的提取
+        pendingWithdrawRecipient = to;
+        withdrawEffectiveTime = block.timestamp + EMERGENCY_WITHDRAW_DELAY;
+
+        emit EmergencyWithdrawInitiated(to, withdrawEffectiveTime);
+    }
+
+    /**
+     * @notice 确认紧急提取（在延迟期过后）
+     */
+    function confirmEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawRecipient != address(0), "No pending withdraw");
+        require(block.timestamp >= withdrawEffectiveTime, "Timelock not elapsed");
+
+        address recipient = pendingWithdrawRecipient;
         uint256 balance = vibeToken.balanceOf(address(this));
-        if (balance > 0) {
-            vibeToken.safeTransfer(to, balance);
-        }
         uint256 ethBalance = address(this).balance;
-        if (ethBalance > 0) {
-            payable(to).transfer(ethBalance);
+
+        // 清除状态
+        delete pendingWithdrawRecipient;
+        delete withdrawEffectiveTime;
+
+        if (balance > 0) {
+            vibeToken.safeTransfer(recipient, balance);
         }
+        if (ethBalance > 0) {
+            payable(recipient).transfer(ethBalance);
+        }
+
+        emit EmergencyWithdraw(recipient, balance, ethBalance);
+    }
+
+    /**
+     * @notice 取消待生效的紧急提取
+     */
+    function cancelEmergencyWithdraw() external onlyOwner {
+        require(pendingWithdrawRecipient != address(0), "No pending withdraw");
+
+        delete pendingWithdrawRecipient;
+        delete withdrawEffectiveTime;
+
+        emit EmergencyWithdrawCancelled();
     }
 
     // ========== 内部函数 ==========
@@ -335,33 +405,35 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         uint256 governanceAmount = (amount * GOVERNANCE_RATIO) / PRECISION;
         uint256 reserveAmount = (amount * RESERVE_RATIO) / PRECISION;
 
-        // 计算实际分配总量（避免整数除法丢失）
-        uint256 totalDistributed;
+        // 计算预期分配总量
+        uint256 expectedTotal = stakingAmount + ecosystemAmount + governanceAmount + reserveAmount;
+
+        // 计算并跟踪整数除法截断造成的余数
+        uint256 actualDistributed = expectedTotal;
+        if (amount > expectedTotal) {
+            unallocatedRemainder += (amount - expectedTotal);
+        }
 
         // 转账到各池
         if (stakingPool != address(0) && stakingAmount > 0) {
             vibeToken.safeTransfer(stakingPool, stakingAmount);
-            totalDistributed += stakingAmount;
         }
         if (ecosystemPool != address(0) && ecosystemAmount > 0) {
             vibeToken.safeTransfer(ecosystemPool, ecosystemAmount);
-            totalDistributed += ecosystemAmount;
         }
         if (governancePool != address(0) && governanceAmount > 0) {
             vibeToken.safeTransfer(governancePool, governanceAmount);
-            totalDistributed += governanceAmount;
         }
         if (reservePool != address(0) && reserveAmount > 0) {
             vibeToken.safeTransfer(reservePool, reserveAmount);
-            totalDistributed += reserveAmount;
         }
 
-        // 更新状态 - 使用实际分配量
-        totalReleased += totalDistributed;
+        // 更新状态
+        totalReleased += actualDistributed;
 
         // 记录释放
         releaseRecords.push(ReleaseRecord({
-            amount: totalDistributed,
+            amount: actualDistributed,
             timestamp: block.timestamp,
             trigger: msg.sender,
             isEmergency: isEmergency,
@@ -374,7 +446,7 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         // 支付触发者奖励（如果有 ETH）
         _payTriggerReward();
 
-        emit EmissionReleased(totalDistributed, msg.sender, isEmergency, block.timestamp);
+        emit EmissionReleased(actualDistributed, msg.sender, isEmergency, block.timestamp);
     }
 
     /**

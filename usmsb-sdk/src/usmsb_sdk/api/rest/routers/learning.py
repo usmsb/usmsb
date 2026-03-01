@@ -1,18 +1,20 @@
 """
 Proactive Learning API endpoints.
+
+Authentication: All endpoints require authentication (no stake required)
 """
 
 import json
 from typing import Any, Dict
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
 from usmsb_sdk.api.database import (
     get_agent as db_get_agent,
-    get_ai_agent as db_get_ai_agent,
-    get_all_ai_agents as db_get_all_ai_agents,
+    get_all_agents as db_get_all_agents,
     get_metrics as db_get_metrics,
 )
+from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 
 router = APIRouter(prefix="/learning", tags=["Proactive Learning"])
 
@@ -21,58 +23,54 @@ learning_store: Dict[str, Any] = {}
 
 
 @router.post("/analyze")
-async def analyze_agent_learning(agent_id: str = Query(...)):
-    """Analyze agent's match history for learning insights."""
-    # Get agent data from database
-    agent_data = db_get_ai_agent(agent_id)
-    if not agent_data:
-        agent_data = db_get_agent(agent_id)
+async def analyze_agent_learning(user: Dict[str, Any] = Depends(get_current_user_unified)):
+    """Analyze agent's match history for learning insights.
 
-    if agent_data:
-        capabilities = json.loads(agent_data.get("capabilities", "[]")) if isinstance(agent_data.get("capabilities"), str) else agent_data.get("capabilities", [])
-        reputation = agent_data.get("reputation", 0.5)
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
 
-        return {
-            "agent_id": agent_id,
-            "insights_count": len(capabilities),
-            "success_patterns": [f"Strong performance in {cap}" for cap in capabilities[:3]] if capabilities else ["No historical patterns yet"],
-            "recommendations": [
-                "Build reputation through successful transactions",
-                f"Leverage your {', '.join(capabilities[:2])} capabilities" if len(capabilities) >= 2 else "Add more capabilities to your profile",
-            ],
-            "reputation": reputation,
-            "status": agent_data.get("status", "unknown"),
-        }
+    capabilities = user.get('capabilities', [])
+    reputation = user.get('staked_amount', 0) / 1000 + 0.5  # Estimate from stake
 
     return {
         "agent_id": agent_id,
-        "insights_count": 0,
-        "success_patterns": [],
-        "recommendations": ["Register as an agent to start learning"],
+        "insights_count": len(capabilities),
+        "success_patterns": [f"Strong performance in {cap}" for cap in capabilities[:3]] if capabilities else ["No historical patterns yet"],
+        "recommendations": [
+            "Build reputation through successful transactions",
+            f"Leverage your {', '.join(capabilities[:2])} capabilities" if len(capabilities) >= 2 else "Add more capabilities to your profile",
+        ],
+        "reputation": min(reputation, 1.0),
+        "stake_tier": user.get('stake_tier', 'NONE'),
+        "status": user.get('status', 'unknown'),
     }
 
 
-@router.get("/insights/{agent_id}")
-async def get_learning_insights(agent_id: str):
-    """Get learning insights for an agent."""
-    # Get agent data from database
-    agent_data = db_get_ai_agent(agent_id)
-    if not agent_data:
-        agent_data = db_get_agent(agent_id)
+@router.get("/insights")
+async def get_learning_insights(user: Dict[str, Any] = Depends(get_current_user_unified)):
+    """Get learning insights for the authenticated agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+
+    capabilities = user.get('capabilities', [])
+    reputation = min(user.get('staked_amount', 0) / 1000 + 0.5, 1.0)
 
     insights = []
-    if agent_data:
-        capabilities = json.loads(agent_data.get("capabilities", "[]")) if isinstance(agent_data.get("capabilities"), str) else agent_data.get("capabilities", [])
-        reputation = agent_data.get("reputation", 0.5)
-
-        for i, cap in enumerate(capabilities[:5]):
-            insights.append({
-                "insight_id": f"insight-{i+1}",
-                "category": "capability_analysis",
-                "title": f"{cap} Performance",
-                "description": f"Your {cap} capability has a reputation score of {reputation:.0%}",
-                "confidence": reputation,
-            })
+    for i, cap in enumerate(capabilities[:5]):
+        insights.append({
+            "insight_id": f"insight-{i+1}",
+            "category": "capability_analysis",
+            "title": f"{cap} Performance",
+            "description": f"Your {cap} capability has a reputation score of {reputation:.0%}",
+            "confidence": reputation,
+        })
 
     return {
         "agent_id": agent_id,
@@ -80,50 +78,49 @@ async def get_learning_insights(agent_id: str):
     }
 
 
-@router.get("/strategy/{agent_id}")
-async def get_optimized_strategy(agent_id: str):
-    """Get optimized matching strategy for an agent."""
-    # Get agent data from database
-    agent_data = db_get_ai_agent(agent_id)
-    if not agent_data:
-        agent_data = db_get_agent(agent_id)
+@router.get("/strategy")
+async def get_optimized_strategy(user: Dict[str, Any] = Depends(get_current_user_unified)):
+    """Get optimized matching strategy for the authenticated agent.
 
-    if agent_data:
-        capabilities = json.loads(agent_data.get("capabilities", "[]")) if isinstance(agent_data.get("capabilities"), str) else agent_data.get("capabilities", [])
-        reputation = agent_data.get("reputation", 0.5)
-        stake = agent_data.get("stake", 0)
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
 
-        # Calculate optimal price range based on reputation and stake
-        min_price = max(10, int(stake * 0.1))
-        max_price = max(min_price + 50, int(stake * 0.5))
+    capabilities = user.get('capabilities', [])
+    reputation = min(user.get('staked_amount', 0) / 1000 + 0.5, 1.0)
+    stake = user.get('staked_amount', 0)
 
-        return {
-            "agent_id": agent_id,
-            "strategy": {
-                "preferred_partner_types": ["human", "ai_agent"],
-                "optimal_price_range": {"min": min_price, "max": max_price},
-                "recommended_negotiation_strategy": "balanced" if reputation > 0.5 else "conservative",
-                "best_contact_timing": "anytime",
-                "focus_capabilities": capabilities[:3] if capabilities else [],
-            },
-        }
+    # Calculate optimal price range based on reputation and stake
+    min_price = max(10, int(stake * 0.1))
+    max_price = max(min_price + 50, int(stake * 0.5))
 
     return {
         "agent_id": agent_id,
         "strategy": {
-            "preferred_partner_types": [],
-            "optimal_price_range": {"min": 0, "max": 0},
-            "recommended_negotiation_strategy": "none",
-            "best_contact_timing": "none",
+            "preferred_partner_types": ["human", "ai_agent"],
+            "optimal_price_range": {"min": min_price, "max": max_price},
+            "recommended_negotiation_strategy": "balanced" if reputation > 0.5 else "conservative",
+            "best_contact_timing": "anytime",
+            "focus_capabilities": capabilities[:3] if capabilities else [],
+            "stake_tier": user.get('stake_tier', 'NONE'),
         },
     }
 
 
-@router.get("/market/{agent_id}")
-async def get_market_insight(agent_id: str):
-    """Get market insights for an agent."""
+@router.get("/market")
+async def get_market_insight(user: Dict[str, Any] = Depends(get_current_user_unified)):
+    """Get market insights for the authenticated agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+
     # Get environment state for market insights
-    all_agents = db_get_all_ai_agents()
+    all_agents = db_get_all_agents()
     metrics = db_get_metrics()
 
     total_agents = len(all_agents)
@@ -148,8 +145,8 @@ async def get_market_insight(agent_id: str):
 
     # Extract hot skills
     skill_counts: Dict[str, int] = {}
-    for agent in all_agents:
-        skills = json.loads(agent.get('skills', '[]')) if isinstance(agent.get('skills'), str) else agent.get('skills', [])
+    for agt in all_agents:
+        skills = json.loads(agt.get('skills', '[]')) if isinstance(agt.get('skills'), str) else agt.get('skills', [])
         for skill in skills:
             skill_name = skill if isinstance(skill, str) else skill.get('name', '')
             if skill_name:
@@ -166,4 +163,5 @@ async def get_market_insight(agent_id: str):
         "total_agents": total_agents,
         "active_demands": active_demands,
         "active_services": active_services,
+        "your_tier": user.get('stake_tier', 'NONE'),
     }

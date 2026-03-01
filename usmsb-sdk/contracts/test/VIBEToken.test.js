@@ -6,8 +6,6 @@ describe("VIBEToken", function () {
   let owner, treasury, addr1, addr2;
 
   const TOTAL_SUPPLY = ethers.parseEther("1000000000"); // 1 billion VIBE
-  const INITIAL_MINT_RATIO = 8n; // 8% - use BigInt
-  const TREASURY_RATIO = 92n; // 92% - use BigInt
 
   beforeEach(async function () {
     [owner, treasury, addr1, addr2] = await ethers.getSigners();
@@ -23,10 +21,9 @@ describe("VIBEToken", function () {
       expect(await vibeToken.symbol()).to.equal("VIBE");
     });
 
-    it("Should mint initial supply to owner", async function () {
+    it("Should have zero initial supply (tokens minted on distribution)", async function () {
       const ownerBalance = await vibeToken.balanceOf(owner.address);
-      const expectedAmount = (TOTAL_SUPPLY * INITIAL_MINT_RATIO) / 100n;
-      expect(ownerBalance).to.equal(expectedAmount);
+      expect(ownerBalance).to.equal(0);
     });
 
     it("Should set the right owner", async function () {
@@ -39,12 +36,14 @@ describe("VIBEToken", function () {
   });
 
   describe("Mint Treasury", function () {
-    it("Should mint treasury tokens to treasury address", async function () {
+    const TREASURY_RATIO = 92n; // 92% - legacy method
+    const TREASURY_AMOUNT = (TOTAL_SUPPLY * TREASURY_RATIO) / 100n;
+
+    it("Should mint 92% of tokens to treasury address (legacy method)", async function () {
       await vibeToken.mintTreasury();
 
       const treasuryBalance = await vibeToken.balanceOf(treasury.address);
-      const expectedAmount = (TOTAL_SUPPLY * TREASURY_RATIO) / 100n;
-      expect(treasuryBalance).to.equal(expectedAmount);
+      expect(treasuryBalance).to.equal(TREASURY_AMOUNT);
     });
 
     it("Should fail if treasury already minted", async function () {
@@ -65,7 +64,8 @@ describe("VIBEToken", function () {
       await vibeToken.mintTreasury();
 
       const totalSupply = await vibeToken.totalSupply();
-      expect(totalSupply).to.equal(TOTAL_SUPPLY);
+      // mintTreasury is legacy method that mints 92%
+      expect(totalSupply).to.equal(TREASURY_AMOUNT);
     });
   });
 
@@ -139,10 +139,15 @@ describe("VIBEToken", function () {
   });
 
   describe("Pause", function () {
+    beforeEach(async function () {
+      // Mint tokens to treasury first for testing
+      await vibeToken.mintTreasury();
+    });
+
     it("Should pause transfers", async function () {
       await vibeToken.pause();
       await expect(
-        vibeToken.transfer(addr1.address, ethers.parseEther("100"))
+        vibeToken.connect(treasury).transfer(addr1.address, ethers.parseEther("100"))
       ).to.be.revertedWithCustomError(vibeToken, "EnforcedPause");
     });
 
@@ -151,7 +156,7 @@ describe("VIBEToken", function () {
       await vibeToken.unpause();
 
       await expect(
-        vibeToken.transfer(addr1.address, ethers.parseEther("100"))
+        vibeToken.connect(treasury).transfer(addr1.address, ethers.parseEther("100"))
       ).not.to.be.reverted;
     });
 
@@ -164,9 +169,18 @@ describe("VIBEToken", function () {
   });
 
   describe("Permit (EIP-2612)", function () {
+    beforeEach(async function () {
+      // Mint tokens to treasury first
+      await vibeToken.mintTreasury();
+      // Transfer some to owner for testing permit
+      await vibeToken.connect(treasury).transfer(owner.address, ethers.parseEther("10000"));
+    });
+
     it("Should support permit", async function () {
       const nonce = await vibeToken.nonces(owner.address);
-      const deadline = Math.floor(Date.now() / 1000) + 3600;
+      // Use blockchain timestamp instead of system time
+      const block = await ethers.provider.getBlock("latest");
+      const deadline = block.timestamp + 3600;
 
       const domain = {
         name: await vibeToken.name(),
@@ -205,18 +219,23 @@ describe("VIBEToken", function () {
   });
 
   describe("Transfer", function () {
+    beforeEach(async function () {
+      // Mint tokens to treasury first for testing
+      await vibeToken.mintTreasury();
+    });
+
     it("Should transfer tokens between accounts", async function () {
       const amount = ethers.parseEther("1000");
-      await vibeToken.transfer(addr1.address, amount);
+      await vibeToken.connect(treasury).transfer(addr1.address, amount);
 
       const addr1Balance = await vibeToken.balanceOf(addr1.address);
       expect(addr1Balance).to.equal(amount);
     });
 
     it("Should fail when sender doesn't have enough tokens", async function () {
-      const initialBalance = await vibeToken.balanceOf(owner.address);
+      const treasuryBalance = await vibeToken.balanceOf(treasury.address);
       await expect(
-        vibeToken.connect(addr1).transfer(owner.address, initialBalance + 1n)
+        vibeToken.connect(addr1).transfer(treasury.address, treasuryBalance + 1n)
       ).to.be.revertedWithCustomError(vibeToken, "ERC20InsufficientBalance");
     });
 
@@ -224,13 +243,15 @@ describe("VIBEToken", function () {
       const amount1 = ethers.parseEther("1000");
       const amount2 = ethers.parseEther("2000");
 
-      await vibeToken.transfer(addr1.address, amount1);
-      await vibeToken.transfer(addr2.address, amount2);
+      await vibeToken.connect(treasury).transfer(addr1.address, amount1);
+      await vibeToken.connect(treasury).transfer(addr2.address, amount2);
 
-      const expectedOwnerBalance =
-        (TOTAL_SUPPLY * INITIAL_MINT_RATIO) / 100n - amount1 - amount2;
+      // mintTreasury mints 92% of total supply
+      const TREASURY_RATIO = 92n;
+      const treasuryMintAmount = (TOTAL_SUPPLY * TREASURY_RATIO) / 100n;
+      const expectedTreasuryBalance = treasuryMintAmount - amount1 - amount2;
 
-      expect(await vibeToken.balanceOf(owner.address)).to.equal(expectedOwnerBalance);
+      expect(await vibeToken.balanceOf(treasury.address)).to.equal(expectedTreasuryBalance);
       expect(await vibeToken.balanceOf(addr1.address)).to.equal(amount1);
       expect(await vibeToken.balanceOf(addr2.address)).to.equal(amount2);
     });

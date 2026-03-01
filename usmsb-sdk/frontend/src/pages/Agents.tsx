@@ -7,6 +7,8 @@ import {
   Search,
   Filter,
   Bot,
+  User,
+  Settings,
   Link2,
   MessageSquare,
   FileCode,
@@ -14,10 +16,14 @@ import {
   Zap,
   Star,
   Clock,
+  Wallet,
+  AlertTriangle,
+  Shield,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { EmptyState } from '@/components/ui'
 import { getStatusColor } from '@/utils/statusColors'
+import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -35,6 +41,7 @@ interface AIAgent {
   reputation: number
   registered_at: number
   last_heartbeat: number
+  has_wallet_binding: boolean
 }
 
 // Raw API response type (capabilities/skills may be string or array)
@@ -52,21 +59,24 @@ interface AIAgentApiResponse {
   reputation: number
   registered_at: number
   last_heartbeat: number
+  has_wallet_binding?: boolean
 }
 
 type ProtocolFilter = 'all' | 'standard' | 'mcp' | 'a2a' | 'skill_md'
+type AgentTypeFilter = 'all' | 'human_agent' | 'ai_agent' | 'system_agent'
 
 export default function Agents() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [protocolFilter, setProtocolFilter] = useState<ProtocolFilter>('all')
+  const [agentTypeFilter, setAgentTypeFilter] = useState<AgentTypeFilter>('all')
 
   // Fetch AI agents from database
   const { data: agents, isLoading, refetch } = useQuery({
     queryKey: ['ai-agents'],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/agents`)
+      const response = await authFetch(`${API_BASE}/agents`)
       if (!response.ok) throw new Error('Failed to fetch agents')
       const data = await response.json() as AIAgentApiResponse[]
       // Transform data to ensure arrays are properly parsed
@@ -101,6 +111,11 @@ export default function Agents() {
       return false
     }
 
+    // Agent type filter
+    if (agentTypeFilter !== 'all' && agent.agent_type !== agentTypeFilter) {
+      return false
+    }
+
     return true
   })
 
@@ -118,6 +133,19 @@ export default function Agents() {
     }
   }
 
+  // Get agent type info for display
+  const getAgentTypeInfo = (agentType: string | undefined) => {
+    const type = agentType || 'ai_agent'
+    switch (type) {
+      case 'human_agent':
+        return { icon: User, color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400', label: t('agents.humanAgent', 'Human') }
+      case 'system_agent':
+        return { icon: Settings, color: 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400', label: t('agents.systemAgent', 'System') }
+      default:
+        return { icon: Bot, color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400', label: t('agents.aiAgent', 'AI') }
+    }
+  }
+
   const formatTime = (timestamp: number) => {
     if (!timestamp) return 'N/A'
     const date = new Date(timestamp * 1000)
@@ -128,6 +156,46 @@ export default function Agents() {
     if (diff < 3600000) return `${Math.floor(diff / 60000)}${t('agents.minAgo')}`
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}${t('agents.hAgo')}`
     return date.toLocaleDateString()
+  }
+
+  // Calculate time remaining before auto-unregister (24 hours grace period)
+  const getAutoUnregisterInfo = (agent: AIAgent) => {
+    // If has wallet binding, will never be auto-unregistered
+    if (agent.has_wallet_binding) {
+      return { protected: true, remaining: null, warning: false }
+    }
+
+    // If online, no warning
+    if (agent.status === 'online') {
+      return { protected: false, remaining: null, warning: false }
+    }
+
+    // Calculate remaining time (24 hours = 86400 seconds grace period)
+    const gracePeriod = 24 * 60 * 60 // 24 hours in seconds
+    const lastHeartbeat = agent.last_heartbeat || 0
+    const now = Math.floor(Date.now() / 1000)
+    const elapsed = now - lastHeartbeat
+    const remaining = gracePeriod - elapsed
+
+    if (remaining <= 0) {
+      return { protected: false, remaining: 0, warning: true, critical: true }
+    }
+
+    // Warning if less than 6 hours remaining
+    const warning = remaining < 6 * 60 * 60
+
+    return { protected: false, remaining, warning, critical: remaining < 1 * 60 * 60 }
+  }
+
+  const formatRemainingTime = (seconds: number) => {
+    if (seconds <= 0) return t('agents.expiringSoon', 'Expiring soon')
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    }
+    return `${minutes}m`
   }
 
   return (
@@ -157,15 +225,26 @@ export default function Agents() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
         <div className="card">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
               <Bot className="text-blue-600 dark:text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{agents?.length || 0}</p>
-              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('agents.aiAgents')}</p>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{agents?.filter((a) => a.agent_type === 'ai_agent').length || 0}</p>
+              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('agents.aiAgents', 'AI Agents')}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+              <User className="text-amber-600 dark:text-amber-400" size={20} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">{agents?.filter((a) => a.agent_type === 'human_agent').length || 0}</p>
+              <p className="text-sm text-secondary-500 dark:text-secondary-400">{t('agents.humanAgents', 'Human Agents')}</p>
             </div>
           </div>
         </div>
@@ -228,8 +307,20 @@ export default function Agents() {
               className="input pl-10 w-full dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-100 dark:placeholder-secondary-400"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter size={20} className="text-secondary-400 dark:text-secondary-500 flex-shrink-0" />
+            {/* Agent Type Filter */}
+            <select
+              value={agentTypeFilter}
+              onChange={(e) => setAgentTypeFilter(e.target.value as AgentTypeFilter)}
+              className="input flex-1 md:w-36 dark:bg-secondary-700 dark:border-secondary-600 dark:text-secondary-100"
+            >
+              <option value="all">{t('agents.allTypes', 'All Types')}</option>
+              <option value="ai_agent">{t('agents.aiAgents', 'AI Agents')}</option>
+              <option value="human_agent">{t('agents.humanAgents', 'Human Agents')}</option>
+              <option value="system_agent">{t('agents.systemAgents', 'System Agents')}</option>
+            </select>
+            {/* Protocol Filter */}
             <select
               value={protocolFilter}
               onChange={(e) => setProtocolFilter(e.target.value as ProtocolFilter)}
@@ -281,6 +372,8 @@ export default function Agents() {
           {filteredAgents.map((agent) => {
             const protocolInfo = getProtocolInfo(agent.protocol)
             const ProtocolIcon = protocolInfo.icon
+            const typeInfo = getAgentTypeInfo(agent.agent_type)
+            const TypeIcon = typeInfo.icon
 
             return (
               <div
@@ -295,12 +388,20 @@ export default function Agents() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={clsx('w-12 h-12 rounded-xl flex items-center justify-center', protocolInfo.color)}>
-                      <ProtocolIcon size={24} />
+                    <div className={clsx('w-12 h-12 rounded-xl flex items-center justify-center', typeInfo.color)}>
+                      <TypeIcon size={24} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-light-text-primary dark:text-secondary-100">{agent.name}</h3>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={clsx('px-2 py-0.5 rounded-full text-xs', typeInfo.color)}>{typeInfo.label}</span>
+                        {/* Wallet binding indicator */}
+                        {agent.has_wallet_binding && (
+                          <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            <Wallet size={10} />
+                            <span>{t('agents.walletBound', 'Wallet')}</span>
+                          </span>
+                        )}
                         <span className="text-xs text-secondary-500 dark:text-secondary-400">{protocolInfo.label}</span>
                         <span className={clsx('px-2 py-0.5 rounded-full text-xs', getStatusColor(agent.status))}>
                           {agent.status}
@@ -333,6 +434,14 @@ export default function Agents() {
                   </div>
                 </div>
 
+                {/* Wallet Binding Status */}
+                {agent.agent_type === 'ai_agent' && !agent.has_wallet_binding && agent.status === 'offline' && (
+                  <div className="mb-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded text-xs text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    <span>{t('agents.autoUnregisterWarning', 'No wallet - auto-unregister after 24h offline')}</span>
+                  </div>
+                )}
+
                 {/* Stats */}
                 <div className="flex items-center justify-between pt-4 border-t border-secondary-200 dark:border-secondary-700">
                   <div className="flex items-center gap-4 text-sm text-secondary-500 dark:text-secondary-400">
@@ -345,8 +454,21 @@ export default function Agents() {
                       <span>{formatTime(agent.last_heartbeat)}</span>
                     </div>
                   </div>
-                  <div className="text-sm font-medium text-light-text-primary dark:text-secondary-100">
-                    {agent.stake} VIBE
+                  <div className="flex items-center gap-2">
+                    {agent.has_wallet_binding ? (
+                      <div className="flex items-center gap-1 text-green-500 dark:text-green-400">
+                        <Shield size={14} />
+                        <span className="text-xs">{t('agents.protected', 'Protected')}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500">
+                        <Wallet size={14} />
+                        <span className="text-xs">{t('agents.noWallet', 'No wallet')}</span>
+                      </div>
+                    )}
+                    <div className="text-sm font-medium text-light-text-primary dark:text-secondary-100">
+                      {agent.stake} VIBE
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,10 +1,14 @@
 """
 Environment management endpoints.
+
+Authentication:
+- POST requires X-API-Key + X-Agent-ID headers
+- GET endpoints are public for discovery
 """
 
-from typing import List
+from typing import List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 
 from usmsb_sdk.api.database import (
     create_environment as db_create_environment,
@@ -13,14 +17,24 @@ from usmsb_sdk.api.database import (
 )
 from usmsb_sdk.api.rest.schemas.environment import EnvironmentCreate
 from usmsb_sdk.api.rest.services.utils import safe_json_loads
+from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 from usmsb_sdk.core.elements import Environment, EnvironmentType
 
 router = APIRouter(prefix="/environments", tags=["Environments"])
 
 
 @router.post("", status_code=201)
-async def create_environment_endpoint(env_create: EnvironmentCreate):
-    """Create a new environment."""
+async def create_environment_endpoint(
+    env_create: EnvironmentCreate,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """
+    Create a new environment.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
     try:
         env_type = EnvironmentType(env_create.type)
     except ValueError:

@@ -60,6 +60,7 @@ from usmsb_sdk.agent_sdk.agent_config import (
     ProtocolConfig,
     ProtocolType,
     SkillDefinition,
+    SkillParameter,
     CapabilityDefinition,
 )
 from usmsb_sdk.agent_sdk.registration import (
@@ -228,6 +229,7 @@ __all__ = [
     "ProtocolConfig",
     "ProtocolType",
     "SkillDefinition",
+    "SkillParameter",
     "CapabilityDefinition",
     "AgentCapability",  # Alias
     # Registration

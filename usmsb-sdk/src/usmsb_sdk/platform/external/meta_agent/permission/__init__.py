@@ -13,6 +13,13 @@ from .models import (
     get_tool_required_permissions,
 )
 from .manager import PermissionManager
+from .audit_logger import (
+    AuditLogger,
+    AuditLevel,
+    AuditAction,
+    AuditLog,
+    get_audit_logger,
+)
 
 __all__ = [
     "UserRole",
@@ -24,4 +31,9 @@ __all__ = [
     "get_role_permissions",
     "get_tool_required_permissions",
     "PermissionManager",
+    "AuditLogger",
+    "AuditLevel",
+    "AuditAction",
+    "AuditLog",
+    "get_audit_logger",
 ]

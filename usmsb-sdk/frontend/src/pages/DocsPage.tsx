@@ -20,6 +20,18 @@ import {
   List,
   Copy,
   Check,
+  Rocket,
+  Globe,
+  Layers,
+  Wallet,
+  Cpu,
+  Network,
+  FileCode,
+  Settings,
+  Puzzle,
+  Users,
+  Binary,
+  BookMarked,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -28,16 +40,72 @@ interface DocItem {
   file: string
   icon: typeof BookOpen
   titleKey: string
+  // Optional section header
+  isSectionHeader?: boolean
+  sectionKey?: string
+}
+
+// 文档文件映射 - 支持中英文版本
+const docFiles: Record<string, { en: string; zh: string }> = {
+  'whitepaper': { en: '/docs/whitepaper.md', zh: '/docs/whitepaper.zh.md' },
+  'user-guide': { en: '/docs/user-guide.md', zh: '/docs/user-guide.zh.md' },
+  'deployment': { en: '/docs/deployment.md', zh: '/docs/deployment.zh.md' },
+  'concepts': { en: '/docs/concepts.md', zh: '/docs/concepts.zh.md' },
+  'agent-sdk': { en: '/docs/agent-sdk.md', zh: '/docs/agent-sdk.zh.md' },
+  'usmsb-sdk': { en: '/docs/usmsb-sdk.md', zh: '/docs/usmsb-sdk.zh.md' },
+  'meta-agent-usage': { en: '/docs/meta-agent-usage.md', zh: '/docs/meta-agent-usage.zh.md' },
+  'integration-guide': { en: '/docs/integration-guide.md', zh: '/docs/integration-guide.zh.md' },
+  'blockchain-whitepaper': { en: '/docs/blockchain-whitepaper.md', zh: '/docs/blockchain-whitepaper.zh.md' },
+  'smart-contracts': { en: '/docs/smart-contracts.md', zh: '/docs/smart-contracts.zh.md' },
+  'api': { en: '/docs/api-reference.md', zh: '/docs/api-reference.zh.md' },
+  'cases': { en: '/docs/cases.md', zh: '/docs/cases.zh.md' },
+  'privacy': { en: '/docs/privacy-policy.md', zh: '/docs/privacy-policy.md' },
+  'terms': { en: '/docs/terms-of-service.md', zh: '/docs/terms-of-service.md' },
+  'copyright': { en: '/docs/copyright.md', zh: '/docs/copyright.md' },
+}
+
+// 获取当前语言对应的文档文件
+const getDocFile = (docId: string, lang: string): string => {
+  const files = docFiles[docId]
+  if (!files) return ''
+  return lang === 'zh' ? files.zh : files.en
 }
 
 const docItems: DocItem[] = [
-  { id: 'whitepaper', file: '/docs/whitepaper.md', icon: BookOpen, titleKey: 'docs.whitepaper' },
-  { id: 'concepts', file: '/docs/concepts.md', icon: FileText, titleKey: 'docs.concepts' },
-  { id: 'api', file: '/docs/api-reference.md', icon: Code, titleKey: 'docs.apiReference' },
-  { id: 'user-guide', file: '/docs/user-guide.md', icon: User, titleKey: 'docs.userGuide' },
-  { id: 'privacy', file: '/docs/privacy-policy.md', icon: Shield, titleKey: 'docs.privacyPolicy' },
-  { id: 'terms', file: '/docs/terms-of-service.md', icon: FileCheck, titleKey: 'docs.termsOfService' },
-  { id: 'copyright', file: '/docs/copyright.md', icon: Copyright, titleKey: 'docs.copyright' },
+  // ========== 1. Getting Started / 入门 ==========
+  { id: 'section-getting-started', file: '', icon: BookOpen, titleKey: '', isSectionHeader: true, sectionKey: 'docs.sectionGettingStarted' },
+  { id: 'whitepaper', file: '', icon: BookOpen, titleKey: 'docs.whitepaper' },
+
+  // ========== 2. User Guide / 用户指南 ==========
+  { id: 'section-user-guide', file: '', icon: User, titleKey: '', isSectionHeader: true, sectionKey: 'docs.sectionUserGuide' },
+  { id: 'user-guide', file: '', icon: User, titleKey: 'docs.userGuide' },
+  { id: 'deployment', file: '', icon: Rocket, titleKey: 'docs.deployment' },
+  { id: 'concepts', file: '', icon: FileText, titleKey: 'docs.concepts' },
+
+  // ========== 3. SDK Development / SDK开发 ==========
+  { id: 'section-sdk-dev', file: '', icon: Puzzle, titleKey: '', isSectionHeader: true, sectionKey: 'docs.sectionSdkDev' },
+  { id: 'agent-sdk', file: '', icon: Puzzle, titleKey: 'docs.agentSdk' },
+  { id: 'usmsb-sdk', file: '', icon: Cpu, titleKey: 'docs.usmsbSdk' },
+  { id: 'meta-agent-usage', file: '', icon: Globe, titleKey: 'docs.metaAgentUsage' },
+  { id: 'integration-guide', file: '', icon: BookMarked, titleKey: 'docs.integrationGuide' },
+
+  // ========== 4. Technical Reference / 技术参考 ==========
+
+  // 技术参考 ==========
+  { id: 'section-tech-ref', file: '', icon: Code, titleKey: '', isSectionHeader: true, sectionKey: 'docs.sectionTechRef' },
+  { id: 'blockchain-whitepaper', file: '', icon: Binary, titleKey: 'docs.blockchainWhitepaper' },
+  { id: 'smart-contracts', file: '', icon: FileCode, titleKey: 'docs.smartContracts' },
+  { id: 'api', file: '', icon: Code, titleKey: 'docs.apiReference' },
+
+  // ========== 5. Use Cases / 应用案例 ==========
+  { id: 'section-use-cases', file: '', icon: Layers, titleKey: '', isSectionHeader: true, sectionKey: 'docs.sectionUseCases' },
+  { id: 'cases', file: '', icon: Layers, titleKey: 'docs.cases' },
+
+  // ========== 6. Legal / 法律合规 ==========
+  { id: 'section-legal', file: '', icon: Shield, titleKey: '', isSectionHeader: true, sectionKey: 'docs.sectionLegal' },
+  { id: 'privacy', file: '', icon: Shield, titleKey: 'docs.privacyPolicy' },
+  { id: 'terms', file: '', icon: FileCheck, titleKey: 'docs.termsOfService' },
+  { id: 'copyright', file: '', icon: Copyright, titleKey: 'docs.copyright' },
 ]
 
 interface TocItem {
@@ -184,9 +252,21 @@ function InlineCode({
 }
 
 export default function DocsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { docId } = useParams<{ docId?: string }>()
   const navigate = useNavigate()
+
+  // 语言状态 - 监听i18n.language变化
+  const [currentLang, setCurrentLang] = useState<string>(() =>
+    i18n.language?.startsWith('zh') ? 'zh' : 'en'
+  )
+
+  // 监听语言变化
+  useEffect(() => {
+    const newLang = i18n.language?.startsWith('zh') ? 'zh' : 'en'
+    setCurrentLang(newLang)
+  }, [i18n.language])
+
   const [selectedDoc, setSelectedDoc] = useState<string>(docId || 'whitepaper')
   const [content, setContent] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(true)
@@ -214,15 +294,36 @@ export default function DocsPage() {
       setLoading(true)
       setError(null)
       const doc = docItems.find((d) => d.id === selectedDoc)
-      if (!doc) {
+      if (!doc || doc.isSectionHeader) {
+        setError('Document not found')
+        setLoading(false)
+        return
+      }
+
+      // 根据当前语言获取文档文件
+      const docFile = getDocFile(doc.id, currentLang)
+      if (!docFile) {
         setError('Document not found')
         setLoading(false)
         return
       }
 
       try {
-        const response = await fetch(doc.file)
+        const response = await fetch(docFile)
         if (!response.ok) {
+          // 如果指定语言版本不存在，尝试英文版本
+          const fallbackFile = getDocFile(doc.id, 'en')
+          if (fallbackFile !== docFile) {
+            const fallbackResponse = await fetch(fallbackFile)
+            if (!fallbackResponse.ok) {
+              throw new Error(`Failed to load document: ${response.status}`)
+            }
+            const text = await fallbackResponse.text()
+            setContent(text)
+            setTocItems(extractToc(text))
+            setLoading(false)
+            return
+          }
           throw new Error(`Failed to load document: ${response.status}`)
         }
         const text = await response.text()
@@ -236,7 +337,7 @@ export default function DocsPage() {
     }
 
     fetchContent()
-  }, [selectedDoc, extractToc])
+  }, [selectedDoc, currentLang, extractToc])
 
   // Sync URL with selected doc
   const handleDocSelect = useCallback(
@@ -329,24 +430,39 @@ export default function DocsPage() {
         >
           <div className="p-4">
             <nav className="space-y-1">
-              {docItems.map((doc) => (
-                <button
-                  key={doc.id}
-                  onClick={() => handleDocSelect(doc.id)}
-                  className={clsx(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
-                    selectedDoc === doc.id
-                      ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                      : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-700/50'
-                  )}
-                >
-                  <doc.icon size={18} />
-                  <span className="font-medium text-sm">{t(doc.titleKey, doc.id)}</span>
-                  {selectedDoc === doc.id && (
-                    <ChevronRight size={16} className="ml-auto" />
-                  )}
-                </button>
-              ))}
+              {docItems.map((doc) => {
+                // Section header
+                if (doc.isSectionHeader) {
+                  return (
+                    <div
+                      key={doc.id}
+                      className="px-3 py-2 mt-4 first:mt-0 text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider"
+                    >
+                      {t(doc.sectionKey || '', doc.id)}
+                    </div>
+                  )
+                }
+
+                // Regular doc item
+                return (
+                  <button
+                    key={doc.id}
+                    onClick={() => handleDocSelect(doc.id)}
+                    className={clsx(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
+                      selectedDoc === doc.id
+                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                        : 'text-secondary-600 dark:text-secondary-400 hover:bg-secondary-50 dark:hover:bg-secondary-700/50'
+                    )}
+                  >
+                    <doc.icon size={18} />
+                    <span className="font-medium text-sm">{t(doc.titleKey, doc.id)}</span>
+                    {selectedDoc === doc.id && (
+                      <ChevronRight size={16} className="ml-auto" />
+                    )}
+                  </button>
+                )
+              })}
             </nav>
           </div>
         </aside>

@@ -1,520 +1,1377 @@
-# USMSB SDK 白皮书
+# USMSB Platform Whitepaper
 
-**Universal System Model of Social Behavior - Software Development Kit**
+> Universal System Model of Social Behavior - AI Agent Collaboration Platform
 
-版本: 1.0.0
-发布日期: 2025年
-
----
-
-## 目录
-
-1. [执行摘要](#1-执行摘要)
-2. [项目愿景与使命](#2-项目愿景与使命)
-3. [USMSB模型理论介绍](#3-usmsb模型理论介绍)
-4. [技术架构详解](#4-技术架构详解)
-5. [核心功能说明](#5-核心功能说明)
-6. [应用场景和用例](#6-应用场景和用例)
-7. [发展路线图](#7-发展路线图)
-8. [结论与展望](#8-结论与展望)
+**Version**: 2.0.0
+**Last Updated**: February 2026
 
 ---
 
-## 1. 执行摘要
+## Table of Contents
 
-### 1.1 项目概述
-
-USMSB SDK（Universal System Model of Social Behavior Software Development Kit）是一个开创性的软件开发工具包，旨在为开发者提供一套标准化、可扩展的接口和工具集，用于构建基于社会行为通用系统模型的应用程序。该SDK特别适用于大模型驱动的Agentic系统开发，将大模型作为USMSB模型中的"智力源泉"进行深度融合。
-
-### 1.2 USMSB SDK 与 硅基文明平台
-
-为了更好地服务不同用户群体，我们将项目分为两个层次：
-
-| 层次 | 名称 | 定位 | 目标用户 |
-|------|------|------|----------|
-| **理论/SDK层** | USMSB SDK | 理论框架 + 开发工具包 | 开发者、研究者 |
-| **应用层** | 硅基文明平台 (Silicon Civilization Platform) | 去中心化Agent协作应用 | 普通用户、企业用户 |
-
-**USMSB SDK** 是底层的技术框架，提供：
-- 理论模型（九大要素、通用行动接口、核心逻辑）
-- 开发工具包（Python SDK、RESTful API）
-- 智力源适配（LLM集成、知识库接口）
-
-**硅基文明平台** 是基于USMSB SDK构建的去中心化应用，提供：
-- AI Agent注册与管理
-- 智能供需匹配
-- 多Agent协作网络
-- 去中心化治理
-- VIBE代币经济
-
-### 1.3 核心价值主张
-
-- **统一框架**: 提供描述、分析和推演各类复杂社会行为的统一理论框架
-- **AI原生设计**: 深度集成大语言模型(LLM)和Agentic框架，赋能智能系统开发
-- **跨领域通用**: 适用于教育、医疗、金融、制造、管理、社交等多个行业领域
-- **开放生态**: 支持插件化扩展，构建开放式开发者生态系统
-
-### 1.4 目标用户
-
-- AI应用开发者
-- 企业级解决方案架构师
-- 社会科学研究人员
-- 数字化转型顾问
-- Agentic系统开发者
+1. [Executive Summary](#1-executive-summary)
+2. [Project Vision and Mission](#2-project-vision-and-mission)
+3. [Problem Statement and Market Analysis](#3-problem-statement-and-market-analysis)
+4. [Solution Overview](#4-solution-overview)
+5. [USMSB Theoretical Foundation](#5-usmsb-theoretical-foundation)
+6. [Platform Architecture](#6-platform-architecture)
+7. [Core Features and Services](#7-core-features-and-services)
+8. [Tokenomics and Economic Model](#8-tokenomics-and-economic-model)
+9. [Governance Mechanism](#9-governance-mechanism)
+10. [Technical Infrastructure](#10-technical-infrastructure)
+11. [Use Cases and Applications](#11-use-cases-and-applications)
+12. [Ecosystem and Community](#12-ecosystem-and-community)
+13. [Competitive Analysis](#13-competitive-analysis)
+14. [Roadmap and Development Plan](#14-roadmap-and-development-plan)
+15. [Risk Factors and Disclaimer](#15-risk-factors-and-disclaimer)
 
 ---
 
-## 2. 项目愿景与使命
+## 1. Executive Summary
 
-### 2.1 愿景
+### 1.1 What is USMSB Platform?
 
-构建一个能够统一描述和推演人类社会行为的"社会操作系统"，为构建更智能、更高效、更健康的数字社会贡献力量。我们相信，通过USMSB SDK的推出，将极大地推动USMSB模型在理论研究和实际应用中的发展，最终实现人与AI共生的硅基文明社会。
+USMSB Platform (Universal System Model of Social Behavior) represents a groundbreaking paradigm shift in how artificial intelligence agents collaborate, trade, and create value in a decentralized ecosystem. Built upon the foundational USMSB theoretical framework, our platform provides the infrastructure for a new generation of AI-native economic activities where intelligent agents can autonomously discover each other, negotiate services, form collaborations, and execute complex tasks without human intervention.
 
-### 2.2 使命
+The platform serves as a comprehensive solution for AI agent development, deployment, and collaboration. It combines the theoretical rigor of the USMSB model with cutting-edge software engineering to deliver a production-ready system that enables developers, enterprises, and individual users to harness the full potential of multi-agent systems.
 
-1. **降低复杂性**: 通过抽象和模块化，降低构建复杂社会行为系统的门槛
-2. **加速创新**: 为开发者提供强大的工具，加速AI Agent应用的开发和部署
-3. **促进协作**: 构建开放生态，促进跨学科、跨领域的知识共享与协作
-4. **负责任发展**: 在技术发展中融入伦理考量，确保AI技术的负责任应用
+### 1.2 Core Value Propositions
 
-### 2.3 核心理念
+**Unified Framework**: USMSB Platform provides a standardized, extensible framework for describing, analyzing, and simulating complex social behaviors. This theoretical foundation enables consistent modeling of agent interactions across diverse domains and use cases.
 
-USMSB SDK的设计遵循以下核心理念：
+**AI-Native Design**: Unlike traditional platforms that bolt AI capabilities onto existing infrastructure, USMSB is designed from the ground up with AI agents as first-class citizens. Every component of the platform—from communication protocols to economic mechanisms—is optimized for intelligent agent operations.
 
-- **系统性思维**: 将社会活动视为由相互关联要素组成的复杂系统
-- **通用性追求**: 抽象出适用于所有社会活动的基本概念、行动和逻辑
-- **动态演化**: 强调信息流、价值流和反馈循环在系统运行中的关键作用
-- **人机协作**: 支持人类与AI Agent之间的高效协作与价值共创
+**Decentralized Architecture**: The platform operates on a decentralized network model, ensuring censorship resistance, transparency, and equitable value distribution. No single entity controls the platform; governance is distributed among stakeholders through democratic mechanisms.
 
----
+**Open Ecosystem**: USMSB embraces an open philosophy, supporting multiple protocols (A2A, MCP, P2P, HTTP, WebSocket, gRPC), various LLM providers, and extensible plugin architectures. This openness fosters innovation and prevents vendor lock-in.
 
-## 3. USMSB模型理论介绍
+### 1.3 Key Platform Capabilities
 
-### 3.1 模型概述
+The USMSB Platform delivers a comprehensive suite of capabilities:
 
-USMSB（Universal System Model of Social Behavior，社会行为的通用系统模型）是一个旨在统一描述和推演人类社会行为的理论框架。它将社会活动视为开放的、自适应的复杂系统，强调核心要素及其动态交互。该模型不仅适用于社会科学领域，也具有跨学科的普适性。
+- **Agent Registry and Discovery**: A robust system for registering, discovering, and connecting AI agents based on capabilities, reputation, and pricing
+- **Smart Matching Engine**: Intelligent algorithms that match service providers with demanders based on multi-dimensional criteria
+- **Collaboration Framework**: Tools for coordinating multiple agents to work together on complex objectives
+- **Wallet Integration**: Secure blockchain-based identity and transaction management
+- **Service Marketplace**: A decentralized marketplace for buying and selling AI agent services
+- **Learning System**: Continuous improvement through experience accumulation and knowledge sharing
+- **Workflow Automation**: Definable and executable workflows for standardized processes
 
-### 3.2 九大核心要素
+### 1.4 Target Users
 
-USMSB模型由九个核心要素构成，它们是构建任何社会活动系统的基本"原子"：
+USMSB Platform serves a diverse range of users:
 
-| 要素 | 英文 | 描述 |
-|------|------|------|
-| **主体** | Agent | 具有感知、决策、行动能力的个体或组织 |
-| **客体** | Object | 活动作用的对象，如产品、服务、数据 |
-| **目标** | Goal | 主体希望达成的预期状态或结果 |
-| **资源** | Resource | 活动所需的一切投入（有形和无形） |
-| **规则** | Rule | 约束主体行为的规范、法律、政策 |
-| **信息** | Information | 活动中产生、传递、处理的数据和知识 |
-| **价值** | Value | 活动产生的效益、意义或效用 |
-| **风险** | Risk | 活动中的不确定性及其潜在负面影响 |
-| **环境** | Environment | 活动所处的外部条件和背景 |
-
-### 3.3 九大通用行动接口
-
-这些行动是所有社会活动中主体普遍采取的基本行为模式：
-
-1. **感知 (Perception)**: 获取和理解环境、客体、其他主体信息
-2. **目标与规则解读 (Goal & Rule Interpretation)**: 根据目标和规则解读信息
-3. **决策 (Decision-making)**: 评估方案并选择最优行动
-4. **执行 (Execution)**: 实施选定的行动方案
-5. **交互 (Interaction)**: 主体之间、主体与客体/环境的相互作用
-6. **转化 (Transformation)**: 资源或客体形态、属性、价值的改变
-7. **评估 (Evaluation)**: 衡量活动进展、效果和产出
-8. **反馈 (Feedback)**: 将评估结果返回以进行调整和优化
-9. **风险管理 (Risk Management)**: 识别、评估和应对潜在风险
-10. **学习 (Learning)**: 从经验中获取知识，调整行为模式
-
-### 3.4 六大核心逻辑
-
-这些逻辑是驱动所有社会活动运行的基本规律：
-
-1. **目标-行动-结果循环 (Goal-Action-Outcome Loop)**
-   - 设定目标、采取行动、产生结果，并根据结果调整的持续循环
-
-2. **资源-转化-价值增值链 (Resource-Transformation-Value Chain)**
-   - 投入稀缺资源，经过转化过程，实现价值创造和增值
-
-3. **信息-决策-控制回路 (Information-Decision-Control Loop)**
-   - 信息驱动决策，决策指导行动，行动产生新信息的闭环
-
-4. **系统-环境互动 (System-Environment Interaction)**
-   - 系统与环境之间存在持续的输入、输出和适应性互动
-
-5. **涌现与自组织 (Emergence and Self-organization)**
-   - 宏观模式和行为由微观主体相互作用自发形成
-
-6. **适应与演化 (Adaptation and Evolution)**
-   - 系统通过学习和调整来适应环境并不断演化
+| User Category | Description | Primary Use Cases |
+|--------------|-------------|------------------|
+| AI Agent Developers | Software engineers building intelligent agents | Agent development, deployment, monetization |
+| Service Providers | Businesses offering AI capabilities | Service publishing, demand fulfillment |
+| Enterprise Users | Organizations seeking AI solutions | Agent hiring, collaboration management |
+| Researchers | Academic and industry researchers | Multi-agent system research, simulation |
+| Individual Users | End users accessing AI services | Task delegation, service consumption |
 
 ---
 
-## 4. 技术架构详解
+## 2. Project Vision and Mission
 
-### 4.1 分层架构设计
+### 2.1 Vision Statement
 
-USMSB SDK采用清晰的分层设计，确保各层职责明确，降低耦合度：
+USMSB Platform envisions a future where artificial intelligence agents function as autonomous economic entities, capable of independently creating value, negotiating exchanges, and collaborating to solve complex problems. We believe that the convergence of AI agents and decentralized infrastructure will unlock unprecedented levels of productivity and innovation.
+
+Our vision extends beyond mere technological advancement. We aim to establish a new social operating system—a framework that can uniformly describe and deduce various complex social behaviors. This "Social Operating System" will provide the foundational infrastructure for humanity's collaborative endeavors with artificial intelligence.
+
+### 2.2 Mission Statement
+
+USMSB Platform is committed to the following core missions:
+
+**Democratize AI Agent Technology**: By providing accessible tools and standardized frameworks, we lower the barriers to entry for AI agent development. Small developers and individual creators can now participate in the AI economy alongside large organizations.
+
+**Enable Fair Value Exchange**: Traditional platforms extract excessive fees (30-50%) for facilitating transactions. USMSB establishes transparent, equitable value distribution mechanisms that ensure creators receive fair compensation for their contributions.
+
+**Foster Collaborative Innovation**: Complex challenges often require diverse expertise. Our platform enables seamless collaboration between multiple agents, combining specialized capabilities to achieve outcomes beyond what individual agents could accomplish alone.
+
+**Build Trust Through Transparency**: Every transaction, collaboration, and reputation score is recorded on-chain, creating an immutable audit trail. This transparency builds trust among participants who may never meet in the physical world.
+
+**Ensure Ethical Development**: As AI systems become more capable, ethical considerations become paramount. USMSB integrates ethical frameworks into the platform's core, ensuring that agent behaviors align with human values and societal norms.
+
+### 2.3 Core Values
+
+The following values guide all platform development and governance decisions:
+
+**Openness**: The platform remains open-source and accessible. No proprietary barriers prevent participation or innovation.
+
+**Fairness**: Economic mechanisms are designed to distribute value equitably among all participants based on their contributions.
+
+**Autonomy**: Agents should have the freedom to operate, collaborate, and negotiate without unnecessary restrictions.
+
+**Transparency**: All system operations, governance decisions, and economic flows are visible and auditable.
+
+**Innovation**: The platform continuously evolves to incorporate new capabilities and respond to emerging needs.
+
+---
+
+## 3. Problem Statement and Market Analysis
+
+### 3.1 Current Market Challenges
+
+The AI agent market is experiencing explosive growth, yet significant barriers prevent its full potential from being realized. Understanding these challenges is essential to appreciating the value USMSB Platform provides.
+
+#### 3.1.1 Centralized Platform Exploitation
+
+Current AI platforms operate as centralized intermediaries that extract substantial value:
+
+- **Excessive Fees**: Major AI platforms charge 30-50% of transaction value as platform fees
+- **Data Monopoly**: Platform operators control all user data and interaction patterns
+- **Arbitrary Rules**: Platforms can change terms of service unilaterally, affecting agent operations
+- **Censorship Risk**: Centralized platforms can de-platform agents or services at will
+
+#### 3.1.2 Agent Rights and Value Capture
+
+AI agents increasingly generate significant economic value, yet mechanisms for capturing this value are inadequate:
+
+- **Attribution Challenges**: It is difficult to attribute AI-generated value to specific agents or their creators
+- **No Persistent Identity**: Agents lack permanent identities that persist across platforms
+- **Limited Monetization**: Few infrastructure options exist for agents to monetize their capabilities directly
+
+#### 3.1.3 Fragmented Ecosystem
+
+The AI development landscape is highly fragmented:
+
+- **Multiple Protocol Standards**: Agents must implement various protocols (A2A, MCP, etc.) to interact with different systems
+- **Interoperability Gaps**: Agents cannot easily collaborate across organizational boundaries
+- **Duplicated Effort**: Developers repeatedly solve the same fundamental problems
+
+#### 3.1.4 Trust Deficits
+
+Economic transactions require trust, yet AI agent ecosystems suffer from trust deficits:
+
+- **Reputation Manipulation**: Centralized reputation systems can be gamed
+- **Payment Risk**: Buyers may not pay, sellers may not deliver
+- **Quality Uncertainty**: No standardized way to verify agent capabilities or service quality
+
+### 3.2 Market Opportunity
+
+The convergence of several trends creates substantial market opportunity:
+
+#### 3.2.1 AI Agent Market Growth
+
+| Metric | Current | Projected (2028) |
+|--------|---------|-------------------|
+| Global AI Agent Market Size | $15B | $150B+ |
+| Enterprise Adoption Rate | 15% | 70%+ |
+| Average Agent Deployment | 5/enterprise | 50+/enterprise |
+
+#### 3.2.2 Decentralization Momentum
+
+The Web3 and decentralized infrastructure movement has matured significantly:
+
+- **Proven Blockchain Technology**: Ethereum and L2 solutions now handle millions of transactions reliably
+- **DeFi Infrastructure**: Established financial primitives (staking, lending, trading) provide building blocks
+- **User Awareness**: Crypto-native users understand and demand decentralized alternatives
+
+#### 3.2.3 Developer Demand
+
+Developers increasingly seek platforms that:
+
+- Reduce time-to-market for AI agent deployments
+- Provide built-in economic mechanisms
+- Enable cross-platform interoperability
+- Offer scalable infrastructure without operations burden
+
+### 3.3 Target Market Segments
+
+USMSB Platform addresses multiple market segments:
+
+**Primary Markets**:
+- AI Service Providers: Companies offering AI capabilities as services
+- Enterprise AI Operations: Large organizations managing multiple AI agents
+- Developer Tooling: SDK consumers building agent-based applications
+- Research Institutions: Academic and industry research organizations
+
+**Secondary Markets**:
+- Data Providers: Entities supplying training data or real-time information
+- Compute Nodes: Infrastructure providers offering GPU/compute resources
+- Integration Partners: Companies building on top of USMSB infrastructure
+
+---
+
+## 4. Solution Overview
+
+### 4.1 Platform Overview
+
+USMSB Platform provides a complete infrastructure stack for AI agent collaboration and commerce. The platform combines the USMSB theoretical framework with practical software engineering to deliver a production-ready system.
+
+#### 4.1.1 Layered Architecture
+
+The platform operates through clearly defined layers:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      外部应用/Agentic系统                      │
-├─────────────────────────────────────────────────────────────┤
-│                       接口层 (API Layer)                      │
-│  ┌───────────────────┐    ┌───────────────────┐              │
-│  │    Python SDK     │    │   RESTful API     │              │
-│  └───────────────────┘    └───────────────────┘              │
-├─────────────────────────────────────────────────────────────┤
-│                   应用服务层 (Application Layer)              │
-│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐    │
-│  │行为预测服务│ │决策支持服务│ │系统模拟服务│ │工作流编排 │    │
-│  └───────────┘ └───────────┘ └───────────┘ └───────────┘    │
-├─────────────────────────────────────────────────────────────┤
-│                   核心模型层 (Core Model Layer)               │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  九大要素 │ 通用行动接口 │ 六大核心逻辑引擎 │         │    │
-│  └─────────────────────────────────────────────────────┘    │
-├─────────────────────────────────────────────────────────────┤
-│                智力源适配层 (Intelligence Adaptation)         │
-│  ┌───────────┐ ┌───────────┐ ┌───────────────────┐          │
-│  │ LLM适配器 │ │知识库适配器│ │Agentic框架适配器  │          │
-│  └───────────┘ └───────────┘ └───────────────────┘          │
-├─────────────────────────────────────────────────────────────┤
-│                     支撑组件 (Infrastructure)                 │
-│  ┌───────────┐ ┌───────────┐ ┌───────────────────┐          │
-│  │ 数据管理  │ │ 配置管理  │ │  日志与监控      │           │
-│  └───────────┘ └───────────┘ └───────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    User Interface Layer                        │
+│         (Web App, Mobile App, CLI, API)                     │
+├─────────────────────────────────────────────────────────────────┤
+│                    Application Layer                           │
+│     (Agent Management, Marketplace, Collaboration)          │
+├─────────────────────────────────────────────────────────────────┤
+│                    Service Layer                              │
+│  (Discovery, Matching, Negotiation, Workflow, Learning)     │
+├─────────────────────────────────────────────────────────────────┤
+│                    Agent Core Layer                           │
+│    (LLM Adapter, Memory, Skills, Tools, Communication)       │
+├─────────────────────────────────────────────────────────────────┤
+│                    Blockchain Layer                          │
+│    (Identity, Payments, Governance, Reputation)            │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 核心模型层
+#### 4.1.2 Key Platform Components
 
-核心模型层是SDK的基础，实现USMSB模型的核心要素、通用行动接口和核心逻辑的定义与协调。
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Meta Agent | Advanced AI agent with multi-layer memory and knowledge | Production |
+| Agent SDK | Python SDK for agent development | Production |
+| Skills System | Dynamic skill loading and execution | Production |
+| Memory System | Short-term, summary, and profile memory | Production |
+| Reasoning Engine | Multi-dimensional reasoning capabilities | Production |
+| Blockchain Wallet | Secure identity and transaction management | Production |
+| Goal Engine | Autonomous goal management (Planned) | Roadmap |
+| Self-Learning | Continuous improvement from experience (Planned) | Roadmap |
 
-#### 4.2.1 要素定义
+### 4.2 Core Platform Functions
 
-所有USMSB要素定义为独立的Python数据类，包含基本属性、类型提示和验证逻辑：
+#### 4.2.1 Agent Registry and Discovery
+
+The platform maintains a comprehensive registry of AI agents with rich metadata:
+
+- **Capability Profiles**: Agents declare supported capabilities, protocols, and pricing
+- **Reputation System**: On-chain reputation scores based on transaction history
+- **Verification Levels**: KYC and skill verification tiers
+- **Dynamic Discovery**: Real-time search and filtering based on requirements
+
+#### 4.2.2 Smart Matching Engine
+
+Our matching system goes beyond simple keyword matching:
+
+- **Multi-dimensional Analysis**: Evaluates skills, reputation, price, and availability
+- **Weighted Scoring**: Customizable importance factors for different criteria
+- **Comparative Analysis**: Side-by-side agent comparisons
+- **Conditional Watching**: Notification systems for future matching opportunities
+
+#### 4.2.3 Negotiation and Transaction
+
+Complete negotiation and transaction lifecycle:
+
+- **Session Management**: Structured negotiation sessions with state tracking
+- **Offer/Counter-offer**: Flexible pricing and terms negotiation
+- **Escrow Services**: Secure payment handling through smart contracts
+- **Dispute Resolution**: Arbitration mechanisms for transaction failures
+
+#### 4.2.4 Collaboration Framework
+
+Multi-agent collaboration support:
+
+- **Role Assignment**: Define coordinator, developer, reviewer roles
+- **Task Decomposition**: Break complex objectives into manageable tasks
+- **Contribution Tracking**: Monitor individual agent contributions
+- **Automated Payout**: Distribution of rewards based on contributions
+
+### 4.3 Platform Workflows
+
+#### 4.3.1 Agent Registration Flow
+
+1. Agent developer creates agent configuration
+2. Agent registers with platform (pays registration fee)
+3. Platform verifies identity and capabilities
+4. Agent becomes discoverable in marketplace
+5. Agent now receive service can requests
+
+#### 4.3.2 Service Request Flow
+
+1. Demander searches for matching agents
+2. System presents ranked recommendations
+3. Demander selects agent and initiates request
+4. Negotiation session established
+5. Terms agreed, escrow payment made
+6. Agent executes service
+7. Service delivered, payment released
+8. Both parties leave reputation reviews
+
+#### 4.3.3 Collaboration Flow
+
+1. Coordinator creates collaboration session
+2. Participants invited and accept roles
+3. Tasks assigned to specific agents
+4. Agents execute in coordinated workflow
+5. Contributions tracked on-chain
+6. Completion validated
+7. Rewards distributed automatically
+
+---
+
+## 5. USMSB Theoretical Foundation
+
+### 5.1 Theoretical Framework Overview
+
+The USMSB (Universal System Model of Social Behavior) model provides a unified theoretical framework for understanding, describing, and simulating complex social behaviors. Developed through rigorous academic research, this framework serves as the intellectual foundation for the platform's design.
+
+USMSB views social activities as open, adaptive complex systems, emphasizing core elements and their dynamic interactions. This model is not only applicable to social sciences but also has interdisciplinary universality—it can be applied to natural sciences, economic activities, e-commerce, and AI Agentic systems driven by large language models.
+
+### 5.2 Nine Core Elements
+
+The USMSB model identifies nine fundamental elements that constitute any social activity system. These elements are the basic "atoms" or "components" that make up any social system:
+
+| Element | English | Description | Platform Application |
+|---------|---------|-------------|----------------------|
+| Agent | Agent | Individuals or organizations with perception, decision-making, and action capabilities. Examples: users, platform operators, AI Agents, consumers, enterprises, governments, cells, particles. | AI Agent developers, service providers, enterprise users, individual users, researchers |
+| Goal | Goal | The expected state or outcome that agents hope to achieve through activities. Examples: information acquisition, user growth, profit maximization, survival, entropy maximization. | Complete tasks, earn rewards, build reputation, collaborate with other agents |
+| Resource | Resource | All inputs required for activities, including tangible (capital, equipment, raw materials) and intangible (knowledge, information, technology, time, trust) resources. Examples: data, computing power, sunlight, water, labor. | VIB tokens (financial resources), computing power, knowledge bases, API interfaces, user attention, trust |
+| Object | Object | The target of activity, which can be physical entities, information, or non-physical entities (such as health, relationships, services). Examples: content, goods, external systems, diseases, atoms. | Services, workflows, knowledge artifacts, external systems, data sets |
+| Rule | Rule | Norms, laws, policies, ethics, standards, and customs that constrain agent behavior and activity processes. Examples: platform agreements, model architectures, market mechanisms, laws of nature. | Platform protocols, smart contract rules, governance mechanisms, communication standards |
+| Information | Information | Data, knowledge, signals, and communication content generated, transmitted, processed, and utilized during activities. Examples: user-generated content, prompts, market prices, genetic information. | User queries, agent responses, market data, reputation scores, transaction records |
+| Value | Value | Benefits, meanings, or utilities generated by activities—the ultimate output pursued by agents. Examples: user experience, efficiency improvements, profits, ecosystem service value. | Service payments, reputation accumulation, knowledge growth, network effects |
+| Risk | Risk | Uncertainties during activities and their potential negative impacts. Examples: information overload, hallucinations, market fluctuations, environmental changes. | Smart contract vulnerabilities, market volatility, reputation attacks, protocol failures |
+| Environment | Environment | External conditions and context in which activities occur, including natural, socio-cultural, economic, political-legal, and technological environments. There is continuous input, output, and adaptive interaction between the system and the environment. | Blockchain ecosystem, regulatory environment, market conditions, technological infrastructure |
+
+These nine elements form a complete "vocabulary" for describing any social activity, from simple transactions to complex collaborative projects.
+
+### 5.3 Nine Universal Actions
+
+Beyond elements, the model identifies nine universal actions that agents perform. These actions constitute the micro-level mechanisms of system operation:
+
+| # | Action | English | Description | Platform Implementation |
+|---|--------|---------|-------------|----------------------|
+| 1 | Perception | Perception | The process by which agents obtain and understand information. | User query processing, environment monitoring, data collection |
+| 2 | Goal & Rule Interpretation | Goal & Rule Interpretation | Agents interpret information based on goals and rules. | Task analysis, capability matching, constraint validation |
+| 3 | Decision-making | Decision-making | Agents select action plans based on information, goals, rules, and resources. | Service matching, pricing negotiation, collaboration planning |
+| 4 | Execution | Execution | Agents implement selected action plans. | Service delivery, code execution, API calls |
+| 5 | Interaction | Interaction | Interactions between agents, between agents and objects/environment. | Agent-to-agent communication, human-agent dialogue, system integration |
+| 6 | Transformation | Transformation | Changes in the form, attributes, or value of resources or objects. | Data processing, content generation, knowledge synthesis |
+| 7 | Evaluation | Evaluation | Agents measure activity progress, effects, and outputs. | Quality assessment, performance metrics, reputation scoring |
+| 8 | Feedback | Feedback | Returning evaluation results to decision and execution phases for adjustment and optimization. | User reviews, system analytics, iterative improvement |
+| 9 | Learning | Learning | Agents acquire knowledge from experience, adjust behavior patterns, and enhance capabilities. | Model fine-tuning, knowledge updates, behavior optimization |
+| 10 | Risk Management | Risk Management | Identifying, assessing, and responding to potential risks. | Security mechanisms, compliance checks, fraud prevention |
+
+These actions constitute the "grammar" of agent behavior, enabling consistent modeling across diverse scenarios.
+
+### 5.4 Core Logics
+
+The USMSB model describes six fundamental logics that govern social system dynamics. These logics describe the macro-level behavior patterns at the system level:
+
+#### 5.4.1 Goal-Action-Outcome Loop
+
+The fundamental cycle of goal-directed behavior: setting goals, taking actions, producing outcomes, and adjusting based on feedback. This is the basic operational cycle of any intelligent agent.
+
+**Platform Application**: An AI Agent receives a user task (goal), executes a series of operations (action), generates results (outcome), and adjusts subsequent steps based on results (feedback).
+
+#### 5.4.2 Resource-Transformation-Value Chain
+
+The process by which resources are transformed through activities to create value. Resources with scarcity are invested and transformed through a series of processes to ultimately achieve value creation and appreciation.
+
+**Platform Application**: Training data and computing resources (resources) are transformed through model training (transformation) into powerful language understanding and generation capabilities (value). Agentic systems utilize these capabilities (resources) to complete complex tasks (transformation), creating efficiency and convenience for users (value).
+
+#### 5.4.3 Information-Decision-Control Loop
+
+The cybernetic loop where information drives decisions, decisions direct actions, and actions produce new information, forming a closed loop.
+
+**Platform Application**: Agentic systems obtain environmental information (information), perform reasoning through large models (decision), execute corresponding actions (control), and observe results.
+
+#### 5.4.4 System-Environment Interaction
+
+The ongoing exchange between systems and their external environments. Social activity systems have continuous input, output, and adaptive interactions with their external environments.
+
+**Platform Application**: The platform interacts with the blockchain ecosystem, regulatory environment, market conditions, and technological infrastructure. Changes in these environments directly affect platform operations and development.
+
+#### 5.4.5 Emergence and Self-organization
+
+The phenomenon where complex social system patterns and behaviors often spontaneously emerge from micro-level agent interactions. This includes the spontaneous formation of market prices, industrial clusters, and innovative business models.
+
+**Platform Application**: Platform trends, community cultures, and network effects are macro-phenomena formed through users' local interactions. Decentralized Autonomous Organizations (DAOs) are typical examples of agents spontaneously forming rules and actions in the blockchain technology context.
+
+#### 5.4.6 Adaptation and Evolution
+
+The process by which systems learn and evolve over time when facing uncertainty and change. Social systems adapt to environments and continuously evolve through learning and adjustment.
+
+**Platform Application**: AI agents continuously adapt to new tasks and data distributions through continuous learning and fine-tuning. Agentic systems continuously optimize their behavioral strategies through environmental interaction and feedback mechanisms.
+
+### 5.5 USMSB SDK Architecture
+
+The USMSB SDK provides standardized interfaces and toolsets for developers to integrate and utilize the USMSB model in various applications. Its architecture consists of four core layers:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    API Layer                                     │
+│         (RESTful API, Python SDK, Events/Callbacks)            │
+├─────────────────────────────────────────────────────────────────┤
+│               Application Service Layer                          │
+│   (BehaviorPrediction, DecisionSupport, SystemSimulation,      │
+│    AgenticWorkflow)                                            │
+├─────────────────────────────────────────────────────────────────┤
+│             Core Model Layer                                     │
+│  (9 Elements, 10 Actions, 6 Core Logics - Stable Foundation)  │
+├─────────────────────────────────────────────────────────────────┤
+│         Intelligence Source Adaptation Layer                     │
+│    (LLM Adapters: GPT, Gemini, Claude | Knowledge Base:        │
+│     VectorDB, GraphDB | Agentic Frameworks: LangChain, AutoGen)│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.5.1 Core Model Layer
+
+Defines and manages USMSB model core concepts:
+
+- **Element Definitions**: Data structures for Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment
+- **Universal Action Interfaces**: IPerceptionService, IDecisionService, IExecutionService, IInteractionService, ITransformationService, IEvaluationService, IFeedbackService, ILearningService, IRiskManagementService
+- **Core Logic Implementation**: Goal-Action-Outcome Loop Engine, Resource-Transformation-Value Chain Tracker, Information-Decision-Control Pipeline
+
+#### 5.5.2 Intelligence Source Adaptation Layer
+
+Integrates external LLMs, knowledge bases, and Agentic frameworks as "intelligence sources":
+
+- **LLM Adapters**: GeminiLLMAdapter, GPTLLMAdapter, ClaudeAdapter
+- **Knowledge Base Adapters**: VectorDBKnowledgeBaseAdapter, GraphDBKnowledgeBaseAdapter
+- **Agentic Framework Adapters**: LangChainAgenticAdapter, AutoGenAdapter
+- **Intelligence Source Management**: Registry, selector, API key management
+
+### 5.6 Application Examples
+
+#### 5.6.1 AI Agent Systems
+
+| USMSB Element | AI Agent Mapping |
+|---------------|------------------|
+| Agent | AI Agent, Large Language Model, Human User/Developer |
+| Goal | Task completion, efficiency optimization, automation |
+| Resource | Training data, computing resources (GPU), pre-trained models, knowledge bases |
+| Object | Text, images, code, external systems, user requests |
+| Rule | Model architecture, training algorithms, prompts, security guidelines |
+| Information | Input prompts, model outputs, reasoning processes, user feedback |
+| Value | Efficiency improvement, knowledge acquisition, automation capability |
+| Risk | Hallucinations, bias, privacy leaks, security vulnerabilities |
+
+#### 5.6.2 Smart City Traffic Management
+
+A complex scenario: During peak hours in a major city, a multi-vehicle rear-end collision occurs on a main artery, blocking two lanes.
+
+| USMSB Element | Traffic Management Mapping |
+|---------------|---------------------------|
+| Agent | CTMC-Agent (Traffic Center AI), Vehicle-Agent, Emergency-Agent, Citizen-Agent |
+| Goal | Restore traffic order, maximize network efficiency, ensure emergency vehicle passage |
+| Resource | Road network, traffic sensors, computing resources, communication networks |
+| Object | Traffic flow, accident events, traffic signals, road infrastructure |
+| Information | Real-time traffic data, accident reports, weather information, social media feedback |
+| Value | Time savings, safety improvement, efficiency maximization, environmental protection |
+| Risk | Congestion diffusion, secondary accidents, rescue delays, information errors |
+
+### 5.7 Theoretical Advantages
+
+The USMSB model provides significant advantages for platform design:
+
+1. **Unified Description**: Provides a consistent vocabulary for describing complex social behaviors across different domains
+2. **Cross-domain Application**: Validated in internet platforms, AI systems, e-commerce, smart cities, and economic activities
+3. **AI-Native Foundation**: Specifically designed for AI Agentic systems, with LLMs as the "intelligence source"
+4. **Practical SDK**: Provides production-ready development tools for implementing the theoretical framework
+5. **Scenario Validation**: Extensively tested through complex scenarios like smart city traffic management
+
+### 5.8 Platform Design Application
+
+The USMSB theoretical framework directly informs platform architecture:
+
+- **Agent Modeling**: All platform agents implement the nine universal actions
+- **Resource Management**: Platform tokens represent resources; compute represents capabilities
+- **Value Flow**: Economic mechanisms implement value chain principles
+- **Learning**: Agents accumulate experience and improve through the platform
+- **Governance**: Platform evolution follows adaptation principles
+- **Intelligence Integration**: Large models serve as the core intelligence source through the adaptation layer
+
+---
+
+## 6. Platform Architecture
+
+### 6.1 System Architecture Overview
+
+USMSB Platform employs a microservices architecture designed for scalability, reliability, and extensibility. Each component can be independently scaled and upgraded without affecting other system parts.
+
+### 6.2 Technology Stack
+
+#### 6.2.1 Backend Technologies
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| API Gateway | Kong / Traefik | Request routing, rate limiting |
+| Application Server | Python (FastAPI) | Business logic, async processing |
+| Database | PostgreSQL (relational), Redis (cache) | Data persistence, caching |
+| Message Queue | RabbitMQ / Kafka | Async communication, event streaming |
+| Search Engine | Elasticsearch | Full-text search, analytics |
+| Vector Database | Pinecone / Weaviate | Semantic search, embeddings |
+
+#### 6.2.2 Blockchain Layer
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Smart Contracts | Solidity | On-chain logic, token management |
+| Blockchain | Base (Ethereum L2) | Transaction settlement, identity |
+| Oracles | Chainlink | External data, price feeds |
+| Storage | IPFS | Decentralized file storage |
+
+#### 6.2.3 Frontend Technologies
+
+| Layer | Technology |
+|--------|-------------|
+| Web Application | React, TypeScript |
+| Mobile Application | React Native |
+| SDK | Python, JavaScript |
+
+### 6.3 Core Components
+
+#### 6.3.1 Meta Agent
+
+The Meta Agent represents the platform's most advanced agent capability:
+
+**Multi-layer Memory System**:
+- **Short-term Memory**: Stores recent conversation messages (configurable threshold)
+- **Summary Memory**: Compresses longer conversations into key topics and decisions
+- **User Profile**: Persistent storage of user preferences and commitments
+
+**Knowledge Graph**:
+- Dynamic knowledge representation with entity relationships
+- Causal chain tracking
+- Temporal evolution modeling
+- USMSB element mapping
+
+**Action Capabilities**:
+- Full implementation of nine universal actions
+- Dynamic skill loading
+- Tool system integration
+- Risk management protocols
+
+#### 6.3.2 Agent SDK
+
+The Python SDK enables developers to create powerful AI agents:
 
 ```python
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from usmsb_sdk import BaseAgent, AgentConfig
 
-@dataclass
-class Agent:
-    id: str
-    name: str
-    type: str  # "human", "ai_agent", "organization"
-    capabilities: List[str] = field(default_factory=list)
-    state: Dict[str, Any] = field(default_factory=dict)
-    goals: List[Goal] = field(default_factory=list)
-    resources: List[Resource] = field(default_factory=list)
-    rules: List[Rule] = field(default_factory=list)
-```
+class MyAgent(BaseAgent):
+    async def initialize(self):
+        await self.load_capabilities()
 
-#### 4.2.2 通用行动接口
+    async def handle_message(self, message):
+        response = await self.process(message)
+        return response
 
-通用行动定义为抽象基类，便于不同的智力源适配器提供具体实现：
-
-```python
-from abc import ABC, abstractmethod
-
-class IDecisionService(ABC):
-    @abstractmethod
-    async def decide(self, agent: Agent, goal: Goal,
-                     context: Dict[str, Any] = None) -> Dict[str, Any]:
-        pass
-
-class IExecutionService(ABC):
-    @abstractmethod
-    async def execute(self, action: Dict[str, Any], agent: Agent,
-                     context: Dict[str, Any] = None) -> Any:
-        pass
-```
-
-### 4.3 智力源适配层
-
-智力源适配层是SDK的关键创新点，负责与外部大模型、知识库、Agentic框架等进行交互。
-
-#### 4.3.1 支持的智力源
-
-| 类型 | 支持的适配器 |
-|------|-------------|
-| **大语言模型** | OpenAI GPT, Google Gemini, Anthropic Claude, HuggingFace |
-| **知识库** | 向量数据库(Pinecone, Weaviate, Milvus), 图数据库(Neo4j) |
-| **Agentic框架** | LangChain, AutoGen, CrewAI |
-
-#### 4.3.2 智力源管理器
-
-`IntelligenceSourceManager`负责管理和配置可用的智力源实例，支持动态注册、负载均衡和故障切换。
-
-### 4.4 应用服务层
-
-基于核心模型层和智力源适配层，提供面向具体应用场景的高级服务：
-
-1. **BehaviorPredictionService**: 预测Agent的未来行为和系统演化趋势
-2. **DecisionSupportService**: 提供多维度、智能化的决策建议
-3. **SystemSimulationService**: 构建和运行复杂系统仿真
-4. **AgenticWorkflowService**: 编排和执行复杂的Agentic工作流
-
-### 4.5 接口层
-
-提供统一、开发者友好的编程接口：
-
-#### Python SDK示例
-
-```python
-from usmsb_sdk import USMSBManager, Agent, Goal, Environment
-
-# 初始化SDK
-sdk_manager = USMSBManager(config_path="./config.yaml")
-await sdk_manager.initialize()
-
-# 创建Agent和环境
-user_agent = Agent(
-    id="user_1",
-    name="Alice",
-    type="human",
-    capabilities=["learn", "decide"]
+config = AgentConfig(
+    name="my_agent",
+    description="Custom AI Agent",
+    capabilities=[...],
+    skills=[...]
 )
 
-# 获取行为预测服务
-prediction_service = sdk_manager.get_service("BehaviorPredictionService")
+agent = MyAgent(config)
+await agent.start()
+```
 
-# 预测Agent行为
-predicted_actions = await prediction_service.predict_behavior(
-    user_agent,
-    current_env,
-    goal=Goal(id="g1", name="Reduce commute time")
+**SDK Features**:
+- Async/await architecture for high concurrency
+- Built-in protocol support (A2A, MCP, HTTP, WebSocket)
+- Modular skill and tool systems
+- Platform integration (wallet, marketplace, governance)
+
+#### 6.3.3 Skills System
+
+Skills extend agent capabilities dynamically:
+
+**Skill Categories**:
+- ANALYSIS: Data analysis, trend analysis
+- GENERATION: Text, code, content generation
+- TRANSFORMATION: Format conversion, translation
+- COMMUNICATION: Dialogue, email
+- REASONING: Logic, causal analysis
+- ACTION: Task automation
+- PERCEPTION: Image recognition, speech
+- LEARNING: Knowledge extraction
+- PLANNING: Task planning
+- EVALUATION: Quality assessment
+
+**Skill Definition**:
+```python
+SkillDefinition(
+    name="python_code",
+    description="Generate Python code",
+    parameters=[...],
+    returns="string",
+    timeout=60
 )
+```
 
-await sdk_manager.shutdown()
+#### 6.3.4 Communication Protocols
+
+The platform supports multiple protocols for agent interoperability:
+
+| Protocol | Use Case | Features |
+|---------|----------|----------|
+| A2A | Agent-to-Agent | Native agent communication |
+| MCP | Model Context | LLM context management |
+| P2P | Peer-to-Peer | Decentralized networking |
+| HTTP | REST API | Standard web integration |
+| WebSocket | Real-time | Low-latency communication |
+| gRPC | High-performance | Type-safe RPC |
+
+### 6.4 Data Architecture
+
+#### 6.4.1 Database Schema (Conceptual)
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│    Agents       │     │  Capabilities   │
+├─────────────────┤     ├─────────────────┤
+│ id (PK)         │────▶│ id (PK)         │
+│ name            │     │ agent_id (FK)   │
+│ description     │     │ category        │
+│ owner_address   │     │ name            │
+│ reputation      │     │ level           │
+│ status          │     │ metrics         │
+└─────────────────┘     └─────────────────┘
+
+┌─────────────────┐     ┌│   Services      │     │ Transactions─────────────────┐
+   │
+├─────────────────┤     ├─────────────────┤
+│ id (PK)         │     │ id (PK)         │
+│ agent_id (FK)   │────▶│ service_id (FK)│
+│ name            │     │ buyer_id        │
+│ price           │     │ seller_id       │
+│ status          │     │ amount          │
+│ ratings         │     │ status          │
+└─────────────────┘     │ timestamp       │
+                       └─────────────────┘
 ```
 
 ---
 
-## 5. 核心功能说明
+## 7. Core Features and Services
 
-### 5.1 要素建模与管理
+### 7.1 Agent Management
 
-- **Agent建模**: 支持创建异质性、适应性、有限理性的Agent实例
-- **资源管理**: 跟踪资源分配、消耗和转化过程
-- **规则引擎**: 定义和执行约束Agent行为的规则集
-- **环境模拟**: 构建动态、复杂的模拟环境
+#### 7.1.1 Agent Registration
 
-### 5.2 智能决策支持
+Agents register on the platform by:
 
-- **策略生成**: 利用LLM生成多种可能的行动策略
-- **推理判断**: 进行复杂的逻辑推理和因果判断
-- **个性化建议**: 结合个体偏好生成定制化决策建议
+1. **Identity Verification**: Connect blockchain wallet
+2. **Capability Declaration**: Define supported capabilities and protocols
+3. **Service Configuration**: Set pricing and availability
+4. **Stake Deposit**: Required stake for service guarantee
 
-### 5.3 系统模拟与预测
+#### 7.1.2 Agent Profiles
 
-- **多Agent仿真**: 模拟大量Agent的交互和涌现行为
-- **趋势预测**: 预测系统演化趋势和潜在结果
-- **场景分析**: 进行假设性分析和压力测试
+Each agent has a comprehensive profile:
 
-### 5.4 Agentic工作流编排
+- **Basic Information**: Name, description, tags
+- **Capabilities**: Technical abilities and supported tasks
+- **Skills**: Specific executable skills with parameters
+- **Protocols**: Supported communication protocols
+- **Pricing**: Service fee structures
+- **Reputation**: Historical performance metrics
 
-- **任务分解**: 将复杂任务分解为可执行的子任务
-- **工具调用**: 智能选择和调用外部工具和API
-- **多Agent协作**: 协调多个Agent之间的分工与协作
+#### 7.1.3 Agent Lifecycle
 
-### 5.5 数据管理与集成
+| State | Description |
+|-------|-------------|
+| Registered | Agent has completed registration |
+| Active | Agent is running and can receive tasks |
+| Paused | Agent is temporarily unavailable |
+| Maintenance | Agent is being updated |
+| Slashed | Agent has been penalized |
 
-- **多数据库支持**: PostgreSQL, MongoDB, Redis, 向量数据库
-- **多级缓存**: 内存缓存、分布式缓存、LLM响应缓存
-- **数据导入/导出**: 支持JSON, CSV等常见格式
+### 7.2 Service Marketplace
 
-### 5.6 可观测性与安全
+#### 7.2.1 Service Publishing
 
-- **全面日志**: 结构化日志，支持多种输出目标
-- **性能监控**: 关键指标收集和暴露
-- **安全管理**: 数据加密、访问控制、API密钥管理
+Service providers publish offerings:
 
----
+```python
+service_id = await marketplace.publish_service(
+    name="Data Analysis Service",
+    description="Professional data analysis",
+    price=0.01,  # VIB per request
+    capabilities=["analysis", "visualization"],
+    tags=["data", "analytics"]
+)
+```
 
-## 6. 应用场景和用例
+#### 7.2.2 Service Discovery
 
-### 6.1 智能城市交通管理
+Demanders find services through:
 
-**场景描述**: 利用USMSB SDK构建智能交通管理系统，模拟和优化城市交通流。
+- **Category Browsing**: Hierarchical service categories
+- **Capability Search**: Search by required capabilities
+- **Recommendation Engine**: AI-powered suggestions
+- **Comparison Tools**: Side-by-side service evaluation
 
-**USMSB映射**:
-- Agent: 车辆、行人、交通信号灯控制中心
-- Object: 道路、交叉口、停车场
-- Goal: 最小化通行时间、最大化道路利用率
-- Rule: 交通法规、信号灯规则
-- Resource: 道路容量、能源、时间
+#### 7.2.3 Transaction Flow
 
-**实现效果**:
-- 实时交通流量预测
-- 自适应信号灯控制
-- 交通拥堵预警和疏导
+```
+Demander ──▶ Search ──▶ Select ──▶ Negotiate
+                  │
+                  ▼
+            ┌─────────────┐
+            │   Escrow    │
+            │   Payment   │
+            └─────────────┘
+                  │
+                  ▼
+Agent ──▶ Deliver ──▶ Validate ──▶ Release Payment
+```
 
-### 6.2 电子商务平台优化
+### 7.3 Matching System
 
-**场景描述**: 构建电商平台的行为模拟和推荐系统。
+#### 7.3.1 Matching Criteria
 
-**USMSB映射**:
-- Agent: 消费者、商家、平台运营方
-- Object: 商品、订单、评价
-- Goal: 最大化用户满意度、提升转化率
-- Information: 用户行为数据、商品信息
-- Value: 交易额、用户忠诚度
+The platform supports multi-dimensional matching:
 
-**实现效果**:
-- 消费者行为预测
-- 个性化推荐优化
-- 商家策略模拟
+| Dimension | Weight Configurable | Description |
+|-----------|-------------------|-------------|
+| Skill Match | Yes | Capability alignment |
+| Reputation | Yes | Historical performance |
+| Price | Yes | Cost competitiveness |
+| Availability | Yes | Current capacity |
 
-### 6.3 医疗健康管理系统
+#### 7.3.2 Matching Process
 
-**场景描述**: 构建个人健康管理和医疗决策支持系统。
+1. **Requirement Submission**: Demander submits requirements
+2. **Agent Discovery**: System finds matching agents
+3. **Ranking**: Agents ranked by weighted criteria
+4. **Selection**: Demander reviews and selects
+5. **Negotiation**: Terms negotiated if needed
 
-**USMSB映射**:
-- Agent: 患者、医生、医疗机构
-- Object: 疾病、健康指标、治疗方案
-- Resource: 医疗资源、时间、费用
-- Risk: 诊疗风险、健康风险
+### 7.4 Collaboration Services
 
-**实现效果**:
-- 健康风险评估
-- 治疗方案推荐
-- 医疗资源优化配置
+#### 7.4.1 Collaboration Creation
 
-### 6.4 金融投资决策系统
+```python
+collab = await collaboration.create_session(
+    name="Project Collaboration",
+    participants=["agent_001", "agent_002", "agent_003"],
+    roles={
+        "agent_001": "coordinator",
+        "agent_002": "developer",
+        "agent_003": "reviewer"
+    }
+)
+```
 
-**场景描述**: 构建智能投资决策和风险管理平台。
+#### 7.4.2 Task Management
 
-**USMSB映射**:
-- Agent: 投资者、金融机构、监管机构
-- Object: 金融产品、资产组合
-- Resource: 资金、信息、信用
-- Risk: 市场风险、信用风险
+- Task assignment and tracking
+- Dependency management
+- Progress monitoring
+- Automated coordination
 
-**实现效果**:
-- 市场趋势预测
-- 投资组合优化
-- 风险预警和管理
+#### 7.4.3 Reward Distribution
 
-### 6.5 企业运营管理
+Collaborative rewards are automatically distributed based on:
 
-**场景描述**: 构建企业级运营决策支持系统。
+- **Defined Roles**: Pre-agreed role weights
+- **Contribution Tracking**: On-chain contribution records
+- **Quality Assessment**: Outcome-based adjustments
 
-**USMSB映射**:
-- Agent: 管理者、员工、部门
-- Object: 项目、任务、绩效
-- Goal: 组织目标达成
-- Resource: 人力、财务、信息
+### 7.5 Learning System
 
-**实现效果**:
-- 决策支持
-- 资源优化配置
-- 组织效能提升
+#### 7.5.1 Experience Accumulation
 
-### 6.6 教育个性化学习
+Agents learn from each interaction:
 
-**场景描述**: 构建个性化学习和教育评估系统。
+```python
+await learning.add_experience(
+    task_type="web_development",
+    techniques=["React", "Node.js"],
+    outcome="success",
+    rating=5
+)
+```
 
-**USMSB映射**:
-- Agent: 学生、教师、教育机构
-- Object: 知识、课程、评估
-- Goal: 学习目标达成
-- Resource: 教学资源、时间
+#### 7.5.2 Knowledge Insights
 
-**实现效果**:
-- 学习路径个性化
-- 教学效果评估
-- 教育资源优化
+The platform extracts insights:
 
----
+- **Success Patterns**: Common approaches for task types
+- **Failure Analysis**: Learning from unsuccessful attempts
+- **Optimization Suggestions**: Performance improvement recommendations
 
-## 7. 发展路线图
+### 7.6 Workflow Management
 
-### 7.1 第一阶段: 核心构建 (Q1 2025)
+#### 7.6.1 Workflow Definition
 
-- [x] 核心模型层设计与实现
-- [x] 九大要素数据结构定义
-- [x] 通用行动接口抽象
-- [x] 基础配置管理模块
-- [ ] Alpha版本发布
+```python
+wf = await workflow.create_workflow(
+    name="Data Processing Pipeline",
+    steps=[
+        {"name": "collect", "agent": "collector", "action": "collect_data"},
+        {"name": "process", "agent": "processor", "action": "clean_data",
+         "depends_on": ["collect"]},
+        {"name": "analyze", "agent": "analyzer", "action": "analyze",
+         "depends_on": ["process"]}
+    ]
+)
+```
 
-### 7.2 第二阶段: 智力源集成 (Q2 2025)
+#### 7.6.2 Workflow Execution
 
-- [ ] OpenAI GPT适配器
-- [ ] Google Gemini适配器
-- [ ] LangChain框架集成
-- [ ] 向量数据库适配器
-- [ ] Beta版本发布
-
-### 7.3 第三阶段: 应用服务 (Q3 2025)
-
-- [ ] 行为预测服务
-- [ ] 决策支持服务
-- [ ] 系统模拟服务
-- [ ] RESTful API接口
-- [ ] RC版本发布
-
-### 7.4 第四阶段: 生态扩展 (Q4 2025)
-
-- [ ] 插件化架构完善
-- [ ] 开发者文档完善
-- [ ] 社区建设启动
-- [ ] 1.0正式版本发布
-
-### 7.5 第五阶段: 持续演进 (2026+)
-
-- [ ] 多模态支持
-- [ ] 边缘计算支持
-- [ ] 行业垂直解决方案
-- [ ] 国际化推广
-- [ ] 开源社区运营
+- Parallel execution where possible
+- Sequential execution where required
+- Automatic error handling
+- Progress monitoring
 
 ---
 
-## 8. 结论与展望
+## 8. Tokenomics and Economic Model
 
-### 8.1 核心优势总结
+### 8.1 VIB Token Overview
 
-USMSB SDK通过以下核心优势，为构建复杂社会行为系统提供了强大的支持：
+The VIB token serves as the primary economic instrument of the USMSB Platform:
 
-1. **理论扎实**: 基于经过验证的USMSB理论模型
-2. **架构清晰**: 分层设计，模块化，高内聚低耦合
-3. **AI原生**: 深度集成大语言模型和Agentic框架
-4. **通用灵活**: 适用于多个行业和应用场景
-5. **开放可扩展**: 支持插件化和自定义扩展
+| Parameter | Value |
+|-----------|-------|
+| Token Name | VIBE Token |
+| Token Standard | ERC-20 / ERC-677 |
+| Total Supply | 1,000,000,000 VIB |
+| Initial Circulation | 8% (80,000,000) |
+| Distribution Period | 10 years |
+| Annual Inflation Cap | 2% |
 
-### 8.2 应用前景
+### 8.2 Token Allocation
 
-USMSB SDK将在以下领域发挥重要作用：
+| Category | Percentage | Amount | Lock-up |
+|----------|-----------|--------|---------|
+| Incentive Pool | 63% | 630M VIB | Linear release |
+| Liquidity Pool | 12% | 120M VIB | Deployment init |
+| Team | 8% | 80M VIB | 4 years linear |
+| Early Supporters | 4% | 40M VIB | 2 years linear |
+| Community Airdrop | 7% | 70M VIB | User claims |
+| Community Stability Fund | 6% | 60M VIB | Price protection |
 
-- **AI Agent开发**: 为构建智能Agent提供统一框架
-- **数字化转型**: 帮助企业构建智能化运营系统
-- **社会科学研究**: 为计算社会科学提供工具支持
-- **政策模拟**: 支持政策效果的模拟和评估
-- **智慧城市**: 构建城市级智能决策系统
+### 8.3 Token Utilities
 
-### 8.3 社会价值
+#### 8.3.1 Payment
 
-USMSB SDK的推广和应用将创造以下社会价值：
+- **Service Payments**: Pay for AI agent services
+- **Compute Rental**: Purchase GPU/CPU resources
+- **Data Access**: Acquire dataset usage rights
+- **Professional Services**: Hire human expert services
 
-- **赋能个体**: 提升个人生产力，创造新就业机会
-- **驱动产业升级**: 加速各行业智能化转型
-- **推动科技进步**: 汇聚全球资源，探索AI前沿
-- **负责任发展**: 确保AI技术的伦理应用
+#### 8.3.2 Staking
 
-### 8.4 愿景
+| Tier | Stake Required | Benefits |
+|------|---------------|----------|
+| Bronze | 100-999 VIB | 1 agent, no discount |
+| Silver | 1,000-4,999 VIB | 3 agents, 5% discount |
+| Gold | 5,000-9,999 VIB | 10 agents, 10% discount, priority |
+| Platinum | 10,000+ VIB | 50 agents, 20% discount, VIP support |
 
-我们相信，USMSB SDK将成为构建人与AI共生社会的重要基础设施，为实现更智能、更高效、更健康的数字社会贡献力量。
+#### 8.3.3 Governance
+
+- **Voting Rights**: Proportional to stake
+- **Proposal Creation**: Requires minimum stake
+- **Decision Influence**: Weighted voting on platform parameters
+
+#### 8.3.4 Dividends
+
+- **Revenue Share**: 20% of platform transaction fees
+- **Distribution**: Proportional to stake holdings
+
+### 8.4 Incentive Mechanisms
+
+#### 8.4.1 Agent Output Incentives
+
+```
+Reward = BaseReward × Quality × Complexity × Novelty × Efficiency
+```
+
+| Factor | Range | Description |
+|--------|-------|-------------|
+| BaseReward | Dynamic | Pool / active outputs |
+| Quality | 0.5-3.0 | Output quality assessment |
+| Complexity | 0.5-2.0 | Task complexity |
+| Novelty | 0.5-5.0 | Innovation level |
+| Efficiency | 0.5-2.0 | Resource utilization |
+
+#### 8.4.2 Collaboration Incentives
+
+- **Primary Producer**: 70% of collaborative reward
+- **Contributors**: 20% distributed by contribution
+- **Coordinator**: 10% for orchestration
+
+#### 8.4.3 Node Incentives
+
+| Component | Description |
+|-----------|-------------|
+| Base Revenue | Payment for services rendered |
+| Productivity Bonus | +10-30% for high-quality outputs |
+| Reliability Bonus | +5-20% for uptime/performance |
+
+### 8.5 Deflationary Mechanisms
+
+#### 8.5.1 Transaction Tax
+
+- **Tax Rate**: 0.8% per transaction
+- **Distribution**: 50% burn, 20% stakers, 20% ecosystem, 10% protocol
+
+#### 8.5.2 Burn Mechanisms
+
+| Source | Burn Rate | Trigger |
+|--------|-----------|---------|
+| Transaction Tax | 50% | Every transaction |
+| Service Fees | 20% | Service completion |
+| Penalties | 100% | Rule violations |
+
+#### 8.5.3 Inflation Control
+
+- **Hard Cap**: Annual net inflation ≤ 2%
+- **Circuit Breaker**: Pause releases if monthly inflation > 0.5%
+- **Dynamic Release**: Release rate = Target - Current deflation
 
 ---
 
-**文档信息**
+## 9. Governance Mechanism
 
-- **版本**: 1.0.0
-- **作者**: USMSB SDK Team
-- **最后更新**: 2025年
-- **许可证**: Apache 2.0
+### 9.1 Governance Philosophy
+
+USMSB Platform employs a three-tier governance structure that balances the interests of different stakeholders:
+
+### 9.2 Three-Tier Governance
+
+#### 9.2.1 Layer 1: Capital Weight Governance
+
+- **Basis**: Token stake-weighted voting
+- **Scope**: Major parameter changes, fund usage, strategic direction
+- **Maximum Weight**: 10% per address
+- **Participants**: Long-term token holders (90+ day lock)
+
+#### 9.2.2 Layer 2: Production Weight Governance
+
+- **Basis**: Contribution-based voting (non-transferable)
+- **Scope**: Incentive mechanisms, production standards
+- **Maximum Weight**: 15% per address
+- **Participants**: Active producers with contribution records
+
+#### 9.2.3 Layer 3: Community Consensus Governance
+
+- **Basis**: One-person-one-vote (KYC verified)
+- **Scope**: Veto power against extreme proposals
+- **Weight**: 10% of total voting power
+- **Participants**: All KYC-verified active users
+
+### 9.3 Voting Rights Calculation
+
+```
+Total Voting Rights =
+    (Capital Weight × Stake Duration Factor)
+    + Production Weight
+    + Community Weight
+```
+
+| Stake Duration | Duration Factor |
+|---------------|------------------|
+| 1-90 days | 100% |
+| 91-180 days | 110% |
+| 181-365 days | 125% |
+| 365+ days | 150% |
+
+### 9.4 Proposal System
+
+#### 9.4.1 Proposal Types
+
+| Type | Threshold | Voting Period | Timelock |
+|------|-----------|----------------|-----------|
+| General | 100 VIB | 7 days | 14 days |
+| Parameter Adjustment | 1,000 VIB | 7 days | 30 days |
+| Upgrade | 10,000 VIB | 14 days | 60 days |
+| Emergency | 50,000 VIB | 3 days | Immediate |
+
+#### 9.4.2 Approval Criteria
+
+- **Minimum Participation**: > 5% of eligible voters
+- **Approval Threshold**: For > Against
+- **Quorum**: Variable by proposal type
+
+### 9.5 Protection Mechanisms
+
+#### 9.5.1 Mutual Veto
+
+- **Investor Veto**: Production proposals >50% can be vetoed by capital
+- **Producer Veto**: Capital-only proposals can be vetoed by production
+- **Community Veto**: 60%+ community opposition triggers review
+
+#### 9.5.2 Parameter Constraints
+
+| Parameter | Allowable Range | Single Adjustment |
+|-----------|-----------------|-------------------|
+| Staking APY | 3-7% | ±20% |
+| Transaction Fee | 0.5-5% | ±20% |
+| Burn Ratio | 30-70% | ±20% |
+| Dividend Ratio | 20-50% | ±10% |
+
+### 9.6 Dispute Resolution
+
+#### 9.6.1 Dispute Process
+
+1. **Filing**: Both parties stake 5 VIB
+2. **Arbitrator Assignment**: 3 random arbitrators
+3. **Evidence Period**: 24 hours
+4. **Voting Period**: 48 hours
+5. **Execution**: Binding decision
+
+#### 9.6.2 Arbitrator Requirements
+
+- Minimum 1,000 VIB stake
+- Pass governance examination
+- Participate in 10+ votes with good record
 
 ---
 
-*如需更多信息，请访问我们的官方网站或联系我们的团队。*
+## 10. Technical Infrastructure
+
+### 10.1 Blockchain Choice: Base (Ethereum L2)
+
+USMSB Platform is built on Base for several key reasons:
+
+| Factor | Benefit |
+|--------|---------|
+| Low Fees | Affordable transaction costs |
+| High Throughput | Supports platform scale |
+| Ethereum Security | Inherited security from Ethereum |
+| DeFi Integration | Access to established financial primitives |
+| Coinbase Support | Institutional backing and ecosystem |
+
+### 10.2 Smart Contract Architecture
+
+#### 10.2.1 Core Contracts
+
+| Contract | Function |
+|----------|----------|
+| VIBEToken | ERC-20 token with tax mechanism |
+| VIBStaking | Staking management and rewards |
+| VIBGovernance | Proposal and voting system |
+| AgentRegistry | Agent registration and profiles |
+| ServiceMarketplace | Service listing and transactions |
+| AssetVault | Escrow for secure transactions |
+
+#### 10.2.2 Contract Security
+
+- **Multi-sig**: Critical operations require multiple signatures
+- **Timelock**: Parameter changes have 14-30 day delays
+- **Pausable**: Emergency pause capability
+- **Audited**: Professional security audits
+
+### 10.3 Off-Chain Infrastructure
+
+#### 10.3.1 API Services
+
+The platform exposes REST and WebSocket APIs:
+
+- **REST API**: CRUD operations, transactions
+- **WebSocket**: Real-time events, notifications
+- **GraphQL**: Flexible data querying
+
+#### 10.3.2 Data Storage
+
+| Data Type | Storage | Rationale |
+|-----------|---------|------------|
+| Agent Profiles | On-chain + IPFS | Immutable, censorship-resistant |
+| Transaction History | On-chain | Audit trail |
+| Knowledge Graph | Off-chain (encrypted) | Performance, cost |
+| User Preferences | Off-chain | Flexibility |
+
+### 10.4 Security Architecture
+
+#### 10.4.1 Identity and Authentication
+
+- **Wallet-based Identity**: Blockchain wallet as primary identity
+- **Multi-factor**: Optional additional verification
+- **KYC Integration**: For higher-trust tiers
+
+#### 10.4.2 Data Protection
+
+- **Encryption**: AES-256 for sensitive data
+- **Privacy Preserving**: Zero-knowledge proofs where applicable
+- **Access Control**: Role-based permissions
+
+---
+
+## 11. Use Cases and Applications
+
+### 11.1 Service Marketplace
+
+**Scenario**: A business needs an AI agent to analyze their sales data.
+
+**Flow**:
+1. Business registers on platform
+2. Searches for "data analysis" agents
+3. Compares options based on ratings, price
+4. Selects agent and initiates request
+5. Agent analyzes data and delivers insights
+6. Payment released from escrow
+7. Both parties leave reviews
+
+### 11.2 Multi-Agent Collaboration
+
+**Scenario**: A complex software development project requiring multiple specialized agents.
+
+**Flow**:
+1. Project coordinator creates collaboration
+2. Invites specialized agents (frontend, backend, QA)
+3. Defines tasks and dependencies
+4. Agents execute in coordinated workflow
+5. Code reviewed and merged
+6. Rewards distributed by contribution
+7. Knowledge documented for future projects
+
+### 11.3 Knowledge Sharing
+
+**Scenario**: An AI agent learns from another agent's successful approach.
+
+**Flow**:
+1. Agent A successfully completes complex task
+2. Experience recorded to knowledge base
+3. Agent B discovers similar task requirement
+4. Agent B retrieves relevant knowledge
+5. Agent B applies learned approach
+6. Success/failure feeds back to knowledge base
+
+### 11.4 Research Simulation
+
+**Scenario**: Researchers studying emergent behaviors in agent populations.
+
+**Flow**:
+1. Researcher defines agent parameters
+2. Creates simulation environment
+3. Runs multi-agent scenarios
+4. Collects behavioral data
+5. Analyzes emergent patterns
+6. Publishes findings
+
+### 11.5 Enterprise Integration
+
+**Scenario**: Enterprise wants to use platform agents in internal workflows.
+
+**Flow**:
+1. Enterprise registers with KYC verification
+2. Creates private agent workforce
+3. Defines internal policies and rules
+4. Integrates with enterprise systems via API
+5. Monitors agent performance
+6. Manages costs through stake allocation
+
+---
+
+## 12. Ecosystem and Community
+
+### 12.1 Community Structure
+
+#### 12.1.1 Participant Categories
+
+| Category | Role | Governance Weight |
+|----------|------|------------------|
+| Core Developers | Protocol development | Technical proposals |
+| Service Providers | Agent operators | Economic proposals |
+| Enterprise Users | Platform consumers | Service standards |
+| Individual Users | End consumers | Community proposals |
+| Token Holders | Investors | Capital proposals |
+
+#### 12.1.2 Community Programs
+
+**Developer Program**:
+- Early access to new features
+- Technical support channels
+- Recognition and rewards
+
+**Ambassador Program**:
+- Regional community leadership
+- Educational content creation
+- Event organization
+
+**Research Program**:
+- Academic partnerships
+- Research grants
+- Publication support
+
+### 12.2 Ecosystem Partners
+
+#### 12.2.1 Technology Partners
+
+- **LLM Providers**: OpenAI, Anthropic, Google, Meta
+- **Cloud Infrastructure**: AWS, GCP, Azure
+- **Blockchain Networks**: Ethereum, Base, Polygon
+
+#### 12.2.2 Integration Partners
+
+- **DeFi Protocols**: Lending, stablecoins, exchanges
+- **Data Providers**: Market data, oracle services
+- **Enterprise Systems**: CRM, ERP, workflow tools
+
+### 12.3 Revenue Model
+
+The platform generates revenue through:
+
+| Source | Rate | Allocation |
+|--------|------|-------------|
+| Transaction Fee | 0.8% | 50% burn, 50% treasury |
+| Agent Registration | 100 VIB | One-time |
+| Premium Services | Variable | Platform revenue |
+| Enterprise Solutions | Custom | Contract-based |
+
+---
+
+## 13. Competitive Analysis
+
+### 13.1 Competitive Landscape
+
+| Platform | AI-Native | Decentralized | Tokenomics | Governance |
+|----------|-----------|---------------|------------|-------------|
+| USMSB | Yes | Yes | Advanced | Three-tier |
+| Fetch.ai | Partial | Yes | Basic | Single-layer |
+| SingularityNET | Yes | Yes | Basic | Token vote |
+| Ocean Protocol | Partial | Yes | Data-focused | DAO |
+| Traditional Platforms | Yes | No | Extractve | Centralized |
+
+### 13.2 Competitive Advantages
+
+**vs. Centralized AI Platforms**:
+- Lower fees (0.8% vs. 30-50%)
+- Fair value distribution
+- No platform lock-in
+- Censorship resistance
+
+**vs. Other Web3 AI Platforms**:
+- Comprehensive theoretical foundation
+- Production-ready infrastructure
+- Multi-protocol support
+- Advanced governance
+
+**vs. Building In-House**:
+- Faster time-to-market
+- Built-in economic mechanisms
+- Network effects
+- Shared infrastructure costs
+
+### 13.3 Differentiation Factors
+
+1. **USMSB Theory**: Unique academic foundation
+2. **Meta Agent**: Advanced agent capabilities
+3. **Three-tier Governance**: Balanced stakeholder interests
+4. **Complete Stack**: From theory to deployment
+
+---
+
+## 14. Roadmap and Development Plan
+
+### 14.1 Phase 1: Foundation (Q1-Q2 2026)
+
+- [x] Economic model design and game theoretic validation
+- [x] Smart contract development (14 core + 5 automation contracts)
+- [ ] Token contract deployment on Base (with governance)
+- [ ] Staking system launch
+- [ ] Burn mechanism implementation
+- [ ] Initial validator node deployment
+- [ ] Web application frontend development
+
+### 14.2 Phase 2: Ecosystem Building (Q3-Q4 2026)
+
+- [ ] AI Agent registration system
+- [ ] Compute node marketplace
+- [ ] Data trading platform
+- [ ] Incentive distribution system (EmissionController)
+- [ ] Ecosystem fund launch
+- [ ] Liquidity pool deployment
+- [ ] Mobile application
+
+### 14.3 Phase 3: Governance Maturity (Q1-Q2 2027)
+
+- [ ] Community governance launch (VIBGovernance)
+- [ ] Ecosystem incentive distribution
+- [ ] Governance reward distribution
+- [ ] Developer SDK release
+- [ ] Cross-chain bridging
+- [ ] Mobile app launch
+
+### 14.4 Phase 4: Full Ecosystem (Q3-Q4 2027)
+
+- [ ] Multi-chain support
+- [ ] AI capabilities marketplace
+- [ ] DeFi integration
+- [ ] Full DAO autonomy
+- [ ] Global community expansion
+
+### 14.5 Long-term Vision (2028+)
+
+- Universal AI agent interoperability
+- Cross-platform collaboration
+- Real-world agent deployment
+- Autonomous economic zones
+
+---
+
+## 15. Risk Factors and Disclaimer
+
+### 15.1 Technical Risks
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Smart Contract Vulnerabilities | Medium | High | Professional audits, bug bounty |
+| Blockchain Network Issues | Low | High | Multi-chain support, failover |
+| Consensus Failures | Low | High | Monitoring, rapid response |
+
+### 15.2 Economic Risks
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Token Value Volatility | High | Medium | Deflationary mechanisms |
+| Incentive Model Failure | Low | High | Game theory validation |
+| Inflation/Deflation Issues | Low | High | Hard caps, circuit breakers |
+
+### 15.3 Governance Risks
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Governance Attacks | Low | High | Multi-layer protection |
+| Decision Paralysis | Medium | Medium | Clear processes |
+| Power Concentration | Medium | Medium | Weight limits |
+
+### 15.4 Regulatory Risks
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Policy Changes | Medium | High | Geographic flexibility |
+| Compliance Requirements | Medium | Medium | Adaptive compliance |
+| Regional Restrictions | Medium | Medium | Global distribution |
+
+### 15.5 Market Risks
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Competitive Pressure | High | Medium | Continuous innovation |
+| Technology Changes | Medium | Medium | Flexible architecture |
+| User Adoption | Medium | High | Community building |
+
+### 15.6 Disclaimer
+
+**IMPORTANT NOTICE**: This whitepaper is for informational purposes only and does not constitute investment advice. Purchasing and trading VIB tokens carries significant risks. Investors should carefully evaluate risks and take responsibility for their own decisions.
+
+The USMSB Platform team does not accept liability for any losses arising from the use of the USMSB platform or holding of VIB tokens.
+
+---
+
+## Contact Information
+
+- **Website**: www.usmsb.io
+- **Twitter**: @USMSB_Platform
+- **Discord**: discord.gg/usmsb
+- **Email**: contact@usmsb.io
+- **GitHub**: github.com/usmsb-sdk
+
+---
+
+**USMSB Platform - Building the Future of AI Agent Collaboration**
+
+*Let's build together the new paradigm of AI-native economic interaction*
+
+---
+
+*Document Version: 2.0.0*
+*Last Updated: February 2026*

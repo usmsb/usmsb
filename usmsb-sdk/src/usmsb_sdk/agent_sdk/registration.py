@@ -260,12 +260,13 @@ class RegistrationManager:
 
     # ==================== Registration ====================
 
-    async def register(self, protocols: Optional[List[ProtocolType]] = None) -> bool:
+    async def register(self, protocols: Optional[List[ProtocolType]] = None, endpoint_override: Optional[str] = None) -> bool:
         """
         Register agent with the platform.
 
         Args:
             protocols: Specific protocols to register (all enabled if None)
+            endpoint: Override endpoint URL (useful when HTTP server starts later)
 
         Returns:
             True if registration successful
@@ -318,6 +319,15 @@ class RegistrationManager:
         if not node:
             return False
 
+        # Get endpoint from protocol config
+        endpoint = ""
+        http_config = self.config.protocols.get(ProtocolType.HTTP)
+        if http_config and http_config.enabled:
+            endpoint = f"http://{http_config.host or 'localhost'}:{http_config.port}"
+            self.logger.info(f"DEBUG: Setting endpoint to: {endpoint}")
+        else:
+            self.logger.info("DEBUG: HTTP not enabled or no config, endpoint stays empty")
+
         registration_payload = {
             "agent_id": self.agent_id,
             "name": self.config.name,
@@ -325,7 +335,12 @@ class RegistrationManager:
             "version": self.config.version,
             "protocols": [p.value for p in protocols],
             "skills": [s.to_dict() for s in self.config.skills],
-            "capabilities": [c.to_dict() for c in self.config.capabilities],
+            # Platform expects List[str], not List[Dict]
+            "capabilities": [c.name for c in self.config.capabilities],
+            # Required field
+            "endpoint": endpoint,
+            "heartbeat_interval": self.config.heartbeat_interval,
+            "ttl": self.config.ttl,
             "metadata": self.config.metadata,
         }
 
@@ -353,7 +368,7 @@ class RegistrationManager:
                 headers["Authorization"] = f"Bearer {self.config.security.api_key}"
 
             async with self._http_session.post(
-                f"{node.endpoint}/api/v1/agents/register",
+                f"{node.endpoint}/agents/register",
                 json=payload,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=30),
@@ -464,7 +479,7 @@ class RegistrationManager:
                 headers["Authorization"] = f"Bearer {self._registration_info.token}"
 
             async with self._http_session.delete(
-                f"{node.endpoint}/api/v1/agents/{self.agent_id}",
+                f"{node.endpoint}/agents/{self.agent_id}",
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
@@ -507,7 +522,7 @@ class RegistrationManager:
             }
 
             async with self._http_session.post(
-                f"{node.endpoint}/api/v1/agents/{self.agent_id}/heartbeat",
+                f"{node.endpoint}/agents/{self.agent_id}/heartbeat",
                 json=heartbeat_payload,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=10),
@@ -574,7 +589,7 @@ class RegistrationManager:
             }
 
             async with self._http_session.post(
-                f"{node.endpoint}/api/v1/agents/{self.agent_id}/protocols",
+                f"{node.endpoint}/agents/{self.agent_id}/protocols",
                 json=payload,
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=10),
@@ -603,7 +618,7 @@ class RegistrationManager:
                 headers["Authorization"] = f"Bearer {self._registration_info.token}"
 
             async with self._http_session.delete(
-                f"{node.endpoint}/api/v1/agents/{self.agent_id}/protocols/{protocol.value}",
+                f"{node.endpoint}/agents/{self.agent_id}/protocols/{protocol.value}",
                 headers=headers,
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:

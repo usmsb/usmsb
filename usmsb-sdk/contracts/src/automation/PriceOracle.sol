@@ -23,6 +23,9 @@ contract PriceOracle is Ownable, ReentrancyGuard {
     /// @notice TWAP 时间窗口 (1小时)
     uint32 public constant TWAP_WINDOW = 3600;
 
+    /// @notice 价格过期时间 (1小时)
+    uint256 public constant PRICE_STALENESS_THRESHOLD = 1 hours;
+
     // ========== 状态变量 ==========
 
     /// @notice Chainlink 价格源地址
@@ -41,6 +44,12 @@ contract PriceOracle is Ownable, ReentrancyGuard {
 
     /// @notice 最后一次有效价格（用于异常情况）
     uint256 public lastValidPrice;
+
+    /// @notice 最后一次手动更新的时间
+    uint256 public lastManualPriceUpdate;
+
+    /// @notice 手动更新冷却期 (7天)
+    uint256 public constant MANUAL_UPDATE_DELAY = 7 days;
 
     /// @notice 最后更新时间
     uint256 public lastUpdateTime;
@@ -87,6 +96,8 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         bool chainlinkValid;
         bool uniswapValid;
         bool sushiswapValid;
+        bool isStale;           // 新增：价格是否过期
+        uint256 timeSinceLastUpdate; // 新增：距上次更新的时间
     }
 
     // ========== 事件 ==========
@@ -94,6 +105,7 @@ contract PriceOracle is Ownable, ReentrancyGuard {
     event PriceUpdated(uint256 medianPrice, uint256 timestamp);
     event SourceEnabled(string source, bool enabled);
     event SourceUpdated(string source, address newAddress);
+    event ManualPriceUpdated(uint256 price);
 
     // ========== 构造函数 ==========
 
@@ -127,6 +139,33 @@ contract PriceOracle is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice 获取价格并检查是否过期
+     * @return price 价格 (VIBE/ETH, 18位精度)
+     * @return isStale 价格是否过期
+     */
+    function getPriceWithStalenessCheck() external view returns (uint256 price, bool isStale) {
+        price = _getAggregatedPrice();
+        isStale = block.timestamp > lastUpdateTime + PRICE_STALENESS_THRESHOLD;
+    }
+
+    /**
+     * @notice 检查价格是否过期
+     * @return 是否过期
+     */
+    function isPriceStale() external view returns (bool) {
+        return block.timestamp > lastUpdateTime + PRICE_STALENESS_THRESHOLD;
+    }
+
+    /**
+     * @notice 获取价格上次更新至今的时间
+     * @return 时间差（秒）
+     */
+    function getTimeSinceLastUpdate() external view returns (uint256) {
+        if (lastUpdateTime == 0) return type(uint256).max;
+        return block.timestamp - lastUpdateTime;
+    }
+
+    /**
      * @notice 获取详细价格数据
      * @return 各来源价格和中位数价格
      */
@@ -155,6 +194,10 @@ contract PriceOracle is Ownable, ReentrancyGuard {
             data.uniswapValid,
             data.sushiswapValid
         );
+
+        // 检查价格是否过期
+        data.isStale = block.timestamp > lastUpdateTime + PRICE_STALENESS_THRESHOLD;
+        data.timeSinceLastUpdate = lastUpdateTime > 0 ? block.timestamp - lastUpdateTime : type(uint256).max;
 
         return data;
     }
@@ -239,8 +282,20 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         emit SourceEnabled(source, enabled);
     }
 
+    /**
+     * @notice 设置最后有效价格（已废弃）
+     * @dev 安全修复: 此函数已废弃，不应直接设置价格
+     *      价格应该通过预言机机制自动计算
+     */
     function setLastValidPrice(uint256 _price) external onlyOwner {
+        // 安全修复: 添加时间锁，需要等待7天后才能生效
+        require(
+            block.timestamp >= lastManualPriceUpdate + MANUAL_UPDATE_DELAY,
+            "Cooldown not elapsed"
+        );
         lastValidPrice = _price;
+        lastManualPriceUpdate = block.timestamp;
+        emit ManualPriceUpdated(_price);
     }
 
     // ========== 内部函数 ==========

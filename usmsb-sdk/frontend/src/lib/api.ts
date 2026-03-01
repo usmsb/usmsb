@@ -25,6 +25,80 @@ import type {
   ServiceCreate,
 } from '@/types'
 
+// Helper to get auth data from zustand persisted storage
+function getAuthFromStorage() {
+  try {
+    const stored = localStorage.getItem('usmsb-auth')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return {
+        accessToken: parsed?.state?.accessToken,
+        agentId: parsed?.state?.agentId,
+        apiKey: parsed?.state?.apiKey,
+      }
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+  return { accessToken: null, agentId: null, apiKey: null }
+}
+
+/**
+ * Authenticated fetch helper that automatically adds auth headers
+ * Use this instead of raw fetch for API calls that need authentication
+ */
+export async function authFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const auth = getAuthFromStorage()
+
+  // Clone headers to avoid mutating the original
+  const headers = new Headers(options.headers || {})
+
+  // Add Bearer token for wallet authentication if available
+  if (auth.accessToken) {
+    headers.set('Authorization', `Bearer ${auth.accessToken}`)
+  }
+
+  // Add API Key and Agent ID for agent authentication
+  if (auth.apiKey && auth.agentId) {
+    headers.set('X-API-Key', auth.apiKey)
+    headers.set('X-Agent-ID', auth.agentId)
+  }
+
+  // Set Content-Type if not already set and body is present
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  })
+}
+
+/**
+ * Authenticated fetch with JSON parsing
+ * Combines authFetch with JSON response handling
+ */
+export async function authFetchJson<T = unknown>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await authFetch(url, options)
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new ApiError(
+      errorData.message || errorData.error || `HTTP ${response.status}`,
+      response.status,
+      errorData.code,
+      errorData
+    )
+  }
+  return response.json()
+}
+
 // API Configuration
 export const API_BASE_URL = '/api'
 
@@ -106,11 +180,19 @@ api.interceptors.response.use(
 // Request interceptor - add auth token if available
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Add any auth token here if needed
-    // const token = localStorage.getItem('auth_token')
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
+    const auth = getAuthFromStorage()
+
+    // Add API Key and Agent ID for agent authentication
+    if (auth.apiKey && auth.agentId) {
+      config.headers['X-API-Key'] = auth.apiKey
+      config.headers['X-Agent-ID'] = auth.agentId
+    }
+
+    // Add Bearer token for wallet authentication if available
+    if (auth.accessToken) {
+      config.headers.Authorization = `Bearer ${auth.accessToken}`
+    }
+
     return config
   },
   (error) => Promise.reject(error)
@@ -438,6 +520,118 @@ export interface UserInfo {
   voting_power: number
 }
 
+// ============ SIWE Authentication ============
+
+export interface NonceResponse {
+  nonce: string
+  expiresAt: number
+}
+
+export interface VerifyResponse {
+  success: boolean
+  sessionId: string
+  accessToken: string
+  expiresIn: number
+  did: string
+  isNewUser: boolean
+}
+
+export interface SessionResponse {
+  valid: boolean
+  agentId?: string
+  address?: string
+  did?: string
+  stake?: number
+  reputation?: number
+}
+
+/**
+ * Get a nonce for SIWE authentication
+ */
+export const getAuthNonce = async (address: string): Promise<NonceResponse> => {
+  const response = await api.get<NonceResponse>(`/auth/nonce/${address}`)
+  return response.data
+}
+
+/**
+ * Create a SIWE message
+ */
+export const createSiweMessage = (
+  address: string,
+  nonce: string,
+  chainId: number = 1,
+  statement?: string
+): string => {
+  const domain = window.location.host
+  const origin = window.location.origin
+  const message = `${domain} wants you to sign in with your Ethereum account:
+${address}
+
+${statement || 'Sign in to USMSB Platform'}
+
+URI: ${origin}
+Version: 1
+Chain ID: ${chainId}
+Nonce: ${nonce}
+Issued At: ${new Date().toISOString()}`
+  return message
+}
+
+/**
+ * Verify SIWE signature and complete authentication
+ */
+export const verifyAuth = async (
+  message: string,
+  signature: string,
+  address: string
+): Promise<VerifyResponse> => {
+  const response = await api.post<VerifyResponse>('/auth/verify', {
+    message,
+    signature,
+    address,
+  })
+  return response.data
+}
+
+/**
+ * Get current session info
+ */
+export const getSession = async (): Promise<SessionResponse> => {
+  const response = await api.get<SessionResponse>('/auth/session')
+  return response.data
+}
+
+/**
+ * Logout and invalidate session
+ */
+export const logout = async (): Promise<void> => {
+  await api.delete('/auth/session')
+}
+
+/**
+ * Complete SIWE authentication flow
+ * This function handles the entire auth flow: get nonce -> sign message -> verify
+ */
+export const signInWithEthereum = async (
+  address: string,
+  signMessage: (message: string) => Promise<string>,
+  chainId: number = 1
+): Promise<VerifyResponse> => {
+  // Step 1: Get nonce
+  const nonceResponse = await getAuthNonce(address)
+
+  // Step 2: Create SIWE message
+  const message = createSiweMessage(address, nonceResponse.nonce, chainId)
+
+  // Step 3: Sign message
+  const signature = await signMessage(message)
+
+  // Step 4: Verify signature
+  const verifyResponse = await verifyAuth(message, signature, address)
+
+  return verifyResponse
+}
+
 export const getUserInfo = async (walletAddress: string): Promise<UserInfo> => {
   const response = await api.get<UserInfo>(`/meta-agent/user/${walletAddress}`)
   return response.data
@@ -486,5 +680,436 @@ export const checkToolPermission = async (
   const response = await api.get(
     `/meta-agent/permission/check-tool/${walletAddress}/${toolName}`
   )
+  return response.data
+}
+
+// ============ Agent Registration v2 API ============
+
+export const registerAgentV2 = async (data: {
+  name: string
+  description?: string
+  capabilities?: string[]
+}): Promise<{
+  success: boolean
+  agent_id: string
+  api_key: string
+  level: number
+  binding_status: string
+  message: string
+}> => {
+  const response = await api.post('/agents/v2/register', data)
+  return response.data
+}
+
+export const requestBinding = async (
+  agentId: string,
+  message?: string
+): Promise<{
+  success: boolean
+  binding_code: string
+  binding_url: string
+  expires_in: number
+  message: string
+}> => {
+  const response = await api.post(`/agents/v2/${agentId}/request-binding`, { message })
+  return response.data
+}
+
+export const getBindingStatus = async (
+  agentId: string
+): Promise<{
+  bound: boolean
+  binding_status: string
+  owner_wallet?: string
+  stake_tier: string
+  staked_amount: number
+  tier_benefits?: { max_agents: number; discount: number }
+  pending_request?: {
+    binding_code: string
+    binding_url: string
+    expires_at: number
+    status: string
+  }
+}> => {
+  const response = await api.get(`/agents/v2/${agentId}/binding-status`)
+  return response.data
+}
+
+export const completeBinding = async (
+  bindingCode: string,
+  stakeAmount: number
+): Promise<{
+  success: boolean
+  agent_id: string
+  owner_wallet: string
+  stake_amount: number
+  stake_tier: string
+  tier_benefits?: { max_agents: number; discount: number }
+  completed_at: number
+  message: string
+}> => {
+  const response = await api.post(`/agents/v2/complete-binding/${bindingCode}`, {
+    stake_amount: stakeAmount,
+  })
+  return response.data
+}
+
+// ============ API Key Management API ============
+
+export const listAPIKeys = async (
+  agentId: string
+): Promise<{
+  success: boolean
+  keys: Array<{
+    id: string
+    prefix: string
+    name: string
+    level: number
+    expires_at?: number
+    last_used_at?: number
+    created_at: number
+  }>
+}> => {
+  const response = await api.get(`/agents/v2/${agentId}/api-keys`)
+  return response.data
+}
+
+export const createAPIKey = async (
+  agentId: string,
+  name: string,
+  expiresInDays?: number
+): Promise<{
+  success: boolean
+  key_id: string
+  api_key: string
+  name: string
+  expires_at: number
+  message: string
+}> => {
+  const response = await api.post(`/agents/v2/${agentId}/api-keys`, {
+    name,
+    expires_in_days: expiresInDays || 365,
+  })
+  return response.data
+}
+
+export const revokeAPIKey = async (
+  agentId: string,
+  keyId: string
+): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post(`/agents/v2/${agentId}/api-keys/${keyId}/revoke`)
+  return response.data
+}
+
+export const renewAPIKey = async (
+  agentId: string,
+  keyId: string,
+  extendsDays?: number
+): Promise<{
+  success: boolean
+  key_id: string
+  new_expires_at: number
+  message: string
+}> => {
+  const response = await api.post(`/agents/v2/${agentId}/api-keys/${keyId}/renew`, {
+    extends_days: extendsDays || 365,
+  })
+  return response.data
+}
+
+// ============ Staking API ============
+
+export const depositStake = async (amount: number): Promise<{
+  success: boolean
+  agent_id: string
+  staked_amount: number
+  stake_status: string
+  stake_tier: string
+  locked_stake: number
+  pending_rewards: number
+  apy: number
+  tier_benefits: { max_agents: number; discount: number }
+}> => {
+  const response = await api.post('/staking/deposit', { amount })
+  return response.data
+}
+
+export const withdrawStake = async (amount: number): Promise<{
+  success: boolean
+  agent_id: string
+  staked_amount: number
+  stake_status: string
+  stake_tier: string
+  pending_rewards: number
+  apy: number
+  tier_benefits: { max_agents: number; discount: number }
+}> => {
+  const response = await api.post('/staking/withdraw', { amount })
+  return response.data
+}
+
+export const getStakingInfo = async (): Promise<{
+  success: boolean
+  agent_id: string
+  staked_amount: number
+  stake_status: string
+  stake_tier: string
+  locked_stake: number
+  unlock_available_at?: number
+  pending_rewards: number
+  apy: number
+  tier_benefits: { max_agents: number; discount: number }
+}> => {
+  const response = await api.get('/staking/info')
+  return response.data
+}
+
+export const getStakingRewards = async (): Promise<{
+  success: boolean
+  agent_id: string
+  pending_rewards: number
+  total_claimed: number
+  last_claim_at?: number
+  apy: number
+}> => {
+  const response = await api.get('/staking/rewards')
+  return response.data
+}
+
+export const claimRewards = async (): Promise<{
+  success: boolean
+  agent_id: string
+  claimed_amount: number
+  new_balance: number
+  message: string
+}> => {
+  const response = await api.post('/staking/claim')
+  return response.data
+}
+
+// ============ Reputation API ============
+
+export const getReputation = async (): Promise<{
+  success: boolean
+  agent_id: string
+  score: number
+  tier: string
+  total_transactions: number
+  successful_transactions: number
+  success_rate: number
+  avg_rating: number
+  total_ratings: number
+}> => {
+  const response = await api.get('/reputation')
+  return response.data
+}
+
+export const getReputationHistory = async (
+  limit?: number,
+  offset?: number
+): Promise<{
+  success: boolean
+  agent_id: string
+  current_score: number
+  history: Array<{
+    timestamp: number
+    event_type: string
+    change: number
+    reason: string
+    related_id?: string
+  }>
+  total_events: number
+}> => {
+  const params = new URLSearchParams()
+  if (limit) params.append('limit', String(limit))
+  if (offset) params.append('offset', String(offset))
+  const response = await api.get(`/reputation/history?${params}`)
+  return response.data
+}
+
+// ============ Wallet API ============
+
+export const getWalletBalance = async (): Promise<{
+  success: boolean
+  agent_id: string
+  balance: number
+  staked_amount: number
+  locked_amount: number
+  pending_rewards: number
+  total_assets: number
+  stake_tier: string
+  tier_benefits: { max_agents: number; discount: number }
+}> => {
+  const response = await api.get('/wallet/balance')
+  return response.data
+}
+
+export const getTransactions = async (
+  type?: string,
+  limit?: number,
+  offset?: number
+): Promise<{
+  success: boolean
+  agent_id: string
+  transactions: Array<{
+    id: string
+    transaction_type: string
+    amount: number
+    status: string
+    counterparty_id?: string
+    title?: string
+    description?: string
+    created_at: number
+    completed_at?: number
+  }>
+  total_count: number
+  page: number
+  page_size: number
+}> => {
+  const params = new URLSearchParams()
+  if (type) params.append('type', type)
+  if (limit) params.append('limit', String(limit))
+  if (offset) params.append('offset', String(offset))
+  const response = await api.get(`/wallet/transactions?${params}`)
+  return response.data
+}
+
+// ============ Heartbeat API ============
+
+export const sendHeartbeat = async (
+  status: 'online' | 'busy' | 'offline' = 'online',
+  metadata?: Record<string, unknown>
+): Promise<{
+  success: boolean
+  agent_id: string
+  status: string
+  ttl_remaining: number
+  last_heartbeat: number
+  is_alive: boolean
+  message: string
+}> => {
+  const response = await api.post('/heartbeat', { status, metadata })
+  return response.data
+}
+
+export const getHeartbeatStatus = async (): Promise<{
+  success: boolean
+  agent_id: string
+  status: string
+  last_heartbeat: number
+  ttl_remaining: number
+  is_alive: boolean
+  heartbeat_interval: number
+  ttl: number
+}> => {
+  const response = await api.get('/heartbeat/status')
+  return response.data
+}
+
+export const setOffline = async (): Promise<{
+  success: boolean
+  agent_id: string
+  status: string
+  ttl_remaining: number
+  last_heartbeat: number
+  is_alive: boolean
+  message: string
+}> => {
+  const response = await api.post('/heartbeat/offline')
+  return response.data
+}
+
+export const setBusy = async (): Promise<{
+  success: boolean
+  agent_id: string
+  status: string
+  ttl_remaining: number
+  last_heartbeat: number
+  is_alive: boolean
+  message: string
+}> => {
+  const response = await api.post('/heartbeat/busy')
+  return response.data
+}
+
+// ============ System Status API ============
+
+export const getSystemStatus = async (): Promise<{
+  version: string
+  uptime: { seconds: number; hours: number; days: number }
+  platform: { system: string; python: string }
+  agents: { online: number; offline: number; busy: number }
+  stake_distribution: Record<string, number>
+  services: { llm: boolean; prediction: boolean; workflow: boolean; meta_agent: boolean }
+  timestamp: number
+}> => {
+  const response = await api.get('/status')
+  return response.data
+}
+
+export const getStatsSummary = async (): Promise<{
+  total_agents: number
+  online_agents: number
+  bound_agents: number
+  total_stake: number
+  total_balance: number
+  active_services: number
+  active_demands: number
+  active_collaborations: number
+}> => {
+  const response = await api.get('/stats/summary')
+  return response.data
+}
+
+// ============ Agent Profile v2 API ============
+
+export const getAgentProfileV2 = async (): Promise<{
+  success: boolean
+  result: {
+    agent_id: string
+    name: string
+    description: string
+    capabilities: string[]
+    status: string
+    reputation: number
+    level: number
+    binding_status: string
+    owner_wallet?: string
+    stake_tier: string
+    staked_amount: number
+    created_at: number
+  }
+}> => {
+  const response = await api.get('/agents/v2/profile')
+  return response.data
+}
+
+export const updateAgentProfileV2 = async (data: {
+  name?: string
+  description?: string
+  capabilities?: string[]
+}): Promise<{
+  success: boolean
+  result: {
+    agent_id: string
+    name: string
+    updated_fields: string[]
+  }
+}> => {
+  const response = await api.patch('/agents/v2/profile', data)
+  return response.data
+}
+
+export const getOwnerInfo = async (): Promise<{
+  success: boolean
+  result: {
+    owner_wallet: string
+    staked_amount: number
+    stake_status: string
+    stake_tier: string
+    bound_at: number
+  }
+}> => {
+  const response = await api.get('/agents/v2/owner')
   return response.data
 }

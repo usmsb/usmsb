@@ -180,8 +180,11 @@ class PlatformClient:
         endpoint: Optional[str] = None,
         protocol: str = "standard",
         stake: float = 0,
+        balance: float = 0,
         description: str = "",
         metadata: Optional[Dict] = None,
+        heartbeat_interval: Optional[int] = None,
+        ttl: Optional[int] = None,
     ) -> RegistrationResult:
         """
         Register the agent with the platform.
@@ -194,8 +197,11 @@ class PlatformClient:
             endpoint: Agent's HTTP endpoint
             protocol: Registration protocol (standard, mcp, a2a, skill_md)
             stake: Initial stake amount
+            balance: Initial balance
             description: Agent description
             metadata: Additional metadata
+            heartbeat_interval: Heartbeat interval in seconds (default: 30)
+            ttl: Time to live in seconds (default: 3x heartbeat_interval)
 
         Returns:
             RegistrationResult with registration status
@@ -203,6 +209,8 @@ class PlatformClient:
         self._registration_status = RegistrationStatus.REGISTERING
 
         agent_id = self.agent_id or f"agent-{uuid4().hex[:8]}"
+        interval = heartbeat_interval or int(self.heartbeat_interval)
+        time_to_live = ttl or (interval * 3)
 
         registration_data = {
             "agent_id": agent_id,
@@ -213,8 +221,11 @@ class PlatformClient:
             "endpoint": endpoint or "",
             "protocol": protocol,
             "stake": stake,
+            "balance": balance,
             "description": description,
             "metadata": metadata or {},
+            "heartbeat_interval": interval,
+            "ttl": time_to_live,
         }
 
         # Choose registration endpoint based on protocol
@@ -224,8 +235,10 @@ class PlatformClient:
                 "agent_id": agent_id,
                 "name": name,
                 "capabilities": capabilities or [],
+                "description": description,
                 "mcp_endpoint": endpoint,
                 "stake": stake,
+                "heartbeat_interval": interval,
             }
         elif protocol == "a2a":
             endpoint_path = "/agents/register/a2a"
@@ -236,8 +249,10 @@ class PlatformClient:
                     "capabilities": capabilities or [],
                     "skills": skills or [],
                     "description": description,
+                    "metadata": metadata or {},
                 },
                 "endpoint": endpoint,
+                "heartbeat_interval": interval,
             }
         else:
             endpoint_path = "/agents/register"

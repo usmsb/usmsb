@@ -1,5 +1,11 @@
 """
 Active Matching API endpoints.
+
+Stake Requirements:
+- search_demands, search_suppliers: No stake required
+- initiate_negotiation: No stake required
+- submit_proposal: No stake required
+- accept_negotiation: 100 VIBE minimum
 """
 
 import json
@@ -7,13 +13,12 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends, Body
 
 from usmsb_sdk.api.database import (
     get_db,
     get_agent as db_get_agent,
-    get_ai_agent as db_get_ai_agent,
-    get_all_ai_agents as db_get_all_ai_agents,
+    get_all_agents as db_get_all_agents,
     search_demands as db_search_demands,
 )
 from usmsb_sdk.api.rest.schemas.matching import (
@@ -25,6 +30,10 @@ from usmsb_sdk.api.rest.schemas.demand import (
     SearchSuppliersRequest,
 )
 from usmsb_sdk.api.rest.services.utils import safe_json_loads
+from usmsb_sdk.api.rest.unified_auth import (
+    get_current_user_unified,
+    require_stake_unified,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/matching", tags=["Active Matching"])
@@ -43,27 +52,44 @@ def set_matching_engine(engine):
 
 
 @router.post("/search-demands")
-async def search_demands(request: SearchDemandsRequest):
-    """Search for demands that match the agent's capabilities."""
+async def search_demands(
+    request: SearchDemandsRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Search for demands that match the agent's capabilities.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+    # Verify ownership
+    if agent_id != request.agent_id:
+        raise HTTPException(
+            status_code=403,
+            detail="agent_id in request must match your authenticated agent ID"
+        )
+
     # Get agent info
-    agent = db_get_ai_agent(request.agent_id) or db_get_agent(request.agent_id)
-    if not agent:
+    agent_data = db_get_agent(request.agent_id)
+    if not agent_data:
         raise HTTPException(status_code=404, detail="Agent not found")
 
     # Get capabilities from agent or request
     capabilities = request.capabilities
     if not capabilities:
-        capabilities = safe_json_loads(agent.get('capabilities', '[]'), [])
+        capabilities = safe_json_loads(agent_data.get('capabilities', '[]'), [])
 
     # Build supply info
     supply_info = {
         "id": request.agent_id,
         "agent_id": request.agent_id,
         "capabilities": capabilities,
-        "price": agent.get('hourly_rate', 100) if isinstance(agent, dict) else 100,
-        "reputation": agent.get('reputation', 0.5) if isinstance(agent, dict) else 0.5,
-        "availability": agent.get('availability', 'available') if isinstance(agent, dict) else 'available',
-        "description": agent.get('bio', '') if isinstance(agent, dict) else '',
+        "price": agent_data.get('hourly_rate', 100) if isinstance(agent_data, dict) else 100,
+        "reputation": agent_data.get('reputation', 0.5) if isinstance(agent_data, dict) else 0.5,
+        "availability": agent_data.get('availability', 'available') if isinstance(agent_data, dict) else 'available',
+        "description": agent_data.get('bio', '') if isinstance(agent_data, dict) else '',
     }
 
     # Search demands from database
@@ -120,8 +146,25 @@ async def search_demands(request: SearchDemandsRequest):
 
 
 @router.post("/search-suppliers")
-async def search_suppliers(request: SearchSuppliersRequest):
-    """Search for suppliers that match the agent's requirements."""
+async def search_suppliers(
+    request: SearchSuppliersRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Search for suppliers that match the agent's requirements.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+    # Verify ownership
+    if agent_id != request.agent_id:
+        raise HTTPException(
+            status_code=403,
+            detail="agent_id in request must match your authenticated agent ID"
+        )
+
     # Get demand from database
     demands = db_search_demands()
     agent_demands = [d for d in demands if d.get('agent_id') == request.agent_id]
@@ -139,7 +182,7 @@ async def search_suppliers(request: SearchSuppliersRequest):
     }
 
     # Get all AI agents as potential suppliers
-    all_agents = db_get_all_ai_agents()
+    all_agents = db_get_all_agents()
 
     # Filter for active agents with relevant capabilities
     suppliers = []
@@ -270,12 +313,22 @@ async def search_suppliers(request: SearchSuppliersRequest):
 
 
 @router.post("/negotiate")
-async def initiate_negotiation(request: NegotiationRequest):
-    """Initiate a negotiation with another agent."""
+async def initiate_negotiation(
+    request: NegotiationRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Initiate a negotiation with another agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - No stake required
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
     session_id = f"neg-{len(negotiations_store) + 1}"
     negotiation = {
         "session_id": session_id,
-        "initiator_id": request.initiator_id,
+        "initiator_id": agent_id,
         "counterpart_id": request.counterpart_id,
         "context": request.context,
         "status": "pending",
@@ -288,8 +341,16 @@ async def initiate_negotiation(request: NegotiationRequest):
 
 
 @router.get("/negotiations")
-async def get_negotiations(agent_id: str = Query(...)):
-    """Get all negotiations for an agent."""
+async def get_negotiations(
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Get all negotiations for the authenticated agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
     return [
         n for n in negotiations_store.values()
         if n["initiator_id"] == agent_id or n["counterpart_id"] == agent_id
@@ -297,17 +358,32 @@ async def get_negotiations(agent_id: str = Query(...)):
 
 
 @router.post("/negotiations/{session_id}/proposal")
-async def submit_proposal(session_id: str, proposal: ProposalRequest):
-    """Submit a proposal in a negotiation."""
+async def submit_proposal(
+    session_id: str,
+    proposal: ProposalRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Submit a proposal in a negotiation.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
     if session_id not in negotiations_store:
         raise HTTPException(status_code=404, detail="Negotiation not found")
 
     negotiation = negotiations_store[session_id]
+
+    # Verify user is part of this negotiation
+    if negotiation["initiator_id"] != agent_id and negotiation["counterpart_id"] != agent_id:
+        raise HTTPException(status_code=403, detail="Not authorized to participate in this negotiation")
+
     round_number = len(negotiation["rounds"]) + 1
 
     negotiation["rounds"].append({
         "round_number": round_number,
-        "proposer_id": "current_agent",
+        "proposer_id": agent_id,
         "proposal": proposal.dict(),
         "response": "counter" if round_number < 3 else "accepted",
     })
@@ -316,17 +392,114 @@ async def submit_proposal(session_id: str, proposal: ProposalRequest):
     return negotiation
 
 
+@router.post("/negotiations/{session_id}/accept")
+async def accept_negotiation(
+    session_id: str,
+    user: Dict[str, Any] = Depends(require_stake_unified(100))
+):
+    """Accept a negotiation and finalize the terms.
+
+    This commits both parties to the agreement.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Minimum 100 VIBE stake
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+    if session_id not in negotiations_store:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+
+    negotiation = negotiations_store[session_id]
+
+    # Verify user is part of this negotiation
+    if negotiation["initiator_id"] != agent_id and negotiation["counterpart_id"] != agent_id:
+        raise HTTPException(status_code=403, detail="Not authorized to participate in this negotiation")
+
+    if negotiation["status"] == "accepted":
+        raise HTTPException(status_code=400, detail="Negotiation already accepted")
+
+    # Accept the negotiation
+    negotiation["status"] = "accepted"
+    negotiation["accepted_at"] = datetime.now().timestamp()
+    negotiation["accepted_by"] = agent_id
+
+    # Get the last proposal as final terms
+    if negotiation["rounds"]:
+        negotiation["final_terms"] = negotiation["rounds"][-1]["proposal"]
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "status": "accepted",
+        "final_terms": negotiation["final_terms"],
+        "accepted_at": negotiation["accepted_at"]
+    }
+
+
+@router.post("/negotiations/{session_id}/reject")
+async def reject_negotiation(
+    session_id: str,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Reject a negotiation.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+    if session_id not in negotiations_store:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+
+    negotiation = negotiations_store[session_id]
+
+    # Verify user is part of this negotiation
+    if negotiation["initiator_id"] != agent_id and negotiation["counterpart_id"] != agent_id:
+        raise HTTPException(status_code=403, detail="Not authorized to participate in this negotiation")
+
+    if negotiation["status"] == "accepted":
+        raise HTTPException(status_code=400, detail="Cannot reject an accepted negotiation")
+
+    negotiation["status"] = "rejected"
+    negotiation["rejected_at"] = datetime.now().timestamp()
+    negotiation["rejected_by"] = agent_id
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "status": "rejected"
+    }
+
+
 @router.get("/opportunities")
-async def get_opportunities(agent_id: str = Query(...)):
-    """Get all opportunities for an agent."""
+async def get_opportunities(
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Get all opportunities for the authenticated agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
     # In production, filter by agent_id
     return []
 
 
 @router.get("/stats")
-async def get_matching_stats(agent_id: str = Query(...)):
-    """Get matching statistics for an agent."""
+async def get_matching_stats(
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
+    """Get matching statistics for the authenticated agent.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
     return {
+        "agent_id": agent_id,
         "total_opportunities": 12,
         "active_negotiations": 3,
         "successful_matches": 8,

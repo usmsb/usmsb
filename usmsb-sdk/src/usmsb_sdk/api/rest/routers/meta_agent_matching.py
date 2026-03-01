@@ -10,6 +10,10 @@ Meta Agent Matching API Router
 - POST /meta-agent/showcase - 接收展示
 - GET /meta-agent/profiles - 获取所有画像
 - GET /meta-agent/profiles/{agent_id} - 获取Agent画像
+
+Authentication:
+- Most endpoints require X-API-Key + X-Agent-ID headers
+- Agent-specific operations require ownership verification
 """
 
 import logging
@@ -17,6 +21,11 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+
+from usmsb_sdk.api.rest.unified_auth import (
+    get_current_user_unified,
+    verify_agent_access,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +97,7 @@ def get_meta_agent_service():
 @router.post("/conversations")
 async def initiate_conversation(
     request: InitiateConversationRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -99,7 +109,15 @@ async def initiate_conversation(
     - showcase: 接收能力展示
     - consultation: 咨询服务
     - recommendation: 推荐通知
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
     """
+    # Verify ownership
+    verify_agent_access(user, request.agent_id)
+
     try:
         conversation = await service.initiate_conversation(
             agent_id=request.agent_id,
@@ -126,15 +144,28 @@ async def initiate_conversation(
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     获取对话详情
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Must be the agent in the conversation
     """
     try:
         conversation = service.get_conversation(conversation_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
+
+        # Verify ownership
+        if conversation.agent_id != user.get('agent_id') or user.get('user_id'):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only access your own conversations"
+            )
 
         return {
             "success": True,
@@ -152,14 +183,31 @@ async def get_conversation(
 async def send_message(
     conversation_id: str,
     request: SendMessageRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     发送消息到对话
 
     Agent 发送消息，Meta Agent 生成响应
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Must be the agent in the conversation
     """
     try:
+        # Get conversation and verify ownership
+        conversation = service.get_conversation(conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conversation.agent_id != user.get('agent_id') or user.get('user_id'):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only send messages to your own conversations"
+            )
+
         response = await service.process_agent_message(
             conversation_id=conversation_id,
             message=request.message,
@@ -170,6 +218,8 @@ async def send_message(
             "response": response,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to send message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -180,12 +230,17 @@ async def send_message(
 @router.post("/recommend")
 async def recommend_agents(
     request: RecommendRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     为需求推荐最佳 Agent
 
     基于基因胶囊和能力画像进行精准匹配
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     try:
         recommendations = await service.recommend_for_demand(
@@ -207,12 +262,17 @@ async def recommend_agents(
 @router.post("/match/gene-capsule")
 async def match_by_gene_capsule(
     request: GeneCapsuleMatchRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     基于基因胶囊匹配 Agent
 
     使用基因胶囊进行更精准的匹配
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     try:
         if not service.gene_capsule_service:
@@ -241,10 +301,15 @@ async def match_by_gene_capsule(
 
 @router.get("/profiles")
 async def get_all_profiles(
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     获取所有 Agent 画像
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     try:
         profiles = service.get_all_profiles()
@@ -263,6 +328,7 @@ async def get_all_profiles(
 @router.get("/profiles/{agent_id}")
 async def get_agent_profile(
     agent_id: str,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     conversation_id: Optional[str] = None,
     service = Depends(get_meta_agent_service),
 ):
@@ -270,6 +336,10 @@ async def get_agent_profile(
     获取 Agent 能力画像
 
     可以通过 conversation_id 从对话中提取画像
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     try:
         if conversation_id:
@@ -299,6 +369,7 @@ async def get_agent_profile(
 @router.post("/consult")
 async def consult(
     request: ConsultRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -309,7 +380,15 @@ async def consult(
     - 市场需求趋势
     - 定价建议
     - 能力提升方向
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
     """
+    # Verify ownership
+    verify_agent_access(user, request.agent_id)
+
     try:
         response = await service.consult_for_agent(
             agent_id=request.agent_id,
@@ -331,6 +410,7 @@ async def consult(
 @router.post("/showcase")
 async def receive_showcase(
     request: ShowcaseRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -340,7 +420,15 @@ async def receive_showcase(
     - 新完成的案例
     - 学到的技巧
     - 能力的提升
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
     """
+    # Verify ownership
+    verify_agent_access(user, request.agent_id)
+
     try:
         success = await service.receive_showcase(
             agent_id=request.agent_id,
@@ -362,13 +450,22 @@ async def receive_showcase(
 @router.post("/opportunities/notify")
 async def notify_opportunity(
     request: NotifyOpportunityRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     主动通知 Agent 商业机会
 
     Meta Agent 主动联系 Agent 告知匹配的机会
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - agent_id in request must match authenticated agent
     """
+    # Verify ownership
+    verify_agent_access(user, request.agent_id)
+
     try:
         from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import Opportunity
 
@@ -398,10 +495,15 @@ async def notify_opportunity(
 
 @router.post("/opportunities/scan")
 async def scan_opportunities(
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     扫描平台上的机会
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     try:
         opportunities = await service.scan_for_opportunities()
@@ -419,12 +521,17 @@ async def scan_opportunities(
 
 @router.post("/opportunities/auto-match")
 async def auto_match_and_notify(
+    user: Dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
     自动匹配并通知
 
     扫描需求，匹配 Agent，主动通知
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     try:
         await service.auto_match_and_notify()

@@ -264,8 +264,12 @@ class CommunicationManager:
 
     # ==================== Initialization ====================
 
-    async def initialize(self) -> None:
-        """Initialize communication channels"""
+    async def initialize(self, skip_http_start: bool = False) -> None:
+        """Initialize communication channels
+
+        Args:
+            skip_http_start: If True, skip auto-starting HTTP server (useful when starting manually later)
+        """
         if self._initialized:
             return
 
@@ -274,7 +278,7 @@ class CommunicationManager:
         # Start protocols based on config
         protocols = self.config.get_enabled_protocols()
 
-        if ProtocolType.HTTP in protocols:
+        if ProtocolType.HTTP in protocols and not skip_http_start:
             await self._start_http_server()
 
         if ProtocolType.WEBSOCKET in protocols:
@@ -679,7 +683,7 @@ class CommunicationManager:
 
         try:
             async with self._http_session.get(
-                f"{platform_url}/api/v1/agents/{target_id}/endpoint",
+                f"{platform_url}/agents/{target_id}/endpoint",
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as response:
                 if response.status == 200:

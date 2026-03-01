@@ -23,9 +23,12 @@ Version: 1.0.0
 
 ### 1.1 Base URL
 
+> **Note**: The following URLs are example URLs. Replace with your platform address in actual deployment.
+
 ```
-Production: https://api.usmsb-sdk.io/v1
-Development: https://dev-api.usmsb-sdk.io/v1
+Production: https://api.usmsb-sdk.io/v1  (example)
+Development: https://dev-api.usmsb-sdk.io/v1  (example)
+Local Development: http://localhost:8000/v1
 ```
 
 ### 1.2 API Versioning
@@ -87,9 +90,13 @@ X-API-Key: YOUR_API_KEY
 
 ### 2.2 Obtaining an API Key
 
-1. Register at [USMSB Developer Portal](https://developers.usmsb-sdk.io)
+> **Note**: The following is an example flow. Refer to your platform deployment configuration for actual operations.
+
+1. Register at USMSB Developer Portal (if deployed)
 2. Create a new application
 3. Generate an API key from the dashboard
+
+Or use the default API key provided by the platform for testing.
 
 ### 2.3 API Key Types
 
@@ -1078,7 +1085,8 @@ GET /v1/workflows/{workflow_id}/executions/{execution_id}
 Connect to the WebSocket endpoint for real-time communication:
 
 ```
-wss://api.usmsb-sdk.io/v1/ws
+wss://api.usmsb-sdk.io/v1/ws  (example)
+Local Development: ws://localhost:8000/v1/ws
 ```
 
 **Authentication:**
@@ -1086,7 +1094,10 @@ wss://api.usmsb-sdk.io/v1/ws
 Include the API key in the connection URL or as the first message:
 
 ```javascript
+// Example
 const ws = new WebSocket('wss://api.usmsb-sdk.io/v1/ws?api_key=YOUR_API_KEY');
+// Local Development
+const wsLocal = new WebSocket('ws://localhost:8000/v1/ws?api_key=YOUR_API_KEY');
 ```
 
 ### 4.2 Message Format
@@ -1797,4 +1808,4 @@ async def handle_rate_limit():
 
 ---
 
-*For more information, visit our [Developer Portal](https://developers.usmsb-sdk.io)*
+*For more information, please refer to the platform documentation or contact the platform operator.*

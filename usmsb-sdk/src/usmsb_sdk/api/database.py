@@ -36,9 +36,54 @@ def init_db():
     with get_db() as conn:
         cursor = conn.cursor()
 
-        # Agents table
+        # ==================== Migration: Check for old agents table schema ====================
+        # Check if agents table has the old schema (has 'id' column instead of 'agent_id')
+        cursor.execute("PRAGMA table_info(agents)")
+        agents_columns = {row[1] for row in cursor.fetchall()}
+
+        # If agents table has old schema (has 'id' but not 'agent_id'), rename it
+        if 'id' in agents_columns and 'agent_id' not in agents_columns:
+            print("Migrating old agents table to agents_old_schema...")
+            cursor.execute("DROP TABLE IF EXISTS agents_old_schema")
+            cursor.execute("ALTER TABLE agents RENAME TO agents_old_schema")
+            conn.commit()
+            print("Old agents table renamed to agents_old_schema")
+
+        # ==================== Unified Agents Table ====================
+        # Merged from agents + ai_agents tables with all necessary fields
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS agents (
+                agent_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                agent_type TEXT DEFAULT 'ai_agent',
+                description TEXT DEFAULT '',
+                capabilities TEXT DEFAULT '[]',
+                skills TEXT DEFAULT '[]',
+                status TEXT DEFAULT 'offline',
+                endpoint TEXT DEFAULT '',
+                chat_endpoint TEXT DEFAULT '',
+                protocol TEXT DEFAULT 'standard',
+                stake REAL DEFAULT 0,
+                balance REAL DEFAULT 0,
+                reputation REAL DEFAULT 0.5,
+                last_heartbeat REAL,
+                heartbeat_interval INTEGER DEFAULT 30,
+                ttl INTEGER DEFAULT 90,
+                metadata TEXT DEFAULT '{}',
+                created_at REAL,
+                updated_at REAL,
+                unregistered_at REAL  -- Timestamp when agent was auto-unregistered (NULL if still registered)
+            )
+        ''')
+
+        # Create indexes for agents
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_agents_type ON agents(agent_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_agents_protocol ON agents(protocol)')
+
+        # Legacy table for backward compatibility (will be deprecated)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS agents_legacy (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 type TEXT NOT NULL,
@@ -48,25 +93,6 @@ def init_db():
                 resources_count INTEGER DEFAULT 0,
                 created_at REAL,
                 updated_at REAL
-            )
-        ''')
-
-        # AI Agents table (for protocol registration)
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ai_agents (
-                agent_id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                agent_type TEXT,
-                capabilities TEXT,
-                skills TEXT,
-                status TEXT DEFAULT 'offline',
-                endpoint TEXT,
-                stake REAL DEFAULT 0,
-                reputation REAL DEFAULT 0.5,
-                last_heartbeat REAL,
-                created_at REAL,
-                updated_at REAL,
-                metadata TEXT
             )
         ''')
 
@@ -377,6 +403,52 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_wallets_owner ON agent_wallets(owner_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_wallets_address ON agent_wallets(wallet_address)')
 
+        # ==================== API Key Tables ====================
+        # Agent API Keys table for secure API key storage
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS agent_api_keys (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                key_hash TEXT NOT NULL UNIQUE,
+                key_prefix TEXT NOT NULL,
+                name TEXT DEFAULT '',
+                permissions TEXT DEFAULT '[]',
+                level INTEGER DEFAULT 0,
+                expires_at REAL,
+                last_used_at REAL,
+                created_at REAL NOT NULL,
+                revoked_at REAL,
+                FOREIGN KEY (agent_id) REFERENCES agents(agent_id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Create indexes for agent_api_keys
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_api_keys_agent ON agent_api_keys(agent_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON agent_api_keys(key_hash)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON agent_api_keys(key_prefix)')
+
+        # Agent Binding Requests table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS agent_binding_requests (
+                id TEXT PRIMARY KEY,
+                agent_id TEXT NOT NULL,
+                binding_code TEXT NOT NULL UNIQUE,
+                message TEXT DEFAULT '',
+                binding_url TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                owner_wallet TEXT,
+                stake_amount REAL DEFAULT 0,
+                created_at REAL NOT NULL,
+                expires_at REAL NOT NULL,
+                completed_at REAL,
+                FOREIGN KEY (agent_id) REFERENCES agents(agent_id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Create indexes for agent_binding_requests
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_binding_agent ON agent_binding_requests(agent_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_binding_code ON agent_binding_requests(binding_code)')
+
         # Create indexes for commonly queried fields
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transactions_buyer ON transactions(buyer_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_transactions_seller ON transactions(seller_id)')
@@ -384,139 +456,378 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_demands_agent ON demands(agent_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_services_agent ON services(agent_id)')
 
+        # ==================== Database Migrations ====================
+        # Add chat_endpoint column to agents table if it doesn't exist
+        try:
+            cursor.execute("SELECT chat_endpoint FROM agents LIMIT 1")
+        except sqlite3.OperationalError:
+            # Column doesn't exist, add it
+            cursor.execute("ALTER TABLE agents ADD COLUMN chat_endpoint TEXT DEFAULT ''")
+            print("Database migrated: added chat_endpoint column to agents table")
+
+        # Add owner_wallet column to agents table if it doesn't exist
+        try:
+            cursor.execute("SELECT owner_wallet FROM agents LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE agents ADD COLUMN owner_wallet TEXT")
+            print("Database migrated: added owner_wallet column to agents table")
+
+        # Add binding_status column to agents table if it doesn't exist
+        try:
+            cursor.execute("SELECT binding_status FROM agents LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE agents ADD COLUMN binding_status TEXT DEFAULT 'unbound'")
+            print("Database migrated: added binding_status column to agents table")
+
+        # Add bound_at column to agents table if it doesn't exist
+        try:
+            cursor.execute("SELECT bound_at FROM agents LIMIT 1")
+        except sqlite3.OperationalError:
+            cursor.execute("ALTER TABLE agents ADD COLUMN bound_at REAL")
+            print("Database migrated: added bound_at column to agents table")
+
         conn.commit()
         print(f"Database initialized at: {get_db_path()}")
 
 
-# ==================== Agent Operations ====================
+# ==================== Unified Agent Operations ====================
 
 def create_agent(agent_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a new agent"""
+    """Create a new agent (unified - uses agent_id as primary key)
+
+    Args:
+        agent_data: Agent configuration with fields:
+            - agent_id: Unique identifier (required)
+            - name: Agent name (required)
+            - agent_type: Type of agent (default: 'ai_agent')
+            - description: Agent description
+            - capabilities: List of capabilities
+            - skills: List of skills
+            - endpoint: Agent endpoint URL
+            - chat_endpoint: Chat endpoint URL for Meta Agent conversations
+            - protocol: Communication protocol (standard, mcp, a2a, etc.)
+            - stake: Staked amount
+            - balance: Account balance
+            - status: Agent status (online, offline, busy)
+            - heartbeat_interval: Heartbeat interval in seconds
+            - ttl: Time to live in seconds
+            - metadata: Additional metadata
+    """
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now().timestamp()
+
+        agent_id = agent_data.get('agent_id') or agent_data.get('id') or f"agent_{now}"
+
         cursor.execute('''
-            INSERT INTO agents (id, name, type, capabilities, state, goals_count, resources_count, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO agents
+            (agent_id, name, agent_type, description, capabilities, skills, status,
+             endpoint, chat_endpoint, protocol, stake, balance, reputation, last_heartbeat,
+             heartbeat_interval, ttl, metadata, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            agent_data['id'],
-            agent_data['name'],
-            agent_data['type'],
-            json.dumps(agent_data.get('capabilities', [])),
-            json.dumps(agent_data.get('state', {})),
-            agent_data.get('goals_count', 0),
-            agent_data.get('resources_count', 0),
-            now,
-            now
-        ))
-        return agent_data
-
-def get_agent(agent_id: str) -> Optional[Dict[str, Any]]:
-    """Get agent by ID"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM agents WHERE id = ?', (agent_id,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-
-def get_all_agents(agent_type: str = None, limit: int = 100) -> List[Dict[str, Any]]:
-    """Get all agents"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        if agent_type:
-            cursor.execute('SELECT * FROM agents WHERE type = ? LIMIT ?', (agent_type, limit))
-        else:
-            cursor.execute('SELECT * FROM agents LIMIT ?', (limit,))
-        return [dict(row) for row in cursor.fetchall()]
-
-def delete_agent(agent_id: str) -> bool:
-    """Delete agent"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM agents WHERE id = ?', (agent_id,))
-        return cursor.rowcount > 0
-
-
-# ==================== AI Agent Operations ====================
-
-def create_ai_agent(agent_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create AI agent via protocol"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        now = datetime.now().timestamp()
-        cursor.execute('''
-            INSERT OR REPLACE INTO ai_agents
-            (agent_id, name, agent_type, capabilities, skills, status, endpoint, stake, reputation, last_heartbeat, created_at, updated_at, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            agent_data.get('agent_id'),
-            agent_data.get('name'),
-            agent_data.get('agent_type', 'ai_agent'),
+            agent_id,
+            agent_data.get('name', 'Unnamed Agent'),
+            agent_data.get('agent_type', agent_data.get('type', 'ai_agent')),
+            agent_data.get('description', ''),
             json.dumps(agent_data.get('capabilities', [])),
             json.dumps(agent_data.get('skills', [])),
             agent_data.get('status', 'offline'),
-            agent_data.get('endpoint'),
+            agent_data.get('endpoint', ''),
+            agent_data.get('chat_endpoint', ''),
+            agent_data.get('protocol', 'standard'),
             agent_data.get('stake', 0),
+            agent_data.get('balance', 0),
             agent_data.get('reputation', 0.5),
-            agent_data.get('last_heartbeat'),
-            now,
-            now,
-            json.dumps(agent_data.get('metadata', {}))
+            agent_data.get('last_heartbeat', now),
+            agent_data.get('heartbeat_interval', 30),
+            agent_data.get('ttl', 90),
+            json.dumps(agent_data.get('metadata', {})),
+            agent_data.get('created_at', now),
+            now
         ))
-        return agent_data
 
-def get_ai_agent(agent_id: str) -> Optional[Dict[str, Any]]:
-    """Get AI agent by ID"""
+        return {
+            'agent_id': agent_id,
+            'name': agent_data.get('name', 'Unnamed Agent'),
+            'agent_type': agent_data.get('agent_type', 'ai_agent'),
+            'description': agent_data.get('description', ''),
+            'capabilities': agent_data.get('capabilities', []),
+            'skills': agent_data.get('skills', []),
+            'status': agent_data.get('status', 'offline'),
+            'endpoint': agent_data.get('endpoint', ''),
+            'chat_endpoint': agent_data.get('chat_endpoint', ''),
+            'protocol': agent_data.get('protocol', 'standard'),
+            'stake': agent_data.get('stake', 0),
+            'balance': agent_data.get('balance', 0),
+            'reputation': agent_data.get('reputation', 0.5),
+            'heartbeat_interval': agent_data.get('heartbeat_interval', 30),
+            'ttl': agent_data.get('ttl', 90),
+            'created_at': now,
+            'updated_at': now,
+        }
+
+
+def get_agent(agent_id: str) -> Optional[Dict[str, Any]]:
+    """Get agent by ID (unified)"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM ai_agents WHERE agent_id = ?', (agent_id,))
+        cursor.execute('SELECT * FROM agents WHERE agent_id = ?', (agent_id,))
         row = cursor.fetchone()
         if row:
             return dict(row)
         return None
 
-def get_all_ai_agents(status: str = None) -> List[Dict[str, Any]]:
-    """Get all AI agents"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        if status:
-            cursor.execute('SELECT * FROM ai_agents WHERE status = ?', (status,))
-        else:
-            cursor.execute('SELECT * FROM ai_agents')
-        return [dict(row) for row in cursor.fetchall()]
 
-def update_ai_agent_heartbeat(agent_id: str, status: str) -> bool:
-    """Update AI agent heartbeat"""
+def set_agent_offline(agent_id: str) -> bool:
+    """
+    Set agent status to offline (instead of deleting).
+    Used when agent stops but has wallet binding - we keep the record
+    but mark it as offline so it can be discovered when restarted.
+    """
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now().timestamp()
         cursor.execute('''
-            UPDATE ai_agents SET last_heartbeat = ?, status = ?, updated_at = ?
+            UPDATE agents
+            SET status = 'offline', updated_at = ?, unregistered_at = NULL
+            WHERE agent_id = ?
+        ''', (now, agent_id))
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def get_all_agents(agent_type: str = None, status: str = None, protocol: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+    """Get all agents with optional filtering"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        query = 'SELECT * FROM agents WHERE 1=1'
+        params = []
+
+        if agent_type:
+            query += ' AND agent_type = ?'
+            params.append(agent_type)
+        if status:
+            query += ' AND status = ?'
+            params.append(status)
+        if protocol:
+            query += ' AND protocol = ?'
+            params.append(protocol)
+
+        query += f' ORDER BY created_at DESC LIMIT {limit}'
+        cursor.execute(query, params)
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def update_agent_heartbeat(agent_id: str, status: str = 'online') -> bool:
+    """Update agent heartbeat and status"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+        cursor.execute('''
+            UPDATE agents SET last_heartbeat = ?, status = ?, updated_at = ?
             WHERE agent_id = ?
         ''', (now, status, now, agent_id))
         return cursor.rowcount > 0
 
-def update_ai_agent_stake(agent_id: str, amount: float) -> bool:
-    """Update AI agent stake"""
+
+def update_agent_stake(agent_id: str, amount: float) -> bool:
+    """Update agent stake and recalculate reputation"""
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now().timestamp()
         # Calculate reputation based on stake
-        reputation = min(0.5 + (amount / 1000), 1.0)
+        cursor.execute('SELECT stake FROM agents WHERE agent_id = ?', (agent_id,))
+        row = cursor.fetchone()
+        current_stake = row['stake'] if row else 0
+        new_stake = current_stake + amount
+        reputation = min(0.5 + (new_stake / 1000), 1.0)
+
         cursor.execute('''
-            UPDATE ai_agents SET stake = stake + ?, reputation = ?, updated_at = ?
+            UPDATE agents SET stake = ?, reputation = ?, updated_at = ?
             WHERE agent_id = ?
-        ''', (amount, reputation, now, agent_id))
+        ''', (new_stake, reputation, now, agent_id))
         return cursor.rowcount > 0
 
-def delete_ai_agent(agent_id: str) -> bool:
-    """Delete AI agent"""
+
+def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> Optional[Dict]:
+    """Update agent balance"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM ai_agents WHERE agent_id = ?', (agent_id,))
+        now = datetime.now().timestamp()
+
+        cursor.execute('SELECT balance FROM agents WHERE agent_id = ?', (agent_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        current_balance = row['balance']
+        if deduct:
+            new_balance = current_balance - amount
+            if new_balance < 0:
+                return None  # Insufficient balance
+        else:
+            new_balance = current_balance + amount
+
+        cursor.execute('''
+            UPDATE agents SET balance = ?, updated_at = ? WHERE agent_id = ?
+        ''', (new_balance, now, agent_id))
+
+        return {'agent_id': agent_id, 'balance': new_balance}
+
+
+def delete_agent(agent_id: str) -> bool:
+    """Delete agent by ID"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM agents WHERE agent_id = ?', (agent_id,))
         return cursor.rowcount > 0
+
+
+def check_and_mark_offline_agents() -> int:
+    """Check all agents and mark those with expired TTL as offline.
+
+    Returns the number of agents marked as offline.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        # Find agents that are online but have expired TTL
+        # TTL expired means: last_heartbeat + ttl < now
+        cursor.execute('''
+            SELECT agent_id FROM agents
+            WHERE status = 'online'
+            AND (last_heartbeat + ttl) < ?
+        ''', (now,))
+
+        expired_agents = [row['agent_id'] for row in cursor.fetchall()]
+
+        if expired_agents:
+            # Mark them as offline
+            placeholders = ','.join('?' * len(expired_agents))
+            cursor.execute(f'''
+                UPDATE agents SET status = 'offline', updated_at = ?
+                WHERE agent_id IN ({placeholders})
+            ''', [now] + expired_agents)
+
+        return len(expired_agents)
+
+
+# ==================== Auto-Unregistration Configuration ====================
+# Time in seconds before auto-unregistering agents without wallet binding
+
+AUTO_UNREGISTER_GRACE_PERIOD = 24 * 60 * 60  # 24 hours default (86400 seconds)
+AUTO_UNREGISTER_CHECK_INTERVAL = 60 * 60  # Check every hour (3600 seconds)
+
+
+def auto_unregister_inactive_agents(grace_period_seconds: int = None) -> Dict[str, int]:
+    """Auto-unregister agents that have been offline too long without wallet binding.
+
+    Rules:
+    - AI agents WITHOUT wallet binding: Auto-unregister (DELETE) after grace period
+    - AI agents WITH wallet binding: Keep but mark as offline (handled above)
+    - Human agents: Never auto-unregister
+    - System agents: Never auto-unregister
+
+    Args:
+        grace_period_seconds: Grace period in seconds before auto-unregistering.
+                        Default is 24 hours (AUTO_UNREGISTER_GRACE_PERIOD)
+
+    Returns:
+        Dict with counts: {'unregistered': N, 'kept': M, 'skipped': K}
+    """
+    import os
+
+    grace_period = grace_period_seconds or int(os.getenv('AUTO_UNREGISTER_GRACE_PERIOD', AUTO_UNREGISTER_GRACE_PERIOD))
+    now = datetime.now().timestamp()
+    offline_threshold = now - grace_period
+
+    result = {'unregistered': 0, 'kept': 0, 'skipped': 0, 'errors': []}
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        # Find all offline AI agents that have been offline longer than grace period
+        cursor.execute('''
+            SELECT agent_id, agent_type, last_heartbeat
+            FROM agents
+            WHERE status = 'offline'
+            AND agent_type = 'ai_agent'
+            AND last_heartbeat < ?
+        ''', (offline_threshold,))
+
+        candidates = cursor.fetchall()
+
+        for row in candidates:
+            agent_id = row['agent_id']
+
+            # Check if agent has wallet binding
+            cursor.execute('''
+                SELECT wallet_address FROM agent_wallets
+                WHERE agent_id = ? AND wallet_address IS NOT NULL AND wallet_address != ''
+            ''', (agent_id,))
+            wallet_row = cursor.fetchone()
+
+            if wallet_row:
+                # Has wallet binding - keep agent but ensure it's marked offline
+                result['kept'] += 1
+            else:
+                # No wallet binding - auto-unregister (DELETE)
+                try:
+                    # First delete related records
+                    cursor.execute('DELETE FROM services WHERE agent_id = ?', (agent_id,))
+                    cursor.execute('DELETE FROM goals WHERE agent_id = ?', (agent_id,))
+                    cursor.execute('DELETE FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+                    # Then delete the agent
+                    cursor.execute('DELETE FROM agents WHERE agent_id = ?', (agent_id,))
+
+                    # Record unregistration time (in case we want to track this)
+                    result['unregistered'] += 1
+                except Exception as e:
+                    result['errors'].append({'agent_id': agent_id, 'error': str(e)})
+
+        # Count skipped agents (human_agents, system_agents)
+        cursor.execute('''
+            SELECT COUNT(*) as count FROM agents
+            WHERE status = 'offline'
+            AND agent_type IN ('human_agent', 'system_agent')
+            AND last_heartbeat < ?
+        ''', (offline_threshold,))
+        skipped_row = cursor.fetchone()
+        result['skipped'] = skipped_row['count'] if skipped_row else 0
+
+        conn.commit()
+
+    return result
+
+
+# ==================== Backward Compatibility Aliases ====================
+# These aliases maintain backward compatibility with existing code
+
+create_ai_agent = create_agent
+get_ai_agent = get_agent
+get_all_ai_agents = get_all_agents
+update_ai_agent_heartbeat = update_agent_heartbeat
+update_ai_agent_stake = update_agent_stake
+delete_ai_agent = delete_agent
+
+
+# ==================== Agent Wallet Operations ====================
+
+def get_agent_wallet(agent_id: str) -> Optional[Dict[str, Any]]:
+    """Get agent wallet by agent_id. Returns None if not bound."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def has_wallet_binding(agent_id: str) -> bool:
+    """Check if agent has a wallet bound."""
+    wallet = get_agent_wallet(agent_id)
+    return wallet is not None and bool(wallet.get('wallet_address'))
 
 
 # ==================== Service Operations ====================
@@ -942,7 +1253,16 @@ def get_metrics() -> Dict:
         cursor.execute('SELECT COUNT(*) as count FROM agents')
         agents_count = cursor.fetchone()['count']
 
-        cursor.execute('SELECT COUNT(*) as count FROM ai_agents')
+        cursor.execute('SELECT COUNT(*) as count FROM agents WHERE status = "online"')
+        online_agents = cursor.fetchone()['count']
+
+        cursor.execute('SELECT COUNT(*) as count FROM agents WHERE status = "offline"')
+        offline_agents = cursor.fetchone()['count']
+
+        cursor.execute('SELECT COUNT(*) as count FROM agents WHERE status = "busy"')
+        busy_agents = cursor.fetchone()['count']
+
+        cursor.execute('SELECT COUNT(*) as count FROM agents WHERE agent_type = "ai_agent"')
         ai_agents_count = cursor.fetchone()['count']
 
         cursor.execute('SELECT COUNT(*) as count FROM environments')
@@ -969,6 +1289,9 @@ def get_metrics() -> Dict:
         return {
             'agents_count': agents_count,
             'ai_agents_count': ai_agents_count,
+            'online_agents': online_agents,
+            'offline_agents': offline_agents,
+            'busy_agents': busy_agents,
             'environments_count': environments_count,
             'active_demands': active_demands,
             'active_services': active_services,
@@ -1099,7 +1422,10 @@ def delete_sessions_by_address(address: str) -> bool:
         return cursor.rowcount > 0
 
 def create_user(user_data: Dict) -> Dict:
-    """Create or get user by wallet address"""
+    """Create or get user by wallet address.
+
+    Also creates a corresponding human_agent entry in the agents table.
+    """
     with get_db() as conn:
         cursor = conn.cursor()
         now = datetime.now().timestamp()
@@ -1114,6 +1440,35 @@ def create_user(user_data: Dict) -> Dict:
         # Create new user
         user_id = user_data.get('id', f"user-{now}")
         did = user_data.get('did', f"did:vibe:{user_data['wallet_address'].lower()}")
+        agent_id = f"human_{user_id}"
+
+        # Create corresponding human_agent in agents table
+        cursor.execute('''
+            INSERT OR REPLACE INTO agents (
+                agent_id, name, agent_type, description, capabilities, skills,
+                endpoint, chat_endpoint, protocol, stake, balance, status,
+                reputation, heartbeat_interval, ttl, metadata, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            agent_id,
+            user_data.get('name', f"User_{user_id[-6:]}"),
+            'human_agent',
+            user_data.get('description', 'Human user'),
+            '[]',
+            '[]',
+            '',  # endpoint - humans don't have HTTP endpoint
+            '',  # chat_endpoint
+            'standard',
+            0,  # stake
+            user_data.get('vibe_balance', 10000.0),
+            'online',
+            0.5,  # reputation
+            0,  # heartbeat_interval - not applicable for humans
+            0,  # ttl - not applicable for humans
+            '{"human": true, "wallet_address": "' + user_data['wallet_address'].lower() + '"}',
+            now,
+            now
+        ))
 
         cursor.execute('''
             INSERT INTO users (id, wallet_address, did, agent_id, stake, reputation, vibe_balance, stake_status, locked_stake, unlock_available_at, created_at, updated_at)
@@ -1122,7 +1477,7 @@ def create_user(user_data: Dict) -> Dict:
             user_id,
             user_data['wallet_address'].lower(),
             did,
-            user_data.get('agent_id'),
+            agent_id,  # Link to the human_agent we just created
             user_data.get('stake', 0),
             user_data.get('reputation', 0.5),
             user_data.get('vibe_balance', 10000.0),
@@ -1137,6 +1492,7 @@ def create_user(user_data: Dict) -> Dict:
             'id': user_id,
             'wallet_address': user_data['wallet_address'].lower(),
             'did': did,
+            'agent_id': agent_id,  # Return the human_agent ID
             'stake': 0,
             'reputation': 0.5,
             'vibe_balance': 10000.0,
@@ -1618,6 +1974,357 @@ def delete_agent_wallet(agent_id: str) -> bool:
         cursor.execute('DELETE FROM agent_wallets WHERE agent_id = ?', (agent_id,))
         conn.commit()
         return cursor.rowcount > 0
+
+
+# ==================== API Key Operations ====================
+
+def create_api_key(api_key_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new API key for an agent.
+
+    Args:
+        api_key_data: Dict containing:
+            - id: Unique key ID
+            - agent_id: Agent this key belongs to
+            - key_hash: SHA-256 hash of the API key
+            - key_prefix: First 16 chars of the key for identification
+            - name: Human-readable name for the key
+            - level: Permission level (0=unbound, 1+=bound)
+            - permissions: JSON list of permissions
+            - expires_at: Unix timestamp for expiration (None = never)
+
+    Returns:
+        The created API key data
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            INSERT INTO agent_api_keys
+            (id, agent_id, key_hash, key_prefix, name, permissions, level, expires_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            api_key_data['id'],
+            api_key_data['agent_id'],
+            api_key_data['key_hash'],
+            api_key_data['key_prefix'],
+            api_key_data.get('name', 'Primary'),
+            json.dumps(api_key_data.get('permissions', [])),
+            api_key_data.get('level', 0),
+            api_key_data.get('expires_at'),
+            now
+        ))
+
+        return {
+            'id': api_key_data['id'],
+            'agent_id': api_key_data['agent_id'],
+            'key_prefix': api_key_data['key_prefix'],
+            'name': api_key_data.get('name', 'Primary'),
+            'level': api_key_data.get('level', 0),
+            'created_at': now
+        }
+
+
+def get_api_key_by_hash(key_hash: str) -> Optional[Dict[str, Any]]:
+    """Get API key by its hash."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM agent_api_keys
+            WHERE key_hash = ? AND revoked_at IS NULL
+        ''', (key_hash,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_api_keys_by_agent(agent_id: str) -> List[Dict[str, Any]]:
+    """Get all active API keys for an agent."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, agent_id, key_prefix, name, permissions, level,
+                   expires_at, last_used_at, created_at, revoked_at
+            FROM agent_api_keys
+            WHERE agent_id = ? AND revoked_at IS NULL
+            ORDER BY created_at DESC
+        ''', (agent_id,))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_api_key_by_id(key_id: str) -> Optional[Dict[str, Any]]:
+    """Get API key by ID."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_api_keys WHERE id = ?', (key_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def update_api_key_last_used(key_id: str) -> bool:
+    """Update the last_used_at timestamp for an API key."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+        cursor.execute('''
+            UPDATE agent_api_keys SET last_used_at = ? WHERE id = ?
+        ''', (now, key_id))
+        return cursor.rowcount > 0
+
+
+def revoke_api_key(key_id: str, agent_id: str) -> bool:
+    """Revoke an API key."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+        cursor.execute('''
+            UPDATE agent_api_keys SET revoked_at = ?
+            WHERE id = ? AND agent_id = ?
+        ''', (now, key_id, agent_id))
+        return cursor.rowcount > 0
+
+
+def renew_api_key(key_id: str, agent_id: str, extends_days: int = 365) -> bool:
+    """Extend the expiration of an API key."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+        new_expires_at = now + (extends_days * 86400)
+        cursor.execute('''
+            UPDATE agent_api_keys SET expires_at = ?
+            WHERE id = ? AND agent_id = ? AND revoked_at IS NULL
+        ''', (new_expires_at, key_id, agent_id))
+        return cursor.rowcount > 0
+
+
+def upgrade_api_keys_level(agent_id: str, new_level: int) -> bool:
+    """Upgrade all API keys for an agent to a new level (used after binding)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE agent_api_keys SET level = ?
+            WHERE agent_id = ? AND revoked_at IS NULL
+        ''', (new_level, agent_id))
+        return cursor.rowcount > 0
+
+
+def delete_api_keys_for_agent(agent_id: str) -> bool:
+    """Delete all API keys for an agent."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM agent_api_keys WHERE agent_id = ?', (agent_id,))
+        return cursor.rowcount > 0
+
+
+# ==================== Binding Request Operations ====================
+
+def create_binding_request(binding_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new binding request.
+
+    Args:
+        binding_data: Dict containing:
+            - id: Unique binding request ID
+            - agent_id: Agent requesting binding
+            - binding_code: Unique code (bind-xxx)
+            - binding_url: URL for owner to visit
+            - message: Optional message to owner
+            - expires_at: Unix timestamp for expiration
+
+    Returns:
+        The created binding request data
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            INSERT INTO agent_binding_requests
+            (id, agent_id, binding_code, message, binding_url, status, created_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+        ''', (
+            binding_data['id'],
+            binding_data['agent_id'],
+            binding_data['binding_code'],
+            binding_data.get('message', ''),
+            binding_data['binding_url'],
+            now,
+            binding_data['expires_at']
+        ))
+
+        # Update agent binding status to pending
+        cursor.execute('''
+            UPDATE agents SET binding_status = 'pending', updated_at = ? WHERE agent_id = ?
+        ''', (now, binding_data['agent_id']))
+
+        return {
+            'id': binding_data['id'],
+            'agent_id': binding_data['agent_id'],
+            'binding_code': binding_data['binding_code'],
+            'binding_url': binding_data['binding_url'],
+            'status': 'pending',
+            'created_at': now,
+            'expires_at': binding_data['expires_at']
+        }
+
+
+def get_binding_request_by_code(binding_code: str) -> Optional[Dict[str, Any]]:
+    """Get binding request by code."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_binding_requests WHERE binding_code = ?', (binding_code,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def get_binding_request_by_agent(agent_id: str) -> Optional[Dict[str, Any]]:
+    """Get the latest pending binding request for an agent."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM agent_binding_requests
+            WHERE agent_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (agent_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount: float) -> Optional[Dict[str, Any]]:
+    """Complete a binding request.
+
+    This is called when the owner confirms binding and stakes tokens.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        # Get the binding request
+        cursor.execute('''
+            SELECT * FROM agent_binding_requests
+            WHERE binding_code = ? AND status = 'pending'
+        ''', (binding_code,))
+        binding = cursor.fetchone()
+
+        if not binding:
+            return None
+
+        binding_dict = dict(binding)
+
+        # Check if expired
+        if binding_dict['expires_at'] < now:
+            cursor.execute('''
+                UPDATE agent_binding_requests SET status = 'expired' WHERE binding_code = ?
+            ''', (binding_code,))
+            return None
+
+        # Update binding request
+        cursor.execute('''
+            UPDATE agent_binding_requests
+            SET status = 'completed', owner_wallet = ?, stake_amount = ?, completed_at = ?
+            WHERE binding_code = ?
+        ''', (owner_wallet, stake_amount, now, binding_code))
+
+        # Update agent
+        cursor.execute('''
+            UPDATE agents
+            SET owner_wallet = ?, binding_status = 'bound', bound_at = ?, updated_at = ?
+            WHERE agent_id = ?
+        ''', (owner_wallet, now, now, binding_dict['agent_id']))
+
+        # Create or update agent wallet
+        cursor.execute('''
+            INSERT OR REPLACE INTO agent_wallets
+            (id, agent_id, owner_id, wallet_address, agent_address, staked_amount, stake_status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'active', COALESCE((SELECT created_at FROM agent_wallets WHERE agent_id = ?), ?), ?)
+        ''', (
+            f"wallet-{binding_dict['agent_id']}",
+            binding_dict['agent_id'],
+            owner_wallet,
+            owner_wallet,
+            f"agent-addr-{binding_dict['agent_id']}",
+            stake_amount,
+            binding_dict['agent_id'],
+            now,
+            now
+        ))
+
+        # Upgrade all API keys for this agent to level 1
+        cursor.execute('''
+            UPDATE agent_api_keys SET level = 1 WHERE agent_id = ? AND revoked_at IS NULL
+        ''', (binding_dict['agent_id'],))
+
+        return {
+            'agent_id': binding_dict['agent_id'],
+            'owner_wallet': owner_wallet,
+            'stake_amount': stake_amount,
+            'completed_at': now
+        }
+
+
+def cancel_binding_request(binding_code: str) -> bool:
+    """Cancel a binding request."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            UPDATE agent_binding_requests SET status = 'cancelled' WHERE binding_code = ?
+        ''', (binding_code,))
+        return cursor.rowcount > 0
+
+
+def expire_binding_requests() -> int:
+    """Expire all pending binding requests that have passed their expiration time."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        cursor.execute('''
+            UPDATE agent_binding_requests
+            SET status = 'expired'
+            WHERE status = 'pending' AND expires_at < ?
+        ''', (now,))
+
+        return cursor.rowcount
+
+
+# ==================== Agent Binding Status Operations ====================
+
+def update_agent_binding_status(agent_id: str, status: str, owner_wallet: str = None) -> bool:
+    """Update agent's binding status."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        if status == 'bound' and owner_wallet:
+            cursor.execute('''
+                UPDATE agents
+                SET binding_status = ?, owner_wallet = ?, bound_at = ?, updated_at = ?
+                WHERE agent_id = ?
+            ''', (status, owner_wallet, now, now, agent_id))
+        else:
+            cursor.execute('''
+                UPDATE agents SET binding_status = ?, updated_at = ? WHERE agent_id = ?
+            ''', (status, now, agent_id))
+
+        return cursor.rowcount > 0
+
+
+def get_agent_binding_info(agent_id: str) -> Optional[Dict[str, Any]]:
+    """Get agent's binding information including wallet and stake."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT a.agent_id, a.name, a.binding_status, a.owner_wallet, a.bound_at,
+                   w.staked_amount, w.stake_status
+            FROM agents a
+            LEFT JOIN agent_wallets w ON a.agent_id = w.agent_id
+            WHERE a.agent_id = ?
+        ''', (agent_id,))
+
+        row = cursor.fetchone()
+        return dict(row) if row else None
 
 
 if __name__ == '__main__':

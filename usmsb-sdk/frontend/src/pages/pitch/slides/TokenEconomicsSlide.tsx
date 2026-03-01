@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { SlideContainer, SlideContent, SlideTitle, TokenAllocation, StatCard } from '../components/SlideContainer'
 import { SlideProps } from '../types'
-import { Coins, TrendingUp, Lock, Users } from 'lucide-react'
+import { Coins, TrendingUp, Lock, Users, Flame, Percent } from 'lucide-react'
 
 export function TokenEconomicsSlide({ isActive, direction }: SlideProps) {
   const { t } = useTranslation()
@@ -19,7 +19,7 @@ export function TokenEconomicsSlide({ isActive, direction }: SlideProps) {
     <SlideContainer isActive={isActive} direction={direction}>
       <SlideContent>
         <SlideTitle
-          subtitle={t('pitch.token.subtitle', 'VIBE 代币是生态系统的核心，总量固定，不可增发')}
+          subtitle={t('pitch.token.subtitle', 'VIBE 代币是生态系统的核心，总量固定10亿，不可增发')}
         >
           {t('pitch.token.title', '代币经济')}
         </SlideTitle>
@@ -37,19 +37,19 @@ export function TokenEconomicsSlide({ isActive, direction }: SlideProps) {
               icon={<Coins className="w-6 h-6" />}
             />
             <StatCard
+              value="8%"
+              label={t('pitch.token.initialCirculation', '初始流通')}
+              icon={<Percent className="w-6 h-6" />}
+            />
+            <StatCard
               value="3%"
               label={t('pitch.token.apy', '年化收益')}
               icon={<TrendingUp className="w-6 h-6" />}
             />
             <StatCard
-              value="7天"
-              label={t('pitch.token.unlock', '解锁期')}
-              icon={<Lock className="w-6 h-6" />}
-            />
-            <StatCard
-              value="100"
-              label={t('pitch.token.minStake', '最低质押')}
-              icon={<Users className="w-6 h-6" />}
+              value="0.8%"
+              label={t('pitch.token.txFee', '交易手续费')}
+              icon={<Flame className="w-6 h-6" />}
             />
           </div>
         </div>
@@ -66,6 +66,19 @@ export function TokenEconomicsSlide({ isActive, direction }: SlideProps) {
           <div className="p-4 rounded-xl bg-white/5 border border-white/10">
             <h4 className="font-medium mb-2 text-cyan-400">{t('pitch.token.use3Title', '激励奖励')}</h4>
             <p className="text-slate-400 text-sm">{t('pitch.token.use3Desc', '贡献服务获得 VIBE 奖励')}</p>
+          </div>
+        </div>
+
+        <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-primary-500/10 to-purple-500/10 border border-primary-400/20">
+          <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">{t('pitch.token.deflation', '通缩机制')}:</span>
+              <span className="text-green-400 font-medium">{t('pitch.token.burnRate', '50% 手续费销毁')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">{t('pitch.token.dividend', '分红')}:</span>
+              <span className="text-yellow-400 font-medium">{t('pitch.token.dividendRate', '20% 质押者分红')}</span>
+            </div>
           </div>
         </div>
       </SlideContent>

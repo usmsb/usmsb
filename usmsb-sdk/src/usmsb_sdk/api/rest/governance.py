@@ -245,3 +245,81 @@ async def get_my_votes(user: dict = Depends(get_current_user)):
     # In production, would query a votes table filtered by user
     # For now, return empty list
     return []
+
+
+@router.get("/voting-power")
+async def get_voting_power(authorization: Optional[str] = Header(None)):
+    """
+    Get voting power for the current user.
+
+    Voting power is calculated based on:
+    - Staked VIBE amount
+    - Reputation score
+    - Governance participation history
+    """
+    if not authorization:
+        # Return 0 voting power for unauthenticated users
+        return {
+            "success": True,
+            "voting_power": 0,
+            "stake_weight": 0,
+            "reputation_weight": 0,
+            "participation_weight": 0,
+            "message": "Not authenticated"
+        }
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    access_token = authorization[7:]
+    session = get_session_by_token(access_token)
+
+    if not session:
+        return {
+            "success": True,
+            "voting_power": 0,
+            "stake_weight": 0,
+            "reputation_weight": 0,
+            "participation_weight": 0,
+            "message": "Invalid or expired session"
+        }
+
+    user = get_user_by_address(session['address'])
+    if not user:
+        return {
+            "success": True,
+            "voting_power": 0,
+            "stake_weight": 0,
+            "reputation_weight": 0,
+            "participation_weight": 0,
+            "message": "User not found"
+        }
+
+    # Calculate voting power components
+    stake = user.get('stake', 0) or 0
+    reputation = user.get('reputation', 0.5) or 0.5
+
+    # Weight calculations
+    # Stake: 1 voting power per 10 VIBE staked
+    stake_weight = stake / 10
+
+    # Reputation: 0-100 voting power based on reputation (0.0-1.0)
+    reputation_weight = reputation * 100
+
+    # Participation: Bonus for governance participation
+    # For now, return 0 as we don't have participation history
+    participation_weight = 0
+
+    total_voting_power = stake_weight + reputation_weight + participation_weight
+
+    return {
+        "success": True,
+        "voting_power": round(total_voting_power, 2),
+        "stake_weight": round(stake_weight, 2),
+        "reputation_weight": round(reputation_weight, 2),
+        "participation_weight": round(participation_weight, 2),
+        "breakdown": {
+            "staked_amount": stake,
+            "reputation_score": reputation,
+        }
+    }

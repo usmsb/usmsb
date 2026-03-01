@@ -22,6 +22,7 @@ import DocsPage from './pages/DocsPage'
 import LegalPage from './pages/LegalPage'
 import Chat from './pages/Chat'
 import PitchPage from './pages/pitch'
+import BindingPage from './pages/BindingPage'
 import { useAuthStore } from './stores/authStore'
 import { StakeGuideModal } from './components/StakeGuideModal'
 
@@ -78,6 +79,9 @@ function App() {
 
         {/* Pitch Page - Investor Presentation */}
         <Route path="/pitch" element={<PitchPage />} />
+
+        {/* Agent Binding Page - for owner wallet binding */}
+        <Route path="/binding/:bindingCode" element={<BindingPage />} />
 
         {/* Onboarding - outside Layout */}
         <Route path="/app/onboarding" element={<Onboarding />} />

@@ -27,9 +27,15 @@ describe("VIBDispute", function () {
     disputeContract = await VIBDispute.deploy(
       await vibeToken.getAddress(),
       ethers.ZeroAddress, // stakingContract
-      ethers.ZeroAddress  // governanceContract
+      ethers.ZeroAddress, // governanceContract
+      ethers.ZeroAddress, // vrfCoordinator (测试环境使用零地址)
+      ethers.ZeroAddress, // linkToken
+      "0x0000000000000000000000000000000000000000000000000000000000000000" // vrfKeyHash
     );
     await disputeContract.waitForDeployment();
+
+    // M-11修复: 测试环境启用回退随机性
+    await disputeContract.setAllowFallbackRandomness(true);
 
     // Transfer tokens to test accounts
     await vibeToken.transfer(plaintiff.address, ethers.parseEther("1000"));

@@ -3,6 +3,7 @@ pydantic-settings>=2.0
 python-dotenv>=1.0
 pyyaml>=6.0
 aiohttp>=3.9
+httpx>=0.25
 openai>=1.0
 google-generativeai>=0.3
 langchain>=0.1
@@ -18,13 +19,28 @@ structlog>=24.1
 pytest>=7.0
 pytest-asyncio>=0.21
 pytest-cov>=4.0
+pytest-mock>=3.12
+pytest-timeout>=2.2
 black>=23.0
 isort>=5.0
 mypy>=1.0
 ruff>=0.1
+httpx>=0.25
+faker>=22.0
+freezegun>=1.4
 
 [graph-db]
 neo4j>=5.15
+
+[test]
+pytest>=7.0
+pytest-asyncio>=0.21
+pytest-cov>=4.0
+pytest-mock>=3.12
+pytest-timeout>=2.2
+httpx>=0.25
+faker>=22.0
+freezegun>=1.4
 
 [vector-db]
 pinecone-client>=2.2

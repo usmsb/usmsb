@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
+import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -184,9 +185,8 @@ export default function RegisterAgent() {
           break
       }
 
-      const response = await fetch(endpoint, {
+      const response = await authFetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
 

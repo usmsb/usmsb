@@ -14,6 +14,17 @@ from .skill_system import (
     CodeExecutionSkill,
 )
 
+from .npm_skill import (
+    NpxCommandSkill,
+    DynamicNpmSkill,
+    npx_command_skill,
+)
+
+from .git_skill import (
+    GitCommandSkill,
+    git_command_skill,
+)
+
 __all__ = [
     "Skill",
     "SkillCategory",
@@ -26,4 +37,9 @@ __all__ = [
     "DataTransformationSkill",
     "WebSearchSkill",
     "CodeExecutionSkill",
+    "NpxCommandSkill",
+    "DynamicNpmSkill",
+    "npx_command_skill",
+    "GitCommandSkill",
+    "git_command_skill",
 ]

@@ -102,7 +102,7 @@ contract VIBTimelock is Ownable, ReentrancyGuard {
 
     /// @notice 检查是否是管理员
     modifier onlyAdmin() {
-        require(admin[msg.sender] || msg.sender == owner(), "VIBTimelock: not admin");
+        require(admin[msg.sender], "VIBTimelock: not admin");
         _;
     }
 
@@ -120,7 +120,7 @@ contract VIBTimelock is Ownable, ReentrancyGuard {
         operationDelays[OperationType.SET_ECOSYSTEM_RATIO] = 30 days;
         operationDelays[OperationType.SET_PROTOCOL_RATIO] = 30 days;
         operationDelays[OperationType.UPGRADE_CONTRACT] = 60 days;
-        operationDelays[OperationType.EMERGENCY_WITHDRAW] = 0; // 紧急操作无延迟
+        operationDelays[OperationType.EMERGENCY_WITHDRAW] = 1 days; // 安全修复: 紧急操作也需24小时延迟
 
         // 部署者默认为管理员
         admin[msg.sender] = true;

@@ -7,6 +7,11 @@ API routes for gene capsule management including:
 - Pattern gene management
 - LLM desensitization
 - Experience matching and discovery
+
+Authentication:
+- Mutation endpoints (POST/PATCH/DELETE): Require X-API-Key + X-Agent-ID headers
+- Read endpoints (GET): Public for discovery purposes
+- Agent-specific operations: Require ownership verification
 """
 
 import json
@@ -14,7 +19,12 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
+
+from usmsb_sdk.api.rest.unified_auth import (
+    get_current_user_unified,
+    verify_agent_access,
+)
 
 from usmsb_sdk.api.rest.schemas.gene_capsule import (
     AddExperienceRequest,
@@ -88,12 +98,23 @@ async def get_gene_capsule(agent_id: str):
 
 
 @router.post("/experiences", response_model=ExperienceGeneResponse)
-async def add_experience(request: AddExperienceRequest):
+async def add_experience(
+    request: AddExperienceRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Add a new experience gene to an agent's capsule.
 
     Optionally auto-desensitizes sensitive information using LLM.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in request must match authenticated agent
     """
+    # Verify ownership: can only add experiences to own capsule
+    verify_agent_access(user, request.agent_id)
+
     if not _gene_capsule_service:
         raise HTTPException(status_code=503, detail="Gene capsule service not available")
 
@@ -119,6 +140,7 @@ async def add_experience(request: AddExperienceRequest):
 async def update_experience_visibility(
     experience_id: str,
     request: UpdateVisibilityRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Update the visibility level of an experience gene.
@@ -128,7 +150,15 @@ async def update_experience_visibility(
     - semi_public: Visible to verified agents only
     - private: Only visible in negotiations with permission
     - hidden: Not visible externally
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in request must match authenticated agent
     """
+    # Verify ownership: can only update own experiences
+    verify_agent_access(user, request.agent_id)
+
     if not _gene_capsule_service:
         raise HTTPException(status_code=503, detail="Gene capsule service not available")
 
@@ -151,7 +181,10 @@ async def update_experience_visibility(
 
 
 @router.post("/desensitize", response_model=DesensitizeTextResponse)
-async def desensitize_text(request: DesensitizeTextRequest):
+async def desensitize_text(
+    request: DesensitizeTextRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Desensitize text using LLM-based recursive processing.
 
@@ -165,6 +198,10 @@ async def desensitize_text(request: DesensitizeTextRequest):
     - Other sensitive patterns
 
     Multiple rounds ensure thorough desensitization.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     if not _desensitization_service:
         raise HTTPException(status_code=503, detail="Desensitization service not available")
@@ -191,7 +228,10 @@ async def desensitize_text(request: DesensitizeTextRequest):
 # ==================== Matching & Discovery ====================
 
 @router.post("/match", response_model=List[MatchingExperienceResponse])
-async def find_matching_experiences(request: FindMatchingExperiencesRequest):
+async def find_matching_experiences(
+    request: FindMatchingExperiencesRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Find experiences from an agent's capsule that match a given task.
 
@@ -199,7 +239,15 @@ async def find_matching_experiences(request: FindMatchingExperiencesRequest):
     - Relevance scores
     - Matching skills and techniques
     - Reasoning for the match
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in request must match authenticated agent
     """
+    # Verify ownership: can only search own experiences
+    verify_agent_access(user, request.agent_id)
+
     if not _matching_service:
         raise HTTPException(status_code=503, detail="Matching service not available")
 
@@ -228,12 +276,23 @@ async def find_matching_experiences(request: FindMatchingExperiencesRequest):
 
 
 @router.post("/skill-recommendations", response_model=Dict[str, Any])
-async def get_skill_recommendations(request: SkillRecommendationsRequest):
+async def get_skill_recommendations(
+    request: SkillRecommendationsRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Get skill recommendations based on an agent's gene capsule analysis.
 
     Analyzes past experiences to suggest skills that would be useful for the task.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in request must match authenticated agent
     """
+    # Verify ownership: can only get recommendations for own capsule
+    verify_agent_access(user, request.agent_id)
+
     if not _gene_capsule_service:
         raise HTTPException(status_code=503, detail="Gene capsule service not available")
 
@@ -250,7 +309,10 @@ async def get_skill_recommendations(request: SkillRecommendationsRequest):
 
 
 @router.post("/search-agents", response_model=List[AgentExperienceSearchResult])
-async def search_agents_by_experience(request: SearchAgentsByExperienceRequest):
+async def search_agents_by_experience(
+    request: SearchAgentsByExperienceRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Search for agents with relevant experience genes.
 
@@ -262,6 +324,10 @@ async def search_agents_by_experience(request: SearchAgentsByExperienceRequest):
     - Skill proficiency levels
     - Experience verification status
     - Past success rates
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
     """
     if not _matching_service:
         raise HTTPException(status_code=503, detail="Matching service not available")
@@ -302,12 +368,23 @@ async def search_agents_by_experience(request: SearchAgentsByExperienceRequest):
 # ==================== Showcase & Export ====================
 
 @router.post("/showcase", response_model=ShowcaseResponse)
-async def export_showcase(request: ExportShowcaseRequest):
+async def export_showcase(
+    request: ExportShowcaseRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Export a showcase of experiences for negotiation or portfolio display.
 
     Selects and formats the best experiences to present to potential clients.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in request must match authenticated agent
     """
+    # Verify ownership: can only export own showcase
+    verify_agent_access(user, request.agent_id)
+
     if not _gene_capsule_service:
         raise HTTPException(status_code=503, detail="Gene capsule service not available")
 
@@ -335,7 +412,11 @@ async def export_showcase(request: ExportShowcaseRequest):
 # ==================== Verification ====================
 
 @router.post("/experiences/{experience_id}/verify")
-async def request_verification(experience_id: str, request: RequestVerificationRequest):
+async def request_verification(
+    experience_id: str,
+    request: RequestVerificationRequest,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Request platform verification for an experience.
 
@@ -344,7 +425,15 @@ async def request_verification(experience_id: str, request: RequestVerificationR
     - Execution traces
     - Client feedback authenticity
     - Timestamp consistency
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in request must match authenticated agent
     """
+    # Verify ownership: can only request verification for own experiences
+    verify_agent_access(user, request.agent_id)
+
     if not _verification_service:
         raise HTTPException(status_code=503, detail="Verification service not available")
 
@@ -453,12 +542,23 @@ async def get_pattern_library(agent_id: str):
 # ==================== Sync ====================
 
 @router.post("/{agent_id}/sync")
-async def sync_capsule_version(agent_id: str):
+async def sync_capsule_version(
+    agent_id: str,
+    user: Dict[str, Any] = Depends(get_current_user_unified)
+):
     """
     Sync local capsule with platform version.
 
     Returns the latest capsule data and version information.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+        - Agent ID in path must match authenticated agent
     """
+    # Verify ownership: can only sync own capsule
+    verify_agent_access(user, agent_id)
+
     if not _gene_capsule_service:
         raise HTTPException(status_code=503, detail="Gene capsule service not available")
 
