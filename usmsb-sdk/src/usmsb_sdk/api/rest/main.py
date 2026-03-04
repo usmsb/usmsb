@@ -83,6 +83,7 @@ from usmsb_sdk.api.rest.routers import (
     reputation_router,
     wallet_router,
     heartbeat_router,
+    blockchain_router,
 )
 
 # Import Meta Agent router
@@ -226,25 +227,11 @@ async def lifespan(app: FastAPI):
     set_prediction_service(prediction_service)
     set_workflow_service(workflow_service)
     set_matching_engine(matching_engine)
-    set_global_references(
-        source_manager=source_manager,
-        prediction_service=prediction_service,
-        workflow_service=workflow_service,
-    )
 
-    # Initialize Meta Agent
-    from usmsb_sdk.platform.external.meta_agent.agent import MetaAgent
-    from usmsb_sdk.platform.external.meta_agent.meta_agent_config import MetaAgentConfig
+    # Initialize Permission Manager first
     from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
     from usmsb_sdk.api.rest.meta_agent import set_meta_agent, set_permission_manager
 
-    meta_agent = MetaAgent(MetaAgentConfig.from_env())
-    await meta_agent._init_components()
-    await meta_agent._register_default_tools()
-    set_meta_agent(meta_agent)
-    logger.info("Meta Agent initialized")
-
-    # Initialize Permission Manager
     try:
         permission_manager = PermissionManager("meta_agent.db")
         await permission_manager.init()
@@ -256,6 +243,33 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize Permission Manager: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         set_permission_manager(None)
+        permission_manager = None
+
+    # Initialize Meta Agent (pass permission_manager if available)
+    from usmsb_sdk.platform.external.meta_agent.agent import MetaAgent
+    from usmsb_sdk.platform.external.meta_agent.meta_agent_config import MetaAgentConfig
+
+    meta_agent = MetaAgent(MetaAgentConfig.from_env())
+
+    # If permission_manager is available, set it in the Meta Agent
+    if permission_manager:
+        meta_agent.permission_manager = permission_manager
+
+    await meta_agent._init_components()
+    await meta_agent._register_default_tools()
+
+    # Set the global meta_agent reference
+    set_meta_agent(meta_agent)
+    set_permission_manager(permission_manager)
+    logger.info("Meta Agent initialized with shared Permission Manager")
+
+    # Now set global references including meta_agent
+    set_global_references(
+        source_manager=source_manager,
+        prediction_service=prediction_service,
+        workflow_service=workflow_service,
+        meta_agent=meta_agent,
+    )
 
     # Initialize MetaAgentService for precise matching
     from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import MetaAgentService
@@ -324,14 +338,17 @@ app.add_middleware(
 
 # Add Request Tracing Middleware
 from usmsb_sdk.api.rest.request_tracing import RequestTracingMiddleware
+
 app.add_middleware(RequestTracingMiddleware)
 
 # Add Rate Limiting Middleware
 from usmsb_sdk.api.rest.rate_limiter import RateLimitMiddleware
+
 app.add_middleware(RateLimitMiddleware)
 
 # Import error handler
 from usmsb_sdk.api.rest.error_handler import APIError, api_error_handler
+
 app.add_exception_handler(APIError, api_error_handler)
 
 # Include existing routers
@@ -364,6 +381,7 @@ app.include_router(staking_router, prefix="/api")
 app.include_router(reputation_router, prefix="/api")
 app.include_router(wallet_router, prefix="/api")
 app.include_router(heartbeat_router, prefix="/api")
+app.include_router(blockchain_router, prefix="/api")
 
 
 # WebSocket endpoint

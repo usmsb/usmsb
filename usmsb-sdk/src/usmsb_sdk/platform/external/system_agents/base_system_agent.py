@@ -30,12 +30,13 @@ from usmsb_sdk.agent_sdk.communication import Message, MessageType, Session
 
 class SystemAgentPermission(Enum):
     """System agent permission levels"""
-    READ_ONLY = "read_only"           # Read system data only
-    MONITOR = "monitor"               # Monitoring and alerting
-    CONFIGURE = "configure"           # Configuration changes
-    CONTROL = "control"               # Start/stop/restart agents
-    ADMIN = "admin"                   # Full administrative access
-    SUPERUSER = "superuser"           # Unlimited access (platform internal)
+
+    READ_ONLY = "read_only"  # Read system data only
+    MONITOR = "monitor"  # Monitoring and alerting
+    CONFIGURE = "configure"  # Configuration changes
+    CONTROL = "control"  # Start/stop/restart agents
+    ADMIN = "admin"  # Full administrative access
+    SUPERUSER = "superuser"  # Unlimited access (platform internal)
 
 
 class SystemAgentConfig:
@@ -176,6 +177,7 @@ class BaseSystemAgent(BaseAgent):
         system_capability = CapabilityDefinition(
             name="system_access",
             description="Access to system-level resources",
+            category="system",
             version="1.0.0",
         )
         self.add_capability(system_capability)
@@ -297,8 +299,9 @@ class BaseSystemAgent(BaseAgent):
             # Track resource access
             if "resource" in details:
                 resource = details["resource"]
-                self._system_metrics["resource_access_count"][resource] = \
+                self._system_metrics["resource_access_count"][resource] = (
                     self._system_metrics["resource_access_count"].get(resource, 0) + 1
+                )
 
         self.logger.debug(f"Audited operation: {operation}")
 
@@ -379,9 +382,7 @@ class BaseSystemAgent(BaseAgent):
 
     @abstractmethod
     async def handle_message(
-        self,
-        message: Message,
-        session: Optional[Session] = None
+        self, message: Message, session: Optional[Session] = None
     ) -> Optional[Message]:
         """
         Handle incoming messages.
@@ -426,11 +427,13 @@ class BaseSystemAgent(BaseAgent):
     def to_dict(self) -> Dict[str, Any]:
         """Convert system agent info to dictionary"""
         base_dict = super().to_dict()
-        base_dict.update({
-            "system_agent_type": self.SYSTEM_AGENT_TYPE,
-            "system_config": self._system_config.to_dict(),
-            "system_metrics": self.system_metrics,
-        })
+        base_dict.update(
+            {
+                "system_agent_type": self.SYSTEM_AGENT_TYPE,
+                "system_config": self._system_config.to_dict(),
+                "system_metrics": self.system_metrics,
+            }
+        )
         return base_dict
 
     def __repr__(self) -> str:

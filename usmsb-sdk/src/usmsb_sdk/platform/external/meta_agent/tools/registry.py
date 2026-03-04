@@ -65,17 +65,20 @@ class Tool:
         """转换为 Function Calling 的 JSON Schema 格式
 
         Args:
-            provider: LLM提供商 (anthropic/openai/ollama)
+            provider: LLM提供商 (anthropic/openai/ollama/minimax)
         """
-        if provider == "anthropic":
-            # Anthropic Claude 格式 - 使用 parameters 而非 input_schema
+        if provider in ("anthropic", "minimax"):
+            # Anthropic/MiniMax 兼容格式 - 使用 type: function
             return {
-                "name": self.name,
-                "description": self.description,
-                "input_schema": {
-                    "type": "object",
-                    "properties": self._get_parameters(),
-                    "required": self._get_required_parameters(),
+                "type": "function",
+                "function": {
+                    "name": self.name,
+                    "description": self.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": self._get_parameters(),
+                        "required": self._get_required_parameters(),
+                    },
                 },
             }
         else:
@@ -152,7 +155,13 @@ class Tool:
                 "destination": {"type": "string", "description": "目标文件路径"},
             },
         }
-        return params_map.get(self.name, {})
+
+        # If tool has no defined parameters, return a default empty object parameter
+        # This is required by MiniMax API
+        params = params_map.get(self.name, {})
+        if not params:
+            params = {"input": {"type": "string", "description": f"{self.name}的输入参数"}}
+        return params
 
     def _get_required_parameters(self) -> List[str]:
         """获取必需的参数列表"""

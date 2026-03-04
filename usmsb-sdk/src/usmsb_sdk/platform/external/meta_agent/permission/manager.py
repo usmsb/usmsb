@@ -225,6 +225,20 @@ class PermissionManager:
         logger.info(f"Updated role for {wallet_address}: {old_role.value} -> {new_role.value}")
         return user
 
+    def invalidate_cache(self, wallet_address: Optional[str] = None):
+        """清除用户缓存
+
+        Args:
+            wallet_address: 要清除缓存的用户钱包地址。如果为 None，则清除所有缓存。
+        """
+        if wallet_address:
+            if wallet_address in self._user_cache:
+                del self._user_cache[wallet_address]
+                logger.info(f"Cleared cache for user: {wallet_address}")
+        else:
+            self._user_cache.clear()
+            logger.info("Cleared all user cache")
+
     async def update_stake(
         self, wallet_address: str, stake_amount: float
     ) -> Optional[UserPermission]:

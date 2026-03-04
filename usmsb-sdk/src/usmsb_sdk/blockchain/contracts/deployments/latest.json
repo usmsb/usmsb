@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "network": "testnet",
+  "chain_id": 84532,
+  "network_name": "Base Sepolia",
+  "deployed_at": "2026-03-03T00:00:00Z",
+  "contracts": {
+    "VIBEToken": {
+      "address": "0x91d8C3084b4fd21A04fA3584BFE357F378938dbc",
+      "type": "ERC20",
+      "description": "VIBE平台代币",
+      "category": "core"
+    },
+    "VIBStaking": {
+      "address": "0xc3fbD1736a95f403A0569FcA8C84d7B85e2b4E53",
+      "type": "Staking",
+      "description": "VIBE质押合约",
+      "category": "staking"
+    },
+    "AgentRegistry": {
+      "address": "0x54bEbDc40cc8B60b0922D8FA6463ab710B14dC69",
+      "type": "Registry",
+      "description": "Agent注册合约",
+      "category": "registry"
+    },
+    "VIBIdentity": {
+      "address": "0x6b72711045b3a384E26eD9039CFF4cA12b856952",
+      "type": "Identity",
+      "description": "VIBE身份合约",
+      "category": "identity"
+    },
+    "VIBCollaboration": {
+      "address": "0x7E61b51c49438696195142D06f46c12d90909059",
+      "type": "Collaboration",
+      "description": "VIBE协作合约",
+      "category": "collaboration"
+    },
+    "JointOrder": {
+      "address": "0xc63d9DEb845138A2C5CFF41A4Cb519ccbDf00F3a",
+      "type": "JointOrder",
+      "description": "联合订单合约",
+      "category": "trading"
+    },
+    "VIBDividend": {
+      "address": "0x324571F84C092a958eB46b3478742C58a7beaE7B",
+      "type": "Dividend",
+      "description": "VIBE分红合约",
+      "category": "dividend"
+    },
+    "VIBGovernance": {
+      "address": "0xD866536154154a378544E9dc295D510a0fe29236",
+      "type": "Governance",
+      "description": "VIBE治理合约",
+      "category": "governance"
+    },
+    "ZKCredential": {
+      "address": "0x4B8465Fe80Ec91876da78DB775a551dDdBBdB04a",
+      "type": "ZKCredential",
+      "description": "零知识凭证合约",
+      "category": "zk"
+    }
+  },
+  "metadata": {
+    "documentation": "docs/BLOCKCHAIN_INTEGRATION.md",
+    "verification": {
+      "verified": true,
+      "explorer": "https://sepolia.basescan.org"
+    }
+  }
+}

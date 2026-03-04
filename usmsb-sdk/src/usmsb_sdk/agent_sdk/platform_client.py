@@ -629,21 +629,21 @@ class PlatformClient:
         if not self.agent_id:
             return APIResponse(success=False, error="Agent not registered")
 
-        return await self._request("GET", f"/learning/insights/{self.agent_id}")
+        return await self._request("GET", "/learning/insights")
 
     async def get_optimized_strategy(self) -> APIResponse:
         """Get optimized matching strategy"""
         if not self.agent_id:
             return APIResponse(success=False, error="Agent not registered")
 
-        return await self._request("GET", f"/learning/strategy/{self.agent_id}")
+        return await self._request("GET", "/learning/strategy")
 
     async def get_market_insights(self) -> APIResponse:
         """Get market insights"""
         if not self.agent_id:
             return APIResponse(success=False, error="Agent not registered")
 
-        return await self._request("GET", f"/learning/market/{self.agent_id}")
+        return await self._request("GET", "/learning/market")
 
     # ==================== Staking ====================
 

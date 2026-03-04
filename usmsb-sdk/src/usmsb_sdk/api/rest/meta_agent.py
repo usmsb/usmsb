@@ -152,6 +152,50 @@ async def get_tools():
         return []
 
 
+@router.get("/debug/tools-for-wallet/{wallet_address}")
+async def debug_tools_for_wallet(wallet_address: str):
+    """Debug endpoint to check available tools for a wallet."""
+    if _permission_manager is None:
+        return {"error": "Permission manager not initialized"}
+
+    if _meta_agent is None:
+        return {"error": "Meta agent not initialized"}
+
+    try:
+        # Get user
+        user = await _permission_manager.get_user(wallet_address)
+        if not user:
+            return {"error": "User not found"}
+
+        # Get all tools
+        all_tools = _meta_agent.tool_registry.list_tools()
+
+        # Filter tools by permission
+        from usmsb_sdk.platform.external.meta_agent.permission.models import (
+            get_tool_required_permissions,
+        )
+
+        allowed_tools = []
+        for tool in all_tools:
+            tool_name = tool["name"]
+            required_perms = get_tool_required_permissions(tool_name)
+            has_all_perms = all(user.has_permission(perm) for perm in required_perms)
+            if has_all_perms:
+                allowed_tools.append(tool_name)
+
+        return {
+            "wallet_address": wallet_address,
+            "role": user.role.value,
+            "permissions": [p.value for p in user.permissions],
+            "total_tools": len(all_tools),
+            "allowed_tools": allowed_tools,
+            "allowed_count": len(allowed_tools),
+        }
+    except Exception as e:
+        logger.error(f"Debug tools error: {e}")
+        return {"error": str(e)}
+
+
 @router.get("/history/{wallet_address}", response_model=List[HistoryMessage])
 async def get_history(wallet_address: str, limit: int = 50):
     """Get conversation history for a wallet address."""
@@ -166,6 +210,20 @@ async def get_history(wallet_address: str, limit: int = 50):
         return [HistoryMessage(**msg) for msg in history]
     except Exception as e:
         logger.error(f"Get history error: {e}")
+        return []
+
+
+@router.get("/debug-logs/{wallet_address}")
+async def get_debug_logs(wallet_address: str, after_timestamp: float = 0):
+    """Get debug logs for a wallet address (for real-time monitoring)."""
+    if _meta_agent is None:
+        return []
+
+    try:
+        logs = _meta_agent.get_debug_logs(wallet_address, after_timestamp)
+        return logs
+    except Exception as e:
+        logger.error(f"Get debug logs error: {e}")
         return []
 
 
@@ -238,12 +296,19 @@ async def update_user_role(request: UpdateRoleRequest):
         from usmsb_sdk.platform.external.meta_agent.permission.models import UserRole
 
         new_role = UserRole(request.new_role)
+
+        # 先清除缓存，确保获取最新权限
+        _permission_manager.invalidate_cache(request.wallet_address)
+
         user = await _permission_manager.update_role(
             wallet_address=request.wallet_address,
             new_role=new_role,
             reason=request.reason,
         )
         if user:
+            # 再次清除缓存，确保Meta Agent获取最新权限
+            _permission_manager.invalidate_cache(request.wallet_address)
+
             return UserInfo(
                 wallet_address=user.wallet_address,
                 role=user.role.value,

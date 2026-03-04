@@ -185,27 +185,6 @@ contract VIBGovernance is
     event ExecutionTargetUpdated(address indexed target, bool isAllowed);
     event KYCUpdated(address indexed user, bool isVerified);
 
-    // ========== 接口 ==========
-
-    interface IVIBStaking {
-        function getVotingPower(address user) external view returns (uint256);
-        function totalStaked() external view returns (uint256);
-    }
-
-    interface IDelegation {
-        function delegates(address) external view returns (address);
-        function delegatedVotes(address) external view returns (uint256);
-        function getDelegationInfo(address) external view returns (address, uint256, uint256, uint256);
-        function autoCheckDelegationExpiry(address) external;
-        function votingPowerLastUpdateBlock(address) external view returns (uint256);
-        function votingPowerAcquireTime(address) external view returns (uint256);
-    }
-
-    interface IContributionPoints {
-        function getEffectiveContributionPoints(address) external view returns (uint256);
-        function totalContributionPoints() external view returns (uint256);
-    }
-
     // ========== 修饰符 ==========
 
     modifier proposalExists(uint256 proposalId) {

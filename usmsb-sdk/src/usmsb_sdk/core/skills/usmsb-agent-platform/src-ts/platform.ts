@@ -69,6 +69,16 @@ class PlatformClient {
     return this.handleResponse(response);
   }
 
+  async patch(path: string, body: Record<string, any> = {}): Promise<any> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "PATCH",
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    return this.handleResponse(response);
+  }
+
   private getHeaders(): Record<string, string> {
     return {
       "X-API-Key": this.apiKey,
@@ -238,43 +248,139 @@ export class AgentPlatform {
   }
 
   private async executeCollaboration(client: PlatformClient, action: string, params: any): Promise<any> {
-    const path = `/api/collaboration/${action}`;
-    if (action === "list") {
-      return client.get(path, params);
+    switch (action) {
+      case "create":
+        return client.post("/api/collaborations", {
+          goal_description: params.goal || params.goal_description || "",
+          ...params
+        });
+      case "join":
+        return client.post(`/api/collaborations/${params.collab_id || params.session_id}/join`, params);
+      case "contribute":
+        return client.post(`/api/collaborations/${params.collab_id || params.session_id}/contribute`, {
+          contribution: { content: params.content || params.contribution },
+          ...params
+        });
+      case "list":
+        return client.get("/api/collaborations", params);
+      default:
+        return client.post(`/api/collaborations`, params);
     }
-    return client.post(path, params);
   }
 
   private async executeMarketplace(client: PlatformClient, action: string, params: any): Promise<any> {
-    const path = `/api/marketplace/${action}`;
-    if (["find_work", "find_workers"].includes(action)) {
-      return client.get(path, params);
+    switch (action) {
+      case "publish_service":
+        // POST /api/agents/{agentId}/services
+        return client.post(`/api/agents/${this.agentId}/services`, {
+          name: params.name,
+          price: params.price,
+          description: params.description,
+          skills: params.skills || []
+        });
+      case "find_work":
+        // POST /api/matching/search-demands
+        return client.post("/api/matching/search-demands", {
+          skill_filter: params.skill || params.skill_filter
+        });
+      case "find_workers":
+        // POST /api/matching/search-suppliers
+        return client.post("/api/matching/search-suppliers", {
+          skills: params.skills
+        });
+      case "publish_demand":
+        // POST /api/demands
+        return client.post("/api/demands", {
+          title: params.title,
+          budget: params.budget,
+          description: params.description
+        });
+      case "hire":
+        // Not implemented in backend yet
+        return client.post("/api/marketplace/hire", params);
+      default:
+        return client.post(`/api/marketplace/${action}`, params);
     }
-    return client.post(path, params);
   }
 
   private async executeDiscovery(client: PlatformClient, action: string, params: any): Promise<any> {
-    const path = `/api/discovery/${action}`;
-    if (action === "recommend") {
-      return client.post(path, params);
+    switch (action) {
+      case "by_capability":
+        // POST /api/network/explore
+        return client.post("/api/network/explore", {
+          capability: params.capability
+        });
+      case "by_skill":
+        // POST /api/network/explore
+        return client.post("/api/network/explore", {
+          skills: params.skills
+        });
+      case "recommend":
+        // POST /api/network/recommendations
+        return client.post("/api/network/recommendations", {
+          goal: params.goal
+        });
+      default:
+        return client.post("/api/network/explore", params);
     }
-    return client.get(path, params);
   }
 
   private async executeNegotiation(client: PlatformClient, action: string, params: any): Promise<any> {
-    return client.post(`/api/negotiation/${action}`, params);
+    switch (action) {
+      case "initiate":
+        // POST /api/matching/negotiate
+        return client.post("/api/matching/negotiate", {
+          target_agent_id: params.target_id || params.target_agent_id,
+          terms: params.terms
+        });
+      case "accept":
+        // POST /api/matching/negotiations/{id}/accept
+        return client.post(`/api/matching/negotiations/${params.negotiation_id || params.id}/accept`, params);
+      case "reject":
+        // POST /api/matching/negotiations/{id}/reject
+        return client.post(`/api/matching/negotiations/${params.negotiation_id || params.id}/reject`, params);
+      case "propose":
+        // POST /api/matching/negotiations/{id}/proposal
+        return client.post(`/api/matching/negotiations/${params.negotiation_id || params.id}/proposal`, {
+          new_terms: params.new_terms || params.terms
+        });
+      default:
+        return client.post(`/api/matching/negotiate`, params);
+    }
   }
 
   private async executeWorkflow(client: PlatformClient, action: string, params: any): Promise<any> {
-    const path = `/api/workflow/${action}`;
-    if (action === "list") {
-      return client.get(path, params);
+    switch (action) {
+      case "create":
+        // POST /api/workflows
+        return client.post("/api/workflows", {
+          name: params.name,
+          steps: params.steps
+        });
+      case "execute":
+        // POST /api/workflows/{id}/execute
+        return client.post(`/api/workflows/${params.workflow_id || params.id}/execute`, {
+          inputs: params.inputs
+        });
+      case "list":
+        // GET /api/workflows
+        return client.get("/api/workflows", params);
+      default:
+        return client.post("/api/workflows", params);
     }
-    return client.post(path, params);
   }
 
   private async executeLearning(client: PlatformClient, action: string, params: any): Promise<any> {
-    return client.get(`/api/learning/${action}`, params);
+    switch (action) {
+      case "analyze":
+        // POST /api/learning/analyze (not GET)
+        return client.post("/api/learning/analyze", params);
+      case "insights":
+        // GET /api/learning/insights
+        return client.get("/api/learning/insights", params);
+      default:
+        return client.get(`/api/learning/${action}`, params);
+    }
   }
 
   /**

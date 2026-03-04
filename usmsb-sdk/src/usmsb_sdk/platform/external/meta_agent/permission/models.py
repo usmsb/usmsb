@@ -78,6 +78,15 @@ class PermissionType(str, Enum):
     GIT_FORCE = "git:force"  # git push --force (强制推送)
     GIT_DANGER = "git:danger"  # 危险 git 操作
 
+    # 用户环境隔离权限 (基于 workspace/sandbox/browser 隔离机制)
+    WORKSPACE = "workspace"  # 用户工作目录操作 (读写文件等)
+    SANDBOX = "sandbox"  # 代码执行沙箱
+    BROWSER = "browser"  # 浏览器操作
+    NETWORK = "network"  # 网络访问
+
+    # Agent 服务
+    AGENT_SERVICE = "agent:service"  # Agent 推荐、匹配等服务
+
 
 @dataclass
 class Permission:
@@ -173,6 +182,7 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.AGENT_REGISTER,
         PermissionType.AGENT_UNREGISTER,
         PermissionType.AGENT_MANAGE,
+        PermissionType.AGENT_SERVICE,
         PermissionType.WALLET_CREATE,
         PermissionType.WALLET_BIND,
         PermissionType.STAKE,
@@ -186,6 +196,11 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.SYSTEM_HEALTH,
         PermissionType.SYSTEM_METRICS,
         PermissionType.SYSTEM_LOGS,
+        # 环境隔离权限
+        PermissionType.WORKSPACE,
+        PermissionType.SANDBOX,
+        PermissionType.BROWSER,
+        PermissionType.NETWORK,
         # NPM/NPX 全权限
         PermissionType.NPM_PUBLIC,
         PermissionType.NPM_INSTALL,
@@ -206,6 +221,7 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.NODE_MONITOR,
         PermissionType.AGENT_REGISTER,
         PermissionType.AGENT_MANAGE,
+        PermissionType.AGENT_SERVICE,
         PermissionType.WALLET_BIND,
         PermissionType.DATA_QUERY,
         PermissionType.DATA_WRITE,
@@ -213,6 +229,11 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.SYSTEM_HEALTH,
         PermissionType.SYSTEM_METRICS,
         PermissionType.SYSTEM_LOGS,
+        # 环境隔离权限
+        PermissionType.WORKSPACE,
+        PermissionType.SANDBOX,
+        PermissionType.BROWSER,
+        PermissionType.NETWORK,
         # NPM/NPX 权限
         PermissionType.NPM_PUBLIC,
         PermissionType.NPM_INSTALL,
@@ -234,9 +255,14 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.STAKE,
         PermissionType.VOTE,
         PermissionType.DATA_QUERY,
+        PermissionType.DATA_WRITE,
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
         PermissionType.SYSTEM_METRICS,
+        PermissionType.SYSTEM_LOGS,
+        # 环境隔离权限
+        PermissionType.WORKSPACE,
+        PermissionType.NETWORK,
         # NPM/NPX 权限
         PermissionType.NPM_PUBLIC,
         PermissionType.NPM_INSTALL,
@@ -248,45 +274,59 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
     ],
     UserRole.NODE_OPERATOR: [
         PermissionType.NODE_MONITOR,
+        PermissionType.NODE_CONFIG,
         PermissionType.WALLET_BIND,
         PermissionType.STAKE,
         PermissionType.VOTE,
         PermissionType.DATA_QUERY,
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
+        PermissionType.SYSTEM_METRICS,
+        PermissionType.SYSTEM_LOGS,
+        # 环境隔离权限
+        PermissionType.WORKSPACE,
+        PermissionType.NETWORK,
         # NPM/NPX 权限
         PermissionType.NPM_PUBLIC,
         PermissionType.NPM_INSTALL,
-        PermissionType.NPM_RUN,
         # Git 权限
         PermissionType.GIT_READ,
-        PermissionType.GIT_WRITE,
     ],
     UserRole.HUMAN: [
-        PermissionType.WALLET_CREATE,
-        PermissionType.WALLET_BIND,
-        PermissionType.STAKE,
-        PermissionType.VOTE,
-        PermissionType.DATA_QUERY,
+        # 基础权限
         PermissionType.CHAT,
+        PermissionType.DATA_QUERY,
         PermissionType.SYSTEM_HEALTH,
-        # NPM/NPX 基础权限
+        # 钱包/区块链 (需要质押后才开放)
+        PermissionType.WALLET_BIND,
+        # 环境隔离权限 (workspace/sandbox/browser 保护)
+        PermissionType.WORKSPACE,      # 文件操作
+        PermissionType.SANDBOX,        # 代码执行
+        PermissionType.BROWSER,         # 浏览器操作
+        PermissionType.NETWORK,        # 网络访问
+        # Agent 服务
+        PermissionType.AGENT_SERVICE,
+        # NPM/Git 基础权限
         PermissionType.NPM_PUBLIC,
         PermissionType.NPM_INSTALL,
         PermissionType.NPM_RUN,
-        # Git 基础权限
         PermissionType.GIT_READ,
-        PermissionType.GIT_WRITE,
-        PermissionType.GIT_CLONE,
     ],
     UserRole.AI_OWNER: [
         PermissionType.AGENT_REGISTER,
+        PermissionType.AGENT_UNREGISTER,
         PermissionType.AGENT_MANAGE,
+        PermissionType.AGENT_SERVICE,
         PermissionType.WALLET_BIND,
         PermissionType.STAKE,
         PermissionType.VOTE,
         PermissionType.DATA_QUERY,
+        PermissionType.DATA_WRITE,
         PermissionType.CHAT,
+        PermissionType.SYSTEM_HEALTH,
+        # 环境隔离权限
+        PermissionType.WORKSPACE,
+        PermissionType.NETWORK,
         # NPM/NPX 权限
         PermissionType.NPM_PUBLIC,
         PermissionType.NPM_INSTALL,
@@ -296,10 +336,18 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
         PermissionType.GIT_WRITE,
     ],
     UserRole.AI_AGENT: [
+        PermissionType.AGENT_REGISTER,
+        PermissionType.AGENT_SERVICE,
         PermissionType.WALLET_BIND,
         PermissionType.DATA_QUERY,
+        PermissionType.DATA_WRITE,
         PermissionType.CHAT,
         PermissionType.SYSTEM_HEALTH,
+        # 环境隔离权限
+        PermissionType.WORKSPACE,
+        PermissionType.SANDBOX,
+        PermissionType.BROWSER,
+        PermissionType.NETWORK,
         # NPM/NPX 基础权限
         PermissionType.NPM_PUBLIC,
         # Git 只读权限
@@ -311,7 +359,7 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
 # ============ 工具权限映射 ============
 
 TOOL_PERMISSIONS: Dict[str, List[PermissionType]] = {
-    # 平台管理
+    # ========== 平台管理 ==========
     "start_node": [PermissionType.NODE_START],
     "stop_node": [PermissionType.NODE_STOP],
     "get_node_status": [PermissionType.NODE_MONITOR],
@@ -320,52 +368,117 @@ TOOL_PERMISSIONS: Dict[str, List[PermissionType]] = {
     "bind_wallet": [PermissionType.WALLET_BIND],
     "register_agent": [PermissionType.AGENT_REGISTER],
     "unregister_agent": [PermissionType.AGENT_UNREGISTER],
-    # 监控
+
+    # ========== 监控/系统 ==========
     "health_check": [PermissionType.SYSTEM_HEALTH],
     "get_metrics": [PermissionType.SYSTEM_METRICS],
     "set_threshold": [PermissionType.NODE_CONFIG],
     "get_alerts": [PermissionType.NODE_MONITOR],
-    # 区块链
+    "get_system_health": [PermissionType.SYSTEM_HEALTH],
+    "get_system_metrics": [PermissionType.SYSTEM_METRICS],
+    "query_logs": [PermissionType.SYSTEM_LOGS],
+
+    # ========== 钱包/区块链 ==========
     "create_wallet": [PermissionType.WALLET_CREATE],
     "get_balance": [PermissionType.WALLET_BIND],
+    "switch_chain": [PermissionType.WALLET_BIND],
+    "get_chain_info": [PermissionType.WALLET_BIND],
     "stake": [PermissionType.STAKE],
     "unstake": [PermissionType.STAKE],
     "vote": [PermissionType.VOTE],
+    "delegate_vote": [PermissionType.VOTE],
+    "get_vote_power": [PermissionType.VOTE],
+    "list_proposals": [PermissionType.VOTE],
     "submit_proposal": [PermissionType.GOVERN],
-    "switch_chain": [PermissionType.WALLET_BIND],
-    "get_chain_info": [PermissionType.WALLET_BIND],
-    # IPFS
+    "get_user_info": [PermissionType.WALLET_BIND],
+
+    # ========== IPFS ==========
     "upload_to_ipfs": [PermissionType.DATA_WRITE],
     "download_from_ipfs": [PermissionType.DATA_QUERY],
     "sync_to_ipfs": [PermissionType.DATA_WRITE],
-    # 数据库
+
+    # ========== 数据库 ==========
     "query_db": [PermissionType.DATA_QUERY],
     "insert_db": [PermissionType.DATA_WRITE],
     "update_db": [PermissionType.DATA_WRITE],
     "delete_db": [PermissionType.DATA_ADMIN],
     "analyze_data": [PermissionType.DATA_QUERY],
     "generate_report": [PermissionType.DATA_QUERY],
-    # 前端
-    "generate_component": [PermissionType.PLATFORM_CONFIG],
-    "manage_page": [PermissionType.PLATFORM_CONFIG],
-    "call_api": [PermissionType.DATA_QUERY],
-    # 治理
-    "get_user_info": [PermissionType.WALLET_BIND],
+
+    # ========== 文件操作 (Workspace隔离) ==========
+    "read_file": [PermissionType.WORKSPACE],
+    "write_file": [PermissionType.WORKSPACE],
+    "list_directory": [PermissionType.WORKSPACE],
+    "create_directory": [PermissionType.WORKSPACE],
+    "copy_file": [PermissionType.WORKSPACE],
+    "move_file": [PermissionType.WORKSPACE],
+    "delete_file": [PermissionType.WORKSPACE],
+    "get_file_info": [PermissionType.WORKSPACE],
+    "search_files": [PermissionType.WORKSPACE],
+
+    # ========== 代码执行 (Sandbox隔离) ==========
+    "execute_python": [PermissionType.SANDBOX],
+    "execute_javascript": [PermissionType.SANDBOX],
+    "execute_command": [PermissionType.SANDBOX],
+    "run_program": [PermissionType.SANDBOX],
+
+    # ========== 浏览器 (Browser隔离) ==========
+    "browser_open": [PermissionType.BROWSER],
+    "browser_click": [PermissionType.BROWSER],
+    "browser_fill": [PermissionType.BROWSER],
+    "browser_get_content": [PermissionType.BROWSER],
+    "browser_screenshot": [PermissionType.BROWSER],
+    "browser_close": [PermissionType.BROWSER],
+
+    # ========== 网络访问 ==========
+    "fetch_url": [PermissionType.NETWORK],
+    "parse_html": [PermissionType.NETWORK],
+    "download_file": [PermissionType.NETWORK],
+    "get_headers": [PermissionType.NETWORK],
+    "search_web": [PermissionType.NETWORK],
+
+    # ========== 技能 ==========
+    "parse_skill_md": [PermissionType.SANDBOX],
+    "execute_skill": [PermissionType.SANDBOX],
+    "list_skills": [PermissionType.SANDBOX],
+
+    # ========== Agent服务 ==========
+    "search_agents": [PermissionType.AGENT_SERVICE],
+    "recommend_agents": [PermissionType.AGENT_SERVICE],
+    "get_recommendation_history": [PermissionType.AGENT_SERVICE],
+    "rate_agent": [PermissionType.AGENT_SERVICE],
+    "get_agent_profile": [PermissionType.AGENT_SERVICE],
+    "get_all_agent_profiles": [PermissionType.AGENT_SERVICE],
+    "recommend_agents_for_demand": [PermissionType.AGENT_SERVICE],
+    "match_by_gene_capsule": [PermissionType.AGENT_SERVICE],
+    "generate_recommendation_explanation": [PermissionType.AGENT_SERVICE],
+    "proactively_notify_opportunity": [PermissionType.AGENT_SERVICE],
+    "scan_opportunities": [PermissionType.AGENT_SERVICE],
+    "auto_match_and_notify": [PermissionType.AGENT_SERVICE],
+    "consult_agent": [PermissionType.AGENT_SERVICE],
+    "route_message": [PermissionType.AGENT_SERVICE],
+    "get_load_balance_status": [PermissionType.AGENT_SERVICE],
+    "get_route_info": [PermissionType.AGENT_SERVICE],
+    "interview_agent": [PermissionType.AGENT_SERVICE],
+    "send_agent_message": [PermissionType.AGENT_SERVICE],
+    "receive_agent_showcase": [PermissionType.AGENT_SERVICE],
+    "retrieve_user_info": [PermissionType.AGENT_SERVICE],
     "list_user_agents": [PermissionType.AGENT_MANAGE],
-    "delegate_vote": [PermissionType.VOTE],
-    "get_vote_power": [PermissionType.VOTE],
-    "list_proposals": [PermissionType.VOTE],
-    # NPM/NPX 开发工具
+
+    # ========== 知识库 ==========
+    "search_knowledge": [PermissionType.DATA_QUERY],
+
+    # ========== 通用 ==========
+    "general_response": [PermissionType.CHAT],
+
+    # ========== NPM/Git (保留原权限) ==========
     "npm_executor": [PermissionType.NPM_INSTALL],
     "npm_public": [PermissionType.NPM_PUBLIC],
     "npm_global": [PermissionType.NPM_GLOBAL],
-    # Git 版本控制工具
     "git_executor": [PermissionType.GIT_READ],
     "git_push": [PermissionType.GIT_PUSH],
     "git_clone": [PermissionType.GIT_CLONE],
     "git_force": [PermissionType.GIT_FORCE],
-    # 通用
-    "general_response": [PermissionType.CHAT],
 }
 
 

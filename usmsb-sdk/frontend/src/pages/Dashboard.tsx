@@ -30,6 +30,7 @@ import { WelcomeGuide } from '@/components/WelcomeGuide'
 import { ListItemSkeleton } from '@/components/ui/EmptyState'
 import { WalletBalanceCard, TransactionList } from '@/components/WalletBalance'
 import { ReputationDisplay } from '@/components/ReputationDisplay'
+import { BlockchainStatusCard, TokenBalanceChecker } from '@/components/BlockchainStatus'
 import { useAppStore } from '@/store'
 import clsx from 'clsx'
 
@@ -386,7 +387,7 @@ export default function Dashboard() {
             <div className="space-y-4">
               {agents?.map((agent, index) => (
                 <div
-                  key={agent.id}
+                  key={agent.id ?? `agent-${index}`}
                   className={clsx(
                     'flex items-center justify-between p-4 rounded-lg transition-all duration-300',
                     'bg-secondary-50',
@@ -536,6 +537,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <WalletBalanceCard />
         <ReputationDisplay showHistory={true} />
+        <BlockchainStatusCard />
+      </div>
+
+      {/* Transactions & Blockchain Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <h3 className={clsx(
             'text-lg font-semibold mb-4',
@@ -544,6 +550,7 @@ export default function Dashboard() {
           )}>{t('dashboard.recentTransactions', 'Recent Transactions')}</h3>
           <TransactionList limit={5} />
         </div>
+        <TokenBalanceChecker />
       </div>
 
       {/* System Status */}
