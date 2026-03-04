@@ -193,9 +193,17 @@ class UserSession:
 
         if self._sandbox is None:
             from ..sandbox.code_sandbox import CodeSandbox
+            from ..workspace.user_workspace import UserWorkspace, WorkspaceConfig
+
+            # 获取 workspace 路径
+            config = WorkspaceConfig(workspace_root=self._data_dir)
+            workspace = UserWorkspace(wallet_address=self.wallet_address, config=config)
+            workspace_root = str(workspace.workspace_root)
 
             self._sandbox = CodeSandbox(
-                wallet_address=self.wallet_address, sandbox_root=self._data_dir
+                wallet_address=self.wallet_address,
+                sandbox_root=self._data_dir,
+                workspace_root=workspace_root,
             )
         return self._sandbox
 
@@ -223,7 +231,7 @@ class UserSession:
 
             self._browser_context = BrowserContext(
                 wallet_address=self.wallet_address,
-                user_data_dir=Path(self._data_dir) / self.wallet_address / "browser/user_data",
+                data_dir=self._data_dir,
             )
         return self._browser_context
 

@@ -61,7 +61,7 @@ class WorkspaceConfig:
     Attributes:
         workspace_root: 工作空间根目录
         max_file_size_mb: 单文件最大大小（MB），默认10MB
-        max_storage_mb: 存储空间限制（MB），默认100MB
+        max_storage_mb: 存储空间限制（MB），默认10GB
         max_files: 最大文件数量，默认1000个
         auto_cleanup_temp: 是否自动清理临时文件
         temp_file_ttl_seconds: 临时文件过期时间（秒），默认24小时
@@ -69,7 +69,7 @@ class WorkspaceConfig:
 
     workspace_root: str = "/data/users"
     max_file_size_mb: int = 10
-    max_storage_mb: int = 100
+    max_storage_mb: int = 10240  # 10GB
     max_files: int = 1000
     auto_cleanup_temp: bool = True
     temp_file_ttl_seconds: int = 86400  # 24 hours

@@ -17,6 +17,7 @@ import json
 
 class ProtocolType(Enum):
     """Supported communication protocol types"""
+
     A2A = "a2a"  # Agent-to-Agent Protocol
     MCP = "mcp"  # Model Context Protocol
     P2P = "p2p"  # Peer-to-Peer Protocol
@@ -27,6 +28,7 @@ class ProtocolType(Enum):
 
 class TransportType(Enum):
     """Transport layer types"""
+
     TCP = "tcp"
     UDP = "udp"
     QUIC = "quic"
@@ -36,6 +38,7 @@ class TransportType(Enum):
 @dataclass
 class SkillParameter:
     """Definition of a skill parameter"""
+
     name: str
     type: str  # "string", "integer", "float", "boolean", "array", "object"
     description: str
@@ -50,6 +53,7 @@ class SkillParameter:
 @dataclass
 class SkillDefinition:
     """Complete definition of an agent skill"""
+
     name: str
     description: str
     parameters: List[SkillParameter] = field(default_factory=list)
@@ -96,17 +100,19 @@ class SkillDefinition:
         """Create from dictionary representation"""
         params = []
         for p in data.get("parameters", []):
-            params.append(SkillParameter(
-                name=p["name"],
-                type=p["type"],
-                description=p["description"],
-                required=p.get("required", True),
-                default=p.get("default"),
-                enum=p.get("enum"),
-                min_value=p.get("min_value"),
-                max_value=p.get("max_value"),
-                pattern=p.get("pattern"),
-            ))
+            params.append(
+                SkillParameter(
+                    name=p["name"],
+                    type=p["type"],
+                    description=p["description"],
+                    required=p.get("required", True),
+                    default=p.get("default"),
+                    enum=p.get("enum"),
+                    min_value=p.get("min_value"),
+                    max_value=p.get("max_value"),
+                    pattern=p.get("pattern"),
+                )
+            )
 
         return cls(
             name=data["name"],
@@ -126,9 +132,11 @@ class SkillDefinition:
 @dataclass
 class CapabilityDefinition:
     """Definition of an agent capability"""
+
     name: str
     description: str
     category: str  # e.g., "nlp", "vision", "data", "automation"
+    version: str = "1.0.0"  # 版本号
     level: str = "basic"  # "basic", "intermediate", "advanced", "expert"
     dependencies: List[str] = field(default_factory=list)
     metrics: Dict[str, Any] = field(default_factory=dict)
@@ -140,6 +148,7 @@ class CapabilityDefinition:
             "name": self.name,
             "description": self.description,
             "category": self.category,
+            "version": self.version,
             "level": self.level,
             "dependencies": self.dependencies,
             "metrics": self.metrics,
@@ -153,6 +162,7 @@ class CapabilityDefinition:
             name=data["name"],
             description=data["description"],
             category=data["category"],
+            version=data.get("version", "1.0.0"),
             level=data.get("level", "basic"),
             dependencies=data.get("dependencies", []),
             metrics=data.get("metrics", {}),
@@ -163,6 +173,7 @@ class CapabilityDefinition:
 @dataclass
 class ProtocolConfig:
     """Configuration for a specific protocol"""
+
     protocol_type: ProtocolType
     enabled: bool = True
     host: str = "0.0.0.0"
@@ -218,6 +229,7 @@ class ProtocolConfig:
 @dataclass
 class NetworkConfig:
     """Network configuration for the agent"""
+
     platform_endpoints: List[str] = field(default_factory=lambda: ["http://localhost:8000"])
     p2p_bootstrap_nodes: List[str] = field(default_factory=list)
     p2p_listen_port: int = 9000
@@ -258,6 +270,7 @@ class NetworkConfig:
 @dataclass
 class SecurityConfig:
     """Security configuration for the agent"""
+
     auth_enabled: bool = True
     api_key: Optional[str] = None
     jwt_secret: Optional[str] = None
@@ -309,6 +322,7 @@ class AgentConfig:
     This class contains all settings needed to initialize and run an agent,
     including identity, protocols, skills, capabilities, network, and security.
     """
+
     # Identity
     name: str
     description: str
@@ -379,15 +393,9 @@ class AgentConfig:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentConfig":
         """Create from dictionary representation"""
-        capabilities = [
-            CapabilityDefinition.from_dict(c)
-            for c in data.get("capabilities", [])
-        ]
+        capabilities = [CapabilityDefinition.from_dict(c) for c in data.get("capabilities", [])]
 
-        skills = [
-            SkillDefinition.from_dict(s)
-            for s in data.get("skills", [])
-        ]
+        skills = [SkillDefinition.from_dict(s) for s in data.get("skills", [])]
 
         protocols = {}
         for k, v in data.get("protocols", {}).items():
@@ -428,7 +436,9 @@ class AgentConfig:
         """Add a capability to the agent"""
         self.capabilities.append(capability)
 
-    def enable_protocol(self, protocol_type: ProtocolType, config: Optional[ProtocolConfig] = None) -> None:
+    def enable_protocol(
+        self, protocol_type: ProtocolType, config: Optional[ProtocolConfig] = None
+    ) -> None:
         """Enable a specific protocol"""
         if config:
             self.protocols[protocol_type] = config

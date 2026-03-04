@@ -416,8 +416,8 @@ export const deleteDemand = async (demandId: string): Promise<void> => {
 
 // ============ Service API ============
 
-export const createService = async (data: ServiceCreate): Promise<Service> => {
-  const response = await api.post<Service>('/services', data)
+export const createService = async (agentId: string, data: ServiceCreate): Promise<Service> => {
+  const response = await api.post<Service>(`/agents/${agentId}/services`, data)
   return response.data
 }
 
@@ -1111,5 +1111,65 @@ export const getOwnerInfo = async (): Promise<{
   }
 }> => {
   const response = await api.get('/agents/v2/owner')
+  return response.data
+}
+
+// ============ Blockchain API ============
+
+export interface BlockchainStatus {
+  connected: boolean
+  chain_id: number
+  network_name: string
+  block_number: number
+  token_address: string
+  token_name: string
+  token_symbol: string
+}
+
+export interface TokenBalance {
+  address: string
+  balance_wei: number
+  balance_vibe: number
+  symbol: string
+  name: string
+  decimals: number
+}
+
+export interface TaxBreakdown {
+  amount_vibe: number
+  tax_rate: number
+  tax_vibe: number
+  net_vibe: number
+}
+
+/**
+ * 获取区块链连接状态
+ */
+export const getBlockchainStatus = async (): Promise<BlockchainStatus> => {
+  const response = await api.get<BlockchainStatus>('/blockchain/status')
+  return response.data
+}
+
+/**
+ * 查询指定地址的VIBE代币余额
+ */
+export const getTokenBalance = async (address: string): Promise<TokenBalance> => {
+  const response = await api.get<TokenBalance>(`/blockchain/balance/${address}`)
+  return response.data
+}
+
+/**
+ * 计算交易税明细
+ */
+export const getTaxBreakdown = async (amount: number): Promise<TaxBreakdown> => {
+  const response = await api.get<TaxBreakdown>(`/blockchain/tax/${amount}`)
+  return response.data
+}
+
+/**
+ * 查询VIBE代币总供应量
+ */
+export const getTotalSupply = async (): Promise<{ total_supply_vibe: number }> => {
+  const response = await api.get<{ total_supply_vibe: number }>('/blockchain/total-supply')
   return response.data
 }

@@ -23,6 +23,7 @@ from usmsb_sdk.api.rest.routers.staking import router as staking_router
 from usmsb_sdk.api.rest.routers.reputation import router as reputation_router
 from usmsb_sdk.api.rest.routers.wallet import router as wallet_router
 from usmsb_sdk.api.rest.routers.heartbeat import router as heartbeat_router
+from usmsb_sdk.api.rest.routers.blockchain import router as blockchain_router
 
 __all__ = [
     "agents_router",
@@ -44,4 +45,5 @@ __all__ = [
     "reputation_router",
     "wallet_router",
     "heartbeat_router",
+    "blockchain_router",
 ]

@@ -121,9 +121,9 @@ class AgentProfile:
             experience_score = 20
 
         return (
-            rating_score * rating_weight +
-            success_score * success_weight +
-            experience_score * experience_weight
+            rating_score * rating_weight
+            + success_score * success_weight
+            + experience_score * experience_weight
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -462,17 +462,22 @@ class RecommenderAgent(BaseSystemAgent):
         await self._refresh_agent_profiles()
 
     async def handle_message(
-        self,
-        message: Message,
-        session: Optional[Session] = None
+        self, message: Message, session: Optional[Session] = None
     ) -> Optional[Message]:
         """Handle incoming messages"""
-        await self.audit_operation("message_received", {
-            "message_type": message.type.value if hasattr(message.type, 'value') else str(message.type),
-            "sender": message.sender_id,
-        })
+        await self.audit_operation(
+            "message_received",
+            {
+                "message_type": message.type.value
+                if hasattr(message.type, "value")
+                else str(message.type),
+                "sender": message.sender_id,
+            },
+        )
 
-        content = message.content if isinstance(message.content, dict) else {"data": message.content}
+        content = (
+            message.content if isinstance(message.content, dict) else {"data": message.content}
+        )
 
         # Handle agent registration updates
         if content.get("type") == "agent_registered":
@@ -500,10 +505,13 @@ class RecommenderAgent(BaseSystemAgent):
 
     async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
         """Execute recommender skills"""
-        await self.audit_operation("skill_execution", {
-            "skill": skill_name,
-            "params": {k: v for k, v in params.items() if k not in ["comment"]},
-        })
+        await self.audit_operation(
+            "skill_execution",
+            {
+                "skill": skill_name,
+                "params": {k: v for k, v in params.items() if k not in ["comment"]},
+            },
+        )
 
         if skill_name == "recommend":
             return await self._skill_recommend(params)
@@ -616,13 +624,15 @@ class RecommenderAgent(BaseSystemAgent):
 
             # Text search
             if query:
-                searchable = " ".join([
-                    profile.agent_info.name.lower(),
-                    profile.agent_info.description.lower(),
-                    " ".join(s.name.lower() for s in profile.agent_info.skills),
-                    " ".join(c.name.lower() for c in profile.agent_info.capabilities),
-                    " ".join(profile.tags),
-                ])
+                searchable = " ".join(
+                    [
+                        profile.agent_info.name.lower(),
+                        profile.agent_info.description.lower(),
+                        " ".join(s.name.lower() for s in profile.agent_info.skills),
+                        " ".join(c.name.lower() for c in profile.agent_info.capabilities),
+                        " ".join(profile.tags),
+                    ]
+                )
                 if query not in searchable:
                     continue
 
@@ -667,12 +677,15 @@ class RecommenderAgent(BaseSystemAgent):
         else:
             profile.failure_count += 1
 
-        await self.audit_operation("agent_rated", {
-            "agent_id": agent_id,
-            "rating": rating,
-            "reviewer_id": reviewer_id,
-            "success": success,
-        })
+        await self.audit_operation(
+            "agent_rated",
+            {
+                "agent_id": agent_id,
+                "rating": rating,
+                "reviewer_id": reviewer_id,
+                "success": success,
+            },
+        )
 
         return {
             "status": "success",
@@ -810,11 +823,7 @@ class RecommenderAgent(BaseSystemAgent):
 
         return min(100.0, (overlap / len(task_words)) * 100)
 
-    def _calculate_skill_match(
-        self,
-        profile: AgentProfile,
-        required_skills: List[str]
-    ) -> float:
+    def _calculate_skill_match(self, profile: AgentProfile, required_skills: List[str]) -> float:
         """Calculate skill matching score"""
         if not required_skills:
             return 100.0
@@ -826,9 +835,7 @@ class RecommenderAgent(BaseSystemAgent):
         return (matched / len(required)) * 100
 
     def _calculate_capability_match(
-        self,
-        profile: AgentProfile,
-        required_capabilities: List[str]
+        self, profile: AgentProfile, required_capabilities: List[str]
     ) -> float:
         """Calculate capability matching score"""
         if not required_capabilities:
@@ -840,11 +847,7 @@ class RecommenderAgent(BaseSystemAgent):
         matched = len(agent_caps & required)
         return (matched / len(required)) * 100
 
-    def _calculate_personalization_bonus(
-        self,
-        profile: AgentProfile,
-        user_id: str
-    ) -> float:
+    def _calculate_personalization_bonus(self, profile: AgentProfile, user_id: str) -> float:
         """Calculate personalization bonus based on user history"""
         prefs = self._user_preferences.get(user_id, {})
 
@@ -860,11 +863,7 @@ class RecommenderAgent(BaseSystemAgent):
 
     # ==================== Public Helper Methods ====================
 
-    def update_user_preferences(
-        self,
-        user_id: str,
-        preferences: Dict[str, Any]
-    ) -> None:
+    def update_user_preferences(self, user_id: str, preferences: Dict[str, Any]) -> None:
         """Update user preferences for personalization"""
         if user_id not in self._user_preferences:
             self._user_preferences[user_id] = {

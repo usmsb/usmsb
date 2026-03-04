@@ -8,3 +8,10 @@ nul
 *.db
 *.db-*
 .claude/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.vite/
+*.zip
+temp/

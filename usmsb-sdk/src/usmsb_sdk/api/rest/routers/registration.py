@@ -512,6 +512,64 @@ async def get_agent_profile(user: dict = Depends(get_current_user_unified)):
     }
 
 
+class UpdateProfileRequest(BaseModel):
+    """Request to update agent profile."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    capabilities: Optional[List[str]] = None
+
+
+@router.patch("/agents/v2/profile")
+async def update_agent_profile(
+    request: UpdateProfileRequest,
+    user: dict = Depends(get_current_user_unified)
+):
+    """Update agent's profile information.
+
+    Requires:
+        - X-API-Key header
+        - X-Agent-ID header
+    """
+    agent_id = user.get('agent_id') or user.get('user_id')
+    if not agent_id:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "Agent ID not found", "code": "UNAUTHORIZED"}
+        )
+
+    # Build update data
+    update_data = {'agent_id': agent_id}
+    updated_fields = []
+
+    if request.name is not None:
+        update_data['name'] = request.name
+        updated_fields.append('name')
+    if request.description is not None:
+        update_data['description'] = request.description
+        updated_fields.append('description')
+    if request.capabilities is not None:
+        update_data['capabilities'] = request.capabilities
+        updated_fields.append('capabilities')
+
+    if not updated_fields:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "No fields to update", "code": "NO_UPDATES"}
+        )
+
+    # Update in database
+    db_create_agent(update_data)  # Uses INSERT OR REPLACE
+
+    return {
+        "success": True,
+        "result": {
+            "agent_id": agent_id,
+            "name": request.name or user.get('agent_name', ''),
+            "updated_fields": updated_fields
+        }
+    }
+
+
 @router.get("/agents/v2/owner")
 async def get_owner_info(user: dict = Depends(get_current_user_unified)):
     """Get information about the bound owner."""

@@ -19,6 +19,25 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from ..session.user_session import UserSession
+
+
+def _get_path(params: dict) -> str:
+    """统一获取路径参数
+
+    支持两种参数名：path 和 file_path
+    LLM 有时用 file_path，有时用 path，统一处理
+
+    Args:
+        params: 工具参数字典
+
+    Returns:
+        路径字符串，如果都没有则返回空字符串
+    """
+    return params.get("path") or params.get("file_path") or ""
+
+
+if TYPE_CHECKING:
+    from ..session.user_session import UserSession
     from ..workspace.user_workspace import UserWorkspace
 
 from .registry import Tool
@@ -289,7 +308,7 @@ async def read_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     Returns:
         读取结果
     """
-    path = params.get("path", "")
+    path = _get_path(params)
     offset = params.get("offset", 0)
     limit = params.get("limit", 10000)
     encoding = params.get("encoding", "utf-8")
@@ -345,7 +364,7 @@ async def write_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     Returns:
         写入结果
     """
-    path = params.get("path", "")
+    path = _get_path(params)
     content = params.get("content", "")
     mode = params.get("mode", "w")
     user_confirmed = params.get("user_confirmed", False)
@@ -392,7 +411,7 @@ async def list_directory(session: "UserSession", params: dict) -> Dict[str, Any]
     Returns:
         目录内容
     """
-    path = params.get("path", "")
+    path = _get_path(params)
     show_hidden = params.get("show_hidden", False)
     recursive = params.get("recursive", False)
     pattern = params.get("pattern", "*")
@@ -400,9 +419,7 @@ async def list_directory(session: "UserSession", params: dict) -> Dict[str, Any]
     try:
         # 使用用户工作空间列出文件
         files = await session.workspace.list_files(
-            directory=path,
-            pattern=pattern,
-            recursive=recursive
+            directory=path, pattern=pattern, recursive=recursive
         )
 
         # 过滤隐藏文件
@@ -437,7 +454,7 @@ async def create_directory(session: "UserSession", params: dict) -> Dict[str, An
     Returns:
         创建结果
     """
-    path = params.get("path", "")
+    path = _get_path(params)
     parents = params.get("parents", True)
 
     try:
@@ -470,7 +487,7 @@ async def delete_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     Returns:
         删除结果
     """
-    path = params.get("path", "")
+    path = _get_path(params)
     user_confirmed = params.get("user_confirmed", False)
 
     if not user_confirmed:
@@ -514,7 +531,7 @@ async def search_files(session: "UserSession", params: dict) -> Dict[str, Any]:
     Returns:
         搜索结果
     """
-    path = params.get("path", "")
+    path = _get_path(params)
     pattern = params.get("pattern", "*")
     max_results = params.get("max_results", 100)
     recursive = params.get("recursive", True)
@@ -522,9 +539,7 @@ async def search_files(session: "UserSession", params: dict) -> Dict[str, Any]:
     try:
         # 使用用户工作空间搜索文件
         files = await session.workspace.list_files(
-            directory=path,
-            pattern=pattern,
-            recursive=recursive
+            directory=path, pattern=pattern, recursive=recursive
         )
 
         # 限制结果数量
@@ -558,7 +573,7 @@ async def get_file_info(session: "UserSession", params: dict) -> Dict[str, Any]:
     Returns:
         文件信息
     """
-    path = params.get("path", "")
+    path = _get_path(params)
 
     try:
         # 使用用户工作空间获取文件信息

@@ -58,7 +58,9 @@ class MiniMaxAdapter(ILLMAdapter):
         super().__init__(config)
 
         self.model = config.model or self.DEFAULT_MODEL
-        self.embedding_model = config.extra_params.get("embedding_model", self.DEFAULT_EMBEDDING_MODEL)
+        self.embedding_model = config.extra_params.get(
+            "embedding_model", self.DEFAULT_EMBEDDING_MODEL
+        )
         self.max_tokens = config.extra_params.get("max_tokens", self.DEFAULT_MAX_TOKENS)
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
         self.base_url = config.extra_params.get("base_url", "https://api.minimaxi.com/anthropic")
@@ -156,6 +158,42 @@ class MiniMaxAdapter(ILLMAdapter):
 
         if tools:
             payload["tools"] = tools
+            print(f"DEBUG: Sending {len(tools)} tools to MiniMax")
+            logger.info(f"MiniMax API: sending {len(tools)} tools")
+            # Detailed check for all tools
+            for i, t in enumerate(tools):
+                func = t.get("function", {})
+                name = func.get("name", "")
+                params = func.get("parameters", {})
+
+                if not name:
+                    print(f"DEBUG: Tool {i}: EMPTY NAME")
+                    logger.info(f"Tool {i}: EMPTY NAME")
+                    continue
+
+                if not params:
+                    print(f"DEBUG: Tool {i} ({name}): EMPTY parameters")
+                    logger.info(f"Tool {i} ({name}): EMPTY parameters")
+                    continue
+
+                props = params.get("properties", {})
+
+                # Check for empty properties
+                if not props or props == {}:
+                    print(f"DEBUG: Tool {i} ({name}): EMPTY properties")
+                    logger.info(f"Tool {i} ({name}): EMPTY properties")
+                    continue
+
+                for pname, pval in props.items():
+                    if pval is None:
+                        print(f"DEBUG: Tool {i} ({name}): param {pname} is None")
+                        logger.info(f"Tool {i} ({name}): param {pname} is None")
+
+            # Log first tool as sample
+            if tools:
+                sample = json.dumps(tools[0], ensure_ascii=False)[:300]
+                print(f"DEBUG: First tool: {sample}")
+                logger.info(f"Sample tool: {sample}")
 
         try:
             response = await self._client.post("/v1/messages", json=payload)
@@ -465,19 +503,27 @@ class MiniMaxAdapter(ILLMAdapter):
 
         model = kwargs.get("embedding_model", self.embedding_model)
 
-        # MiniMax OpenAI-compatible API format - uses "input" parameter
+        # MiniMax embedding API format - requires "texts" and "type"
+        # embed用于查询，用"query"类型
         payload = {
             "model": model,
-            "input": text,  # OpenAI-compatible format accepts string or array
+            "texts": [text],  # MiniMax requires texts as array
+            "type": "query",  # Required for query
         }
 
         try:
+            logger.info(
+                f"MiniMax embed request: model={model}, texts={payload.get('texts')}, type={payload.get('type')}"
+            )
             response = await self._embedding_client.post("/v1/embeddings", json=payload)
+            logger.info(f"MiniMax embed response: {response.status_code} - {response.text[:300]}")
 
             if response.status_code != 200:
                 error_text = response.text
                 logger.error(f"MiniMax embedding API error: {response.status_code} - {error_text}")
-                raise RuntimeError(f"MiniMax embedding API error: {response.status_code} - {error_text}")
+                raise RuntimeError(
+                    f"MiniMax embedding API error: {response.status_code} - {error_text}"
+                )
 
             result = response.json()
             logger.debug(f"MiniMax embedding response: {result}")
@@ -506,7 +552,11 @@ class MiniMaxAdapter(ILLMAdapter):
                 embedding = result["data"][0]["embedding"]
             elif "embeddings" in result:
                 # Alternative format (some MiniMax versions)
-                embedding = result["embeddings"][0] if isinstance(result["embeddings"][0], list) else result["embeddings"][0].get("embedding", result["embeddings"][0])
+                embedding = (
+                    result["embeddings"][0]
+                    if isinstance(result["embeddings"][0], list)
+                    else result["embeddings"][0].get("embedding", result["embeddings"][0])
+                )
             elif "vector" in result:
                 # Another alternative format
                 embedding = result["vector"]
@@ -543,10 +593,12 @@ class MiniMaxAdapter(ILLMAdapter):
 
         model = kwargs.get("embedding_model", self.embedding_model)
 
-        # MiniMax OpenAI-compatible API format - uses "input" parameter
+        # MiniMax embedding API format - requires "texts" and "type"
+        # embed_batch用于建知识库，用"db"类型
         payload = {
             "model": model,
-            "input": texts,  # OpenAI-compatible format accepts array
+            "texts": texts,
+            "type": "db",
         }
 
         try:
@@ -555,7 +607,9 @@ class MiniMaxAdapter(ILLMAdapter):
             if response.status_code != 200:
                 error_text = response.text
                 logger.error(f"MiniMax embedding API error: {response.status_code} - {error_text}")
-                raise RuntimeError(f"MiniMax embedding API error: {response.status_code} - {error_text}")
+                raise RuntimeError(
+                    f"MiniMax embedding API error: {response.status_code} - {error_text}"
+                )
 
             result = response.json()
             logger.debug(f"MiniMax batch embedding response: {result}")
@@ -571,9 +625,13 @@ class MiniMaxAdapter(ILLMAdapter):
                 embeddings = [item["embedding"] for item in embeddings_data]
             else:
                 logger.error(f"Unexpected MiniMax batch embedding response format: {result.keys()}")
-                raise ValueError(f"Unexpected batch embedding response format: {list(result.keys())}")
+                raise ValueError(
+                    f"Unexpected batch embedding response format: {list(result.keys())}"
+                )
 
-            logger.debug(f"Generated {len(embeddings)} embeddings with dimension {len(embeddings[0]) if embeddings else 0}")
+            logger.debug(
+                f"Generated {len(embeddings)} embeddings with dimension {len(embeddings[0]) if embeddings else 0}"
+            )
             return embeddings
 
         except httpx.HTTPError as e:
@@ -603,7 +661,11 @@ class MiniMaxAdapter(ILLMAdapter):
                 pass
 
         if not self._client:
-            return {"content": "LLM 不可用（未配置 API Key）", "tool_calls": [], "raw_content_blocks": []}
+            return {
+                "content": "LLM 不可用（未配置 API Key）",
+                "tool_calls": [],
+                "raw_content_blocks": [],
+            }
 
         try:
             max_tokens = kwargs.get("max_tokens", self.max_tokens)
@@ -628,7 +690,9 @@ class MiniMaxAdapter(ILLMAdapter):
                     elif isinstance(content, str):
                         chat_messages.append({"role": role, "content": content})
                     else:
-                        chat_messages.append({"role": role, "content": str(content) if content else ""})
+                        chat_messages.append(
+                            {"role": role, "content": str(content) if content else ""}
+                        )
 
             if not chat_messages:
                 chat_messages = [{"role": "user", "content": "Hello"}]
@@ -667,15 +731,21 @@ class MiniMaxAdapter(ILLMAdapter):
                         },
                     }
                     tool_calls.append(tool_call)
-                    raw_content_blocks.append({
-                        "type": "tool_use",
-                        "id": block.get("id", ""),
-                        "name": block.get("name", ""),
-                        "input": block.get("input", {}),
-                    })
+                    raw_content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": block.get("id", ""),
+                            "name": block.get("name", ""),
+                            "input": block.get("input", {}),
+                        }
+                    )
 
                 elif block_type == "redacted_thinking":
                     raw_content_blocks.append({"type": "redacted_thinking"})
+
+            # Fallback: parse tool calls from text content if not in structured format
+            if not tool_calls and text_content:
+                tool_calls = self._parse_tool_calls_from_text(text_content)
 
             return {
                 "content": text_content,
@@ -686,4 +756,52 @@ class MiniMaxAdapter(ILLMAdapter):
 
         except Exception as e:
             logger.error(f"MiniMax chat with tools failed: {e}")
-            return {"content": f"LLM 调用失败: {str(e)}", "tool_calls": [], "raw_content_blocks": [], "error": str(e)}
+            return {
+                "content": f"LLM 调用失败: {str(e)}",
+                "tool_calls": [],
+                "raw_content_blocks": [],
+                "error": str(e),
+            }
+
+    def _parse_tool_calls_from_text(self, text_content: str) -> List[Dict[str, Any]]:
+        """Parse tool calls from text content when LLM returns them as text."""
+        import re
+
+        tool_calls = []
+        try:
+            # Match [TOOL_CALL] blocks
+            pattern = r'\[TOOL_CALL\]\s*\{[^}]*tool\s*=>\s*"([^"]+)"[^}]*args\s*=>\s*(\{[^}]*\})\s*\}\s*\[/TOOL_CALL\]'
+            matches = re.findall(pattern, text_content, re.IGNORECASE | re.DOTALL)
+
+            for match in matches:
+                tool_name = match[0]
+                args_str = match[1]
+
+                # Parse arguments
+                try:
+                    # Convert JS-style args to JSON
+                    args_json = args_str.replace("=>", ":").replace("'", '"')
+                    # Handle empty braces
+                    if args_json.strip() == "{}":
+                        args = {}
+                    else:
+                        args = json.loads(args_json)
+                except json.JSONDecodeError:
+                    args = {}
+
+                tool_call = {
+                    "id": f"call_{len(tool_calls)}",
+                    "function": {
+                        "name": tool_name,
+                        "arguments": args,
+                    },
+                }
+                tool_calls.append(tool_call)
+
+            if tool_calls:
+                logger.info(f"Parsed {len(tool_calls)} tool calls from text content")
+
+        except Exception as e:
+            logger.warning(f"Failed to parse tool calls from text: {e}")
+
+        return tool_calls

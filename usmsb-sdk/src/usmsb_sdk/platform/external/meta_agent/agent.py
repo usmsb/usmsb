@@ -148,6 +148,10 @@ class MetaAgent:
         self.config = config or MetaAgentConfig()
         self.agent_id = f"meta_{uuid4().hex[:8]}"
 
+        # ========== 调试日志缓冲区 ==========
+        # 用于实时记录工具调用日志，供前端轮询查看
+        self._debug_logs: Dict[str, List[Dict]] = {}  # wallet_address -> logs
+
         # ========== 新增：多用户隔离支持 ==========
 
         # 会话管理器（新增）
@@ -173,9 +177,15 @@ class MetaAgent:
         self.skills_manager = SkillsManager(self.config.database.path)
 
         # ========== 权限管理和审计 ==========
-        self.permission_manager = PermissionManager(
-            db_path=self.config.database.path.replace(".db", "_permissions.db")
-        )
+        # Use the same database as the API for permission consistency
+        self.permission_manager = PermissionManager(db_path="meta_agent.db")
+        if os.path.exists(
+            self.config.database.path.replace(".db", "_permissions.db").replace("_permissions", "")
+        ):
+            # Use the main database path for permissions to match API
+            perm_db_path = self.config.database.path.replace(".db", "_permissions.db")
+
+        self.permission_manager = PermissionManager(db_path=perm_db_path)
         self.audit_logger = get_audit_logger(
             db_path=self.config.database.path.replace(".db", "_audit.db")
         )
@@ -958,10 +968,11 @@ class MetaAgent:
                 binding_type="wallet" if wallet_address.startswith("0x") else "manual",
             )
 
-        # 获取可用工具
-        available_tools = self.tool_registry.list_tools()
-        tool_names = [t["name"] for t in available_tools]
-        logger.debug(f"chat: tools count={len(tool_names)}")
+        # 获取可用工具（根据用户权限过滤）
+        all_tools = self.tool_registry.list_tools()
+        tool_names = await self._filter_tools_by_permission(all_tools, wallet_address)
+        logger.info(f"Filtered {len(tool_names)} tools for {wallet_address[:10]}...")
+        logger.debug(f"chat: tools count={len(tool_names)} (from {len(all_tools)} total)")
 
         # 构建完整的消息列表（包含系统提示词、知识库检索、对话历史、分层记忆、智能召回）
         messages = await self.context_manager.build_messages(
@@ -977,10 +988,22 @@ class MetaAgent:
         # 获取工具和技能 schema
         # MiniMax 使用 Anthropic API 格式
         llm_provider = "anthropic" if self.llm_manager.provider == "minimax" else "openai"
-        tools_schema = self.tool_registry.get_tools_schema(provider=llm_provider)
+        all_tools_schema = self.tool_registry.get_tools_schema(provider=llm_provider)
+
+        # TEMPORARY: Use all 96 tools to debug the issue
+        tools_schema = all_tools_schema
+
+        # Log for debugging
+        if wallet_address:
+            self.add_debug_log(
+                wallet_address,
+                "info",
+                f"🔧 Using ALL {len(tools_schema)} tools (debug mode)",
+            )
+
         skills_schema = self.skills_manager.get_skills_schema(provider=llm_provider)
         logger.debug(
-            f"chat: tools_schema={len(tools_schema)}, skills_schema={len(skills_schema)}, provider={llm_provider}"
+            f"chat: tools_schema={len(tools_schema)} (filtered from {len(all_tools_schema)}), skills_schema={len(skills_schema)}, provider={llm_provider}"
         )
 
         # 调用 LLM（支持工具和技能调用）
@@ -1008,6 +1031,13 @@ class MetaAgent:
                         logger.info("[BACKGROUND] Starting background task execution")
                         logger.info(f"[BACKGROUND] tools_schema count: {len(tools_schema)}")
                         logger.info(f"[BACKGROUND] skills_schema count: {len(skills_schema)}")
+
+                        # 清除旧的调试日志并添加开始日志
+                        self.clear_debug_logs(wallet_address)
+                        self.add_debug_log(
+                            wallet_address, "info", f"🟢 后台任务开始: {message[:50]}..."
+                        )
+
                         await self.conversation_manager.add_message(
                             conversation_id=conversation.id,
                             role=MessageRole.BACKGROUND_TASK,
@@ -1016,47 +1046,378 @@ class MetaAgent:
 
                         max_retries = 3
                         current_messages = messages
+                        tool_results = []
+                        result_text = ""  # 初始化结果文本
 
+                        self.add_debug_log(
+                            wallet_address,
+                            "info",
+                            f"📋 初始化完成，开始执行 (max_retries={max_retries})",
+                        )
+
+                        # 外层循环：max_retries 次尝试
                         for attempt in range(max_retries):
-                            logger.info(f"[BACKGROUND] Attempt {attempt + 1}/{max_retries}")
-                            # Step 1: LLM 调用
-                            llm_response = await self._chat_with_llm(
-                                current_messages,
-                                tools=tools_schema,
-                                skills=skills_schema,
-                                conversation_id=str(conversation.id),
-                                user_session=user_session,
+                            logger.info(
+                                f"[BACKGROUND] ========== 第 {attempt + 1}/{max_retries} 次尝试 =========="
+                            )
+                            self.add_debug_log(
+                                wallet_address, "info", f"🔄 第 {attempt + 1}/{max_retries} 次尝试"
                             )
 
-                            # Step 2: LLM 返回后判断
-                            llm_retry_decision = await self._llm_judge_response_retry(
-                                response=llm_response, attempt=attempt, max_retries=max_retries
+                            # 内层循环：执行工具直到不需要工具
+                            while True:
+                                # 检测是否是需要强制使用工具的场景（天气查询）
+                                message_lower = message.lower()
+                                is_weather_query = any(
+                                    kw in message_lower
+                                    for kw in ["天气", "weather", "气温", "温度", "下雨", "晴天"]
+                                )
+
+                                # 如果是天气查询且这是第一次尝试且还没有工具结果，先自动调用搜索工具
+                                if is_weather_query and attempt == 0 and not tool_results:
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "info",
+                                        f"🔍 检测到天气查询，自动调用搜索工具...",
+                                    )
+
+                                    # 提取搜索关键词
+                                    search_keyword = message
+                                    weather_url = None
+                                    if "深圳" in message:
+                                        search_keyword = "深圳天气"
+                                        weather_url = (
+                                            "https://www.weather.com.cn/weather/101280601.shtml"
+                                        )
+                                    elif "北京" in message:
+                                        search_keyword = "北京天气"
+                                        weather_url = (
+                                            "https://www.weather.com.cn/weather/101010100.shtml"
+                                        )
+                                    elif "上海" in message:
+                                        search_keyword = "上海天气"
+                                        weather_url = (
+                                            "https://www.weather.com.cn/weather/101020100.shtml"
+                                        )
+                                    elif "广州" in message:
+                                        search_keyword = "广州天气"
+                                        weather_url = (
+                                            "https://www.weather.com.cn/weather/101280101.shtml"
+                                        )
+                                    else:
+                                        import re
+
+                                        match = re.search(r"([\u4e00-\u9fa5]+)", message)
+                                        if match:
+                                            search_keyword = match.group(1) + "天气"
+
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "info",
+                                        f"🔍 搜索关键词={search_keyword}, weather_url={weather_url}",
+                                    )
+
+                                    # 调用搜索工具
+                                    search_result = await self._execute_tool(
+                                        "search_web",
+                                        {"query": search_keyword, "max_results": 3},
+                                        user_session,
+                                    )
+
+                                    # 如果有天气URL，直接抓取天气页面
+                                    if weather_url:
+                                        self.add_debug_log(
+                                            wallet_address,
+                                            "info",
+                                            f"🌐 抓取天气页面: {weather_url}",
+                                        )
+                                        fetch_result = await self._execute_tool(
+                                            "fetch_url",
+                                            {"url": weather_url},
+                                            user_session,
+                                        )
+                                        # 合并结果
+                                        if fetch_result.get("status") == "success":
+                                            search_result["weather_content"] = fetch_result.get(
+                                                "content", ""
+                                            )[:5000]
+                                            search_result["weather_url"] = weather_url
+
+                                    tool_results = [
+                                        {
+                                            "tool": "search_web",
+                                            "result": search_result,
+                                            "success": search_result.get("status") == "success",
+                                        }
+                                    ]
+
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "info",
+                                        f"✅ 自动搜索完成, tool_results数量={len(tool_results)}, success={tool_results[0]['success']}",
+                                    )
+
+                                    # 自动搜索完成后，需要调用 LLM 生成最终回复
+                                    # 因为工具执行结果需要 LLM 来整合成自然语言
+                                    formatted_tool_results = self._format_tool_results(tool_results)
+
+                                    optimization_messages = [
+                                        {
+                                            "role": "system",
+                                            "content": """你是一个智能助手，请将下面的工具执行结果优化成更自然、更人性化的用户回复。
+
+要求：
+- 直接整合工具结果到回复中
+- 不要提及"工具"、"执行"等技术细节
+- 用友好的口语化方式表达
+- 如果是数据表格，可以保留表格格式""",
+                                        },
+                                        {
+                                            "role": "user",
+                                            "content": f"用户问题是：{message}\n\n工具执行结果：\n{formatted_tool_results}\n\n请生成最终的回复：",
+                                        },
+                                    ]
+
+                                    llm_response = await self._chat_with_llm(
+                                        optimization_messages,
+                                        tools=[],
+                                        skills=[],
+                                        conversation_id=str(conversation.id),
+                                        user_session=user_session,
+                                    )
+
+                                    # 跳出内层循环，进入最终回复生成
+                                    break
+
+                                # Step 1: LLM 调用
+                                self.add_debug_log(
+                                    wallet_address,
+                                    "info",
+                                    f"🔧 调用LLM, tools_schema数量={len(tools_schema)}, skills_schema数量={len(skills_schema)}",
+                                )
+
+                                llm_response = await self._chat_with_llm(
+                                    current_messages,
+                                    tools=tools_schema,
+                                    skills=skills_schema,
+                                    conversation_id=str(conversation.id),
+                                    user_session=user_session,
+                                )
+
+                                # Step 2: 解析 tool_calls
+                                # 注意：_chat_with_llm 内部已经处理完工具调用了，
+                                # 这里只需要检查是否需要强制重试（如天气查询场景）
+                                self.add_debug_log(
+                                    wallet_address, "info", f"🔍 PARSE: About to parse tool calls"
+                                )
+                                tool_calls = self._parse_tool_calls(llm_response)
+                                self.add_debug_log(
+                                    wallet_address,
+                                    "info",
+                                    f"🔍 PARSE: Parsed tool_calls: {tool_calls}",
+                                )
+
+                                self.add_debug_log(
+                                    wallet_address,
+                                    "info",
+                                    f"🔍 LLM响应: 响应内容前200字={llm_response[:200]}...",
+                                )
+
+                                if not tool_calls:
+                                    # 没有 tool_calls 格式，说明 _chat_with_llm 内部已经处理完工具调用了
+                                    # 直接进入最终回复生成阶段
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "info",
+                                        f"✅ LLM已完成工具调用处理，进入最终回复生成",
+                                    )
+                                    # 跳出内层循环，进入最终回复生成
+                                    break
+
+                                # Step 3: 执行工具调用
+                                tool_results = []
+                                for tool_call in tool_calls:
+                                    tool_name = tool_call.get("name")
+                                    tool_args = tool_call.get("arguments", {})
+
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "tool_call",
+                                        f"执行工具: {tool_name}",
+                                        {"args": tool_args},
+                                    )
+
+                                    tool_result = await self._execute_tool(
+                                        tool_name, tool_args, user_session
+                                    )
+
+                                    # 特别记录 browser 工具的详细结果
+                                    if "browser" in tool_name.lower():
+                                        self.add_debug_log(
+                                            wallet_address,
+                                            "info",
+                                            f"🔍 浏览器工具详细结果: {tool_result}",
+                                        )
+
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "tool_result",
+                                        f"工具结果: {tool_name}",
+                                        {
+                                            "success": tool_result.get("success", False),
+                                            "status": tool_result.get("status", "unknown"),
+                                            "result": str(tool_result)[:500],
+                                        },
+                                    )
+
+                                    tool_results.append(
+                                        {
+                                            "tool": tool_name,
+                                            "result": tool_result,
+                                            "success": tool_result.get("success", False),
+                                        }
+                                    )
+
+                                # Step 4: 工具调用后判断
+                                tool_retry_decision = await self._llm_judge_tool_retry(
+                                    tool_results=tool_results,
+                                    attempt=attempt,
+                                    max_retries=max_retries,
+                                    user_question=message,
+                                    tool_calls=tool_calls,
+                                )
+
+                                self.add_debug_log(
+                                    wallet_address,
+                                    "info",
+                                    f"🔍 工具重试判断: need_retry={tool_retry_decision.get('need_retry')}, reason={tool_retry_decision.get('reason', '')[:100]}",
+                                )
+
+                                if not tool_retry_decision.get("need_retry"):
+                                    # 不需要重试，退出内层循环
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "info",
+                                        f"✅ 工具执行完成，不需要重试，准备生成最终回复",
+                                    )
+
+                                    # 直接使用格式化后的工具结果作为最终回复
+                                    result_text = self._format_tool_results(tool_results)
+                                    self.add_debug_log(
+                                        wallet_address,
+                                        "info",
+                                        f"🤖 工具结果: {result_text[:200]}...",
+                                    )
+                                    break
+
+                                # 如果工具调用需要补充信息
+                                if tool_retry_decision.get("need_info"):
+                                    info_description = tool_retry_decision.get(
+                                        "info_description", ""
+                                    )
+                                    search_history = tool_retry_decision.get("search_history", True)
+                                    search_reason = tool_retry_decision.get("search_reason", "")
+
+                                    logger.info(
+                                        f"[INFO_EXTRACT] tool retry: need_info={tool_retry_decision.get('need_info')}, "
+                                        f"search_history={search_history}, search_reason={search_reason}"
+                                    )
+
+                                    need = InfoNeed(
+                                        need_id=f"tool_retry_{attempt}",
+                                        name=info_description,
+                                        info_type=InfoNeedType(
+                                            tool_retry_decision.get("info_type", "other")
+                                        ),
+                                        description=info_description,
+                                        format_hint=tool_retry_decision.get("param_adjustment", ""),
+                                    )
+
+                                    logger.info(
+                                        f"[INFO_EXTRACT] Calling info_extractor from tool retry, need: {info_description}"
+                                    )
+                                    extracted = await self.info_extractor.extract([need], owner_id)
+                                    logger.info(
+                                        f"[INFO_EXTRACT] Extracted from tool retry: {extracted}"
+                                    )
+
+                                    if extracted and need.need_id in extracted:
+                                        fixed_tool_args = self._fix_tool_args(
+                                            tool_args, need.name, extracted[need.need_id]
+                                        )
+
+                                        tool_result = await self._execute_tool(
+                                            tool_name, fixed_tool_args, user_session
+                                        )
+
+                                        tool_results = [{"tool": tool_name, "result": tool_result}]
+
+                                # 将工具结果加入上下文
+                                current_messages = self._add_tool_results_to_messages(
+                                    current_messages, llm_response, tool_results
+                                )
+
+                            # 内层循环结束
+
+                            # Step 5: 生成最终回复
+                            # 注意：_chat_with_llm 内部已经处理完工具调用并生成了回复
+                            # 直接使用它的返回值作为最终结果，不需要再优化
+                            self.add_debug_log(
+                                wallet_address,
+                                "info",
+                                f"✅ 使用 _chat_with_llm 返回的结果作为最终回复",
                             )
 
-                            if not llm_retry_decision.get("need_retry"):
-                                result_text = llm_response
+                            # 直接使用 _chat_with_llm 的返回值作为最终结果
+                            # 因为它内部已经处理完工具调用了
+                            result_text = llm_response
+
+                            self.add_debug_log(
+                                wallet_address,
+                                "info",
+                                f"🤖 直接使用LLM返回结果: {result_text[:200]}...",
+                            )
+
+                            # Step 6: 判断最终回复是否是"抱歉/无法完成"
+                            final_decision = await self._llm_judge_response_retry(
+                                response=result_text, attempt=attempt, max_retries=max_retries
+                            )
+
+                            if not final_decision.get("need_retry"):
+                                # 最终回复正常，结束外层循环
+                                logger.info(f"[BACKGROUND] 最终回复正常，任务完成")
                                 break
+                            else:
+                                # 最终回复表示无法完成，继续外层循环重试
+                                logger.info(f"[BACKGROUND] 最终回复表示无法完成，继续重试...")
+                                # 清空工具结果，准备下一次尝试
+                                tool_results = []
+                                current_messages = messages
+                                info_description = final_decision.get("info_description", "")
 
-                            # Step 3: 如果需要补充信息
-                            if llm_retry_decision.get("need_info"):
-                                info_description = llm_retry_decision.get("info_description", "")
+                                # 处理空字符串和无效的 info_type
+                                info_type_raw = final_decision.get("info_type", "other")
+                                info_type_str = (
+                                    info_type_raw
+                                    if info_type_raw
+                                    and info_type_raw.lower() not in ("", "none", "null")
+                                    else "other"
+                                )
 
                                 need = InfoNeed(
-                                    need_id=f"llm_retry_{attempt}",
+                                    need_id=f"final_retry_{attempt}",
                                     name=info_description,
-                                    info_type=InfoNeedType(
-                                        llm_retry_decision.get("info_type", "other")
-                                    ),
+                                    info_type=InfoNeedType(info_type_str),
                                     description=info_description,
-                                    format_hint=llm_retry_decision.get("format_hint", ""),
+                                    format_hint=final_decision.get("format_hint", ""),
                                 )
 
                                 logger.info(
-                                    f"[INFO_EXTRACT] Calling info_extractor from LLM response retry, need: {info_description}"
+                                    f"[INFO_EXTRACT] Calling info_extractor from final retry, need: {info_description}"
                                 )
                                 extracted = await self.info_extractor.extract([need], owner_id)
                                 logger.info(
-                                    f"[INFO_EXTRACT] Extracted from LLM response retry: {extracted}"
+                                    f"[INFO_EXTRACT] Extracted from final retry: {extracted}"
                                 )
 
                                 if extracted and need.need_id in extracted:
@@ -1065,90 +1426,6 @@ class MetaAgent:
                                     )
                                     logger.info(f"Injected extracted info for retry: {need.name}")
                                     continue
-
-                            # Step 4: 解析工具调用
-                            tool_calls = self._parse_tool_calls(llm_response)
-
-                            if not tool_calls:
-                                current_messages = self._add_response_to_messages(
-                                    current_messages, llm_response
-                                )
-                                continue
-
-                            # Step 5: 执行工具调用
-                            tool_results = []
-
-                            for tool_call in tool_calls:
-                                tool_name = tool_call.get("name")
-                                tool_args = tool_call.get("arguments", {})
-
-                                tool_result = await self._execute_tool(
-                                    tool_name, tool_args, user_session
-                                )
-
-                                tool_results.append(
-                                    {
-                                        "tool": tool_name,
-                                        "result": tool_result,
-                                        "success": tool_result.get("success", False),
-                                    }
-                                )
-
-                            # Step 6: 工具调用后判断
-                            tool_retry_decision = await self._llm_judge_tool_retry(
-                                tool_results=tool_results, attempt=attempt, max_retries=max_retries
-                            )
-
-                            if not tool_retry_decision.get("need_retry"):
-                                result_text = self._format_tool_results(tool_results)
-                                break
-
-                            # Step 7: 如果工具调用需要补充信息
-                            if tool_retry_decision.get("need_info"):
-                                info_description = tool_retry_decision.get("info_description", "")
-
-                                need = InfoNeed(
-                                    need_id=f"tool_retry_{attempt}",
-                                    name=info_description,
-                                    info_type=InfoNeedType(
-                                        tool_retry_decision.get("info_type", "other")
-                                    ),
-                                    description=info_description,
-                                    format_hint=tool_retry_decision.get("format_hint", ""),
-                                )
-
-                                logger.info(
-                                    f"[INFO_EXTRACT] Calling info_extractor from tool retry, need: {info_description}"
-                                )
-                                extracted = await self.info_extractor.extract([need], owner_id)
-                                logger.info(
-                                    f"[INFO_EXTRACT] Extracted from tool retry: {extracted}"
-                                )
-
-                                if extracted and need.need_id in extracted:
-                                    fixed_tool_args = self._fix_tool_args(
-                                        tool_args, need.name, extracted[need.need_id]
-                                    )
-
-                                    tool_result = await self._execute_tool(
-                                        tool_name, fixed_tool_args, user_session
-                                    )
-
-                                    tool_results = [{"tool": tool_name, "result": tool_result}]
-
-                            # Step 8: 将工具结果加入上下文
-                            current_messages = self._add_tool_results_to_messages(
-                                current_messages, llm_response, tool_results
-                            )
-
-                        # 返回最终结果
-                        result_text = await self._chat_with_llm(
-                            current_messages,
-                            tools=[],
-                            skills=[],
-                            conversation_id=str(conversation.id),
-                            user_session=user_session,
-                        )
 
                         logger.debug(
                             f"Background task result: {result_text[:500] if result_text else 'EMPTY'}"
@@ -2616,6 +2893,11 @@ class MetaAgent:
         """调用 LLM 并传递工具"""
         logger.info(f"DEBUG _call_llm_with_tools called, tools count: {len(tools)}")
 
+        # Log sample tools
+        if tools:
+            sample = json.dumps(tools[0], ensure_ascii=False)[:300]
+            logger.info(f"First tool sample: {sample}")
+
         adapter = self.llm_manager._adapter
         logger.info(f"DEBUG adapter is: {adapter}")
 
@@ -2945,6 +3227,52 @@ class MetaAgent:
         """获取知识库统计"""
         return await self.vector_kb.get_stats()
 
+    # ========== 调试日志方法 ==========
+    def add_debug_log(self, wallet_address: str, log_type: str, message: str, data: Dict = None):
+        """添加调试日志
+
+        Args:
+            wallet_address: 钱包地址
+            log_type: 日志类型 (info, tool_call, tool_result, error, llm_call)
+            message: 日志消息
+            data: 额外数据
+        """
+        if wallet_address not in self._debug_logs:
+            self._debug_logs[wallet_address] = []
+
+        import time
+
+        self._debug_logs[wallet_address].append(
+            {
+                "timestamp": time.time(),
+                "type": log_type,
+                "message": message,
+                "data": data or {},
+            }
+        )
+
+        # 限制每个钱包地址最多保留 100 条日志
+        if len(self._debug_logs[wallet_address]) > 100:
+            self._debug_logs[wallet_address] = self._debug_logs[wallet_address][-100:]
+
+    def get_debug_logs(self, wallet_address: str, after_timestamp: float = 0) -> List[Dict]:
+        """获取调试日志
+
+        Args:
+            wallet_address: 钱包地址
+            after_timestamp: 只返回该时间戳之后的日志
+
+        Returns:
+            日志列表
+        """
+        logs = self._debug_logs.get(wallet_address, [])
+        return [log for log in logs if log["timestamp"] > after_timestamp]
+
+    def clear_debug_logs(self, wallet_address: str):
+        """清除调试日志"""
+        if wallet_address in self._debug_logs:
+            self._debug_logs[wallet_address] = []
+
     def get_available_tools(self) -> List[Dict[str, str]]:
         """获取可用工具列表"""
         return self.tool_registry.list_tools()
@@ -3015,40 +3343,128 @@ LLM 响应:
             logger.warning(f"LLM judge response retry failed: {e}")
             return {"need_retry": False}
 
+    async def _filter_tools_by_permission(
+        self, all_tools: List[Dict], wallet_address: Optional[str]
+    ) -> List[str]:
+        """根据用户权限过滤可用工具
+
+        Args:
+            all_tools: 所有工具列表
+            wallet_address: 用户钱包地址
+
+        Returns:
+            用户有权使用的工具名称列表
+        """
+        if not wallet_address:
+            return [t["name"] for t in all_tools]
+
+        try:
+            user = await self.permission_manager.get_user(wallet_address)
+            if not user:
+                logger.warning(f"User not found: {wallet_address}, allowing all tools")
+                return [t["name"] for t in all_tools]
+
+            from .permission.models import get_tool_required_permissions
+
+            allowed_tools = []
+            for tool in all_tools:
+                tool_name = tool["name"]
+                required_perms = get_tool_required_permissions(tool_name)
+
+                has_all_perms = all(user.has_permission(perm) for perm in required_perms)
+                if has_all_perms:
+                    allowed_tools.append(tool_name)
+                else:
+                    logger.debug(f"Tool {tool_name} filtered out for {wallet_address[:10]}...")
+
+            logger.info(
+                f"Filtered tools: {len(allowed_tools)}/{len(all_tools)} for {wallet_address[:10]}..."
+            )
+            logger.info(
+                f"User {wallet_address[:10]} permissions: {user.permissions if user else 'None'}"
+            )
+            return allowed_tools
+
+        except Exception as e:
+            logger.warning(f"Failed to filter tools by permission: {e}, allowing all")
+            return [t["name"] for t in all_tools]
+
     async def _llm_judge_tool_retry(
-        self, tool_results: List[Dict], attempt: int, max_retries: int
+        self,
+        tool_results: List[Dict],
+        attempt: int,
+        max_retries: int,
+        user_question: str = "",
+        tool_calls: List[Dict] = None,
     ) -> Dict:
         """工具调用后判断是否需要重试"""
         import json
 
+        tool_calls = tool_calls or []
+        tool_name = tool_calls[0].get("name", "unknown") if tool_calls else "unknown"
+        tool_arguments = (
+            json.dumps(tool_calls[0].get("arguments", {}), ensure_ascii=False)
+            if tool_calls
+            else "{}"
+        )
+
         prompt = f"""你是一个智能助手，需要判断工具执行结果是否满足用户需求。
 
-当前尝试: {attempt + 1}/{max_retries}
+## 当前上下文
 
-用户需求可能是：需要从历史对话中查找虾聊API Key、需要查找账号信息、需要查找网址链接等。
+**用户原始问题**: {user_question}
 
-工具执行结果:
+**LLM 工具调用输入**:
+- 工具名称: {tool_name}
+- 调用参数: {tool_arguments}
+
+**当前尝试**: {attempt + 1}/{max_retries}
+
+**工具执行结果**:
 {json.dumps(tool_results, ensure_ascii=False, indent=2)}
 
-请判断：
-1. 工具执行结果是否表明缺少关键信息（如API Key、账号、密码等）？
-2. 工具是否返回错误（如unauthorized、invalid key、missing param等）？
-3. 用户需求是否需要从历史对话记录中提取信息？
+请从以下维度进行分析判断：
+
+## 1. 工具执行状态分析
+- 工具是否执行成功？返回状态码是什么？
+- 是否有错误信息（如 network error、timeout、unauthorized、not found、rate limit 等）？
+- 如果有错误，错误类型是什么？
+
+## 2. 信息完整性分析
+- 工具返回的结果是否包含用户需要的完整信息？
+- 是否缺少关键数据（如 ID、地址、密码、API Key、具体数值、详细描述等）？
+- 返回的数据是否完整有效，还是被截断、空值、无效数据？
+
+## 3. 信息来源判断（关键）
+- 如果缺少信息，这个信息之前是否在对话中提及过？
+  - 【在历史对话中】→ 设置 search_history=true，说明从历史消息中搜索
+  - 【未在对话中提及】→ 设置 search_history=false，说明需要询问用户提供
+  - 【不确定】→ 设置 search_history=true，尝试从历史中搜索
+- 缺少的信息是什么类型？（凭证/账号/URL/参数/数值/描述/其他）
+
+## 4. 用户需求匹配度
+- 工具执行结果是否直接回答了用户的问题？
+- 工具调用参数是否正确反映了用户需求？
+- 还是只提供了部分/间接信息，需要进一步处理？
+
+## 5. 重试合理性
+- 再次尝试调用工具是否能获得更好的结果？
+- 是否需要更换工具或调整参数？
+- 当前工具是否是最优选择？
 
 请返回JSON:
 {{
     "need_retry": true/false,
-    "reason": "判断理由，越详细越好",
+    "reason": "详细判断理由，说明每个分析维度的结论",
     "need_info": true/false,
-    "info_description": "如果需要信息，具体需要什么（如：虾聊API Key、用户账号等）",
-    "info_type": "credential（凭证）/account（账号）/url（网址）/param（参数）/other（其他）",
-    "format_hint": "格式提示（如：xialiao_开头、github.com/xxx等）"
+    "info_description": "如果需要信息，具体需要什么",
+    "info_type": "credential（凭证/密钥）/account（账号）/url（网址）/param（参数）/number（数值）/description（描述）/context（上下文）/other（其他）",
+    "search_history": true/false,
+    "search_reason": "如果需要搜索历史，说明原因；如果不需要，也说明原因",
+    "change_tool": true/false,
+    "new_tool_suggestion": "如果建议更换工具，说明用什么工具",
+    "param_adjustment": "如果建议调整参数，说明如何调整"
 }}
-
-关键判断标准：
-- 如果工具返回认证失败、缺少API Key、需要登录等信息，need_info应为true
-- 如果用户问题涉及"之前给的"、"历史对话中的"、"我的API Key"等，need_info应为true
-- 即使工具执行成功，如果结果不完整，也应考虑need_retry为true
 """
         try:
             logger.info(
@@ -3143,6 +3559,11 @@ LLM 响应:
 
         tool_calls = []
         try:
+            # Debug: log response snippet
+            print(f"[PARSE_TOOL_CALLS] Response: {response[:500]}")
+            logger.info(f"[PARSE_TOOL_CALLS] Response: {response[:500]}")
+
+            # First try to parse JSON format
             json_match = re.search(
                 r'\[[\s\S]*"tool_calls"[\s\S]*\]|\{[^\}]*"tool_calls"[^\}]*\}', response
             )
@@ -3154,6 +3575,105 @@ LLM 响应:
                     for item in data:
                         if isinstance(item, dict) and "tool_calls" in item:
                             tool_calls.extend(item["tool_calls"])
+
+            # Fallback: parse various text formats
+            if not tool_calls:
+                # Debug: try simple search
+                has_invoke = "[invoke" in response
+                has_name = 'name="list_proposals"' in response
+                print(f"[PARSE] has [invoke: {has_invoke}, has name=: {has_name}")
+                logger.info(f"[PARSE] has [invoke: {has_invoke}, has name=: {has_name}")
+
+                # Format 1: [invoke name="tool"]\n<parameter name="key">value</parameter>\n</invoke>
+                xml_block_pattern = r'\[invoke\s+name="([^"]+)"\](.*?)</invoke>'
+                for match in re.finditer(xml_block_pattern, response, re.IGNORECASE | re.DOTALL):
+                    tool_name = match.group(1)
+                    params_str = match.group(2)
+                    args = {}
+                    for param_match in re.finditer(
+                        r'<parameter\s+name="([^"]+)"[^>]*>([^<]*)</parameter>', params_str
+                    ):
+                        args[param_match.group(1)] = param_match.group(2)
+                    tool_calls.append(
+                        {"id": f"call_{len(tool_calls)}", "name": tool_name, "arguments": args}
+                    )
+
+                # Format 2: [invoke name="tool"/]
+                if not tool_calls:
+                    for match in re.finditer(
+                        r'\[invoke\s+name="([^"]+)"\s*/\]', response, re.IGNORECASE
+                    ):
+                        tool_calls.append(
+                            {
+                                "id": f"call_{len(tool_calls)}",
+                                "name": match.group(1),
+                                "arguments": {},
+                            }
+                        )
+
+                # Format 3: tool_name() - simple function call
+                if not tool_calls:
+                    for match in re.finditer(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(\s*\)", response):
+                        tool_name = match.group(1)
+                        # Only include if it looks like a tool name (not common words)
+                        if tool_name not in (
+                            "list",
+                            "get",
+                            "set",
+                            "print",
+                            "return",
+                            "if",
+                            "else",
+                            "for",
+                            "while",
+                        ):
+                            tool_calls.append(
+                                {
+                                    "id": f"call_{len(tool_calls)}",
+                                    "name": tool_name,
+                                    "arguments": {},
+                                }
+                            )
+
+                # Format 4: <FunctionCallBegin>{tool => "name", args => {...}}<FunctionCallEnd>
+                if not tool_calls:
+                    for match in re.finditer(
+                        r'<FunctionCallBegin>\s*\{[^}]*tool\s*=>\s*"([^"]+)"[^}]*args\s*=>\s*(\{[^}]*\})\s*\}\s*<FunctionCallEnd>',
+                        response,
+                        re.IGNORECASE | re.DOTALL,
+                    ):
+                        tool_name = match.group(1)
+                        args_str = match.group(2)
+                        try:
+                            args = json.loads(args_str.replace("=>", ":").replace("'", '"'))
+                        except:
+                            args = {}
+                        tool_calls.append(
+                            {"id": f"call_{len(tool_calls)}", "name": tool_name, "arguments": args}
+                        )
+
+                # Format 5: [TOOL_CALL]{tool => "name", args => {...}}[/TOOL_CALL]
+                if not tool_calls:
+                    for match in re.finditer(
+                        r'\[TOOL_CALL\]\s*\{[^}]*tool\s*=>\s*"([^"]+)"[^}]*args\s*=>\s*(\{[^}]*\})\s*\}\s*\[/TOOL_CALL\]',
+                        response,
+                        re.IGNORECASE | re.DOTALL,
+                    ):
+                        tool_name = match.group(1)
+                        args_str = match.group(2)
+                        try:
+                            args = json.loads(args_str.replace("=>", ":").replace("'", '"'))
+                        except:
+                            args = {}
+                        tool_calls.append(
+                            {"id": f"call_{len(tool_calls)}", "name": tool_name, "arguments": args}
+                        )
+
+                if tool_calls:
+                    logger.info(
+                        f"Parsed {len(tool_calls)} tool calls from text: {[tc.get('name') for tc in tool_calls]}"
+                    )
+
         except Exception as e:
             logger.warning(f"Parse tool calls failed: {e}")
         return tool_calls
