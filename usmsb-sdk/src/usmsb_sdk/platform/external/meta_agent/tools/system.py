@@ -58,21 +58,38 @@ def get_system_tools() -> List[Tool]:
             description="执行命令行命令。用于运行终端命令、脚本等。",
             handler=execute_command,
             security_level=SecurityLevel.HIGH,
-            requires_session=False,  # 全局命令执行
+            requires_session=False,
+            parameters={
+                "command": {"type": "string", "description": "要执行的命令行命令"},
+                "cwd": {"type": "string", "description": "工作目录路径"},
+                "timeout": {"type": "integer", "description": "超时时间（秒）"},
+            },
         ),
         Tool(
             name="run_program",
             description="运行程序或脚本文件",
             handler=run_program,
             security_level=SecurityLevel.HIGH,
-            requires_session=False,  # 全局程序执行
+            requires_session=False,
+            parameters={
+                "program_path": {"type": "string", "description": "程序或脚本的路径"},
+                "args": {"type": "array", "items": {"type": "string"}, "description": "命令行参数"},
+                "cwd": {"type": "string", "description": "工作目录"},
+                "timeout": {"type": "integer", "description": "超时时间"},
+            },
         ),
         Tool(
             name="read_file",
             description="读取文件内容（支持用户工作空间隔离）",
             handler=read_file,
             security_level=SecurityLevel.MEDIUM,
-            requires_session=True,  # 需要访问用户工作空间
+            requires_session=True,
+            parameters={
+                "path": {"type": "string", "description": "要读取的文件路径"},
+                "offset": {"type": "integer", "description": "起始位置"},
+                "limit": {"type": "integer", "description": "读取字节数"},
+                "encoding": {"type": "string", "description": "文件编码"},
+            },
         ),
         Tool(
             name="write_file",
@@ -80,6 +97,11 @@ def get_system_tools() -> List[Tool]:
             handler=write_file,
             security_level=SecurityLevel.HIGH,
             requires_session=True,
+            parameters={
+                "path": {"type": "string", "description": "要写入的文件路径"},
+                "content": {"type": "string", "description": "文件内容"},
+                "mode": {"type": "string", "description": "写入模式 (w/a)"},
+            },
         ),
         Tool(
             name="list_directory",
@@ -87,6 +109,11 @@ def get_system_tools() -> List[Tool]:
             handler=list_directory,
             security_level=SecurityLevel.LOW,
             requires_session=True,
+            parameters={
+                "path": {"type": "string", "description": "目录路径，默认为用户工作空间根目录"},
+                "show_hidden": {"type": "boolean", "description": "是否显示隐藏文件"},
+                "recursive": {"type": "boolean", "description": "是否递归列出子目录"},
+            },
         ),
         Tool(
             name="create_directory",
@@ -94,6 +121,9 @@ def get_system_tools() -> List[Tool]:
             handler=create_directory,
             security_level=SecurityLevel.MEDIUM,
             requires_session=True,
+            parameters={
+                "path": {"type": "string", "description": "要创建的目录路径"},
+            },
         ),
         Tool(
             name="delete_file",
@@ -101,6 +131,10 @@ def get_system_tools() -> List[Tool]:
             handler=delete_file,
             security_level=SecurityLevel.HIGH,
             requires_session=True,
+            parameters={
+                "path": {"type": "string", "description": "要删除的文件或目录路径"},
+                "recursive": {"type": "boolean", "description": "是否递归删除"},
+            },
         ),
         Tool(
             name="search_files",

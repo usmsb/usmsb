@@ -97,10 +97,50 @@ class Tool:
             }
 
     def _get_parameters(self) -> Dict[str, Any]:
-        """获取工具参数定义"""
-        if self.parameters:
-            return self.parameters
+        """
+        获取工具参数的 properties 字典
 
+        设计初衷：
+        MiniMax API 要求每个工具必须有有效的 parameters.properties 字段。
+        这个方法确保返回的始终是有效的 properties 字典，而不是完整的 schema。
+
+        常见错误格式：
+        - parameters={'type': 'object'}  # 缺少 properties
+        - parameters={}  # 空
+        - parameters={'type': 'object', 'properties': {}}  # properties 为空
+
+        正确格式：
+        - parameters={'type': 'object', 'properties': {'key': {...}}}
+        或者只传 properties：
+        - parameters={'key': {'type': 'string', 'description': '...'}}
+        """
+        # 检查 self.parameters 是否是有效的 properties 格式
+        if self.parameters:
+            # 情况1：完整的 JSON Schema 格式 {'type': 'object', 'properties': {...}}
+            if isinstance(self.parameters, dict):
+                if "properties" in self.parameters:
+                    # 提取 properties 字段
+                    props = self.parameters.get("properties", {})
+                    if props and isinstance(props, dict):
+                        # 过滤掉非属性字段（如 'type'）
+                        valid_props = {k: v for k, v in props.items()
+                                     if isinstance(v, dict) and 'type' in v}
+                        if valid_props:
+                            return valid_props
+
+                # 情况2：直接的 properties 格式 {'key': {'type': 'string', ...}}
+                # 检查是否所有值都是有效的属性定义
+                is_direct_props = all(
+                    isinstance(v, dict) and 'type' in v
+                    for v in self.parameters.values()
+                ) if self.parameters else False
+
+                if is_direct_props:
+                    return self.parameters
+
+                # 情况3：无效格式（如 {'type': 'object'}），忽略并使用预定义
+
+        # 使用预定义的参数映射
         params_map = {
             "execute_command": {
                 "command": {"type": "string", "description": "要执行的命令行命令"},
@@ -156,12 +196,14 @@ class Tool:
             },
         }
 
-        # If tool has no defined parameters, return a default empty object parameter
-        # This is required by MiniMax API
-        params = params_map.get(self.name, {})
-        if not params:
-            params = {"input": {"type": "string", "description": f"{self.name}的输入参数"}}
-        return params
+        # 尝试从预定义映射获取
+        params = params_map.get(self.name)
+        if params:
+            return params
+
+        # 如果没有预定义参数，返回默认的 input 参数
+        # 这是 MiniMax API 要求的：每个工具至少需要一个参数
+        return {"input": {"type": "string", "description": f"{self.name}的输入参数"}}
 
     def _get_required_parameters(self) -> List[str]:
         """获取必需的参数列表"""

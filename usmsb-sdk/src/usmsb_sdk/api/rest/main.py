@@ -258,6 +258,9 @@ async def lifespan(app: FastAPI):
     await meta_agent._init_components()
     await meta_agent._register_default_tools()
 
+    # Start Meta Agent (initializes TaskExecutor and other services)
+    await meta_agent.start()
+
     # Set the global meta_agent reference
     set_meta_agent(meta_agent)
     set_permission_manager(permission_manager)

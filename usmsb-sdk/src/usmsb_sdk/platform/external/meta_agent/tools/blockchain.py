@@ -7,14 +7,62 @@ from .registry import Tool
 
 def get_blockchain_tools():
     return [
-        Tool("create_wallet", "创建钱包", create_wallet),
-        Tool("get_balance", "查询余额", get_balance),
-        Tool("stake", "质押代币", stake),
-        Tool("unstake", "取消质押", unstaking),
-        Tool("vote", "投票", vote),
-        Tool("submit_proposal", "提交提案", submit_proposal),
-        Tool("switch_chain", "切换链", switch_chain),
-        Tool("get_chain_info", "获取链信息", get_chain_info),
+        Tool(
+            "create_wallet",
+            "创建钱包",
+            create_wallet,
+            parameters={
+                "chain": {"type": "string", "description": "区块链网络名称，如 ethereum, bsc"}
+            },
+        ),
+        Tool(
+            "get_balance",
+            "查询余额",
+            get_balance,
+            parameters={"address": {"type": "string", "description": "钱包地址"}},
+        ),
+        Tool(
+            "stake",
+            "质押代币",
+            stake,
+            parameters={"amount": {"type": "string", "description": "质押数量"}},
+        ),
+        Tool(
+            "unstake",
+            "取消质押",
+            unstaking,
+            parameters={"amount": {"type": "string", "description": "解除质押数量"}},
+        ),
+        Tool(
+            "vote",
+            "投票",
+            vote,
+            parameters={
+                "proposal_id": {"type": "string", "description": "提案ID"},
+                "support": {"type": "boolean", "description": "是否支持"},
+            },
+        ),
+        Tool(
+            "submit_proposal",
+            "提交提案",
+            submit_proposal,
+            parameters={
+                "title": {"type": "string", "description": "提案标题"},
+                "description": {"type": "string", "description": "提案描述"},
+            },
+        ),
+        Tool(
+            "switch_chain",
+            "切换链",
+            switch_chain,
+            parameters={"chain": {"type": "string", "description": "区块链网络名称"}},
+        ),
+        Tool(
+            "get_chain_info",
+            "获取链信息",
+            get_chain_info,
+            parameters={"chain": {"type": "string", "description": "区块链网络名称"}},
+        ),
     ]
 
 
