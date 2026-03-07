@@ -11,8 +11,10 @@ Authentication:
 import json
 import time
 import uuid
+import asyncio
+import httpx
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -263,6 +265,144 @@ async def update_agent(
     return AgentResponse(**parsed)
 
 
+# ============================================================================
+# Agent 连通性检测 (Ping)
+# ============================================================================
+
+class AgentPingResponse(BaseModel):
+    """Response from agent ping/health check."""
+    success: bool
+    agent_id: str
+    reachable: bool
+    endpoint: str
+    latency_ms: Optional[int] = None
+    error: Optional[str] = None
+    agent_status: Optional[str] = None
+    last_heartbeat: Optional[float] = None
+
+
+async def _check_agent_connectivity(
+    endpoint: str,
+    timeout: float = 5.0
+) -> Dict[str, Any]:
+    """
+    Check if an agent is reachable via its endpoint.
+
+    Returns:
+        dict with keys: reachable (bool), latency_ms (int), error (str)
+    """
+    if not endpoint:
+        return {
+            "reachable": False,
+            "latency_ms": None,
+            "error": "Agent has no endpoint configured"
+        }
+
+    try:
+        start_time = time.time()
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            trust_env=False
+        ) as client:
+            # Try /health endpoint first, fallback to / (root)
+            try:
+                response = await client.get(f"{endpoint}/health")
+            except Exception:
+                try:
+                    response = await client.get(f"{endpoint}/")
+                except Exception as e:
+                    latency = int((time.time() - start_time) * 1000)
+                    return {
+                        "reachable": False,
+                        "latency_ms": latency,
+                        "error": f"Cannot connect to agent: {type(e).__name__}: {str(e)}"
+                    }
+
+            latency = int((time.time() - start_time) * 1000)
+
+            if response.status_code == 200:
+                return {
+                    "reachable": True,
+                    "latency_ms": latency,
+                    "error": None
+                }
+            else:
+                return {
+                    "reachable": False,
+                    "latency_ms": latency,
+                    "error": f"Agent returned HTTP {response.status_code}"
+                }
+
+    except httpx.TimeoutException:
+        latency = int((time.time() - start_time) * 1000)
+        return {
+            "reachable": False,
+            "latency_ms": latency,
+            "error": "Connection timeout - agent may be offline"
+        }
+    except httpx.ConnectError as e:
+        latency = int((time.time() - start_time) * 1000)
+        return {
+            "reachable": False,
+            "latency_ms": latency,
+            "error": f"Connection refused - agent is not running at {endpoint}"
+        }
+    except Exception as e:
+        latency = int((time.time() - start_time) * 1000)
+        return {
+            "reachable": False,
+            "latency_ms": latency,
+            "error": f"{type(e).__name__}: {str(e)}"
+        }
+
+
+@router.get("/{agent_id}/ping", response_model=AgentPingResponse)
+async def ping_agent(
+    agent_id: str,
+    user: Dict[str, Any] = Depends(get_optional_user_unified)
+):
+    """Ping an agent to check if it's reachable.
+
+    This endpoint checks if an agent is actually online by attempting to
+    connect to its endpoint's /health or / endpoint.
+
+    Returns:
+        - reachable: Whether the agent is actually reachable
+        - latency_ms: Response time in milliseconds
+        - error: Error message if not reachable
+
+    Note: This does NOT require authentication (X-API-Key), so it can be
+    used to check any agent's status without credentials.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Get agent from database
+    agent_data = db_get_agent(agent_id)
+    if not agent_data:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+
+    endpoint = agent_data.get("endpoint", "")
+    agent_status = agent_data.get("status", "offline")
+    last_heartbeat = agent_data.get("last_heartbeat", 0)
+
+    # Check connectivity
+    connectivity = await _check_agent_connectivity(endpoint)
+
+    logger.info(f"Ping agent {agent_id}: reachable={connectivity['reachable']}, latency={connectivity.get('latency_ms')}ms")
+
+    return AgentPingResponse(
+        success=True,
+        agent_id=agent_id,
+        reachable=connectivity["reachable"],
+        endpoint=endpoint,
+        latency_ms=connectivity.get("latency_ms"),
+        error=connectivity.get("error"),
+        agent_status=agent_status,
+        last_heartbeat=float(last_heartbeat) if last_heartbeat and last_heartbeat > 0 else None
+    )
+
+
 @router.post("/{agent_id}/heartbeat", response_model=AgentHeartbeatResponse)
 async def agent_heartbeat(
     agent_id: str,
@@ -275,12 +415,46 @@ async def agent_heartbeat(
     to maintain their online status. If no heartbeat is received within TTL seconds,
     the agent will be marked as offline.
 
+    Optional: If the agent has an endpoint configured, this will also verify
+    connectivity to ensure the agent is truly reachable.
+
     Requires:
         - X-API-Key header
         - X-Agent-ID header (must match agent_id)
+
+    Query Parameters:
+        - check_connectivity: If true (default), will ping the agent's endpoint
+          to verify it's actually reachable before updating heartbeat
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     # Verify agent_id matches authenticated agent
     verify_agent_access(user, agent_id)
+
+    # Get agent endpoint for connectivity check
+    agent_data = db_get_agent(agent_id)
+    endpoint = agent_data.get("endpoint", "") if agent_data else ""
+
+    # Check connectivity if endpoint is configured
+    if endpoint:
+        connectivity = await _check_agent_connectivity(endpoint, timeout=3.0)
+        logger.debug(f"Heartbeat connectivity check for {agent_id}: reachable={connectivity['reachable']}")
+
+        # If agent is not reachable, fail the heartbeat
+        if not connectivity["reachable"]:
+            logger.warning(
+                f"Agent {agent_id} heartbeat failed: agent is not reachable: {connectivity.get('error')}"
+            )
+            # Return error response with connectivity info
+            return AgentHeartbeatResponse(
+                success=False,
+                agent_id=agent_id,
+                status="offline",
+                timestamp=time.time(),
+                ttl_remaining=0,
+                renew_registration=False,
+            )
 
     status_value = request.status if request else "online"
     success = update_agent_heartbeat(agent_id, status_value)
@@ -610,16 +784,20 @@ async def invoke_agent(
 
     This endpoint forwards requests to registered agents.
     If the agent has an endpoint configured, it will try to call it directly.
-    Otherwise, it returns a mock response for demo purposes.
 
     This enables the frontend "Send Test" functionality to work with agents.
+
+    Error cases:
+    - No endpoint configured: "Agent 未配置 endpoint，无法接收请求"
+    - Connection timeout: "Agent 连接超时 (X ms)，Agent 可能已离线"
+    - Connection refused: "Agent 连接被拒绝，请确认 Agent 已在运行"
+    - HTTP error: "Agent 返回错误状态码 X"
 
     Requires:
         - X-API-Key header
         - X-Agent-ID header (must match agent_id being invoked)
     """
     import logging
-    import httpx
 
     logger = logging.getLogger(__name__)
 
@@ -632,6 +810,7 @@ async def invoke_agent(
         raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
 
     agent_endpoint = agent_data.get("endpoint")
+    agent_name = agent_data.get("name", agent_id)
     method = request.method if request else "chat"
 
     # If agent has endpoint, try to call it
@@ -642,6 +821,7 @@ async def invoke_agent(
                 timeout=10.0,
                 trust_env=False
             ) as client:
+                start_time = time.time()
                 response = await client.post(
                     f"{agent_endpoint}/invoke",
                     json={
@@ -649,6 +829,7 @@ async def invoke_agent(
                         "params": request.params if request else {"message": "test"}
                     }
                 )
+                latency_ms = int((time.time() - start_time) * 1000)
 
                 if response.status_code == 200:
                     return AgentInvokeResponse(
@@ -660,20 +841,48 @@ async def invoke_agent(
                     logger.warning(f"Agent {agent_id} returned status {response.status_code}")
                     return AgentInvokeResponse(
                         success=False,
-                        error=f"Agent service unavailable (status {response.status_code}). Please ensure the agent is running at {agent_endpoint}",
+                        error=f"Agent 返回错误状态码 {response.status_code}，请确认 Agent 已在 {agent_endpoint} 运行",
                         agent_id=agent_id
                     )
-        except Exception as e:
-            logger.warning(f"Failed to invoke agent {agent_id} at {agent_endpoint}: {e}")
+        except httpx.TimeoutException:
+            logger.warning(f"Agent {agent_id} invoke timeout at {agent_endpoint}")
             return AgentInvokeResponse(
                 success=False,
-                error=f"Agent service unavailable. Cannot connect to {agent_endpoint}. Please ensure the agent is running.",
+                error="Agent 连接超时 (10s)，Agent 可能已离线，请检查 Agent 是否正在运行",
                 agent_id=agent_id
             )
+        except httpx.ConnectError as e:
+            logger.warning(f"Agent {agent_id} connect error at {agent_endpoint}: {e}")
+            return AgentInvokeResponse(
+                success=False,
+                error=f"Agent 连接被拒绝，请确认 Agent 已在 {agent_endpoint} 运行",
+                agent_id=agent_id
+            )
+        except Exception as e:
+            logger.warning(f"Failed to invoke agent {agent_id} at {agent_endpoint}: {e}")
+            error_msg = str(e)
+            if "timeout" in error_msg.lower():
+                return AgentInvokeResponse(
+                    success=False,
+                    error="Agent 连接超时，Agent 可能已离线",
+                    agent_id=agent_id
+                )
+            elif "connect" in error_msg.lower():
+                return AgentInvokeResponse(
+                    success=False,
+                    error=f"无法连接到 Agent ({error_msg})，请确认 Agent 正在运行",
+                    agent_id=agent_id
+                )
+            else:
+                return AgentInvokeResponse(
+                    success=False,
+                    error=f"Agent 服务不可用: {error_msg}",
+                    agent_id=agent_id
+                )
 
     # No endpoint configured
     return AgentInvokeResponse(
         success=False,
-        error=f"Agent {agent_data.get('name', agent_id)} has no endpoint configured. Cannot process request.",
+        error=f"Agent [{agent_name}] 未配置 endpoint，无法接收请求。请先配置 Agent 的 endpoint 地址。",
         agent_id=agent_id
     )

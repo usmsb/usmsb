@@ -233,7 +233,7 @@ class MarketplaceAPI(BaseAPI):
         skills: Optional[list] = None,
         **kwargs
     ) -> Dict:
-        return await self.client.post("/services", {
+        return await self.client.post(f"/agents/{self.client.agent_id}/services", {
             "name": name,
             "price": price,
             "description": description,
@@ -665,78 +665,62 @@ class PreMatchNegotiationAPI(BaseAPI):
 class MetaAgentAPI(BaseAPI):
     """Meta Agent API handler for intelligent recommendations."""
 
-    async def initiate_conversation(
+    async def chat(
         self,
-        conversation_type: str = "introduction",
-        **kwargs
-    ) -> Dict:
-        """Initiate conversation with Meta Agent."""
-        return await self.client.post("/meta-agent/conversations", {
-            "agent_id": self.client.agent_id,
-            "conversation_type": conversation_type,
-            **kwargs
-        })
-
-    async def get_conversation(self, conversation_id: str) -> Dict:
-        """Get conversation details."""
-        return await self.client.get(f"/meta-agent/conversations/{conversation_id}")
-
-    async def send_message(
-        self,
-        conversation_id: str = "",
         message: str = "",
+        wallet_address: Optional[str] = None,
+        context: Optional[Dict] = None,
         **kwargs
     ) -> Dict:
-        """Send message in conversation."""
-        return await self.client.post(
-            f"/meta-agent/conversations/{conversation_id}/messages",
-            {
-                "message": message,
-                **kwargs
-            }
-        )
+        """Chat with Meta Agent.
 
-    async def consult(self, question: str = "", **kwargs) -> Dict:
-        """Consult Meta Agent."""
-        return await self.client.post("/meta-agent/consult", {
-            "agent_id": self.client.agent_id,
-            "question": question,
+        Args:
+            message: The message to send
+            wallet_address: Optional wallet address (uses agent's wallet if not provided)
+            context: Optional context dictionary
+        """
+        target_wallet = wallet_address or self.client.agent_id
+        return await self.client.post("/meta-agent/chat", {
+            "message": message,
+            "wallet_address": target_wallet,
+            "context": context or {},
             **kwargs
         })
 
-    async def showcase(
+    async def get_history(
         self,
-        showcase_data: Optional[Dict] = None,
+        wallet_address: Optional[str] = None,
+        limit: int = 50,
         **kwargs
     ) -> Dict:
-        """Send showcase to Meta Agent."""
-        return await self.client.post("/meta-agent/showcase", {
-            "agent_id": self.client.agent_id,
-            "showcase": showcase_data or {},
-            **kwargs
-        })
+        """Get conversation history for a wallet address.
 
-    async def recommend(
-        self,
-        demand: Optional[Dict] = None,
-        limit: int = 10,
-        **kwargs
-    ) -> Dict:
-        """Get agent recommendations."""
-        return await self.client.post("/meta-agent/recommend", {
-            "demand": demand or {},
+        Args:
+            wallet_address: Optional wallet address (uses agent's wallet if not provided)
+            limit: Maximum number of messages to return
+        """
+        target_wallet = wallet_address or self.client.agent_id
+        return await self.client.get(f"/meta-agent/history/{target_wallet}", {
             "limit": limit,
             **kwargs
         })
 
-    async def get_profile(self, agent_id: str = "") -> Dict:
-        """Get agent profile from Meta Agent."""
-        target_id = agent_id or self.client.agent_id
-        return await self.client.get(f"/meta-agent/profiles/{target_id}")
+    async def get_user_info(self, wallet_address: Optional[str] = None) -> Dict:
+        """Get user info including permissions and stake.
 
-    async def list_profiles(self) -> Dict:
-        """List all agent profiles."""
-        return await self.client.get("/meta-agent/profiles")
+        Args:
+            wallet_address: Optional wallet address (uses agent's wallet if not provided)
+        """
+        target_wallet = wallet_address or self.client.agent_id
+        return await self.client.get(f"/meta-agent/user/{target_wallet}")
+
+    async def get_evolution_stats(self) -> Dict:
+        """Get evolution statistics."""
+        return await self.client.get("/meta-agent/evolution-stats")
+
+    async def get_tools(self) -> Dict:
+        """Get available tools from Meta Agent."""
+        return await self.client.get("/meta-agent/tools")
 
 
 # ==================== Staking API (NEW) ====================
@@ -764,12 +748,13 @@ class StakingAPI(BaseAPI):
 
     async def get_rewards(self, agent_id: str = "") -> Dict:
         """Get pending rewards."""
-        target_id = agent_id or self.client.agent_id
-        return await self.client.get(f"/staking/{target_id}/rewards")
+        # Backend uses authenticated context, no ID in path
+        return await self.client.get("/staking/rewards")
 
     async def claim_rewards(self, **kwargs) -> Dict:
         """Claim pending rewards."""
-        return await self.client.post(f"/staking/{self.client.agent_id}/claim", kwargs)
+        # Backend uses authenticated context, no ID in path
+        return await self.client.post("/staking/claim", kwargs)
 
 
 # ==================== Reputation API (NEW) ====================
@@ -778,8 +763,8 @@ class ReputationAPI(BaseAPI):
 
     async def get(self, agent_id: str = "") -> Dict:
         """Get agent reputation."""
-        target_id = agent_id or self.client.agent_id
-        return await self.client.get(f"/api/agents/{target_id}/reputation")
+        # Backend uses authenticated context
+        return await self.client.get("/reputation")
 
     async def get_history(
         self,
@@ -788,8 +773,8 @@ class ReputationAPI(BaseAPI):
         **kwargs
     ) -> Dict:
         """Get reputation history."""
-        target_id = agent_id or self.client.agent_id
-        return await self.client.get(f"/api/agents/{target_id}/reputation/history", {
+        # Backend uses authenticated context
+        return await self.client.get("/reputation/history", {
             "limit": limit,
             **kwargs
         })

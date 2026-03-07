@@ -2,10 +2,13 @@
 Meta Agent Router
 """
 
+import asyncio
+import json
 import logging
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -108,13 +111,13 @@ async def chat(request: ChatRequest):
 
     try:
         logger.info(f"DEBUG calling _meta_agent.chat, agent={type(_meta_agent)}")
-        # 设置 3 分钟超时
+        # 设置 5 分钟超时（复杂任务需要更长时间）
         result = await asyncio.wait_for(
             _meta_agent.chat(
                 message=request.message,
                 wallet_address=request.wallet_address,
             ),
-            timeout=180.0,
+            timeout=300.0,
         )
         logger.info(f"DEBUG chat result: {result[:100] if result else 'EMPTY'}")
         return ChatResponse(
@@ -375,3 +378,201 @@ async def check_tool_permission(wallet_address: str, tool_name: str):
     except Exception as e:
         logger.error(f"Check tool permission error: {e}")
         return {"allowed": False, "reason": str(e)}
+
+
+# ============ Task Plan APIs (P1: Step-by-step Execution) ============
+
+
+class TaskPlanResponse(BaseModel):
+    task_id: str
+    status: str
+    complexity: str
+    total_steps: int
+    completed_steps: int
+    progress_percentage: float
+    estimated_time: int
+    steps: List[Dict]
+
+
+class ConfirmPlanRequest(BaseModel):
+    task_id: str
+
+
+@router.get("/task/{task_id}", response_model=TaskPlanResponse)
+async def get_task_plan(task_id: str):
+    """Get task plan status and progress."""
+    if _meta_agent is None:
+        raise HTTPException(status_code=500, detail="Meta agent not initialized")
+
+    try:
+        plan_dict = _meta_agent.get_task_plan(task_id)
+        if plan_dict is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        return TaskPlanResponse(
+            task_id=plan_dict["task_id"],
+            status=plan_dict["status"],
+            complexity=plan_dict["complexity"],
+            total_steps=plan_dict["total_steps"],
+            completed_steps=plan_dict["completed_steps"],
+            progress_percentage=plan_dict["progress_percentage"],
+            estimated_time=plan_dict["estimated_time"],
+            steps=plan_dict["steps"],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get task plan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/task/confirm")
+async def confirm_task_plan(request: ConfirmPlanRequest):
+    """Confirm and start executing a task plan."""
+    if _meta_agent is None:
+        raise HTTPException(status_code=500, detail="Meta agent not initialized")
+
+    try:
+        result = await _meta_agent.confirm_and_execute_plan(request.task_id)
+        return {"success": True, "message": result}
+    except Exception as e:
+        logger.error(f"Confirm task plan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/task/{task_id}/cancel")
+async def cancel_task_plan(task_id: str):
+    """Cancel a task plan."""
+    if _meta_agent is None:
+        raise HTTPException(status_code=500, detail="Meta agent not initialized")
+
+    try:
+        if _meta_agent.task_executor is None:
+            raise HTTPException(status_code=500, detail="Task executor not initialized")
+
+        success = _meta_agent.task_executor.cancel_task(task_id)
+        if success:
+            return {"success": True, "message": "Task cancelled"}
+        else:
+            return {"success": False, "message": "Task not found or already completed"}
+    except Exception as e:
+        logger.error(f"Cancel task plan error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ P3: Frontend Progress Display ============
+
+
+@router.get("/tasks/{wallet_address}")
+async def get_wallet_tasks(wallet_address: str, status: Optional[str] = None):
+    """Get all tasks for a wallet address."""
+    if _meta_agent is None:
+        raise HTTPException(status_code=500, detail="Meta agent not initialized")
+
+    try:
+        if _meta_agent.task_executor is None:
+            return []
+
+        tasks = _meta_agent.task_executor.get_tasks_by_wallet(wallet_address)
+        return [
+            {
+                "task_id": t.task_id,
+                "user_request": t.user_request[:100],
+                "complexity": t.complexity.value,
+                "status": t.status.value,
+                "progress": t.get_progress_percentage(),
+                "total_steps": len(t.steps),
+                "completed_steps": len(t.get_completed_steps()),
+                "created_at": t.created_at.isoformat(),
+                "updated_at": t.updated_at.isoformat(),
+            }
+            for t in tasks
+            if status is None or t.status.value == status
+        ]
+    except Exception as e:
+        logger.error(f"Get wallet tasks error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/task/{task_id}/progress/stream")
+async def stream_task_progress(task_id: str):
+    """
+    SSE endpoint for real-time task progress updates.
+
+    Frontend can connect to this endpoint to receive progress updates
+    as Server-Sent Events.
+
+    Usage:
+        const eventSource = new EventSource('/api/meta-agent/task/{task_id}/progress/stream');
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // Update UI with progress
+        };
+    """
+    if _meta_agent is None:
+        raise HTTPException(status_code=500, detail="Meta agent not initialized")
+
+    async def event_generator():
+        """Generate SSE events for task progress."""
+        last_progress = -1
+
+        while True:
+            try:
+                if _meta_agent.task_executor is None:
+                    yield f"data: {json.dumps({'error': 'Task executor not initialized'})}\n\n"
+                    break
+
+                plan = _meta_agent.task_executor.get_task(task_id)
+                if plan is None:
+                    yield f"data: {json.dumps({'error': 'Task not found'})}\n\n"
+                    break
+
+                current_progress = plan.get_progress_percentage()
+
+                # Only send update if progress changed
+                if current_progress != last_progress:
+                    progress_data = {
+                        "task_id": plan.task_id,
+                        "status": plan.status.value,
+                        "progress_percentage": current_progress,
+                        "current_step_index": plan.current_step_index,
+                        "total_steps": len(plan.steps),
+                        "completed_steps": len(plan.get_completed_steps()),
+                        "current_step": (
+                            plan.steps[plan.current_step_index].name
+                            if plan.current_step_index < len(plan.steps)
+                            else None
+                        ),
+                        "steps": [
+                            {
+                                "name": s.name,
+                                "status": s.status.value,
+                                "description": s.description,
+                            }
+                            for s in plan.steps
+                        ],
+                    }
+                    yield f"data: {json.dumps(progress_data)}\n\n"
+                    last_progress = current_progress
+
+                # Check if task is complete
+                if plan.status.value in ["completed", "failed", "cancelled"]:
+                    break
+
+                # Wait before next check
+                await asyncio.sleep(0.5)
+
+            except Exception as e:
+                logger.error(f"SSE error: {e}")
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

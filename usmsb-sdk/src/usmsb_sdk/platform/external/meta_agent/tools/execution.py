@@ -30,14 +30,23 @@ def get_execution_tools() -> List[Tool]:
             description="执行 Python 代码并返回结果。支持标准库和常见第三方库。",
             handler=execute_python,
             security_level=SecurityLevel.HIGH,
-            requires_session=True,  # 需要访问用户的沙箱
+            requires_session=True,
+            parameters={
+                "code": {"type": "string", "description": "要执行的 Python 代码"},
+                "timeout": {"type": "integer", "description": "超时时间（秒）"},
+            },
         ),
         Tool(
             name="run_command",
             description="在沙箱中执行 shell 命令（如 npm install, node app.js）。工作目录默认是用户的 workspace 目录。",
             handler=run_command,
             security_level=SecurityLevel.HIGH,
-            requires_session=True,  # 需要访问用户的沙箱
+            requires_session=True,
+            parameters={
+                "command": {"type": "string", "description": "要执行的 shell 命令"},
+                "cwd": {"type": "string", "description": "工作目录"},
+                "timeout": {"type": "integer", "description": "超时时间（秒）"},
+            },
         ),
         Tool(
             name="start_vscode",
@@ -45,6 +54,9 @@ def get_execution_tools() -> List[Tool]:
             handler=start_vscode_server,
             security_level=SecurityLevel.MEDIUM,
             requires_session=True,
+            parameters={
+                "port": {"type": "integer", "description": "VSCode Server 端口"},
+            },
         ),
         Tool(
             name="stop_vscode",
@@ -52,6 +64,7 @@ def get_execution_tools() -> List[Tool]:
             handler=stop_vscode_server,
             security_level=SecurityLevel.MEDIUM,
             requires_session=True,
+            parameters={},
         ),
         Tool(
             name="vscode_status",
@@ -59,6 +72,7 @@ def get_execution_tools() -> List[Tool]:
             handler=get_vscode_status,
             security_level=SecurityLevel.LOW,
             requires_session=True,
+            parameters={},
         ),
         Tool(
             name="execute_javascript",

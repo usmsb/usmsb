@@ -9,6 +9,8 @@ from .execution import ExecutionService
 from .interaction import InteractionService
 from .learning import LearningService
 from .risk_manager import RiskManager
+from .background_processor import BackgroundTaskProcessor
+from .task_executor import TaskExecutor
 
 __all__ = [
     "PerceptionService",
@@ -17,4 +19,6 @@ __all__ = [
     "InteractionService",
     "LearningService",
     "RiskManager",
+    "BackgroundTaskProcessor",
+    "TaskExecutor",
 ]

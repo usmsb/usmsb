@@ -163,9 +163,6 @@ class PermissionManager:
 
     async def get_user(self, wallet_address: str) -> Optional[UserPermission]:
         """获取用户权限信息"""
-        import sys
-        import traceback
-
         # 检查缓存
         if wallet_address in self._user_cache:
             return self._user_cache[wallet_address]
@@ -177,12 +174,11 @@ class PermissionManager:
                 self._user_cache[wallet_address] = user
                 return user
             else:
-                # 自动注册为新用户
-                user = await self.register_user(wallet_address, UserRole.HUMAN)
-                return user
-        except RecursionError:
-            logger.error(f"RecursionError in get_user for {wallet_address}")
-            logger.error(f"Call stack: {traceback.format_exc()}")
+                # 用户不存在时，返回 None，由调用方决定如何处理
+                logger.info(f"User {wallet_address} not found in database")
+                return None
+        except Exception as e:
+            logger.error(f"Error in get_user for {wallet_address}: {e}")
             return None
 
     async def update_role(

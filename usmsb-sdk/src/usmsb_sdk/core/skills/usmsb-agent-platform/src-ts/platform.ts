@@ -442,7 +442,7 @@ export class AgentPlatform {
    */
   async requestBinding(message: string = ""): Promise<BindingRequestResult> {
     const client = new RegistrationClient(this.baseUrl);
-    return client.requestBinding(this.apiKey, message);
+    return client.requestBinding(this.apiKey, this.agentId, message);
   }
 
   /**
@@ -450,7 +450,7 @@ export class AgentPlatform {
    */
   async getBindingStatus(): Promise<BindingStatus> {
     const client = new RegistrationClient(this.baseUrl);
-    return client.getBindingStatus(this.apiKey);
+    return client.getBindingStatus(this.apiKey, this.agentId);
   }
 
   // === Profile Management ===
@@ -461,7 +461,7 @@ export class AgentPlatform {
   async getProfile(): Promise<PlatformResult> {
     const client = this.getClient();
     try {
-      const result = await client.get("/api/agents/profile");
+      const result = await client.get("/api/agents/v2/profile");
       return { success: true, result };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -483,7 +483,7 @@ export class AgentPlatform {
     if (capabilities !== undefined) data.capabilities = capabilities;
 
     try {
-      const result = await client.post("/api/agents/profile", data);
+      const result = await client.patch("/api/agents/v2/profile", data);
       return { success: true, result };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -498,7 +498,7 @@ export class AgentPlatform {
   async listApiKeys(): Promise<PlatformResult> {
     const client = this.getClient();
     try {
-      const result = await client.get("/api/agents/api-keys");
+      const result = await client.get(`/api/agents/v2/${this.agentId}/api-keys`);
       return { success: true, result };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -511,7 +511,7 @@ export class AgentPlatform {
   async createApiKey(name: string = "", expiresInDays: number = 365): Promise<PlatformResult> {
     const client = this.getClient();
     try {
-      const result = await client.post("/api/agents/api-keys", {
+      const result = await client.post(`/api/agents/v2/${this.agentId}/api-keys`, {
         name,
         expires_in_days: expiresInDays,
       });
@@ -531,7 +531,7 @@ export class AgentPlatform {
   async revokeApiKey(keyId: string): Promise<PlatformResult> {
     const client = this.getClient();
     try {
-      const result = await client.post(`/api/agents/api-keys/${keyId}/revoke`, {});
+      const result = await client.post(`/api/agents/v2/${this.agentId}/api-keys/${keyId}/revoke`, {});
       return { success: true, result, message: "API Key revoked" };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -544,7 +544,7 @@ export class AgentPlatform {
   async renewApiKey(keyId: string, extendsDays: number = 365): Promise<PlatformResult> {
     const client = this.getClient();
     try {
-      const result = await client.post(`/api/agents/api-keys/${keyId}/renew`, {
+      const result = await client.post(`/api/agents/v2/${this.agentId}/api-keys/${keyId}/renew`, {
         extends_days: extendsDays,
       });
       return { success: true, result };
@@ -561,7 +561,7 @@ export class AgentPlatform {
   async getOwnerInfo(): Promise<PlatformResult> {
     const client = this.getClient();
     try {
-      const result = await client.get("/api/agents/owner");
+      const result = await client.get("/api/agents/v2/owner");
       return { success: true, result };
     } catch (e: any) {
       return { success: false, error: e.message };

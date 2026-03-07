@@ -647,13 +647,13 @@ class RecommenderAgent(BaseSystemAgent):
         """Execute rate skill"""
         agent_id = params.get("agent_id")
         rating = params.get("rating")
-        reviewer_id = params.get("reviewer_id")
+        reviewer_id = params.get("reviewer_id") or params.get("wallet_address")
         task_type = params.get("task_type")
         comment = params.get("comment")
         success = params.get("success", True)
 
-        if not agent_id or rating is None or not reviewer_id:
-            raise ValueError("agent_id, rating, and reviewer_id are required")
+        if not agent_id or rating is None:
+            raise ValueError("agent_id and rating are required")
 
         if agent_id not in self._agent_profiles:
             raise ValueError(f"Unknown agent: {agent_id}")

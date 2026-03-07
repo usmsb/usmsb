@@ -31,11 +31,17 @@ class MiniMaxAdapter(ILLMAdapter):
     Uses httpx directly for proper Bearer token authentication.
     """
 
-    DEFAULT_MODEL = "MiniMax-M2.5"
+    DEFAULT_MODEL = "abab6.5s-chat"
     DEFAULT_EMBEDDING_MODEL = "embo-01"
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
     EMBEDDING_BASE_URL = "https://api.minimaxi.com"
+
+    # MiniMax 有两个 API 端点：
+    # - Anthropic 兼容: https://api.minimaxi.com/anthropic (工具调用有问题，报错 2013)
+    # - OpenAI 兼容: https://api.minimaxi.com/v1 (工具调用正常)
+    # 默认使用 OpenAI 兼容端点
+    OPENAI_COMPAT_BASE_URL = "https://api.minimaxi.com/v1"
 
     def __init__(self, config: Optional[IntelligenceSourceConfig] = None):
         """
@@ -43,6 +49,10 @@ class MiniMaxAdapter(ILLMAdapter):
 
         Args:
             config: Configuration for the adapter. If None, uses environment variables.
+
+        Note:
+            使用 OpenAI 兼容端点 (https://api.minimaxi.com/v1) 而不是 Anthropic 端点，
+            因为 Anthropic 端点的工具调用功能存在问题 (错误代码 2013)。
         """
         if config is None:
             config = IntelligenceSourceConfig(
@@ -51,7 +61,7 @@ class MiniMaxAdapter(ILLMAdapter):
                 api_key=os.getenv("MINIMAX_API_KEY"),
                 model=os.getenv("MINIMAX_MODEL", self.DEFAULT_MODEL),
                 extra_params={
-                    "base_url": os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/anthropic"),
+                    "base_url": os.getenv("MINIMAX_BASE_URL", self.OPENAI_COMPAT_BASE_URL),
                 },
             )
 
@@ -63,7 +73,7 @@ class MiniMaxAdapter(ILLMAdapter):
         )
         self.max_tokens = config.extra_params.get("max_tokens", self.DEFAULT_MAX_TOKENS)
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
-        self.base_url = config.extra_params.get("base_url", "https://api.minimaxi.com/anthropic")
+        self.base_url = config.extra_params.get("base_url", self.OPENAI_COMPAT_BASE_URL)
 
         self._client: Optional[httpx.AsyncClient] = None
         self._embedding_client: Optional[httpx.AsyncClient] = None
@@ -78,14 +88,14 @@ class MiniMaxAdapter(ILLMAdapter):
         try:
             # Create httpx client with proper Bearer token authentication
             # MiniMax requires Authorization: Bearer {api_key}
+            # 增加超时时间以避免连接断开
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers={
                     "Authorization": f"Bearer {self.config.api_key}",
                     "Content-Type": "application/json",
-                    "anthropic-version": "2023-06-01",
                 },
-                timeout=httpx.Timeout(120.0, connect=10.0),
+                timeout=httpx.Timeout(300.0, connect=30.0),  # 增加到5分钟超时，30秒连接超时
             )
 
             # Create embedding client for MiniMax embedding API
@@ -139,13 +149,19 @@ class MiniMaxAdapter(ILLMAdapter):
         system: Optional[str] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """Make a raw chat request to MiniMax API."""
+        """
+        Make a raw chat request to MiniMax API.
+
+        使用 OpenAI 兼容端点 /v1/text/chatcompletion_v2 进行请求，
+        因为 Anthropic 兼容端点的工具调用功能存在问题 (错误代码 2013)。
+        """
         if not self._client:
             await self.initialize()
 
         if not self._client:
             raise RuntimeError("MiniMax client not initialized")
 
+        # 构建 OpenAI 兼容格式的 payload
         payload = {
             "model": self.model,
             "max_tokens": max_tokens or self.max_tokens,
@@ -153,12 +169,23 @@ class MiniMaxAdapter(ILLMAdapter):
             "messages": messages,
         }
 
+        # 添加系统消息（如果有）
         if system:
-            payload["system"] = system
+            # 在 OpenAI 格式中，系统消息放在 messages 数组的开头
+            payload["messages"] = [{"role": "system", "content": system}] + messages
 
         if tools:
             payload["tools"] = tools
+            # 打印 payload 中的 tools 结构
+            print(f"🔍 [MINIMAX PAYLOAD] tools[0] structure: {json.dumps(tools[0], ensure_ascii=False)[:500]}")
+            logger.info(f"MiniMax payload tools[0]: {json.dumps(tools[0], ensure_ascii=False)[:500]}")
             print(f"DEBUG: Sending {len(tools)} tools to MiniMax")
+            # Print all tool names
+            print("DEBUG: All tool names in minimax_adapter:")
+            for i, t in enumerate(tools):
+                func = t.get("function", {})
+                name = func.get("name", "EMPTY")
+                print(f"  Tool {i}: '{name}'")
             logger.info(f"MiniMax API: sending {len(tools)} tools")
             # Detailed check for all tools
             for i, t in enumerate(tools):
@@ -195,25 +222,75 @@ class MiniMaxAdapter(ILLMAdapter):
                 print(f"DEBUG: First tool: {sample}")
                 logger.info(f"Sample tool: {sample}")
 
-        try:
-            response = await self._client.post("/v1/messages", json=payload)
+        max_retries = 3
+        retry_count = 0
+        last_error = None
 
-            if response.status_code != 200:
-                error_text = response.text
-                logger.error(f"MiniMax API error: {response.status_code} - {error_text}")
-                raise RuntimeError(f"MiniMax API error: {response.status_code} - {error_text}")
+        while retry_count < max_retries:
+            try:
+                # 使用 OpenAI 兼容端点
+                # 注意：base_url 已经是 https://api.minimaxi.com/v1，所以这里只需要路径 /text/chatcompletion_v2
+                response = await self._client.post("/text/chatcompletion_v2", json=payload)
 
-            return response.json()
-        except httpx.HTTPError as e:
-            logger.error(f"MiniMax HTTP error: {e}")
-            raise
+                print(f"🔍 [MINIMAX] status_code: {response.status_code}")
+                logger.info(f"MiniMax status_code: {response.status_code}")
+
+                # 先解析响应
+                raw_response = response.json()
+                print(f"🔍 [MINIMAX RAW] response keys: {raw_response.keys()}")
+                print(f"🔍 [MINIMAX RAW] response: {json.dumps(raw_response, ensure_ascii=False)[:500]}")
+                logger.info(f"MiniMax raw response: {raw_response}")
+
+                # 检查是否有 API 错误
+                base_resp = raw_response.get("base_resp", {})
+                if base_resp.get("status_code") != 0:
+                    error_msg = base_resp.get("status_msg", "Unknown error")
+                    logger.error(f"MiniMax API error: {error_msg}")
+                    raise RuntimeError(f"MiniMax API error: {error_msg}")
+
+                return raw_response
+            except httpx.ConnectError as e:
+                last_error = e
+                retry_count += 1
+                logger.warning(f"MiniMax connection error (attempt {retry_count}/{max_retries}): {e}")
+                if retry_count < max_retries:
+                    await asyncio.sleep(2 ** retry_count)  # 指数退避
+                    continue
+                raise
+            except httpx.ReadTimeout as e:
+                last_error = e
+                retry_count += 1
+                logger.warning(f"MiniMax read timeout (attempt {retry_count}/{max_retries}): {e}")
+                if retry_count < max_retries:
+                    await asyncio.sleep(2 ** retry_count)
+                    continue
+                raise
+            except httpx.HTTPError as e:
+                logger.error(f"MiniMax HTTP error: {e}")
+                raise
+
+        # 如果所有重试都失败
+        if last_error:
+            raise last_error
 
     def _extract_text_from_response(self, response: Dict[str, Any]) -> str:
-        """Extract text content from MiniMax response."""
+        """
+        Extract text content from MiniMax response.
+
+        支持 OpenAI 格式的响应：
+        {"choices": [{"message": {"content": "..."}}]}
+        """
+        # OpenAI 格式
+        choices = response.get("choices", [])
+        if choices:
+            message = choices[0].get("message", {})
+            return message.get("content", "") or ""
+
+        # 兼容旧的 Anthropic 格式
         content = response.get("content", [])
         text_parts = []
         for block in content:
-            if block.get("type") == "text":
+            if isinstance(block, dict) and block.get("type") == "text":
                 text_parts.append(block.get("text", ""))
         return "".join(text_parts)
 
@@ -265,21 +342,38 @@ class MiniMaxAdapter(ILLMAdapter):
         Returns:
             Generated text
         """
-        try:
-            max_tokens = kwargs.get("max_tokens", self.max_tokens)
-            temperature = kwargs.get("temperature", self.temperature)
+        max_retries = 3
+        retry_count = 0
+        last_error = None
 
-            response = await self._raw_chat_request(
-                messages=[{"role": "user", "content": user_prompt}],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-            )
+        while retry_count < max_retries:
+            try:
+                max_tokens = kwargs.get("max_tokens", self.max_tokens)
+                temperature = kwargs.get("temperature", self.temperature)
 
-            return self._extract_text_from_response(response)
-        except Exception as e:
-            logger.error(f"MiniMax generation with system prompt failed: {e}")
-            raise
+                response = await self._raw_chat_request(
+                    messages=[{"role": "user", "content": user_prompt}],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system=system_prompt,
+                )
+
+                return self._extract_text_from_response(response)
+            except (httpx.ConnectError, httpx.ReadTimeout, ConnectionResetError) as e:
+                last_error = e
+                retry_count += 1
+                logger.warning(f"MiniMax generation error (attempt {retry_count}/{max_retries}): {e}")
+                if retry_count < max_retries:
+                    await asyncio.sleep(2 ** retry_count)
+                    continue
+                logger.error(f"MiniMax generation with system prompt failed after {max_retries} retries: {e}")
+                raise
+            except Exception as e:
+                logger.error(f"MiniMax generation with system prompt failed: {e}")
+                raise
+
+        if last_error:
+            raise last_error
 
     async def chat_with_messages(
         self,
@@ -685,8 +779,16 @@ class MiniMaxAdapter(ILLMAdapter):
                 elif role in ["user", "assistant"]:
                     # Support both string content and list content (Anthropic format)
                     if isinstance(content, list):
-                        # Already in Anthropic format (list of content blocks)
-                        chat_messages.append({"role": role, "content": content})
+                        # Convert Anthropic format to string for OpenAI endpoint
+                        text_parts = []
+                        for block in content:
+                            if isinstance(block, dict):
+                                if block.get("type") == "text":
+                                    text_parts.append(block.get("text", ""))
+                                elif block.get("type") == "tool_result":
+                                    # Include tool result as text
+                                    text_parts.append(f"Tool result: {block.get('content', '')}")
+                        chat_messages.append({"role": role, "content": " ".join(text_parts)})
                     elif isinstance(content, str):
                         chat_messages.append({"role": role, "content": content})
                     else:
@@ -705,53 +807,52 @@ class MiniMaxAdapter(ILLMAdapter):
                 tools=tools if tools else None,
             )
 
-            # Parse response
+            # Parse OpenAI format response
             text_content = ""
             tool_calls = []
             raw_content_blocks = []
 
-            for block in response.get("content", []):
-                block_type = block.get("type", "")
+            # OpenAI 格式: {"choices": [{"message": {"content": "...", "tool_calls": [...]}}]}
+            choices = response.get("choices", [])
+            if choices:
+                message = choices[0].get("message", {})
+                text_content = message.get("content", "") or ""
 
-                if block_type == "text":
-                    text = block.get("text", "")
-                    text_content += text
-                    raw_content_blocks.append({"type": "text", "text": text})
-
-                elif block_type == "thinking":
-                    thinking_text = block.get("thinking", "")
-                    raw_content_blocks.append({"type": "thinking", "thinking": thinking_text})
-
-                elif block_type == "tool_use":
+                # Parse tool calls from OpenAI format
+                openai_tool_calls = message.get("tool_calls", [])
+                for tc in openai_tool_calls:
                     tool_call = {
-                        "id": block.get("id", ""),
+                        "id": tc.get("id", f"call_{len(tool_calls)}"),
                         "function": {
-                            "name": block.get("name", ""),
-                            "arguments": block.get("input", {}),
+                            "name": tc.get("function", {}).get("name", ""),
+                            "arguments": tc.get("function", {}).get("arguments", {}),
                         },
                     }
                     tool_calls.append(tool_call)
-                    raw_content_blocks.append(
-                        {
-                            "type": "tool_use",
-                            "id": block.get("id", ""),
-                            "name": block.get("name", ""),
-                            "input": block.get("input", {}),
-                        }
-                    )
+                    raw_content_blocks.append({
+                        "type": "tool_use",
+                        "id": tc.get("id", ""),
+                        "name": tc.get("function", {}).get("name", ""),
+                        "input": tc.get("function", {}).get("arguments", {}),
+                    })
 
-                elif block_type == "redacted_thinking":
-                    raw_content_blocks.append({"type": "redacted_thinking"})
+                raw_content_blocks.insert(0, {"type": "text", "text": text_content})
 
             # Fallback: parse tool calls from text content if not in structured format
             if not tool_calls and text_content:
                 tool_calls = self._parse_tool_calls_from_text(text_content)
 
+            # 记录返回值
+            print(f"🔍 [MINIMAX] chat_with_tools 返回: content_len={len(text_content)}, tool_calls={len(tool_calls)}")
+            if tool_calls:
+                print(f"🔍 [MINIMAX] tool_calls详情: {tool_calls}")
+            logger.info(f"MiniMax chat_with_tools 返回: content_len={len(text_content)}, tool_calls={len(tool_calls)}, text_content={text_content[:200] if text_content else 'EMPTY'}")
+
             return {
                 "content": text_content,
                 "tool_calls": tool_calls,
                 "raw_content_blocks": raw_content_blocks,
-                "stop_reason": response.get("stop_reason"),
+                "stop_reason": choices[0].get("finish_reason") if choices else None,
             }
 
         except Exception as e:
@@ -766,10 +867,12 @@ class MiniMaxAdapter(ILLMAdapter):
     def _parse_tool_calls_from_text(self, text_content: str) -> List[Dict[str, Any]]:
         """Parse tool calls from text content when LLM returns them as text."""
         import re
+        import xml.etree.ElementTree as ET
 
+        print(f"🔍 [_parse_tool_calls_from_text] START, text_content={text_content[:300]}")
         tool_calls = []
         try:
-            # Match [TOOL_CALL] blocks
+            # 方法1: 匹配 [TOOL_CALL] 格式
             pattern = r'\[TOOL_CALL\]\s*\{[^}]*tool\s*=>\s*"([^"]+)"[^}]*args\s*=>\s*(\{[^}]*\})\s*\}\s*\[/TOOL_CALL\]'
             matches = re.findall(pattern, text_content, re.IGNORECASE | re.DOTALL)
 
@@ -797,6 +900,37 @@ class MiniMaxAdapter(ILLMAdapter):
                     },
                 }
                 tool_calls.append(tool_call)
+
+            # 方法2: 匹配 XML 格式 <invoke name="search_web">...</invoke>
+            if not tool_calls:
+                try:
+                    # 匹配 <invoke name="tool_name">...</invoke>
+                    xml_pattern = r'<invoke\s+name="([^"]+)"[^>]*>(.*?)</invoke>'
+                    xml_matches = re.findall(xml_pattern, text_content, re.DOTALL)
+
+                    for tool_name, args_text in xml_matches:
+                        # 解析参数
+                        args = {}
+                        # 匹配 <parameter name="key">value</parameter>
+                        param_pattern = r'<parameter\s+name="([^"]+)"[^>]*>([^<]*)</parameter>'
+                        param_matches = re.findall(param_pattern, args_text)
+
+                        for param_name, param_value in param_matches:
+                            args[param_name] = param_value.strip()
+
+                        tool_call = {
+                            "id": f"call_{len(tool_calls)}",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": args,
+                            },
+                        }
+                        tool_calls.append(tool_call)
+
+                    if tool_calls:
+                        logger.info(f"Parsed {len(tool_calls)} tool calls from XML format")
+                except Exception as e:
+                    logger.warning(f"Failed to parse XML tool calls: {e}")
 
             if tool_calls:
                 logger.info(f"Parsed {len(tool_calls)} tool calls from text content")
