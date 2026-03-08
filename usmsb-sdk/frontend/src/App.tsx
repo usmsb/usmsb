@@ -23,6 +23,7 @@ import LegalPage from './pages/LegalPage'
 import Chat from './pages/Chat'
 import PitchPage from './pages/pitch'
 import BindingPage from './pages/BindingPage'
+import GeneCapsuleExplore from './pages/GeneCapsuleExplore'
 import { useAuthStore } from './stores/authStore'
 import { StakeGuideModal } from './components/StakeGuideModal'
 
@@ -130,6 +131,7 @@ function App() {
           />
           <Route path="chat" element={<Chat />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="gene-capsule/explore" element={<GeneCapsuleExplore />} />
 
           {/* User Actions */}
           <Route

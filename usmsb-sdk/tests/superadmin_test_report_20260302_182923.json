@@ -1,0 +1,26 @@
+{
+  "test_time": "2026-03-02T18:29:23.836046",
+  "wallet": "0x382B71e8b425CFAaD1B1C6D970481F440458Abf8",
+  "role": "superadmin",
+  "passed": 16,
+  "failed": 0,
+  "total": 16,
+  "results": [
+    "\u001b[92m✓ PASS\u001b[0m - 用户角色验证 role=superadmin",
+    "\u001b[92m✓ PASS\u001b[0m - 权限数量验证 共39项权限",
+    "\u001b[92m✓ PASS\u001b[0m - 权限检查完成 39/39项通过",
+    "\u001b[92m✓ PASS\u001b[0m - 权限统计API ",
+    "\u001b[92m✓ PASS\u001b[0m - 工具列表API 89个工具",
+    "\u001b[92m✓ PASS\u001b[0m - 对话API ",
+    "\u001b[92m✓ PASS\u001b[0m - 健康检查API ",
+    "\u001b[92m✓ PASS\u001b[0m - 历史记录API ",
+    "\u001b[92m✓ PASS\u001b[0m - 权限隔离验证 human(13) < superadmin(37)",
+    "\u001b[92m✓ PASS\u001b[0m - human无platform:admin 权限隔离正确",
+    "\u001b[92m✓ PASS\u001b[0m - 工具 general_response 权限=chat:basic",
+    "\u001b[92m✓ PASS\u001b[0m - 工具 read_file 权限=workspace",
+    "\u001b[92m✓ PASS\u001b[0m - 工具 execute_python 权限=sandbox",
+    "\u001b[92m✓ PASS\u001b[0m - 工具 health_check 权限=system:health",
+    "\u001b[92m✓ PASS\u001b[0m - 工具 register_agent 权限=agent:register",
+    "\u001b[92m✓ PASS\u001b[0m - 工具 create_wallet 权限=wallet:create"
+  ]
+}

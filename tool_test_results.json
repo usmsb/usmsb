@@ -1,0 +1,477 @@
+[
+  {
+    "tool": "execute_python",
+    "status": "✓ PASS",
+    "result": "<MagicMock id='1922913379744'>"
+  },
+  {
+    "tool": "run_command",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'command': 'echo hello', 'cwd': '\\\\test', 'stdout': 'test'"
+  },
+  {
+    "tool": "browser_open",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"浏览器打开失败: object MagicMock can't be used in 'awai"
+  },
+  {
+    "tool": "browser_click",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"点击元素失败: object MagicMock can't be used in 'await"
+  },
+  {
+    "tool": "browser_fill",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"填写表单失败: object MagicMock can't be used in 'await"
+  },
+  {
+    "tool": "browser_get_content",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"获取页面内容失败: object MagicMock can't be used in 'awa"
+  },
+  {
+    "tool": "browser_screenshot",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"截图失败: object MagicMock can't be used in 'await' "
+  },
+  {
+    "tool": "browser_close",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"关闭浏览器失败: object MagicMock can't be used in 'awai"
+  },
+  {
+    "tool": "execute_javascript",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'stdout': 'test\\n', 'stderr': '', 'returncode': 0}"
+  },
+  {
+    "tool": "start_jupyter",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'message': 'JupyterLab 已在后台启动', 'jupyter_url': 'http://loc"
+  },
+  {
+    "tool": "jupyter_status",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'running': True, 'jupyter_url': 'http://localhost:8888/lab"
+  },
+  {
+    "tool": "stop_jupyter",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'message': 'JupyterLab 已停止'}"
+  },
+  {
+    "tool": "start_vscode",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'VSCode Server 仅在 Linux 环境下可用', 'available': Fals"
+  },
+  {
+    "tool": "stop_vscode",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'VSCode Server 仅在 Linux 环境下可用'}"
+  },
+  {
+    "tool": "vscode_status",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'VSCode Server 仅在 Linux 环境下可用', 'running': False}"
+  },
+  {
+    "tool": "parse_skill_md",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': '文件不存在: /test/skills.md'}"
+  },
+  {
+    "tool": "execute_skill",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': '技能未找到: test_skill。请先使用 parse_skill_md 解析技能文件。'}"
+  },
+  {
+    "tool": "list_skills",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'skills': [], 'count': 0}"
+  },
+  {
+    "tool": "read_file",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'path': '/test/file.txt', 'content': 'test content', 'size"
+  },
+  {
+    "tool": "write_file",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"object MagicMock can't be used in 'await' expres"
+  },
+  {
+    "tool": "list_directory",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"'str' object has no attribute 'name'\"}"
+  },
+  {
+    "tool": "create_directory",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'path': '/test/newdir'}"
+  },
+  {
+    "tool": "delete_file",
+    "status": "✓ PASS",
+    "result": "{'status': 'requires_confirmation', 'operation': 'delete_file', 'path': '/test/f"
+  },
+  {
+    "tool": "copy_file",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'source': '/test/a.txt', 'destination': ''}"
+  },
+  {
+    "tool": "move_file",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'source': '/test/a.txt', 'destination': ''}"
+  },
+  {
+    "tool": "get_file_info",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"'dict' object has no attribute 'to_dict'\"}"
+  },
+  {
+    "tool": "search_files",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': \"'str' object has no attribute 'to_dict'\"}"
+  },
+  {
+    "tool": "download_file",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: download_file'}"
+  },
+  {
+    "tool": "search_web",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: search_web'}"
+  },
+  {
+    "tool": "fetch_url",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: fetch_url'}"
+  },
+  {
+    "tool": "parse_html",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: parse_html'}"
+  },
+  {
+    "tool": "download_file",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: download_file'}"
+  },
+  {
+    "tool": "get_headers",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_headers'}"
+  },
+  {
+    "tool": "get_user_info",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_user_info'}"
+  },
+  {
+    "tool": "bind_wallet",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'wallet': '0x123'}"
+  },
+  {
+    "tool": "create_wallet",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: create_wallet'}"
+  },
+  {
+    "tool": "get_agent_profile",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_agent_profile'}"
+  },
+  {
+    "tool": "register_agent",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'agent_id': None}"
+  },
+  {
+    "tool": "unregister_agent",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'agent_id': '123'}"
+  },
+  {
+    "tool": "search_agents",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: search_agents'}"
+  },
+  {
+    "tool": "recommend_agents",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: recommend_agents'}"
+  },
+  {
+    "tool": "rate_agent",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: rate_agent'}"
+  },
+  {
+    "tool": "call_api",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: call_api'}"
+  },
+  {
+    "tool": "route_message",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: route_message'}"
+  },
+  {
+    "tool": "send_agent_message",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: send_agent_message'}"
+  },
+  {
+    "tool": "consult_agent",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: consult_agent'}"
+  },
+  {
+    "tool": "interview_agent",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: interview_agent'}"
+  },
+  {
+    "tool": "list_user_agents",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: list_user_agents'}"
+  },
+  {
+    "tool": "get_all_agent_profiles",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_all_agent_profiles'}"
+  },
+  {
+    "tool": "health_check",
+    "status": "✓ PASS",
+    "result": "{'status': 'healthy', 'target': 'system'}"
+  },
+  {
+    "tool": "get_system_metrics",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_system_metrics'}"
+  },
+  {
+    "tool": "get_system_health",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_system_health'}"
+  },
+  {
+    "tool": "get_load_balance_status",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_load_balance_status'}"
+  },
+  {
+    "tool": "get_node_status",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_node_status'}"
+  },
+  {
+    "tool": "get_alerts",
+    "status": "✓ PASS",
+    "result": "{'alerts': [], 'count': 0}"
+  },
+  {
+    "tool": "query_logs",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: query_logs'}"
+  },
+  {
+    "tool": "get_balance",
+    "status": "✓ PASS",
+    "result": "{'balance': 100.0, 'symbol': 'VIBE'}"
+  },
+  {
+    "tool": "get_chain_info",
+    "status": "✓ PASS",
+    "result": "{'chain': 'ethereum', 'block_number': 12345678}"
+  },
+  {
+    "tool": "switch_chain",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'chain': 'ethereum'}"
+  },
+  {
+    "tool": "stake",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'amount': 100}"
+  },
+  {
+    "tool": "unstake",
+    "status": "✓ PASS",
+    "result": "{'status': 'success'}"
+  },
+  {
+    "tool": "get_vote_power",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_vote_power'}"
+  },
+  {
+    "tool": "delegate_vote",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: delegate_vote'}"
+  },
+  {
+    "tool": "run_program",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: run_program'}"
+  },
+  {
+    "tool": "start_node",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: start_node'}"
+  },
+  {
+    "tool": "stop_node",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: stop_node'}"
+  },
+  {
+    "tool": "execute_command",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: execute_command'}"
+  },
+  {
+    "tool": "upload_to_ipfs",
+    "status": "✓ PASS",
+    "result": "{'cid': 'Qmxxx', 'size': 1024}"
+  },
+  {
+    "tool": "download_from_ipfs",
+    "status": "✓ PASS",
+    "result": "{'content': 'data', 'cid': 'QmTest'}"
+  },
+  {
+    "tool": "sync_to_ipfs",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'cid': 'Qmxxx'}"
+  },
+  {
+    "tool": "query_db",
+    "status": "✓ PASS",
+    "result": "{'rows': [], 'count': 0}"
+  },
+  {
+    "tool": "insert_db",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'affected_rows': 1}"
+  },
+  {
+    "tool": "update_db",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'affected_rows': 1}"
+  },
+  {
+    "tool": "delete_db",
+    "status": "✓ PASS",
+    "result": "{'status': 'success', 'affected_rows': 1}"
+  },
+  {
+    "tool": "generate_component",
+    "status": "✓ PASS",
+    "result": "{'component_type': 'button', 'code': '<button />'}"
+  },
+  {
+    "tool": "generate_report",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: generate_report'}"
+  },
+  {
+    "tool": "manage_page",
+    "status": "✓ PASS",
+    "result": "{'action': 'refresh', 'status': 'success'}"
+  },
+  {
+    "tool": "list_proposals",
+    "status": "✓ PASS",
+    "result": "{'proposals': [], 'count': 0}"
+  },
+  {
+    "tool": "submit_proposal",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: submit_proposal'}"
+  },
+  {
+    "tool": "vote",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: vote'}"
+  },
+  {
+    "tool": "get_recommendation_history",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_recommendation_history'}"
+  },
+  {
+    "tool": "generate_recommendation_explanation",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: generate_recommendation_explanat"
+  },
+  {
+    "tool": "get_config",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: get_config'}"
+  },
+  {
+    "tool": "update_config",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: update_config'}"
+  },
+  {
+    "tool": "analyze_data",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: analyze_data'}"
+  },
+  {
+    "tool": "scan_opportunities",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: scan_opportunities'}"
+  },
+  {
+    "tool": "proactively_notify_opportunity",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: proactively_notify_opportunity'}"
+  },
+  {
+    "tool": "auto_match_and_notify",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: auto_match_and_notify'}"
+  },
+  {
+    "tool": "recommend_agents_for_demand",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: recommend_agents_for_demand'}"
+  },
+  {
+    "tool": "match_by_gene_capsule",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: match_by_gene_capsule'}"
+  },
+  {
+    "tool": "set_threshold",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: set_threshold'}"
+  },
+  {
+    "tool": "receive_agent_showcase",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: receive_agent_showcase'}"
+  },
+  {
+    "tool": "general_response",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: general_response'}"
+  },
+  {
+    "tool": "search_agents",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: search_agents'}"
+  },
+  {
+    "tool": "recommend_agents",
+    "status": "✗ FAIL",
+    "result": "{'status': 'error', 'message': 'Tool not found: recommend_agents'}"
+  }
+]

@@ -218,6 +218,40 @@ async def lifespan(app: FastAPI):
     matching_engine = MatchingEngine(llm_adapter=llm if llm else None)
     logger.info("Matching engine initialized")
 
+    # Initialize Gene Capsule services with simple in-memory implementation
+    from usmsb_sdk.api.rest.routers.gene_capsule import set_gene_capsule_services
+    from usmsb_sdk.api.rest import gene_capsule_service as gene_service_module
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    try:
+        # Create a simple SQLite engine for gene capsule storage
+        gene_engine = create_engine('sqlite:///gene_capsule.db')
+        gene_service_module.Base.metadata.create_all(gene_engine)
+        gene_session_factory = sessionmaker(bind=gene_engine)
+        gene_db_session = gene_session_factory()
+
+        gene_capsule_service = gene_service_module.GeneCapsuleStorageService(gene_db_session)
+        desensitization_service = gene_service_module.LLMDesensitizationService(llm)
+        value_evaluator = gene_service_module.ExperienceValueEvaluator(gene_db_session)
+        verification_service = gene_service_module.AutoVerificationService(gene_db_session)
+        gene_matching_service = gene_service_module.GeneCapsuleMatchingService(gene_db_session)
+
+        set_gene_capsule_services(
+            capsule_service=gene_capsule_service,
+            desensitization_service=desensitization_service,
+            matching_service=gene_matching_service,
+            verification_service=verification_service,
+            value_evaluator=value_evaluator,
+        )
+        logger.info("Gene Capsule services initialized")
+    except Exception as e:
+        import traceback
+        logger.warning(f"Gene Capsule services not available: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
+        # Initialize with None to allow graceful degradation
+        set_gene_capsule_services()
+
     # Set service references in routers
     from usmsb_sdk.api.rest.routers.predictions import set_prediction_service
     from usmsb_sdk.api.rest.routers.workflows import set_workflow_service
@@ -435,7 +469,8 @@ async def http_exception_handler(request, exc):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
-    logger.error(f"Unhandled exception: {exc}")
+    import traceback
+    logger.error(f"Unhandled exception: {exc}\n{traceback.format_exc()}")
     return JSONResponse(
         status_code=500,
         content={"error": "Internal server error", "timestamp": datetime.now().isoformat()},

@@ -28,6 +28,7 @@ from usmsb_sdk.api.database import (
     update_agent_heartbeat,
     update_agent_stake,
     delete_agent as db_delete_agent,
+    get_agent_binding_info,
     create_api_key as db_create_api_key,
     get_api_keys_by_agent as db_get_api_keys_by_agent,
     revoke_api_key as db_revoke_api_key,
@@ -351,18 +352,43 @@ async def complete_binding(
 
 # ==================== API Key Management Endpoints ====================
 
+def check_agent_or_owner_access(user: dict, agent_id: str) -> None:
+    """
+    Check if the user can access the agent's resources.
+
+    Access is granted if:
+    1. User is the agent itself (authenticated with API key)
+    2. User is the owner of the agent (authenticated with wallet)
+
+    Raises HTTPException if access is denied.
+    """
+    authenticated_agent_id = user.get('agent_id') or user.get('user_id')
+
+    # Case 1: User is the agent itself
+    if authenticated_agent_id == agent_id:
+        return
+
+    # Case 2: User is the owner (check via wallet address)
+    user_wallet = user.get('wallet_address') or user.get('address')
+    if user_wallet:
+        binding_info = get_agent_binding_info(agent_id)
+        if binding_info and binding_info.get('owner_wallet', '').lower() == user_wallet.lower():
+            return
+
+    # Access denied
+    raise HTTPException(
+        status_code=403,
+        detail={"error": "Access denied. You must be the agent or its owner.", "code": ErrorCode.UNAUTHORIZED}
+    )
+
+
 @router.get("/agents/v2/{agent_id}/api-keys")
 async def list_api_keys(
     agent_id: str,
     user: dict = Depends(get_current_user_unified)
 ):
     """List all API keys for the agent."""
-    authenticated_agent_id = user.get('agent_id') or user.get('user_id')
-    if authenticated_agent_id != agent_id:
-        raise HTTPException(
-            status_code=403,
-            detail={"error": "Access denied", "code": ErrorCode.UNAUTHORIZED}
-        )
+    check_agent_or_owner_access(user, agent_id)
 
     keys = db_get_api_keys_by_agent(agent_id)
 
@@ -387,12 +413,7 @@ async def create_new_api_key(
     user: dict = Depends(get_current_user_unified)
 ):
     """Create a new API key for the agent."""
-    authenticated_agent_id = user.get('agent_id') or user.get('user_id')
-    if authenticated_agent_id != agent_id:
-        raise HTTPException(
-            status_code=403,
-            detail={"error": "Access denied", "code": ErrorCode.UNAUTHORIZED}
-        )
+    check_agent_or_owner_access(user, agent_id)
 
     # Generate new API key
     key_data = APIKeyManager.create_key_for_agent(
@@ -431,12 +452,7 @@ async def revoke_api_key_endpoint(
     user: dict = Depends(get_current_user_unified)
 ):
     """Revoke an API key."""
-    authenticated_agent_id = user.get('agent_id') or user.get('user_id')
-    if authenticated_agent_id != agent_id:
-        raise HTTPException(
-            status_code=403,
-            detail={"error": "Access denied", "code": ErrorCode.UNAUTHORIZED}
-        )
+    check_agent_or_owner_access(user, agent_id)
 
     # Can't revoke the key currently being used
     if key_id == user.get('api_key_id'):
@@ -464,12 +480,7 @@ async def renew_api_key_endpoint(
     user: dict = Depends(get_current_user_unified)
 ):
     """Renew an API key (extend expiration)."""
-    authenticated_agent_id = user.get('agent_id') or user.get('user_id')
-    if authenticated_agent_id != agent_id:
-        raise HTTPException(
-            status_code=403,
-            detail={"error": "Access denied", "code": ErrorCode.UNAUTHORIZED}
-        )
+    check_agent_or_owner_access(user, agent_id)
 
     success = db_renew_api_key(key_id, agent_id, request.extends_days)
 

@@ -9,8 +9,6 @@ import {
   Check,
   AlertCircle,
   Loader2,
-  Eye,
-  EyeOff,
   Clock,
   Calendar,
 } from 'lucide-react'
@@ -49,8 +47,9 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
     try {
       const response = await listAPIKeys(agentId)
       setKeys(response.keys || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load API keys')
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.response?.data?.message || err?.response?.data?.error || 'Failed to load API keys'
+      setError(typeof errorMessage === 'string' ? errorMessage : 'Failed to load API keys')
     } finally {
       setIsLoading(false)
     }
@@ -70,8 +69,9 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
       setNewKeyName('')
       setNewKeyExpiry(365)
       await loadKeys()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create API key')
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.response?.data?.message || err?.response?.data?.error || 'Failed to create API key'
+      setError(typeof errorMessage === 'string' ? errorMessage : 'Failed to create API key')
     } finally {
       setActionKeyId(null)
     }
@@ -87,8 +87,9 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
     try {
       await revokeAPIKey(agentId, keyId)
       await loadKeys()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke API key')
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.response?.data?.message || err?.response?.data?.error || 'Failed to revoke API key'
+      setError(typeof errorMessage === 'string' ? errorMessage : 'Failed to revoke API key')
     } finally {
       setActionKeyId(null)
     }
@@ -100,8 +101,9 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
     try {
       await renewAPIKey(agentId, keyId, 365)
       await loadKeys()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to renew API key')
+    } catch (err: any) {
+      const errorMessage = err?.message || err?.response?.data?.message || err?.response?.data?.error || 'Failed to renew API key'
+      setError(typeof errorMessage === 'string' ? errorMessage : 'Failed to renew API key')
     } finally {
       setActionKeyId(null)
     }
@@ -128,25 +130,25 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
   }
 
   const getExpiryStatus = (expiresAt?: number) => {
-    if (!expiresAt) return { color: 'text-gray-400', label: t('apiKey.noExpiry', 'No expiry') }
+    if (!expiresAt) return { color: 'text-secondary-500 dark:text-secondary-400', label: t('apiKey.noExpiry', 'No expiry') }
     const expires = expiresAt * 1000
     const now = Date.now()
     const daysLeft = Math.floor((expires - now) / (1000 * 60 * 60 * 24))
 
     if (daysLeft < 0) {
-      return { color: 'text-red-400', label: t('apiKey.expired', 'Expired') }
+      return { color: 'text-red-600 dark:text-red-400', label: t('apiKey.expired', 'Expired') }
     } else if (daysLeft < 30) {
-      return { color: 'text-yellow-400', label: t('apiKey.expiringSoon', `${daysLeft} days left`) }
+      return { color: 'text-yellow-600 dark:text-yellow-400', label: t('apiKey.expiringSoon', `${daysLeft} days left`) }
     } else {
-      return { color: 'text-green-400', label: t('apiKey.daysLeft', `${daysLeft} days left`) }
+      return { color: 'text-green-600 dark:text-green-400', label: t('apiKey.daysLeft', `${daysLeft} days left`) }
     }
   }
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-neon-blue" />
-        <span className="ml-2 text-gray-400">{t('common.loading', 'Loading...')}</span>
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+        <span className="ml-2 text-secondary-500 dark:text-secondary-400">{t('common.loading', 'Loading...')}</span>
       </div>
     )
   }
@@ -156,12 +158,14 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Key className="w-5 h-5 text-neon-blue" />
-          <h3 className="text-lg font-semibold text-white">{t('apiKey.title', 'API Keys')}</h3>
+          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+            <Key className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100">{t('apiKey.title', 'API Keys')}</h3>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-neon-blue hover:bg-neon-blue/80 text-gray-900 rounded-lg font-medium transition-all"
+          className="btn btn-primary flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           {t('apiKey.create', 'Create Key')}
@@ -170,20 +174,33 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
 
       {/* Error Display */}
       {error && (
-        <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-600 dark:text-red-400">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">{error}</span>
+          <span className="text-sm">
+            {typeof error === 'string' ? error : JSON.stringify(error)}
+          </span>
         </div>
       )}
 
       {/* Keys List */}
       {keys.length === 0 ? (
-        <div className="text-center py-8 bg-gray-800/50 rounded-lg border border-gray-700">
-          <Key className="w-12 h-12 mx-auto text-gray-600 mb-2" />
-          <p className="text-gray-400">{t('apiKey.noKeys', 'No API keys yet')}</p>
-          <p className="text-sm text-gray-500 mt-1">
-            {t('apiKey.noKeysDesc', 'Create an API key to authenticate your agent')}
+        <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-light-border dark:border-gray-700">
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center mb-4">
+            <Key className="w-8 h-8 text-secondary-400" />
+          </div>
+          <h4 className="text-lg font-medium text-light-text-primary dark:text-secondary-100 mb-2">
+            {t('apiKey.noKeys', 'No API Keys Yet')}
+          </h4>
+          <p className="text-sm text-secondary-500 dark:text-secondary-400 text-center max-w-sm mb-4">
+            {t('apiKey.noKeysDesc', 'Create an API key to authenticate your agent with external services')}
           </p>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            {t('apiKey.createFirst', 'Create Your First Key')}
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -197,38 +214,38 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                 className={clsx(
                   'p-4 rounded-lg border transition-all',
                   expired
-                    ? 'bg-red-900/10 border-red-500/30'
-                    : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                    ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                    : 'bg-white dark:bg-gray-800/50 border-light-border dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
                 )}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-white">{key.name}</span>
+                      <span className="font-medium text-light-text-primary dark:text-secondary-100">{key.name}</span>
                       {expired && (
-                        <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded">
                           {t('apiKey.revoked', 'Revoked')}
                         </span>
                       )}
                       {key.revoked && (
-                        <span className="px-2 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded">
+                        <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-secondary-500 dark:text-secondary-400 rounded">
                           {t('apiKey.revoked', 'Revoked')}
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-4 mt-2 text-sm">
-                      <div className="flex items-center gap-1 text-gray-400">
-                        <span className="font-mono text-xs bg-gray-700 px-2 py-0.5 rounded">
+                      <div className="flex items-center gap-1 text-secondary-500 dark:text-secondary-400">
+                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
                           {key.prefix}...
                         </span>
                         <button
                           onClick={() => copyToClipboard(key.prefix, key.id)}
-                          className="p-1 hover:bg-gray-700 rounded transition-colors"
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                           title={t('common.copy', 'Copy')}
                         >
                           {copiedKeyId === key.id ? (
-                            <Check className="w-3 h-3 text-green-400" />
+                            <Check className="w-3 h-3 text-green-500" />
                           ) : (
                             <Copy className="w-3 h-3" />
                           )}
@@ -241,7 +258,7 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <div className="flex items-center gap-4 mt-2 text-xs text-secondary-400 dark:text-secondary-500">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         <span>{t('apiKey.created', 'Created')}: {formatDate(key.created_at)}</span>
@@ -260,7 +277,7 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                           disabled={actionKeyId === key.id}
                           className={clsx(
                             'p-2 rounded-lg transition-all',
-                            'hover:bg-gray-700 text-gray-400 hover:text-white',
+                            'hover:bg-gray-100 dark:hover:bg-gray-700 text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-200',
                             'disabled:opacity-50 disabled:cursor-not-allowed'
                           )}
                           title={t('apiKey.renew', 'Renew for 1 year')}
@@ -276,7 +293,7 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                           disabled={actionKeyId === key.id}
                           className={clsx(
                             'p-2 rounded-lg transition-all',
-                            'hover:bg-red-500/20 text-gray-400 hover:text-red-400',
+                            'hover:bg-red-50 dark:hover:bg-red-900/20 text-secondary-400 hover:text-red-600 dark:hover:text-red-400',
                             'disabled:opacity-50 disabled:cursor-not-allowed'
                           )}
                           title={t('apiKey.revoke', 'Revoke key')}
@@ -296,23 +313,23 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
       {/* Create Key Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white mb-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl border border-light-border dark:border-gray-700 p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
               {t('apiKey.createTitle', 'Create New API Key')}
             </h3>
 
             {createdKey ? (
               <div className="space-y-4">
-                <div className="p-4 bg-green-900/30 border border-green-500/50 rounded-lg">
-                  <div className="flex items-center gap-2 text-green-400 mb-2">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
                     <Check className="w-5 h-5" />
                     <span className="font-medium">{t('apiKey.createdSuccess', 'Key Created!')}</span>
                   </div>
-                  <p className="text-sm text-gray-300 mb-3">
+                  <p className="text-sm text-secondary-600 dark:text-secondary-300 mb-3">
                     {t('apiKey.copyWarning', 'Copy your API key now. You won\'t be able to see it again.')}
                   </p>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 p-2 bg-gray-900 rounded text-sm font-mono text-neon-green break-all">
+                    <code className="flex-1 p-2 bg-gray-100 dark:bg-gray-900 rounded text-sm font-mono text-green-600 dark:text-green-400 break-all">
                       {createdKey}
                     </code>
                     <button
@@ -320,8 +337,8 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                       className={clsx(
                         'p-2 rounded-lg transition-all',
                         copiedKeyId === 'created'
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-gray-700 text-gray-400 hover:text-white'
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                          : 'bg-gray-100 dark:bg-gray-700 text-secondary-400 hover:text-secondary-600 dark:hover:text-secondary-200'
                       )}
                     >
                       {copiedKeyId === 'created' ? (
@@ -337,7 +354,7 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                     setShowCreateModal(false)
                     setCreatedKey(null)
                   }}
-                  className="w-full py-2 bg-neon-blue hover:bg-neon-blue/80 text-gray-900 rounded-lg font-medium transition-all"
+                  className="w-full btn btn-primary"
                 >
                   {t('common.done', 'Done')}
                 </button>
@@ -345,7 +362,7 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">
+                  <label className="block text-sm text-secondary-600 dark:text-secondary-400 mb-1">
                     {t('apiKey.keyName', 'Key Name')}
                   </label>
                   <input
@@ -353,18 +370,18 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
                     placeholder={t('apiKey.keyNamePlaceholder', 'e.g., Production Server')}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:border-neon-blue focus:outline-none"
+                    className="w-full bg-white dark:bg-gray-700 border border-light-border dark:border-gray-600 rounded-lg px-4 py-2 text-light-text-primary dark:text-secondary-100 placeholder-secondary-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">
+                  <label className="block text-sm text-secondary-600 dark:text-secondary-400 mb-1">
                     {t('apiKey.expiry', 'Expires After')}
                   </label>
                   <select
                     value={newKeyExpiry}
                     onChange={(e) => setNewKeyExpiry(Number(e.target.value))}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-neon-blue focus:outline-none"
+                    className="w-full bg-white dark:bg-gray-700 border border-light-border dark:border-gray-600 rounded-lg px-4 py-2 text-light-text-primary dark:text-secondary-100 focus:border-blue-500 focus:outline-none"
                   >
                     <option value={30}>{t('apiKey.30days', '30 days')}</option>
                     <option value={90}>{t('apiKey.90days', '90 days')}</option>
@@ -377,17 +394,14 @@ export function APIKeyManager({ agentId }: APIKeyManagerProps) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all"
+                    className="flex-1 btn btn-secondary"
                   >
                     {t('common.cancel', 'Cancel')}
                   </button>
                   <button
                     onClick={handleCreateKey}
                     disabled={actionKeyId === 'new' || !newKeyName.trim()}
-                    className={clsx(
-                      'flex-1 py-2 bg-neon-blue hover:bg-neon-blue/80 text-gray-900 rounded-lg font-medium transition-all',
-                      'disabled:opacity-50 disabled:cursor-not-allowed'
-                    )}
+                    className="flex-1 btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {actionKeyId === 'new' ? (
                       <span className="flex items-center justify-center gap-2">
