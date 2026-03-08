@@ -15,3 +15,23 @@ __pycache__/
 .vite/
 *.zip
 temp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 日志
+logs/
+
+# 测试/开发数据
+data/0x*/
+data/*/browser/
+data/*/workspace/
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/build/
