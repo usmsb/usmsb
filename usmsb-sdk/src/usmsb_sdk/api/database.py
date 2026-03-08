@@ -935,7 +935,9 @@ def create_demand(demand_data: Dict[str, Any]) -> Dict[str, Any]:
         demand_data['id'] = demand_id
         return demand_data
 
-# Skill synonym mappings for better matching
+# Skill synonym mappings - DEPRECATED
+# Now using HybridMatchingService with vector embeddings for semantic matching
+# This is kept as a fallback for simple keyword matching
 SKILL_SYNONYMS = {
     # Chinese to English
     '数据分析': ['data_analysis', 'data', 'analysis', 'python', 'pandas', 'numpy', 'visualization', 'bi'],
@@ -955,8 +957,6 @@ SKILL_SYNONYMS = {
     'frontend': ['前端开发', 'react', 'vue', 'javascript'],
     'backend': ['后端开发', 'python', 'java', 'api'],
 }
-
-
 def expand_capabilities(capabilities: List[str]) -> List[str]:
     """Expand capabilities to include synonyms and related skills."""
     expanded = set(capabilities)
@@ -974,7 +974,12 @@ def expand_capabilities(capabilities: List[str]) -> List[str]:
 
 
 def search_demands(capabilities: List[str] = None, budget_min: float = None, budget_max: float = None) -> List[Dict[str, Any]]:
-    """Search demands with improved semantic matching."""
+    """Search demands - returns all active demands within budget range.
+
+    Semantic matching is handled by HybridMatchingService which uses
+    vector embeddings for intelligent matching. This function just
+    returns all active demands for the matching service to process.
+    """
     with get_db() as conn:
         cursor = conn.cursor()
         query = 'SELECT * FROM demands WHERE status = "active"'
@@ -990,36 +995,8 @@ def search_demands(capabilities: List[str] = None, budget_min: float = None, bud
         cursor.execute(query, params)
         demands = [dict(row) for row in cursor.fetchall()]
 
-        # Filter by capabilities if provided
-        if capabilities:
-            # Expand capabilities with synonyms
-            expanded_caps = expand_capabilities(capabilities)
-            expanded_caps_lower = [c.lower() for c in expanded_caps]
-
-            filtered = []
-            for demand in demands:
-                skills = json.loads(demand.get('required_skills', '[]'))
-                skills_lower = [s.lower() for s in skills]
-
-                # Check if any capability matches any skill
-                # Also check if any skill matches any expanded capability (reverse match)
-                title = demand.get('title', '').lower()
-                description = demand.get('description', '').lower()
-
-                matches = False
-                for cap in expanded_caps_lower:
-                    # Direct skill match
-                    if any(cap in s or s in cap for s in skills_lower):
-                        matches = True
-                        break
-                    # Title/description match
-                    if cap in title or cap in description:
-                        matches = True
-                        break
-
-                if matches:
-                    filtered.append(demand)
-            return filtered
+        # Note: Capability filtering is now done by HybridMatchingService
+        # which uses vector embeddings for semantic matching
         return demands
 
 
