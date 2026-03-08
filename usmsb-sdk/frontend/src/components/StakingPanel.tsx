@@ -171,8 +171,8 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-neon-blue" />
-        <span className="ml-2 text-gray-400">{t('common.loading', 'Loading...')}</span>
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+        <span className="ml-2 text-secondary-500 dark:text-secondary-400">{t('common.loading', 'Loading...')}</span>
       </div>
     )
   }
@@ -185,18 +185,20 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Coins className="w-5 h-5 text-neon-blue" />
-          <h3 className="text-lg font-semibold text-white">{t('staking.title', 'Staking')}</h3>
+          <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+            <Coins className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100">{t('staking.title', 'Staking')}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-400">{t('staking.apy', 'APY')}:</span>
-          <span className="text-neon-green font-medium">{stakeInfo?.apy || 0}%</span>
+          <span className="text-sm text-secondary-500 dark:text-secondary-400">{t('staking.apy', 'APY')}:</span>
+          <span className="text-green-600 dark:text-green-400 font-medium">{stakeInfo?.apy || 0}%</span>
         </div>
       </div>
 
       {/* Error Display */}
       {error && (
-        <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-600 dark:text-red-400">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span className="text-sm">{error}</span>
         </div>
@@ -205,12 +207,12 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
       {/* Main Stats */}
       <div className="grid grid-cols-2 gap-4">
         {/* Staked Amount */}
-        <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+        <div className="card">
+          <div className="flex items-center gap-2 text-secondary-500 dark:text-secondary-400 text-sm mb-1">
             <Lock className="w-4 h-4" />
             {t('staking.stakedAmount', 'Staked Amount')}
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
             {formatNumber(stakeInfo?.staked_amount || 0)} VIBE
           </div>
           <div className="mt-2 flex items-center gap-2">
@@ -227,12 +229,12 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
         </div>
 
         {/* Pending Rewards */}
-        <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
-          <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
+        <div className="card">
+          <div className="flex items-center gap-2 text-secondary-500 dark:text-secondary-400 text-sm mb-1">
             <Gift className="w-4 h-4" />
             {t('staking.pendingRewards', 'Pending Rewards')}
           </div>
-          <div className="text-2xl font-bold text-neon-green">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
             {formatNumber(stakeInfo?.pending_rewards || 0)} VIBE
           </div>
           <button
@@ -240,7 +242,8 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
             disabled={actionType === 'claim' || !stakeInfo?.pending_rewards}
             className={clsx(
               'mt-2 px-3 py-1 text-sm rounded-lg transition-all',
-              'bg-neon-green/20 text-neon-green hover:bg-neon-green/30',
+              'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
+              'hover:bg-green-200 dark:hover:bg-green-900/50',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
@@ -258,14 +261,14 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
 
       {/* Tier Progress */}
       {nextTier && (
-        <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
+        <div className="card">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-400">{t('staking.nextTier', 'Next Tier')}</span>
+            <span className="text-sm text-secondary-500 dark:text-secondary-400">{t('staking.nextTier', 'Next Tier')}</span>
             <span className="text-sm font-medium" style={{ color: nextTier.color }}>
               {nextTier.label}
             </span>
           </div>
-          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all"
               style={{
@@ -277,7 +280,7 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
               }}
             />
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-secondary-400 dark:text-secondary-500 mt-2">
             {t('staking.tierProgress', 'Stake {{amount}} more VIBE to reach {{tier}}', {
               amount: formatNumber(nextTier.min - (stakeInfo?.staked_amount || 0)),
               tier: nextTier.label,
@@ -287,28 +290,28 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
       )}
 
       {/* Tier Benefits */}
-      <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4">
+      <div className="card">
         <div className="flex items-center gap-2 mb-3">
-          <Info className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-medium text-white">
+          <Info className="w-4 h-4 text-secondary-400" />
+          <span className="text-sm font-medium text-light-text-primary dark:text-secondary-100">
             {t('staking.tierBenefits', 'Tier Benefits')}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-400">{t('staking.maxAgents', 'Max Agents')}:</span>
-            <span className="ml-2 text-white">{stakeInfo?.tier_benefits?.max_agents || 1}</span>
+            <span className="text-secondary-500 dark:text-secondary-400">{t('staking.maxAgents', 'Max Agents')}:</span>
+            <span className="ml-2 text-light-text-primary dark:text-secondary-100">{stakeInfo?.tier_benefits?.max_agents || 1}</span>
           </div>
           <div>
-            <span className="text-gray-400">{t('staking.discount', 'Discount')}:</span>
-            <span className="ml-2 text-neon-green">{stakeInfo?.tier_benefits?.discount || 0}%</span>
+            <span className="text-secondary-500 dark:text-secondary-400">{t('staking.discount', 'Discount')}:</span>
+            <span className="ml-2 text-green-600 dark:text-green-400">{stakeInfo?.tier_benefits?.discount || 0}%</span>
           </div>
         </div>
       </div>
 
       {/* All Tiers */}
       <div className="space-y-2">
-        <span className="text-sm font-medium text-gray-400">{t('staking.allTiers', 'Staking Tiers')}</span>
+        <span className="text-sm font-medium text-secondary-500 dark:text-secondary-400">{t('staking.allTiers', 'Staking Tiers')}</span>
         {STAKE_TIERS.map((tier) => {
           const isCurrent = stakeInfo?.stake_tier === tier.tier
           return (
@@ -317,8 +320,8 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
               className={clsx(
                 'p-3 rounded-lg border transition-all',
                 isCurrent
-                  ? 'bg-gray-800 border-gray-600'
-                  : 'bg-gray-800/30 border-gray-700/50'
+                  ? 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700'
+                  : 'bg-gray-50 dark:bg-gray-800/50 border-light-border dark:border-gray-700'
               )}
             >
               <div className="flex items-center justify-between">
@@ -327,18 +330,18 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: tier.color }}
                   />
-                  <span className="font-medium text-white">{tier.label}</span>
+                  <span className="font-medium text-light-text-primary dark:text-secondary-100">{tier.label}</span>
                   {isCurrent && (
-                    <span className="px-2 py-0.5 text-xs bg-neon-blue/20 text-neon-blue rounded">
+                    <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
                       {t('staking.current', 'Current')}
                     </span>
                   )}
                 </div>
-                <span className="text-sm text-gray-400">
+                <span className="text-sm text-secondary-500 dark:text-secondary-400">
                   {tier.min.toLocaleString()} - {tier.max === Infinity ? '∞' : tier.max.toLocaleString()} VIBE
                 </span>
               </div>
-              <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+              <div className="flex items-center gap-4 mt-1 text-xs text-secondary-400 dark:text-secondary-500">
                 <span>{tier.agents} agents</span>
                 <span>{tier.discount} discount</span>
               </div>
@@ -351,7 +354,7 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
       <div className="flex gap-3">
         <button
           onClick={() => setShowDepositModal(true)}
-          className="flex-1 flex items-center justify-center gap-2 py-3 bg-neon-blue hover:bg-neon-blue/80 text-gray-900 rounded-lg font-medium transition-all"
+          className="flex-1 btn btn-primary flex items-center justify-center gap-2"
         >
           <ArrowUpRight className="w-4 h-4" />
           {t('staking.deposit', 'Deposit')}
@@ -359,11 +362,7 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
         <button
           onClick={() => setShowWithdrawModal(true)}
           disabled={!stakeInfo?.staked_amount}
-          className={clsx(
-            'flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all',
-            'bg-gray-700 hover:bg-gray-600 text-white',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
-          )}
+          className="flex-1 btn btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ArrowDownRight className="w-4 h-4" />
           {t('staking.withdraw', 'Withdraw')}
@@ -373,13 +372,13 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
       {/* Deposit Modal */}
       {showDepositModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white mb-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl border border-light-border dark:border-gray-700 p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
               {t('staking.depositTitle', 'Deposit VIBE')}
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
+                <label className="block text-sm text-secondary-600 dark:text-secondary-400 mb-1">
                   {t('staking.amount', 'Amount')}
                 </label>
                 <div className="relative">
@@ -389,13 +388,13 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
                     min={100}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white text-xl placeholder-gray-500 focus:border-neon-blue focus:outline-none"
+                    className="w-full bg-white dark:bg-gray-700 border border-light-border dark:border-gray-600 rounded-lg px-4 py-3 text-light-text-primary dark:text-secondary-100 text-xl placeholder-secondary-400 focus:border-blue-500 focus:outline-none"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary-400">
                     VIBE
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-secondary-400 dark:text-secondary-500 mt-1">
                   {t('staking.minDeposit', 'Minimum deposit: 100 VIBE')}
                 </p>
               </div>
@@ -403,17 +402,14 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowDepositModal(false)}
-                  className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all"
+                  className="flex-1 btn btn-secondary"
                 >
                   {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   onClick={handleDeposit}
                   disabled={actionType === 'deposit'}
-                  className={clsx(
-                    'flex-1 py-2 bg-neon-blue hover:bg-neon-blue/80 text-gray-900 rounded-lg font-medium transition-all',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
+                  className="flex-1 btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {actionType === 'deposit' ? (
                     <span className="flex items-center justify-center gap-2">
@@ -433,25 +429,25 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
       {/* Withdraw Modal */}
       {showWithdrawModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white mb-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl border border-light-border dark:border-gray-700 p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
               {t('staking.withdrawTitle', 'Withdraw VIBE')}
             </h3>
             <div className="space-y-4">
-              <div className="p-3 bg-gray-700/50 rounded-lg">
-                <div className="text-sm text-gray-400">{t('staking.available', 'Available')}</div>
-                <div className="text-xl font-bold text-white">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <div className="text-sm text-secondary-500 dark:text-secondary-400">{t('staking.available', 'Available')}</div>
+                <div className="text-xl font-bold text-light-text-primary dark:text-secondary-100">
                   {formatNumber((stakeInfo?.staked_amount || 0) - (stakeInfo?.locked_stake || 0))} VIBE
                 </div>
                 {stakeInfo?.locked_stake ? (
-                  <div className="text-xs text-yellow-400 mt-1">
+                  <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
                     {formatNumber(stakeInfo.locked_stake)} VIBE {t('staking.locked', 'locked')}
                   </div>
                 ) : null}
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
+                <label className="block text-sm text-secondary-600 dark:text-secondary-400 mb-1">
                   {t('staking.amount', 'Amount')}
                 </label>
                 <div className="relative">
@@ -462,9 +458,9 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
                     placeholder="0.00"
                     min={0}
                     max={(stakeInfo?.staked_amount || 0) - (stakeInfo?.locked_stake || 0)}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white text-xl placeholder-gray-500 focus:border-neon-blue focus:outline-none"
+                    className="w-full bg-white dark:bg-gray-700 border border-light-border dark:border-gray-600 rounded-lg px-4 py-3 text-light-text-primary dark:text-secondary-100 text-xl placeholder-secondary-400 focus:border-blue-500 focus:outline-none"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary-400">
                     VIBE
                   </span>
                 </div>
@@ -474,7 +470,7 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
                       String((stakeInfo?.staked_amount || 0) - (stakeInfo?.locked_stake || 0))
                     )
                   }
-                  className="text-xs text-neon-blue hover:text-neon-blue/80 mt-1"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-1"
                 >
                   {t('staking.withdrawAll', 'Withdraw all')}
                 </button>
@@ -483,17 +479,14 @@ export function StakingPanel({ onStakeChange }: StakingPanelProps) {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowWithdrawModal(false)}
-                  className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-all"
+                  className="flex-1 btn btn-secondary"
                 >
                   {t('common.cancel', 'Cancel')}
                 </button>
                 <button
                   onClick={handleWithdraw}
                   disabled={actionType === 'withdraw'}
-                  className={clsx(
-                    'flex-1 py-2 bg-neon-purple hover:bg-neon-purple/80 text-white rounded-lg font-medium transition-all',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
+                  className="flex-1 btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {actionType === 'withdraw' ? (
                     <span className="flex items-center justify-center gap-2">

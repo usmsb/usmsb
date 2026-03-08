@@ -6,6 +6,10 @@ Stake Requirements:
 - initiate_negotiation: No stake required
 - submit_proposal: No stake required
 - accept_negotiation: 100 VIBE minimum
+
+Hybrid Matching:
+- Uses vector embeddings for semantic similarity (recall phase)
+- Uses LLM for intelligent reranking and explanation (precision phase)
 """
 
 import json
@@ -34,21 +38,37 @@ from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
     require_stake_unified,
 )
+from usmsb_sdk.services.hybrid_matching_service import (
+    HybridMatchingService,
+    get_hybrid_matching_service,
+    init_hybrid_matching_service,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/matching", tags=["Active Matching"])
 
-# Global reference to matching engine (set by main.py)
+# Global reference to matching engine (set by main.py) - kept for backwards compatibility
 _matching_engine = None
+
+# Hybrid matching service instance
+_hybrid_matching_service: Optional[HybridMatchingService] = None
 
 # In-memory storage for matching (in production, use database)
 negotiations_store: Dict[str, Any] = {}
 
 
 def set_matching_engine(engine):
-    """Set the matching engine instance."""
+    """Set the matching engine instance (legacy, kept for compatibility)."""
     global _matching_engine
     _matching_engine = engine
+
+
+async def get_matching_service() -> HybridMatchingService:
+    """Get or initialize the hybrid matching service."""
+    global _hybrid_matching_service
+    if _hybrid_matching_service is None:
+        _hybrid_matching_service = await init_hybrid_matching_service()
+    return _hybrid_matching_service
 
 
 @router.post("/search-demands")
@@ -57,6 +77,10 @@ async def search_demands(
     user: Dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Search for demands that match the agent's capabilities.
+
+    Uses hybrid matching:
+    - Vector embeddings for semantic similarity (recall)
+    - LLM for intelligent reranking (precision)
 
     Requires:
         - X-API-Key header
@@ -92,14 +116,14 @@ async def search_demands(
         "description": agent_data.get('bio', '') if isinstance(agent_data, dict) else '',
     }
 
-    # Search demands from database
+    # Search demands from database - use expanded capabilities for better recall
     demands_data = db_search_demands(
         capabilities=capabilities,
         budget_min=request.budget_min,
         budget_max=request.budget_max,
     )
 
-    # Convert to dict format for matching engine
+    # Convert to dict format for matching service
     demands = []
     for d in demands_data:
         demand_dict = {
@@ -116,8 +140,9 @@ async def search_demands(
         }
         demands.append(demand_dict)
 
-    # Use matching engine
-    matches = await _matching_engine.match_supply_to_demands(
+    # Use hybrid matching service
+    matching_service = await get_matching_service()
+    matches = await matching_service.match_supply_to_demands(
         supply=supply_info,
         demands=demands,
         min_score=0.3,
@@ -127,20 +152,31 @@ async def search_demands(
     # Format response
     results = []
     for match in matches:
-        demand = next((d for d in demands if d.get('id') == match.demand_id), None)
-        if demand:
-            # Get demand agent info
-            demand_agent = db_get_agent(demand.get('agent_id', ''))
-            results.append({
-                "opportunity_id": match.match_id,
-                "counterpart_agent_id": demand.get('agent_id', ''),
-                "counterpart_name": demand_agent.get('name', 'Unknown') if demand_agent else 'Unknown',
-                "opportunity_type": "demand",
-                "details": demand,
-                "match_score": match.score.to_dict(),
-                "status": "discovered",
-                "created_at": match.created_at,
-            })
+        demand_dict = {
+            "id": match.candidate.id,
+            "agent_id": match.candidate.agent_id,
+            "title": match.candidate.name,
+            "description": match.candidate.description,
+            "required_skills": match.candidate.capabilities,
+        }
+        # Get demand agent info
+        demand_agent = db_get_agent(match.candidate.agent_id)
+        results.append({
+            "opportunity_id": f"opp-{match.candidate.id}",
+            "counterpart_agent_id": match.candidate.agent_id,
+            "counterpart_name": demand_agent.get('name', 'Unknown') if demand_agent else 'Unknown',
+            "opportunity_type": "demand",
+            "details": demand_dict,
+            "match_score": {
+                "overall": match.score,
+                "vector_score": match.candidate.vector_score,
+                "llm_score": match.candidate.llm_score,
+            },
+            "explanation": match.explanation,
+            "match_reasons": match.match_reasons,
+            "status": "discovered",
+            "created_at": datetime.now().timestamp(),
+        })
 
     return results
 
@@ -151,6 +187,10 @@ async def search_suppliers(
     user: Dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Search for suppliers that match the agent's requirements.
+
+    Uses hybrid matching:
+    - Vector embeddings for semantic similarity (recall)
+    - LLM for intelligent reranking (precision)
 
     Requires:
         - X-API-Key header
@@ -165,10 +205,6 @@ async def search_suppliers(
             detail="agent_id in request must match your authenticated agent ID"
         )
 
-    # Get demand from database
-    demands = db_search_demands()
-    agent_demands = [d for d in demands if d.get('agent_id') == request.agent_id]
-
     # Build demand info from request
     demand_info = {
         "id": request.agent_id,
@@ -178,13 +214,13 @@ async def search_suppliers(
             "min": request.budget_min or 0,
             "max": request.budget_max or 10000,
         },
-        "description": "",
+        "description": f"寻找具有 {', '.join(request.required_skills)} 技能的供应商",
     }
 
-    # Get all AI agents as potential suppliers
+    # Get all agents as potential suppliers
     all_agents = db_get_all_agents()
 
-    # Filter for active agents with relevant capabilities
+    # Build supplier list - don't pre-filter, let vector matching handle it
     suppliers = []
     for agent in all_agents:
         if agent.get('status') != 'offline':
@@ -211,18 +247,20 @@ async def search_suppliers(
             except (json.JSONDecodeError, TypeError):
                 agent_skills = []
 
-            if any(cap.lower() in [c.lower() for c in agent_capabilities] for cap in request.required_skills):
-                suppliers.append({
-                    "id": agent.get('agent_id'),
-                    "agent_id": agent.get('agent_id'),
-                    "name": agent.get('name'),
-                    "capabilities": agent_capabilities,
-                    "skills": agent_skills,
-                    "price": agent.get('stake', 100) / 10,  # Estimate price from stake
-                    "reputation": agent.get('reputation', 0.5),
-                    "availability": "available" if agent.get('status') == 'online' else "busy",
-                    "description": "",
-                })
+            # Combine capabilities and skills for matching
+            all_caps = list(set(agent_capabilities + agent_skills))
+
+            suppliers.append({
+                "id": agent.get('agent_id'),
+                "agent_id": agent.get('agent_id'),
+                "name": agent.get('name'),
+                "capabilities": all_caps,
+                "skills": agent_skills,
+                "price": agent.get('stake', 100) / 10,  # Estimate price from stake
+                "reputation": agent.get('reputation', 0.5),
+                "availability": "available" if agent.get('status') == 'online' else "busy",
+                "description": agent.get('bio', '') or f"Agent with skills: {', '.join(all_caps[:5])}",
+            })
 
     # Also check regular agents with services
     services_query = "SELECT * FROM services WHERE status = 'active'"
@@ -235,15 +273,15 @@ async def search_suppliers(
         agent_ids = set()
         for service in services:
             service_dict = dict(service) if hasattr(service, 'keys') else service
-            agent_id = service_dict.get('agent_id', '') if isinstance(service_dict, dict) else service['agent_id']
-            if agent_id:
-                agent_ids.add(agent_id)
+            svc_agent_id = service_dict.get('agent_id', '') if isinstance(service_dict, dict) else service['agent_id']
+            if svc_agent_id:
+                agent_ids.add(svc_agent_id)
 
         # Load all agents in one query
         agents_by_id: Dict[str, Any] = {}
         if agent_ids:
             placeholders = ','.join(['?' for _ in agent_ids])
-            cursor.execute(f'SELECT * FROM ai_agents WHERE agent_id IN ({placeholders})', list(agent_ids))
+            cursor.execute(f'SELECT * FROM agents WHERE agent_id IN ({placeholders})', list(agent_ids))
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 agents_by_id[row_dict['agent_id']] = row_dict
@@ -262,52 +300,58 @@ async def search_suppliers(
             except (json.JSONDecodeError, TypeError, KeyError):
                 service_skills = []
 
-            if any(cap.lower() in [s.lower() for s in service_skills] for cap in request.required_skills):
-                # Check if not already added
-                service_agent_id = service_dict.get('agent_id', '') if isinstance(service_dict, dict) else service['agent_id']
-                if not any(s.get('id') == service_agent_id for s in suppliers):
-                    # Get agent from pre-loaded cache
-                    service_agent = agents_by_id.get(service_agent_id)
-                    if service_agent:
-                        suppliers.append({
-                            "id": service_agent_id,
-                            "agent_id": service_agent_id,
-                            "name": service_agent.get('name', 'Unknown'),
-                            "capabilities": service_skills,
-                            "price": service_dict.get('price', 100) if isinstance(service_dict, dict) else service['price'],
-                            "reputation": service_agent.get('reputation', 0.5),
-                            "availability": "available",
-                            "description": service_dict.get('description', '') if isinstance(service_dict, dict) else service['description'],
-                        })
+            # Check if not already added
+            service_agent_id = service_dict.get('agent_id', '') if isinstance(service_dict, dict) else service['agent_id']
+            if not any(s.get('id') == service_agent_id for s in suppliers):
+                # Get agent from pre-loaded cache
+                service_agent = agents_by_id.get(service_agent_id)
+                if service_agent:
+                    suppliers.append({
+                        "id": service_agent_id,
+                        "agent_id": service_agent_id,
+                        "name": service_agent.get('name', 'Unknown'),
+                        "capabilities": service_skills,
+                        "skills": service_skills,
+                        "price": service_dict.get('price', 100) if isinstance(service_dict, dict) else service['price'],
+                        "reputation": service_agent.get('reputation', 0.5),
+                        "availability": "available",
+                        "description": service_dict.get('description', '') if isinstance(service_dict, dict) else service['description'],
+                    })
 
-    # Use matching engine
-    matches = await _matching_engine.match_demand_to_supplies(
+    # Use hybrid matching service
+    matching_service = await get_matching_service()
+    matches = await matching_service.match_demand_to_supplies(
         demand=demand_info,
         supplies=suppliers,
-        min_score=0.3,
+        min_score=0.2,  # Lower threshold for better recall
         max_results=10,
     )
 
     # Format response
     results = []
     for match in matches:
-        supply = next((s for s in suppliers if s.get('id') == match.supply_id), None)
-        if supply:
-            results.append({
-                "opportunity_id": match.match_id,
-                "counterpart_agent_id": supply.get('agent_id', ''),
-                "counterpart_name": supply.get('name', 'Unknown'),
-                "opportunity_type": "supply",
-                "details": {
-                    "capabilities": supply.get('capabilities', []),
-                    "skills": supply.get('skills', []),
-                    "price_per_request": supply.get('price', 100),
-                    "reputation": supply.get('reputation', 0.5),
-                },
-                "match_score": match.score.to_dict(),
-                "status": "discovered",
-                "created_at": match.created_at,
-            })
+        results.append({
+            "opportunity_id": f"opp-{match.candidate.id}",
+            "counterpart_agent_id": match.candidate.agent_id,
+            "counterpart_name": match.candidate.name,
+            "opportunity_type": "supply",
+            "details": {
+                "capabilities": match.candidate.capabilities,
+                "skills": match.candidate.capabilities,
+                "price_per_request": match.candidate.price,
+                "reputation": match.candidate.reputation,
+                "availability": match.candidate.availability,
+            },
+            "match_score": {
+                "overall": match.score,
+                "vector_score": match.candidate.vector_score,
+                "llm_score": match.candidate.llm_score,
+            },
+            "explanation": match.explanation,
+            "match_reasons": match.match_reasons,
+            "status": "discovered",
+            "created_at": datetime.now().timestamp(),
+        })
 
     return results
 

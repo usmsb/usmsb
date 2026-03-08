@@ -90,8 +90,8 @@ def create_agent_from_db_data(agent_data: dict) -> Agent:
         agent_type = AgentType.AI_AGENT
 
     return Agent(
-        id=agent_data['id'],
-        name=agent_data['name'],
+        id=agent_data.get('agent_id') or agent_data.get('id'),
+        name=agent_data.get('name', 'Unknown'),
         type=agent_type,
         capabilities=safe_json_loads(agent_data.get('capabilities', '[]'), []),
         state=safe_json_loads(agent_data.get('state', '{}'), {}),

@@ -25,6 +25,7 @@ import {
   ArrowDownLeft,
   Star,
   Shield,
+  Dna,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { getStatusColor } from '@/utils/statusColors'
@@ -32,6 +33,7 @@ import { APIKeyManager } from '@/components/APIKeyManager'
 import { StakingPanel } from '@/components/StakingPanel'
 import { ReputationDisplay } from '@/components/ReputationDisplay'
 import { TransactionList } from '@/components/WalletBalance'
+import { GeneCapsuleDisplay } from '@/components/GeneCapsuleDisplay'
 import { authFetch } from '@/lib/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
@@ -89,7 +91,7 @@ export default function AgentDetail() {
   const [testInput, setTestInput] = useState('')
   const [testResult, setTestResult] = useState<{ success: boolean; output: string; time: number } | null>(null)
   const [isTesting, setIsTesting] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'demands' | 'services' | 'transactions' | 'staking' | 'apikeys'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'demands' | 'services' | 'transactions' | 'staking' | 'apikeys' | 'genecapsule'>('overview')
 
   // Wallet binding state
   const [showBindForm, setShowBindForm] = useState(false)
@@ -434,9 +436,10 @@ export default function AgentDetail() {
             { id: 'overview', label: 'Overview', icon: Bot },
             { id: 'demands', label: 'Demands', icon: ShoppingCart },
             { id: 'services', label: 'Services', icon: Package },
-            { id: 'transactions', label: 'Transactions', icon: TrendingUp },
+            { id: 'transactions', label: 'Transactions', icon: ArrowUpRight },
             { id: 'staking', label: 'Staking', icon: TrendingUp },
             { id: 'apikeys', label: 'API Keys', icon: Shield },
+            { id: 'genecapsule', label: 'Gene Capsule', icon: Dna },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -926,6 +929,16 @@ export default function AgentDetail() {
               <p>No transactions yet</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Gene Capsule Tab */}
+      {activeTab === 'genecapsule' && (
+        <div className="max-w-4xl">
+          <GeneCapsuleDisplay
+            agentId={agent.agent_id}
+            showSearch={true}
+          />
         </div>
       )}
     </div>

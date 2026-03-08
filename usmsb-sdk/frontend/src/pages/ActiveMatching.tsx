@@ -149,19 +149,23 @@ export default function ActiveMatching() {
     setError(null)
 
     try {
-      const endpoint = searchType === 'demand'
-        ? `${API_BASE}/matching/search-demands`
-        : `${API_BASE}/matching/search-suppliers`
+      // searchType === 'supply' means: I am a SUPPLIER looking for DEMANDS to fulfill
+      // searchType === 'demand' means: I am a DEMANDER looking for SUPPLIERS
+      const endpoint = searchType === 'supply'
+        ? `${API_BASE}/matching/search-demands`   // As supplier, search for demands
+        : `${API_BASE}/matching/search-suppliers` // As demander, search for suppliers
 
       const capabilities = searchForm.capabilities.split(',').map(s => s.trim()).filter(Boolean)
-      const requestBody = searchType === 'demand'
+      const requestBody = searchType === 'supply'
         ? {
+            // Searching for demands - send my capabilities to match
             agent_id: agentId || 'anonymous',
             capabilities,
             budget_min: searchForm.budget_min ? parseFloat(searchForm.budget_min) : undefined,
             budget_max: searchForm.budget_max ? parseFloat(searchForm.budget_max) : undefined,
           }
         : {
+            // Searching for suppliers - send required skills to match
             agent_id: agentId || 'anonymous',
             required_skills: capabilities,
             budget_min: searchForm.budget_min ? parseFloat(searchForm.budget_min) : undefined,
@@ -439,7 +443,7 @@ export default function ActiveMatching() {
               )}
               {isSearching && searchType === 'supply'
                 ? t('common.loading')
-                : t('dashboard.findSuppliers')}
+                : t('dashboard.searchDemands')}
             </button>
           </div>
         </div>
@@ -547,7 +551,7 @@ export default function ActiveMatching() {
               )}
               {isSearching && searchType === 'demand'
                 ? t('common.loading')
-                : t('dashboard.findDemanders')}
+                : t('dashboard.findSuppliers')}
             </button>
           </div>
         </div>

@@ -19,6 +19,19 @@ import {
   ACTION_META,
   stakeInfoFromAmount,
 } from "./types";
+import {
+  GeneCapsuleAPI,
+  GeneCapsule,
+  ExperienceGene,
+  SkillGene,
+  PatternGene,
+  MatchingExperience,
+  AgentExperienceSearchResult,
+  ShowcaseResponse,
+  ExperienceValueScore,
+  AddExperienceRequest,
+  ShareLevel,
+} from "./gene-capsule";
 
 /**
  * Platform client configuration.
@@ -127,6 +140,7 @@ export class AgentPlatform {
   private intentParser: IntentParser;
   private client?: PlatformClient;
   private stakeChecker?: StakeChecker;
+  private _geneCapsule?: GeneCapsuleAPI;
 
   constructor(config: PlatformConfig);
   constructor(apiKey: string, agentId: string, baseUrl?: string);
@@ -563,6 +577,268 @@ export class AgentPlatform {
     try {
       const result = await client.get("/api/agents/v2/owner");
       return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  // === Gene Capsule API ===
+
+  /**
+   * Get the Gene Capsule API instance.
+   */
+  get geneCapsule(): GeneCapsuleAPI {
+    if (!this._geneCapsule) {
+      this._geneCapsule = new GeneCapsuleAPI(this.getClient(), this.agentId);
+    }
+    return this._geneCapsule;
+  }
+
+  /**
+   * Get agent's gene capsule containing experiences, skills, and patterns.
+   */
+  async getGeneCapsule(agentId?: string): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.getCapsule(agentId);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Add a new experience to the gene capsule.
+   *
+   * @param taskType Type of task (e.g., "data_analysis", "nlp", "web_development")
+   * @param taskCategory Category of the task
+   * @param taskDescription Description of what was done (will be desensitized)
+   * @param outcome Result: "success", "partial", or "failed"
+   * @param qualityScore Quality score from 0-1
+   * @param completionTime Time taken in seconds
+   * @param techniquesUsed Techniques and methods applied
+   * @param options Additional options (tools, rating, review, etc.)
+   */
+  async addExperience(
+    taskType: string,
+    taskCategory: string,
+    taskDescription: string,
+    outcome: string,
+    qualityScore: number,
+    completionTime: number,
+    techniquesUsed: string[],
+    options?: {
+      toolsUsed?: string[];
+      approachDescription?: string;
+      clientRating?: number;
+      clientReview?: string;
+      lessonsLearned?: string[];
+      autoDesensitize?: boolean;
+    }
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.addExperience(
+        {
+          task_type: taskType,
+          task_category: taskCategory,
+          task_description: taskDescription,
+          outcome,
+          quality_score: qualityScore,
+          completion_time: completionTime,
+          techniques_used: techniquesUsed,
+          tools_used: options?.toolsUsed || [],
+          approach_description: options?.approachDescription || "",
+          client_rating: options?.clientRating,
+          client_review: options?.clientReview,
+          lessons_learned: options?.lessonsLearned || []
+        },
+        options?.autoDesensitize ?? true
+      );
+      return {
+        success: true,
+        result,
+        message: "Experience added to gene capsule"
+      };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Find matching experiences for a task.
+   *
+   * @param taskDescription Description of the task to match
+   * @param requiredSkills Skills required for the task
+   * @param minRelevance Minimum relevance score (0-1)
+   * @param limit Maximum number of results
+   */
+  async findMatchingExperiences(
+    taskDescription: string,
+    requiredSkills: string[] = [],
+    minRelevance: number = 0.3,
+    limit: number = 10
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.match(
+        taskDescription,
+        requiredSkills,
+        minRelevance,
+        limit
+      );
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Export a showcase for negotiation or portfolio display.
+   *
+   * @param experienceIds Specific experiences to include (optional)
+   * @param forNegotiation Whether this is for a negotiation context
+   */
+  async exportShowcase(
+    experienceIds: string[] = [],
+    forNegotiation: boolean = true
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.showcase(experienceIds, forNegotiation);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Search for agents with relevant experience.
+   *
+   * @param taskDescription Description of the task
+   * @param requiredSkills Skills required
+   * @param minRelevance Minimum experience relevance (0-1)
+   * @param limit Maximum number of results
+   */
+  async searchAgentsByExperience(
+    taskDescription: string,
+    requiredSkills: string[] = [],
+    minRelevance: number = 0.3,
+    limit: number = 10
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.searchAgents(
+        taskDescription,
+        requiredSkills,
+        minRelevance,
+        limit
+      );
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Update visibility of an experience.
+   *
+   * @param experienceId The experience ID
+   * @param shareLevel Visibility level: "public", "semi_public", "private", or "hidden"
+   */
+  async setExperienceVisibility(
+    experienceId: string,
+    shareLevel: string
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.updateVisibility(experienceId, shareLevel);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Hide an experience from matching.
+   */
+  async hideExperience(experienceId: string): Promise<PlatformResult> {
+    return this.setExperienceVisibility(experienceId, ShareLevel.HIDDEN);
+  }
+
+  /**
+   * Desensitize text using LLM.
+   *
+   * @param text Text to desensitize
+   * @param context Context for desensitization
+   * @param recursionDepth Number of desensitization rounds
+   */
+  async desensitizeText(
+    text: string,
+    context: string = "",
+    recursionDepth: number = 3
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.desensitize(text, context, recursionDepth);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Get pattern library from gene capsule.
+   */
+  async getPatterns(agentId?: string): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.getPatterns(agentId);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Get experience value scores.
+   */
+  async getExperienceValueScores(agentId?: string): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.getValueScores(agentId);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Request verification for an experience.
+   */
+  async requestExperienceVerification(experienceId: string): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.requestVerification(experienceId);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Get gene capsule summary for display.
+   */
+  async getGeneCapsuleSummary(agentId?: string): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.getSummary(agentId);
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Sync gene capsule with platform.
+   */
+  async syncGeneCapsule(): Promise<PlatformResult> {
+    try {
+      const result = await this.geneCapsule.sync();
+      return {
+        success: true,
+        result,
+        message: "Gene capsule synced with platform"
+      };
     } catch (e: any) {
       return { success: false, error: e.message };
     }

@@ -935,8 +935,46 @@ def create_demand(demand_data: Dict[str, Any]) -> Dict[str, Any]:
         demand_data['id'] = demand_id
         return demand_data
 
+# Skill synonym mappings for better matching
+SKILL_SYNONYMS = {
+    # Chinese to English
+    '数据分析': ['data_analysis', 'data', 'analysis', 'python', 'pandas', 'numpy', 'visualization', 'bi'],
+    '机器学习': ['machine_learning', 'ml', 'ai', 'deep_learning', 'tensorflow', 'pytorch', 'python'],
+    '深度学习': ['deep_learning', 'dl', 'ai', 'ml', 'neural_network', 'tensorflow', 'pytorch'],
+    '人工智能': ['ai', 'artificial_intelligence', 'ml', 'deep_learning', 'nlp', 'llm'],
+    '自然语言处理': ['nlp', 'natural_language_processing', 'llm', 'transformers', 'bert', 'gpt'],
+    '前端开发': ['frontend', 'react', 'vue', 'javascript', 'typescript', 'css', 'html', 'web'],
+    '后端开发': ['backend', 'python', 'java', 'nodejs', 'api', 'database', 'server'],
+    '开发': ['development', 'programming', 'python', 'javascript', 'coding'],
+    '设计': ['design', 'ui', 'ux', 'figma', 'graphic'],
+    '测试': ['testing', 'qa', 'pytest', 'selenium', 'automation'],
+    # English mappings
+    'data_analysis': ['数据分析', 'data', 'analysis', 'python', 'pandas'],
+    'ml': ['机器学习', 'machine_learning', 'ai', 'deep_learning'],
+    'ai': ['人工智能', 'artificial_intelligence', 'ml', 'deep_learning'],
+    'frontend': ['前端开发', 'react', 'vue', 'javascript'],
+    'backend': ['后端开发', 'python', 'java', 'api'],
+}
+
+
+def expand_capabilities(capabilities: List[str]) -> List[str]:
+    """Expand capabilities to include synonyms and related skills."""
+    expanded = set(capabilities)
+    for cap in capabilities:
+        cap_lower = cap.lower()
+        # Check direct match
+        if cap_lower in SKILL_SYNONYMS:
+            expanded.update(SKILL_SYNONYMS[cap_lower])
+        # Check Chinese characters
+        if cap in SKILL_SYNONYMS:
+            expanded.update(SKILL_SYNONYMS[cap])
+        # Add lowercase version
+        expanded.add(cap_lower)
+    return list(expanded)
+
+
 def search_demands(capabilities: List[str] = None, budget_min: float = None, budget_max: float = None) -> List[Dict[str, Any]]:
-    """Search demands"""
+    """Search demands with improved semantic matching."""
     with get_db() as conn:
         cursor = conn.cursor()
         query = 'SELECT * FROM demands WHERE status = "active"'
@@ -954,10 +992,32 @@ def search_demands(capabilities: List[str] = None, budget_min: float = None, bud
 
         # Filter by capabilities if provided
         if capabilities:
+            # Expand capabilities with synonyms
+            expanded_caps = expand_capabilities(capabilities)
+            expanded_caps_lower = [c.lower() for c in expanded_caps]
+
             filtered = []
             for demand in demands:
                 skills = json.loads(demand.get('required_skills', '[]'))
-                if any(cap.lower() in [s.lower() for s in skills] for cap in capabilities):
+                skills_lower = [s.lower() for s in skills]
+
+                # Check if any capability matches any skill
+                # Also check if any skill matches any expanded capability (reverse match)
+                title = demand.get('title', '').lower()
+                description = demand.get('description', '').lower()
+
+                matches = False
+                for cap in expanded_caps_lower:
+                    # Direct skill match
+                    if any(cap in s or s in cap for s in skills_lower):
+                        matches = True
+                        break
+                    # Title/description match
+                    if cap in title or cap in description:
+                        matches = True
+                        break
+
+                if matches:
                     filtered.append(demand)
             return filtered
         return demands

@@ -16,6 +16,7 @@ Authentication:
 
 import json
 import logging
+from collections import Counter
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -88,12 +89,66 @@ async def get_gene_capsule(agent_id: str):
     try:
         capsule = await _gene_capsule_service.get_capsule(agent_id)
         if not capsule:
-            # Create a new empty capsule
-            capsule = await _gene_capsule_service.create_capsule(agent_id)
+            # Create a new empty capsule (or get existing one)
+            capsule = await _gene_capsule_service.get_or_create_capsule(agent_id)
 
         return _convert_capsule_to_response(capsule)
     except Exception as e:
         logger.error(f"Error getting gene capsule for {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{agent_id}/summary")
+async def get_gene_capsule_summary(agent_id: str):
+    """
+    Get a summary of an agent's gene capsule (lightweight version for display).
+    """
+    if not _gene_capsule_service:
+        raise HTTPException(status_code=503, detail="Gene capsule service not available")
+
+    try:
+        capsule = await _gene_capsule_service.get_capsule(agent_id)
+        if not capsule:
+            # Create a new empty capsule
+            capsule = await _gene_capsule_service.get_or_create_capsule(agent_id)
+
+        # Build summary from capsule
+        experiences = _get_attr(capsule, "experiences", [])
+        skills = _get_attr(capsule, "skills", [])
+        patterns = _get_attr(capsule, "patterns", [])
+
+        # Count by category
+        categories = {}
+        for exp in experiences:
+            cat = _get_attr(exp, "task_category", "other")
+            categories[cat] = categories.get(cat, 0) + 1
+
+        # Top skills by times used
+        top_skills = sorted(skills, key=lambda s: _get_attr(s, "times_used", 0), reverse=True)[:5]
+        top_skills_formatted = [
+            {
+                "name": _get_attr(s, "skill_name", ""),
+                "level": _get_attr(s, "proficiency_level", "basic"),
+                "times_used": _get_attr(s, "times_used", 0)
+            }
+            for s in top_skills
+        ]
+
+        summary = {
+            "capsule_id": _get_attr(capsule, "capsule_id", ""),
+            "version": _get_attr(capsule, "version", "1.0.0"),
+            "total_tasks": _get_attr(capsule, "total_tasks", 0),
+            "success_rate": _get_attr(capsule, "success_rate", 0.0),
+            "avg_satisfaction": _get_attr(capsule, "avg_satisfaction", 0.0),
+            "categories": categories,
+            "top_skills": top_skills_formatted,
+            "patterns_count": len(patterns),
+            "last_updated": _get_attr(capsule, "last_updated"),
+        }
+
+        return {"success": True, "result": summary}
+    except Exception as e:
+        logger.error(f"Error getting gene capsule summary for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -573,21 +628,34 @@ async def sync_capsule_version(
 
 # ==================== Helper Functions ====================
 
-def _convert_capsule_to_response(capsule: Dict[str, Any]) -> GeneCapsuleResponse:
-    """Convert capsule dict to response model."""
+def _get_attr(obj, key, default=None):
+    """Get attribute from dict or object."""
+    if hasattr(obj, key):
+        return getattr(obj, key, default)
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return default
+
+
+def _convert_capsule_to_response(capsule) -> GeneCapsuleResponse:
+    """Convert capsule (dict or SQLAlchemy object) to response model."""
+    experiences = _get_attr(capsule, "experiences", [])
+    skills = _get_attr(capsule, "skills", [])
+    patterns = _get_attr(capsule, "patterns", [])
+
     return GeneCapsuleResponse(
-        capsule_id=capsule.get("capsule_id", ""),
-        agent_id=capsule.get("agent_id", ""),
-        version=capsule.get("version", "1.0.0"),
-        total_tasks=capsule.get("total_tasks", 0),
-        success_rate=capsule.get("success_rate", 0.0),
-        avg_satisfaction=capsule.get("avg_satisfaction", 0.0),
-        verification_status=capsule.get("verification_status", "pending"),
-        experiences=[_convert_experience_to_response(e) for e in capsule.get("experiences", [])],
-        skills=[_convert_skill_to_response(s) for s in capsule.get("skills", [])],
-        patterns=[_convert_pattern_to_response(p) for p in capsule.get("patterns", [])],
-        created_at=capsule.get("created_at"),
-        last_updated=capsule.get("last_updated"),
+        capsule_id=_get_attr(capsule, "capsule_id", ""),
+        agent_id=_get_attr(capsule, "agent_id", ""),
+        version=_get_attr(capsule, "version", "1.0.0"),
+        total_tasks=_get_attr(capsule, "total_tasks", 0),
+        success_rate=_get_attr(capsule, "success_rate", 0.0),
+        avg_satisfaction=_get_attr(capsule, "avg_satisfaction", 0.0),
+        verification_status=_get_attr(capsule, "verification_status", "pending"),
+        experiences=[_convert_experience_to_response(e) for e in experiences],
+        skills=[_convert_skill_to_response(s) for s in skills],
+        patterns=[_convert_pattern_to_response(p) for p in patterns],
+        created_at=_get_attr(capsule, "created_at"),
+        last_updated=_get_attr(capsule, "last_updated"),
     )
 
 

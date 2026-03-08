@@ -51,26 +51,34 @@ async def create_workflow(
         - X-Agent-ID header
         - No stake required
     """
+    logger.info(f"Creating workflow - user keys: {list(user.keys()) if user else 'None'}")
+    logger.info(f"workflow_create: {workflow_create}")
+
     # Return mock workflow if service not available
     if not _workflow_service:
-        workflow_id = f"wf-{uuid.uuid4().hex[:8]}"
-        # Save to database
-        workflow_data = {
-            'id': workflow_id,
-            'name': workflow_create.task_description[:30],
-            'agent_id': user.get('agent_id') or user.get('user_id'),
-            'task_description': workflow_create.task_description,
-            'status': 'pending',
-            'steps': json.dumps(workflow_create.available_tools or []),
-        }
-        db_create_workflow(workflow_data)
-        return {
-            "workflow_id": workflow_id,
-            "name": workflow_create.task_description[:30],
-            "steps_count": len(workflow_create.available_tools) if workflow_create.available_tools else 3,
-            "status": "pending",
-            "creator_id": user.get('agent_id') or user.get('user_id'),
-        }
+        try:
+            workflow_id = f"wf-{uuid.uuid4().hex[:8]}"
+            # Save to database
+            workflow_data = {
+                'id': workflow_id,
+                'name': workflow_create.task_description[:30],
+                'agent_id': user.get('agent_id') or user.get('user_id'),
+                'task_description': workflow_create.task_description,
+                'status': 'pending',
+                'steps': json.dumps(workflow_create.available_tools or []),
+            }
+            logger.info(f"Saving workflow_data: {workflow_data}")
+            db_create_workflow(workflow_data)
+            return {
+                "workflow_id": workflow_id,
+                "name": workflow_create.task_description[:30],
+                "steps_count": len(workflow_create.available_tools) if workflow_create.available_tools else 3,
+                "status": "pending",
+                "creator_id": user.get('agent_id') or user.get('user_id'),
+            }
+        except Exception as e:
+            logger.error(f"Database workflow creation failed: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Workflow creation failed: {str(e)}")
 
     # Create domain object for service
     agent_data = db_get_agent(user.get('agent_id') or user.get('user_id'))
@@ -91,8 +99,29 @@ async def create_workflow(
             "creator_id": user.get('agent_id') or user.get('user_id'),
         }
     except Exception as e:
-        logger.error(f"Workflow creation failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Workflow creation failed: {str(e)}")
+        logger.warning(f"Workflow service failed, falling back to database-only: {e}")
+        # Fall back to database-only creation
+        try:
+            workflow_id = f"wf-{uuid.uuid4().hex[:8]}"
+            workflow_data = {
+                'id': workflow_id,
+                'name': workflow_create.task_description[:30],
+                'agent_id': user.get('agent_id') or user.get('user_id'),
+                'task_description': workflow_create.task_description,
+                'status': 'pending',
+                'steps': json.dumps(workflow_create.available_tools or []),
+            }
+            db_create_workflow(workflow_data)
+            return {
+                "workflow_id": workflow_id,
+                "name": workflow_create.task_description[:30],
+                "steps_count": len(workflow_create.available_tools) if workflow_create.available_tools else 3,
+                "status": "pending",
+                "creator_id": user.get('agent_id') or user.get('user_id'),
+            }
+        except Exception as db_error:
+            logger.error(f"Database workflow creation also failed: {db_error}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Workflow creation failed: {str(db_error)}")
 
 
 @router.post("/{workflow_id}/execute")

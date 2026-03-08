@@ -38,6 +38,7 @@ const resources = {
         analytics: 'Analytics',
         marketplace: 'Marketplace',
         governance: 'Governance',
+        geneCapsule: 'Gene Capsule',
         settings: 'Settings',
       },
       // Sidebar
@@ -106,6 +107,7 @@ const resources = {
         publishDemand: 'Publish Demand',
         findSuppliers: 'Find Suppliers',
         findDemanders: 'Find Demanders',
+        searchDemands: 'Search Demands',
         // Additional
         growing: 'Growing',
         stable: 'Stable',
@@ -1471,6 +1473,7 @@ const resources = {
         analytics: '数据分析',
         marketplace: '交易市场',
         governance: '社区治理',
+        geneCapsule: '基因胶囊',
         settings: '系统设置',
       },
       // Sidebar
@@ -1539,6 +1542,7 @@ const resources = {
         publishDemand: '发布需求',
         findSuppliers: '寻找供给方',
         findDemanders: '寻找需求方',
+        searchDemands: '搜索需求',
       },
       // Agents
       agents: {
@@ -3008,6 +3012,7 @@ const resources = {
         analytics: '分析',
         marketplace: 'マーケットプレイス',
         governance: 'ガバナンス',
+        geneCapsule: '遺伝子カプセル',
         settings: '設定',
       },
       // Sidebar
@@ -3928,6 +3933,7 @@ const resources = {
         analytics: '분석',
         marketplace: '마켓플레이스',
         governance: '거버넌스',
+        geneCapsule: '유전자 캡슐',
         settings: '설정',
       },
       // Sidebar
@@ -4848,6 +4854,7 @@ const resources = {
         analytics: 'Аналитика',
         marketplace: 'Маркетплейс',
         governance: 'Управление',
+        geneCapsule: 'Генная капсула',
         settings: 'Настройки',
       },
       // Sidebar
@@ -5767,6 +5774,7 @@ const resources = {
         analytics: 'Analytique',
         marketplace: 'Marché',
         governance: 'Gouvernance',
+        geneCapsule: 'Capsule génétique',
         settings: 'Paramètres',
       },
       // Sidebar
@@ -6671,6 +6679,7 @@ const resources = {
         analytics: 'Analytik',
         marketplace: 'Marktplatz',
         governance: 'Governance',
+        geneCapsule: 'Gen-Kapsel',
         settings: 'Einstellungen',
       },
       // Sidebar
@@ -7575,6 +7584,7 @@ const resources = {
         analytics: 'Analítica',
         marketplace: 'Mercado',
         governance: 'Gobernanza',
+        geneCapsule: 'Cápsula genética',
         settings: 'Configuración',
       },
       // Sidebar
@@ -8479,6 +8489,7 @@ const resources = {
         analytics: 'Análise',
         marketplace: 'Mercado',
         governance: 'Governança',
+        geneCapsule: 'Cápsula genética',
         settings: 'Configurações',
       },
       // Sidebar

@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { createDemand, getAgents } from '@/lib/api'
+import api from '@/lib/api'
 import { toast } from '../stores/toastStore'
 
 interface DemandForm {
@@ -90,7 +91,37 @@ export default function PublishDemand() {
 
     setIsSubmitting(true)
     try {
-      const agentId = agents[0].id
+      // Get agent ID from auth store (for wallet users) or from agents list (for API key users)
+      const stored = localStorage.getItem('usmsb-auth')
+      let agentId: string | null = null
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        agentId = parsed?.state?.agentId
+      }
+
+      // If no agentId in localStorage, try to get from session API
+      if (!agentId) {
+        try {
+          const sessionResp = await api.get('/auth/session')
+          if (sessionResp.data?.agentId) {
+            agentId = sessionResp.data.agentId
+          }
+        } catch {
+          // Session check failed, continue with fallback
+        }
+      }
+
+      // Fallback to first agent from list (for API key auth)
+      if (!agentId && agents && agents.length > 0) {
+        agentId = agents[0].id
+      }
+
+      if (!agentId) {
+        toast.warning(t('publishDemand.pleaseCreateAgent'))
+        setIsSubmitting(false)
+        return
+      }
+
       await createDemand({
         agent_id: agentId,
         title: form.title,

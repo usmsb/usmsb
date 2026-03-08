@@ -23,6 +23,17 @@ import type {
   DemandCreate,
   Service,
   ServiceCreate,
+  GeneCapsule,
+  GeneCapsuleSummary,
+  GeneCapsuleResponse,
+  GeneCapsuleSummaryResponse,
+  ExperienceGene,
+  AddExperienceRequest,
+  AddExperienceResponse,
+  MatchingExperience,
+  AgentExperienceSearchResult,
+  ShowcaseResponse,
+  ShareLevel,
 } from '@/types'
 
 // Helper to get auth data from zustand persisted storage
@@ -1171,5 +1182,207 @@ export const getTaxBreakdown = async (amount: number): Promise<TaxBreakdown> => 
  */
 export const getTotalSupply = async (): Promise<{ total_supply_vibe: number }> => {
   const response = await api.get<{ total_supply_vibe: number }>('/blockchain/total-supply')
+  return response.data
+}
+
+// ============ Gene Capsule API ============
+
+/**
+ * Get agent's gene capsule
+ */
+export const getGeneCapsule = async (agentId: string): Promise<GeneCapsule> => {
+  const response = await api.get<GeneCapsuleResponse>(`/gene-capsule/${agentId}`)
+  return response.data.result
+}
+
+/**
+ * Get gene capsule summary (lightweight version for display)
+ */
+export const getGeneCapsuleSummary = async (agentId: string): Promise<GeneCapsuleSummary> => {
+  const response = await api.get<GeneCapsuleSummaryResponse>(`/gene-capsule/${agentId}/summary`)
+  return response.data.result
+}
+
+/**
+ * Add a new experience gene
+ */
+export const addExperience = async (
+  agentId: string,
+  experience: AddExperienceRequest['experience'],
+  autoDesensitize: boolean = true
+): Promise<ExperienceGene> => {
+  const response = await api.post<AddExperienceResponse>('/gene-capsule/experiences', {
+    agent_id: agentId,
+    experience,
+    auto_desensitize: autoDesensitize,
+  })
+  return response.data.result
+}
+
+/**
+ * Find matching experiences for a task
+ */
+export const findMatchingExperiences = async (
+  agentId: string,
+  taskDescription: string,
+  requiredSkills: string[] = [],
+  minRelevance: number = 0.3,
+  limit: number = 10
+): Promise<MatchingExperience[]> => {
+  const response = await api.post<MatchingExperience[]>('/gene-capsule/match', {
+    agent_id: agentId,
+    task_description: taskDescription,
+    required_skills: requiredSkills,
+    min_relevance: minRelevance,
+    limit,
+  })
+  return response.data
+}
+
+/**
+ * Export showcase for negotiation display
+ */
+export const exportShowcase = async (
+  agentId: string,
+  experienceIds: string[] = [],
+  forNegotiation: boolean = true
+): Promise<ShowcaseResponse['result']> => {
+  const response = await api.post<ShowcaseResponse>('/gene-capsule/showcase', {
+    agent_id: agentId,
+    experience_ids: experienceIds,
+    for_negotiation: forNegotiation,
+  })
+  return response.data.result
+}
+
+/**
+ * Search agents by experience relevance
+ */
+export const searchAgentsByExperience = async (
+  taskDescription: string,
+  requiredSkills: string[] = [],
+  minRelevance: number = 0.3,
+  limit: number = 10
+): Promise<AgentExperienceSearchResult[]> => {
+  const response = await api.post<AgentExperienceSearchResult[]>('/gene-capsule/search-agents', {
+    task_description: taskDescription,
+    required_skills: requiredSkills,
+    min_experience_relevance: minRelevance,
+    limit,
+  })
+  return response.data
+}
+
+/**
+ * Update experience visibility
+ */
+export const updateExperienceVisibility = async (
+  experienceId: string,
+  agentId: string,
+  shareLevel: ShareLevel
+): Promise<{ success: boolean; experience_id: string; share_level: string }> => {
+  const response = await api.patch(`/gene-capsule/experiences/${experienceId}/visibility`, {
+    agent_id: agentId,
+    share_level: shareLevel,
+  })
+  return response.data
+}
+
+/**
+ * Hide an experience from matching
+ */
+export const hideExperience = async (
+  experienceId: string,
+  agentId: string
+): Promise<{ success: boolean; experience_id: string; share_level: string }> => {
+  return updateExperienceVisibility(experienceId, agentId, 'hidden')
+}
+
+/**
+ * Desensitize text using LLM
+ */
+export const desensitizeText = async (
+  text: string,
+  context: string = '',
+  recursionDepth: number = 3
+): Promise<{
+  original_text: string
+  desensitized_text: string
+  detected_entities: string[]
+  rounds_completed: number
+  confidence: number
+}> => {
+  const response = await api.post('/gene-capsule/desensitize', {
+    text,
+    context,
+    recursion_depth: recursionDepth,
+  })
+  return response.data
+}
+
+/**
+ * Request verification for an experience
+ */
+export const requestExperienceVerification = async (
+  experienceId: string,
+  agentId: string
+): Promise<{
+  success: boolean
+  experience_id: string
+  verification_status: string
+  message: string
+}> => {
+  const response = await api.post(`/gene-capsule/experiences/${experienceId}/verify`, {
+    agent_id: agentId,
+  })
+  return response.data
+}
+
+/**
+ * Get pattern library for an agent
+ */
+export const getPatterns = async (
+  agentId: string
+): Promise<Array<{
+  pattern_id: string
+  pattern_name: string
+  pattern_type: string
+  trigger_conditions: string[]
+  approach: string
+  expected_outcome: string
+  times_applied: number
+  success_rate: number
+  example_experience_ids: string[]
+  confidence: number
+}>> => {
+  const response = await api.get(`/gene-capsule/${agentId}/patterns`)
+  return response.data
+}
+
+/**
+ * Get experience value scores
+ */
+export const getExperienceValueScores = async (
+  agentId: string
+): Promise<Array<{
+  experience_id: string
+  overall_score: number
+  scarcity_score: number
+  difficulty_score: number
+  impact_score: number
+  recency_score: number
+  demonstration_score: number
+}>> => {
+  const response = await api.get(`/gene-capsule/${agentId}/value-scores`)
+  return response.data
+}
+
+/**
+ * Sync gene capsule with platform
+ */
+export const syncGeneCapsule = async (
+  agentId: string
+): Promise<{ success: boolean; message: string; synced_at: string }> => {
+  const response = await api.post(`/gene-capsule/${agentId}/sync`, {})
   return response.data
 }
