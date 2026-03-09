@@ -19,6 +19,13 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 import hashlib
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv(verbose=False)
+except ImportError:
+    pass  # dotenv not installed, use system env vars
+
 logger = logging.getLogger(__name__)
 
 
@@ -574,6 +581,10 @@ async def init_hybrid_matching_service():
 
         api_key = os.getenv("MINIMAX_API_KEY")
         if api_key:
+            # Mask API key for logging (show first 10 and last 4 chars)
+            masked_key = f"{api_key[:10]}...{api_key[-4:]}" if len(api_key) > 14 else "***"
+            logger.info(f"MINIMAX_API_KEY found: {masked_key}")
+
             config = IntelligenceSourceConfig(
                 name="minimax",
                 type=IntelligenceSourceType.LLM,
@@ -586,6 +597,8 @@ async def init_hybrid_matching_service():
             llm_adapter = MiniMaxAdapter(config)
             await llm_adapter.initialize()
             logger.info("Hybrid matching service initialized with MiniMax LLM adapter")
+        else:
+            logger.warning("MINIMAX_API_KEY not found in environment, using local vector embeddings only")
     except Exception as e:
         logger.warning(f"Failed to initialize LLM adapter: {e}, using vector-only mode")
 
