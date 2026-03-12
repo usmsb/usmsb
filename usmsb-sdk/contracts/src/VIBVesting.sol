@@ -28,6 +28,9 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     /// @notice 移除受益人延迟时间 (7天)
     uint256 public constant REMOVE_BENEFICIARY_DELAY = 7 days;
 
+    /// @notice 最大批量大小限制
+    uint256 public constant MAX_BATCH_SIZE = 100;
+
     /// @notice 待提取地址
     address public pendingWithdrawRecipient;
 
@@ -321,6 +324,7 @@ contract VIBVesting is Ownable, ReentrancyGuard {
             "VIBVesting: arrays length mismatch"
         );
         require(beneficiaries_.length > 0, "VIBVesting: empty arrays");
+        require(beneficiaries_.length <= MAX_BATCH_SIZE, "VIBVesting: exceeds max batch size");
 
         // 计算总金额
         uint256 totalAmount = 0;

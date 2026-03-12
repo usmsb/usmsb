@@ -125,7 +125,8 @@ contract EmissionController is Ownable, ReentrancyGuard {
             _staking,
             _ecosystem,
             _output,
-            _governance
+            _governance,
+            _reserve
         );
     }
 
