@@ -24,6 +24,9 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
     /// @notice 提取冷却期 (1天)
     uint256 public constant CLAIM_COOLDOWN = 1 days;
 
+    /// @notice 最大批量大小限制
+    uint256 public constant MAX_BATCH_SIZE = 100;
+
     // ========== 状态变量 ==========
 
     /// @notice VIBE 代币地址
@@ -168,6 +171,8 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
      * @param users 用户地址列表
      */
     function batchClaimDividend(address[] calldata users) external nonReentrant whenNotPaused {
+        require(users.length <= MAX_BATCH_SIZE, "VIBDividend: exceeds max batch size");
+        
         _updateDividend();
 
         for (uint256 i = 0; i < users.length; i++) {
