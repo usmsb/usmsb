@@ -206,7 +206,7 @@ contract VIBGovernance is
         __Pausable_init();
         vibeToken = IERC20(_vibeToken);
 
-        generalProposalThreshold = 500 * 10**18;
+        generalProposalThreshold = 1000 * 10**18; // 白皮书修复: 执行提案门槛1000 VIBE
         parameterProposalThreshold = 5000 * 10**18;
         upgradeProposalThreshold = 50000 * 10**18;
         emergencyProposalThreshold = 1000 * 10**18;
