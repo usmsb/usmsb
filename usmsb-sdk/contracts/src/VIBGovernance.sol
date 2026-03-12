@@ -218,7 +218,7 @@ contract VIBGovernance is
         upgradeTimelock = 60 days;
         dividendIncentiveTimelock = 30 days;
 
-        voteReward = 1 * 10**18;
+        voteReward = 0.01 * 10**18; // 白皮书修复: 投票奖励0.01 VIBE/票
         proposalReward = 10 * 10**18;
         executionWhitelistEnabled = true;
         flashLoanProtectionEnabled = true;
