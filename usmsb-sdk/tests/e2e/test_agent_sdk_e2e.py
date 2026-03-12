@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 # ==================== E2E 配置 ====================
 
-E2E_BASE_URL = os.getenv("E2E_BASE_URL", "http://127.0.0.1:8000")
+E2E_BASE_URL = os.getenv("E2E_BASE_URL", "http://127.0.0.1:8000/api")
 E2E_TIMEOUT = float(os.getenv("E2E_TIMEOUT", "30.0"))
 
 

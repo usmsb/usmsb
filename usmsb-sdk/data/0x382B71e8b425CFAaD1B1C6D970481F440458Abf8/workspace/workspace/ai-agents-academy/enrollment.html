@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>立即报名 - AI Agents 智能体构建学院</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="logo">
+                <i class="fas fa-robot"></i>
+                <span>AI Agents 学院</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="index.html">首页</a></li>
+                <li><a href="courses.html">课程介绍</a></li>
+                <li><a href="practice.html">实战项目</a></li>
+                <li><a href="enrollment.html" class="active">立即报名</a></li>
+                <li><a href="success.html">结业&创业</a></li>
+            </ul>
+            <div class="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 报名Hero区域 -->
+    <section class="enrollment-hero">
+        <div class="container">
+            <h1>开启你的 AI Agents 构建之旅</h1>
+            <p class="subtitle">从零基础到独立构建经济智能体，只需 6 周</p>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <span class="stat-number">2000+</span>
+                    <span class="stat-label">已报名学员</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">98%</span>
+                    <span class="stat-label">完成率</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">85%</span>
+                    <span class="stat-label">转行成功率</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 课程选择 -->
+    <section class="course-selection">
+        <div class="container">
+            <h2 class="section-title">选择你的课程套餐</h2>
+            <div class="pricing-grid">
+                <!-- 基础班 -->
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>基础班</h3>
+                        <div class="price">
+                            <span class="currency">¥</span>
+                            <span class="amount">2999</span>
+                        </div>
+                        <p class="price-desc">适合入门学习</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li><i class="fas fa-check"></i> 4周线上课程</li>
+                        <li><i class="fas fa-check"></i> 30+ 视频教程</li>
+                        <li><i class="fas fa-check"></i> 专属学习社群</li>
+                        <li><i class="fas fa-check"></i> 课后习题辅导</li>
+                        <li><i class="fas fa-check"></i> 结业证书</li>
+                        <li class="disabled"><i class="fas fa-times"></i> 1对1实战指导</li>
+                        <li class="disabled"><i class="fas fa-times"></i> 创业辅导</li>
+                        <li class="disabled"><i class="fas fa-times"></i> 平台入驻资格</li>
+                    </ul>
+                    <button class="btn btn-outline" onclick="selectPlan('basic')">选择基础班</button>
+                </div>
+
+                <!-- 精品班 -->
+                <div class="pricing-card featured">
+                    <div class="popular-badge">最受欢迎</div>
+                    <div class="pricing-header">
+                        <h3>精品班</h3>
+                        <div class="price">
+                            <span class="currency">¥</span>
+                            <span class="amount">5999</span>
+                        </div>
+                        <p class="price-desc">推荐选择</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li><i class="fas fa-check"></i> 4周线上课程</li>
+                        <li><i class="fas fa-check"></i> 50+ 视频教程</li>
+                        <li><i class="fas fa-check"></i> 专属学习社群</li>
+                        <li><i class="fas fa-check"></i> 课后习题辅导</li>
+                        <li><i class="fas fa-check"></i> 结业证书</li>
+                        <li><i class="fas fa-check"></i> 1对1实战指导</li>
+                        <li><i class="fas fa-check"></i> 创业辅导</li>
+                        <li class="disabled"><i class="fas fa-times"></i> 平台入驻资格</li>
+                    </ul>
+                    <button class="btn btn-primary" onclick="selectPlan('pro')">选择精品班</button>
+                </div>
+
+                <!-- 创业班 -->
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>创业班</h3>
+                        <div class="price">
+                            <span class="currency">¥</span>
+                            <span class="amount">12999</span>
+                        </div>
+                        <p class="price-desc">全方位扶持</p>
+                    </div>
+                    <ul class="pricing-features">
+                        <li><i class="fas fa-check"></i> 4周线上课程</li>
+                        <li><i class="fas fa-check"></i> 50+ 视频教程</li>
+                        <li><i class="fas fa-check"></i> 专属学习社群</li>
+                        <li><i class="fas fa-check"></i> 课后习题辅导</li>
+                        <li><i class="fas fa-check"></i> 结业证书</li>
+                        <li><i class="fas fa-check"></i> 1对1实战指导</li>
+                        <li><i class="fas fa-check"></i> 创业辅导</li>
+                        <li><i class="fas fa-check"></i> 平台入驻资格</li>
+                    </ul>
+                    <button class="btn btn-outline" onclick="selectPlan('vip')">选择创业班</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 报名表单 -->
+    <section class="enrollment-form" id="enroll-form" style="display: none;">
+        <div class="container">
+            <h2 class="section-title">填写报名信息</h2>
+            <form id="registration-form" class="form-container">
+                <div class="form-group">
+                    <label for="name">姓名 <span class="required">*</span></label>
+                    <input type="text" id="name" name="name" required placeholder="请输入你的真实姓名">
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">手机号 <span class="required">*</span></label>
+                    <input type="tel" id="phone" name="phone" required placeholder="请输入11位手机号">
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">邮箱 <span class="required">*</span></label>
+                    <input type="email" id="email" name="email" required placeholder="请输入邮箱地址">
+                </div>
+                
+                <div class="form-group">
+                    <label for="education">学历 <span class="required">*</span></label>
+                    <select id="education" name="education" required>
+                        <option value="">请选择学历</option>
+                        <option value="本科">本科</option>
+                        <option value="硕士">硕士</option>
+                        <option value="博士">博士</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="background">专业背景</label>
+                    <select id="background" name="background">
+                        <option value="">请选择专业背景</option>
+                        <option value="计算机">计算机相关</option>
+                        <option value="工程">工程类</option>
+                        <option value="商科">商科/金融</option>
+                        <option value="文科">文科类</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="goal">学习目标</label>
+                    <select id="goal" name="goal">
+                        <option value="">请选择学习目标</option>
+                        <option value="转行">转行AI领域</li>
+                        <option value="提升">提升现有工作能力</option>
+                        <option value="创业">创业/副业</option>
+                        <option value="兴趣">个人兴趣</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="wechat">微信号 <span class="required">*</span></label>
+                    <input type="text" id="wechat" name="wechat" required placeholder="请输入微信号，便于老师联系">
+                </div>
+                
+                <div class="form-group">
+                    <label for="referral">推荐码（选填）</label>
+                    <input type="text" id="referral" name="referral" placeholder="如有推荐人请填写">
+                </div>
+                
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="agree" required>
+                        <span class="checkmark"></span>
+                        我已阅读并同意 <a href="#" onclick="showTerms()">《学员协议》</a> 和 <a href="#" onclick="showPrivacy()">《隐私政策》</a>
+                    </label>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-large">提交报名</button>
+                    <button type="button" class="btn btn-outline" onclick="goBack()">返回选择</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <!-- FAQ区域 -->
+    <section class="faq-section">
+        <div class="container">
+            <h2 class="section-title">常见问题</h2>
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <h3><i class="fas fa-question-circle"></i> 零基础可以学吗？</h3>
+                    <p>完全可以！本课程专为零基础学员设计，从最基础的概念讲起，配合大量实践案例，让你一步步掌握AI Agents构建技能。</p>
+                </div>
+                <div class="faq-item">
+                    <h3><i class="fas fa-question-circle"></i> 课程有效期是多久？</h3>
+                    <p>课程购买后永久有效，可随时回看。实战项目辅导期为报名后6个月内。</p>
+                </div>
+                <div class="faq-item">
+                    <h3><i class="fas fa-question-circle"></i> 学完能赚回学费吗？</h3>
+                    <p>学完课程后，你将具备构建AI Agents的能力，可以：1）在平台接单赚取收益；2）创建自己的经济智能体提供服务；3）从事相关工作或副业。优秀学员已实现月入过万。</p>
+                </div>
+                <div class="faq-item">
+                    <h3><i class="fas fa-question-circle"></i> 如何付款？</h3>
+                    <p>支持微信、支付宝、银行卡等多种支付方式。报名后24小时内会有老师联系你确认报名信息。</p>
+                </div>
+                <div class="faq-item">
+                    <h3><i class="fas fa-question-circle"></i> 可以分期付款吗？</h3>
+                    <p>支持花呗分期、信用卡分期（3/6/12期），减轻你的经济压力。</p>
+                </div>
+                <div class="faq-item">
+                    <h3><i class="fas fa-question-circle"></i> 退款政策是什么？</h3>
+                    <p>开课7天内无理由退款，开课30天内可申请延期或转班。具体政策请咨询课程顾问。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>关于学院</h4>
+                    <p>AI Agents 智能体构建学院，专注为零基础人群提供AI Agents开发培训，帮助你掌握未来最值钱的技能。</p>
+                </div>
+                <div class="footer-section">
+                    <h4>快速链接</h4>
+                    <ul>
+                        <li><a href="index.html">首页</a></li>
+                        <li><a href="courses.html">课程介绍</a></li>
+                        <li><a href="practice.html">实战项目</a></li>
+                        <li><a href="enrollment.html">立即报名</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>联系我们</h4>
+                    <ul>
+                        <li><i class="fas fa-envelope"></i> support@aiagents-academy.com</li>
+                        <li><i class="fas fa-phone"></i> 400-888-8888</li>
+                        <li><i class="fas fa-map-marker-alt"></i> 北京市海淀区科技园</li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>关注我们</h4>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-weixin"></i></a>
+                        <a href="#"><i class="fab fa-zhihu"></i></a>
+                        <a href="#"><i class="fab fa-bilibili"></i></a>
+                        <a href="#"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 AI Agents 智能体构建学院. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="#">隐私政策</a>
+                    <a href="#">服务条款</a>
+                    <a href="#">网站地图</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 报名成功弹窗 -->
+    <div class="modal" id="success-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <i class="fas fa-check-circle"></i>
+                <h3>报名成功！</h3>
+            </div>
+            <div class="modal-body">
+                <p>感谢你的报名！</p>
+                <p>我们的课程顾问将在 <strong>24小时内</strong> 联系你，请保持手机畅通。</p>
+                <p class="highlight">微信号：AIAgents2024</p>
+                <p>（如未及时通过，可添加此微信）</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        // 选择课程套餐
+        function selectPlan(plan) {
+            document.querySelector('.course-selection').style.display = 'none';
+            document.querySelector('.enrollment-form').style.display = 'block';
+            window.scrollTo({ top: document.querySelector('.enrollment-form').offsetTop, behavior: 'smooth' });
+        }
+        
+        // 返回选择
+        function goBack() {
+            document.querySelector('.course-selection').style.display = 'block';
+            document.querySelector('.enrollment-form').style.display = 'none';
+        }
+        
+        // 表单提交
+        document.getElementById('registration-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // 显示成功弹窗
+            document.getElementById('success-modal').style.display = 'flex';
+        });
+        
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('success-modal').style.display = 'none';
+            window.location.href = 'index.html';
+        }
+        
+        // 显示条款
+        function showTerms() {
+            alert('学员协议：\n\n1. 学员需按时完成课程学习\n2. 实战项目需在规定时间内提交\n3. 尊重知识产权，不得外传课程资料\n4. 违反协议将被取消学习资格');
+        }
+        
+        function showPrivacy() {
+            alert('隐私政策：\n\n我们承诺保护你的个人信息安全，不会将其泄露给第三方。');
+        }
+    </script>
+</body>
+</html>
