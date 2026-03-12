@@ -524,9 +524,9 @@ contract VIBGovernance is
     }
 
     function _getDuration(ProposalType t) internal pure returns (uint256) {
-        if (t == ProposalType.GENERAL) return 7 days;
-        if (t == ProposalType.PARAMETER) return 14 days;
-        if (t == ProposalType.UPGRADE) return 21 days;
+        if (t == ProposalType.GENERAL) return 14 days; // 白皮书修复: 一般提案14天
+        if (t == ProposalType.PARAMETER) return 30 days; // 白皮书修复: 参数调整30天
+        if (t == ProposalType.UPGRADE) return 60 days; // 白皮书修复: 协议升级60天
         if (t == ProposalType.DIVIDEND || t == ProposalType.INCENTIVE) return 14 days;
         return 3 days;
     }
