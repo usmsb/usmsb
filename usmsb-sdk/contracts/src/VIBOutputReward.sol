@@ -91,6 +91,15 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
     /// @notice 产出数量
     uint256 public outputCount;
 
+    /// @notice 日池金额（白皮书修复: 防除零）
+    uint256 public dailyPoolAmount;
+
+    /// @notice 上次分配时间
+    uint256 public lastDistributionTime;
+
+    /// @notice 分配周期（7天）
+    uint256 public constant DISTRIBUTION_PERIOD = 7 days;
+
     // ========== 结构体 ==========
 
     struct OutputRecord {
@@ -133,6 +142,8 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
 
     event EvaluatorUpdated(address indexed evaluator, bool authorized);
 
+    event DailyPoolReceived(uint256 amount, uint256 totalPool);
+
     // ========== 修饰符 ==========
 
     modifier onlyAuthorizedEvaluator() {
@@ -149,6 +160,24 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         require(_vibeToken != address(0), "VIBOutputReward: invalid token");
         vibeToken = IERC20(_vibeToken);
         emissionController = _emissionController;
+    }
+
+    /**
+     * @notice 接收日池资金（白皮书修复: 日池分配机制）
+     * @dev 由EmissionController定期调用
+     */
+    function receiveDailyPool(uint256 amount) external {
+        require(msg.sender == emissionController || msg.sender == owner(), "VIBOutputReward: not authorized");
+        require(amount > 0, "VIBOutputReward: amount must be greater than 0");
+        
+        // 从发送者接收代币
+        vibeToken.safeTransferFrom(msg.sender, address(this), amount);
+        
+        // 更新日池金额
+        dailyPoolAmount += amount;
+        lastDistributionTime = block.timestamp;
+        
+        emit DailyPoolReceived(amount, dailyPoolAmount);
     }
 
     // ========== 外部函数 ==========
@@ -422,7 +451,37 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
 
     // ========== 内部函数 ==========
 
-    function _getBaseReward(OutputType outputType) internal pure returns (uint256) {
+    /**
+     * @notice 计算基础奖励（白皮书修复: 日池分配+防除零）
+     * @dev BaseReward = 日池金额 / max(1, 产出数)，最少1
+     */
+    function _getBaseReward(OutputType outputType) internal view returns (uint256) {
+        // 白皮书修复: 防除零保护
+        uint256 effectiveOutputCount = outputCount > 0 ? outputCount : 1;
+        
+        // 如果有日池金额，按日池计算
+        if (dailyPoolAmount > 0) {
+            // 日池金额 / 产出数量
+            uint256 baseFromPool = dailyPoolAmount / effectiveOutputCount;
+            // 最少1 VIBE
+            if (baseFromPool < 1) baseFromPool = 1;
+            
+            // 根据产出类型调整（基础类型的加成系数）
+            uint256 typeMultiplier;
+            if (outputType == OutputType.CODE_PRODUCT) {
+                typeMultiplier = 12000; // 1.2x
+            } else if (outputType == OutputType.CONTENT) {
+                typeMultiplier = 10000; // 1.0x
+            } else if (outputType == OutputType.PROBLEM_SOLVING) {
+                typeMultiplier = 8000; // 0.8x
+            } else {
+                typeMultiplier = 15000; // 1.5x (创新发现加成)
+            }
+            
+            return (baseFromPool * typeMultiplier) / PRECISION;
+        }
+        
+        // 如果没有日池，使用固定基础奖励
         if (outputType == OutputType.CODE_PRODUCT) {
             return (CODE_MIN + CODE_MAX) / 2; // 255 VIBE
         } else if (outputType == OutputType.CONTENT) {
