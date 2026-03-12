@@ -475,22 +475,27 @@ contract VIBDispute is Ownable, ReentrancyGuard {
         // 计算总质押
         uint256 totalStake = dispute.stakeAmount * 2;
 
-        // 分配奖励
+        // 分配奖励（白皮书修复: 败诉方押金用于支付仲裁员报酬+销毁）
         uint256 winnerReward;
         uint256 arbitratorReward;
+        uint256 burnAmount;
 
         if (plaintiffWon) {
-            // 原告胜诉：返还质押 + 被告质押的80%
-            winnerReward = dispute.stakeAmount + (dispute.stakeAmount * 80) / 100;
-            arbitratorReward = totalStake - winnerReward;
+            // 原告胜诉：返还自己的质押
+            winnerReward = dispute.stakeAmount;
+            // 被告质押的80%给原告，20%给仲裁员+销毁
+            arbitratorReward = (dispute.stakeAmount * 80) / 100;
+            burnAmount = dispute.stakeAmount - arbitratorReward; // 20%销毁
 
             // 更新信用记录
             _updateCreditRecord(dispute.plaintiff, true);
             _updateCreditRecord(dispute.defendant, false);
         } else {
-            // 被告胜诉：返还质押 + 原告质押的80%
-            winnerReward = dispute.stakeAmount + (dispute.stakeAmount * 80) / 100;
-            arbitratorReward = totalStake - winnerReward;
+            // 被告胜诉：返还自己的质押
+            winnerReward = dispute.stakeAmount;
+            // 原告质押的80%给被告，20%给仲裁员+销毁
+            arbitratorReward = (dispute.stakeAmount * 80) / 100;
+            burnAmount = dispute.stakeAmount - arbitratorReward; // 20%销毁
 
             // 更新信用记录
             _updateCreditRecord(dispute.plaintiff, false);
@@ -500,6 +505,11 @@ contract VIBDispute is Ownable, ReentrancyGuard {
         // 转移胜方奖励
         address winner = plaintiffWon ? dispute.plaintiff : dispute.defendant;
         vibeToken.safeTransfer(winner, winnerReward);
+
+        // 销毁部分（白皮书修复）
+        if (burnAmount > 0) {
+            vibeToken.safeTransfer(address(0), burnAmount);
+        }
 
         // 分配仲裁员奖励
         _distributeArbitratorRewards(disputeId, arbitratorReward, plaintiffWon);
