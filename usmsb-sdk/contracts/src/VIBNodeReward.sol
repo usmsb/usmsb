@@ -18,15 +18,23 @@ interface IVIBIdentityForNode {
 }
 
 /**
+ * @title IPriceOracle for USD锚定定价
+ */
+interface IPriceOracle {
+    function getVibePrice() external view returns (uint256);
+}
+
+/**
  * @title VIBNodeReward
  * @notice 节点激励合约 - 完全去中心化自动分配
  * @dev 实现白皮书承诺的节点收益模型：
  *      节点总收益 = 基础服务收入 + 生产力加成 + 可靠性奖励
  *
- * 服务类型定价:
- * - GPU算力: 0.1-1.0 VIBE/GPU小时
- * - CPU算力: 0.01-0.1 VIBE/CPU小时
- * - 存储: 0.001 VIBE/GB/天
+ * 服务类型定价（USD锚定）:
+ * - GPU算力: $0.5-5.0/GPU小时
+ * - CPU算力: $0.05-0.5/CPU小时
+ * - 存储: $0.005/GB/天
+ * 支付时按VIBE实时价格折算
  *
  * 完全去中心化：奖励由预言机或自动化系统触发，不需要人工干预
  */
@@ -38,12 +46,13 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
     /// @notice 精度
     uint256 public constant PRECISION = 10000;
 
-    // 基础服务定价（单位：VIBE，精度10^18）
-    uint256 public constant GPU_BASE_RATE = 0.1 * 10**18;     // 0.1 VIBE/GPU小时
-    uint256 public constant GPU_MAX_RATE = 1.0 * 10**18;      // 1.0 VIBE/GPU小时
-    uint256 public constant CPU_BASE_RATE = 0.01 * 10**18;    // 0.01 VIBE/CPU小时
-    uint256 public constant CPU_MAX_RATE = 0.1 * 10**18;      // 0.1 VIBE/CPU小时
-    uint256 public constant STORAGE_RATE = 0.001 * 10**18;    // 0.001 VIBE/GB/天
+    // 基础服务定价（单位：USD，精度10^18）
+    // 白皮书修复: 改为USD锚定定价
+    uint256 public constant GPU_BASE_RATE_USD = 0.5 * 10**18;     // $0.5/GPU小时
+    uint256 public constant GPU_MAX_RATE_USD = 5.0 * 10**18;      // $5.0/GPU小时
+    uint256 public constant CPU_BASE_RATE_USD = 0.05 * 10**18;    // $0.05/CPU小时
+    uint256 public constant CPU_MAX_RATE_USD = 0.5 * 10**18;      // $0.5/CPU小时
+    uint256 public constant STORAGE_RATE_USD = 0.005 * 10**18;    // $0.005/GB/天
 
     // 奖励因子范围（精度10000）
     uint256 public constant MIN_QUALITY = 5000;       // 0.5x
@@ -67,6 +76,9 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice VIBIdentity合约（验证节点身份）
     address public identityContract;
+
+    /// @notice 价格预言机地址（白皮书修复: USD锚定定价）
+    address public priceOracle;
 
     /// @notice 已授权的服务质量评估者（预言机/自动化系统）
     mapping(address => bool) public authorizedAssessors;
@@ -179,6 +191,29 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
         require(_vibeToken != address(0), "VIBNodeReward: invalid token");
         vibeToken = IERC20(_vibeToken);
         identityContract = _identityContract;
+    }
+
+    /**
+     * @notice 设置价格预言机（白皮书修复: USD锚定）
+     * @param _priceOracle 新预言机地址
+     */
+    function setPriceOracle(address _priceOracle) external onlyOwner {
+        priceOracle = _priceOracle;
+    }
+
+    /**
+     * @notice USD转换为VIBE数量（白皮书修复: USD锚定定价）
+     * @param usdAmount USD数量
+     * @return VIBE数量
+     */
+    function usdToVibe(uint256 usdAmount) public view returns (uint256) {
+        if (priceOracle == address(0) || usdAmount == 0) {
+            return usdAmount; // Fallback: 1:1
+        }
+        // 获取VIBE价格（假设预言机返回USD价格，乘以10^18）
+        uint256 vibePrice = IPriceOracle(priceOracle).getVibePrice();
+        // USD金额 / VIBE价格 = VIBE数量
+        return (usdAmount * 10**18) / vibePrice;
     }
 
     // ========== 外部函数 ==========
@@ -487,26 +522,29 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
     // ========== 内部函数 ==========
 
     /**
-     * @notice 计算基础奖励
+     * @notice 计算基础奖励（白皮书修复: USD锚定定价）
      */
     function _calculateBaseReward(
         NodeType serviceType,
         uint256 duration,
         uint256 capacity
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
+        uint256 usdReward;
         if (serviceType == NodeType.GPU_COMPUTE) {
-            // GPU: 0.1 VIBE/GPU小时
+            // GPU: $0.5-5.0/GPU小时
             uint256 hrs = duration / 3600;
-            return (GPU_BASE_RATE * capacity * hrs);
+            usdReward = (GPU_BASE_RATE_USD * capacity * hrs);
         } else if (serviceType == NodeType.CPU_COMPUTE) {
-            // CPU: 0.01 VIBE/CPU小时
+            // CPU: $0.05-0.5/CPU小时
             uint256 hrs = duration / 3600;
-            return (CPU_BASE_RATE * capacity * hrs);
+            usdReward = (CPU_BASE_RATE_USD * capacity * hrs);
         } else {
-            // Storage: 0.001 VIBE/GB/天
+            // Storage: $0.005/GB/天
             uint256 days_ = duration / 86400;
-            return (STORAGE_RATE * capacity * days_);
+            usdReward = (STORAGE_RATE_USD * capacity * days_);
         }
+        // 转换为VIBE
+        return usdToVibe(usdReward);
     }
 
     /**
