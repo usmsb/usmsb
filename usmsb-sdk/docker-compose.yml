@@ -11,6 +11,7 @@ services:
     environment:
       - NODE_ID=backend_${HOSTNAME:-local}
       - NODE_ADDRESS=${NODE_ADDRESS:-0.0.0.0}
+      - META_DATA_DIR=/app/data
       - JWT_SECRET=${JWT_SECRET:-usmsb-production-secret-key-2026-secure-random-string}
       - SESSION_SECRET=${SESSION_SECRET:-usmsb-session-secret-2026}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}

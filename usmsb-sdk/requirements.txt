@@ -43,8 +43,8 @@ structlog>=24.1
 click>=8.0
 rich>=13.0
 
-# IPFS Storage
-ipfshttpclient>=0.8.0
+# IPFS Storage (use alpha for Python 3.12+)
+ipfshttpclient==0.8.0a2
 
 # WebSocket
 websockets>=12.0

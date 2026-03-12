@@ -3,6 +3,9 @@
 
 FROM python:3.12-slim
 
+# Use Chinese mirror for faster download
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -37,6 +40,7 @@ RUN pip install -e .
 
 # Create non-root user for security
 RUN useradd -m -u 1000 usmsb && chown -R usmsb:usmsb /app
+RUN mkdir -p /app/logs && chown -R usmsb:usmsb /app/logs
 USER usmsb
 
 # Expose ports
