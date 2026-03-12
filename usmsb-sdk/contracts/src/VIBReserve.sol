@@ -43,6 +43,9 @@ contract VIBReserve is Ownable, ReentrancyGuard, Pausable {
     /// @notice 单次补充最大比例 (10%)
     uint256 public constant MAX_REFILL_RATIO = 1000;
 
+    /// @notice 单次提取最大比例 (10%) - 白皮书修复
+    uint256 public constant MAX_WITHDRAW_RATIO = 1000;
+
     // 池类型
     enum PoolType {
         STAKING,      // 质押奖励池
@@ -464,6 +467,11 @@ contract VIBReserve is Ownable, ReentrancyGuard, Pausable {
     function initiateEmergencyWithdraw(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "VIBReserve: invalid recipient");
         require(amount > 0, "VIBReserve: invalid amount");
+
+        // 白皮书修复: 单次提取不超过余额的10%
+        uint256 balance = vibeToken.balanceOf(address(this));
+        require(amount <= (balance * MAX_WITHDRAW_RATIO) / PRECISION, 
+            "VIBReserve: exceed 10% withdraw limit");
 
         // 保留最小储备
         uint256 minReserve = (totalFundsReceived * MIN_RESERVE_RATIO) / PRECISION;
