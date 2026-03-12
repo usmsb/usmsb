@@ -67,7 +67,7 @@ contract VIBGovernance is
     uint256 public constant EMERGENCY_PASS_RATE = 9000;
     uint256 public constant DIVIDEND_PASS_RATE = 6700;
     uint256 public constant INCENTIVE_PASS_RATE = 6700;
-    uint256 public constant EMERGENCY_TIMELOCK = 1 days;
+    uint256 public constant EMERGENCY_TIMELOCK = 0 days; // 白皮书修复: 紧急提案无时间锁
     uint256 public constant COMMUNITY_OPPOSITION_THRESHOLD = 6000;
     uint256 public constant MAX_BATCH_SIZE = 100;
 

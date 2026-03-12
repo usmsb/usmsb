@@ -30,8 +30,8 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
 
     // ========== 常量 ==========
 
-    /// @notice 最小 APY
-    uint256 public constant MIN_APY = 1; // 1%
+    /// @notice 最小 APY (白皮书修复: 统一为3%)
+    uint256 public constant MIN_APY = 3; // 3%
 
     /// @notice 最大 APY
     uint256 public constant MAX_APY = 10; // 10%
