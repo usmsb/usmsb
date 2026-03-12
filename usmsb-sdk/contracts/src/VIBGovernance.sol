@@ -551,15 +551,18 @@ contract VIBGovernance is
     // ========== 管理函数 ==========
 
     function setStakingContract(address _addr) external onlyOwner {
+        require(_addr != address(0), "VIBGovernance: zero address");
         stakingContract = _addr;
         vibStaking = IVIBStaking(_addr);
     }
 
     function setDelegationContract(address _addr) external onlyOwner {
+        require(_addr != address(0), "VIBGovernance: zero address");
         delegationContract = _addr;
     }
 
     function setContributionPointsContract(address _addr) external onlyOwner {
+        require(_addr != address(0), "VIBGovernance: zero address");
         contributionPointsContract = _addr;
     }
 

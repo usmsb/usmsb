@@ -24,8 +24,17 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
     /// @notice 提取冷却期 (1天)
     uint256 public constant CLAIM_COOLDOWN = 1 days;
 
-    /// @notice 最大批量大小限制
-    uint256 public constant MAX_BATCH_SIZE = 100;
+    /// @notice 紧急提取时间锁 (7天)
+    uint256 public constant EMERGENCY_WITHDRAW_DELAY = 7 days;
+    
+    /// @notice 待执行的紧急提取
+    struct PendingEmergencyWithdraw {
+        address token;
+        address to;
+        uint256 amount;
+        uint256 availableTime;
+    }
+    PendingEmergencyWithdraw public pendingEmergency;
 
     // ========== 状态变量 ==========
 
@@ -230,13 +239,34 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
         address to,
         uint256 amount
     ) external onlyOwner nonReentrant {
+        // 第一步：发起紧急提取，设置7天时间锁
         require(to != address(0), "VIBDividend: invalid address");
         require(amount > 0, "VIBDividend: amount must be greater than 0");
-
-        if (token == address(0)) {
-            payable(to).transfer(amount);
+        
+        pendingEmergency = PendingEmergencyWithdraw({
+            token: token,
+            to: to,
+            amount: amount,
+            availableTime: block.timestamp + EMERGENCY_WITHDRAW_DELAY
+        });
+    }
+    
+    /**
+     * @notice 执行紧急提取（时间锁后）
+     */
+    function executeEmergencyWithdraw() external onlyOwner nonReentrant {
+        PendingEmergencyWithdraw memory pending = pendingEmergency;
+        require(pending.amount > 0, "VIBDividend: no pending withdraw");
+        require(block.timestamp >= pending.availableTime, "VIBDividend: timelock not expired");
+        
+        // 清除待执行提取
+        delete pendingEmergency;
+        
+        // 执行转账
+        if (pending.token == address(0)) {
+            payable(pending.to).transfer(pending.amount);
         } else {
-            IERC20(token).safeTransfer(to, amount);
+            IERC20(pending.token).safeTransfer(pending.to, pending.amount);
         }
     }
 
