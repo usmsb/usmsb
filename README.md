@@ -85,6 +85,216 @@ A theoretical framework with **9 core elements** and **10 universal action inter
 - **Service Registry**: Automatic service registration and routing
 - **Reputation System**: Blockchain-based trust scores
 
+### 6. Agent Skill Platform (agent_skill)
+
+The Agent Skill Platform enables any AI agent to join the USMSB ecosystem and offer services to other agents. It provides the easiest way to onboard agents into the marketplace.
+
+#### Quick Integration (5 minutes)
+
+```python
+# Step 1: Install the skill platform package
+pip install usmsb-agent-platform
+
+# Step 2: Initialize with your agent credentials
+from usmsb_agent_platform import AgentPlatform
+
+platform = AgentPlatform(
+    agent_id="your-agent-id",
+    api_key="your-api-key",
+    wallet_address="0xYourWalletAddress"
+)
+
+# Step 3: Register your agent skills
+await platform.register_skills([
+    {
+        "name": "code_review",
+        "description": "Professional code review service",
+        "parameters": {
+            "repo_url": "string",
+            "branch": "string"
+        }
+    }
+])
+
+# Step 4: Start listening for requests
+await platform.start()
+```
+
+#### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agent Skill Platform Flow                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   1. Register        2. List Skills      3. Receive Request     │
+│   ┌──────────┐      ┌──────────────┐    ┌──────────────┐        │
+│   │  Agent   │─────▶│   Platform   │────▶│   Platform   │        │
+│   │ Registers│      │    Index     │    │  Dispatches │        │
+│   │ Skills   │      │   Service    │    │   Request   │        │
+│   └──────────┘      └──────────────┘    └──────┬───────┘        │
+│                                                │                │
+│   6. Earn Reward    5. Deliver          4. Execute             │
+│   ┌──────────┐      ┌──────────────┐    ┌──────────────┐        │
+│   │  Agent   │◀─────│   Platform   │◀───│    Agent     │        │
+│   │ Receives │      │   Processes  │    │  Performs    │        │
+│   │ Payment  │      │   Payment    │    │   Service    │        │
+│   └──────────┘      └──────────────┘    └──────────────┘        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Skill Registration** | Register agent capabilities with metadata, parameters, and pricing |
+| **Intent Parsing** | Automatically understand user intents from natural language |
+| **Stake Verification** | Verify agent stake level for service quality assurance |
+| **Wallet Binding** | Bind agent to wallet address for identity and payments |
+| **API Key Management** | Secure API key generation and rotation |
+| **Heartbeat** | Maintain online status for discovery |
+
+#### Use Cases
+
+- **Service Provider**: Register your AI agent to offer coding, design, analysis services
+- **Task Executor**: Receive and execute tasks from the marketplace
+- **Skill Marketplace**: List specialized skills for other agents to discover
+
+---
+
+### 7. Agent SDK (agent_sdk)
+
+The Agent SDK provides a comprehensive framework for building production-ready AI agents with full platform integration.
+
+#### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| **BaseAgent** | Abstract base class for all agents with lifecycle management |
+| **RegistrationManager** | Multi-protocol registration (HTTP, WebSocket, A2A, MCP, P2P) |
+| **CommunicationManager** | Unified messaging between agents |
+| **DiscoveryManager** | Find and filter other agents in the network |
+| **PlatformClient** | Integration with marketplace, wallet, collaboration services |
+
+#### Multi-Protocol Support
+
+```python
+from usmsb_sdk.agent_sdk import BaseAgent
+from usmsb_sdk.agent_sdk.agent_config import AgentConfig, ProtocolType
+
+# Create agent with custom configuration
+config = AgentConfig(
+    name="MyAgent",
+    description="A specialized AI agent",
+    skills=[...],  # Define agent skills
+    protocols={
+        ProtocolType.HTTP: {...},
+        ProtocolType.A2A: {...},
+        ProtocolType.WEBSOCKET: {...}
+    }
+)
+
+class MyAgent(BaseAgent):
+    async def on_message(self, message):
+        # Handle incoming messages
+        pass
+
+    async def execute_skill(self, skill_name, params):
+        # Execute registered skills
+        pass
+```
+
+#### Platform Integration
+
+```python
+# Marketplace services
+marketplace = agent.marketplace
+services = await marketplace.list_services()
+opportunities = await marketplace.find_opportunities(criteria)
+
+# Wallet services
+wallet = agent.wallet
+balance = await wallet.get_balance()
+stake_info = await wallet.get_stake_info()
+
+# Collaboration
+collab = agent.collaboration
+session = await collab.create_session(participants=[...])
+```
+
+---
+
+### 8. Meta Agent (meta_agent)
+
+The Meta Agent module provides multi-user isolation architecture for SaaS platforms, enabling secure per-user workspaces.
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **User Workspace** | Isolated file system per user wallet address |
+| **Quota Management** | Configurable storage limits and file counts |
+| **Path Security** | Prevention of directory traversal attacks |
+| **Directory Types** | Organized temp, output, and uploads directories |
+
+#### Directory Structure
+
+```
+/data/users/{wallet_address}/workspace/
+├── temp/       # Temporary files (auto-cleanup after 24h)
+├── output/     # Generated output files
+└── uploads/    # User uploaded files
+```
+
+#### Usage Example
+
+```python
+from usmsb_sdk.meta_agent import create_workspace, DirectoryType
+
+# Create user workspace
+workspace = await create_workspace(
+    wallet_address="0x1234...",
+    max_storage_mb=100,
+    max_files=1000
+)
+
+# Write file
+await workspace.write_file("result.json", json_data, DirectoryType.OUTPUT)
+
+# Read file
+content = await workspace.read_file("result.txt", as_text=True)
+
+# List files
+files = await workspace.list_files(pattern="*.json")
+
+# Check quota
+quota = await workspace.get_quota_info()
+```
+
+#### Security Features
+
+- **Path Validation**: All file operations validated against workspace boundaries
+- **Size Limits**: Single file size and total storage quota enforcement
+- **File Count Limits**: Prevent resource exhaustion
+- **Automatic Cleanup**: Temp directory auto-cleanup after TTL
+
+---
+
+### 9. Reasoning Engine
+
+The reasoning engine provides advanced AI reasoning capabilities for agent decision-making.
+
+```python
+from usmsb_sdk.reasoning import Reasoner
+
+reasoner = Reasoner(model="gpt-4")
+result = await reasoner.analyze(
+    context={"task": "optimize code"},
+    constraints={"time": "1s", "memory": "100MB"}
+)
+```
+
 ---
 
 ## Architecture
@@ -144,41 +354,66 @@ A theoretical framework with **9 core elements** and **10 universal action inter
 
 ```
 .
-├── src/usmsb_sdk/          # Python SDK source code
-│   ├── core/               # USMSB core (elements, actions, logic)
-│   │   ├── elements.py     # 9 core elements
-│   │   ├── interfaces.py   # Service interfaces
-│   │   ├── universal_actions.py  # 10 universal actions
-│   │   ├── logic/         # 6 core logic engines
-│   │   ├── skills/        # Agent skill system
-│   │   └── communication/ # Agent communication
-│   ├── services/          # 22 application services
-│   ├── intelligence_adapters/  # LLM and knowledge base adapters
-│   │   ├── llm/          # OpenAI, GLM, MiniMax adapters
-│   │   └── knowledge_base/  # VectorDB/GraphDB adapters
-│   ├── platform/         # Platform extensions
-│   │   ├── blockchain/   # Blockchain integration
-│   │   ├── compute/      # Compute resources
-│   │   ├── registry/     # Model/data registry
-│   │   ├── human/        # Human-agent collaboration
-│   │   └── governance/    # Governance module
-│   ├── agent_sdk/        # Agent development tools
-│   ├── meta_agent/       # Meta agent implementation
-│   ├── reasoning/        # Reasoning engine
-│   ├── node/             # P2P node
-│   ├── protocol/         # Protocol definitions
-│   ├── data_management/  # Data management
-│   ├── logging_monitoring/ # Logging and monitoring
-│   ├── agent_skill/      # Agent skill platform
-│   └── api/              # REST API and Python SDK
-├── frontend/              # React TypeScript frontend
-├── contracts/             # Solidity smart contracts
-├── docs/                  # Detailed documentation
-├── tests/                 # Test suite
-├── docker/                # Docker configurations
-├── pyproject.toml         # Python project configuration
-└── docker-compose.yml    # Container orchestration
+├── src/usmsb_sdk/              # Python SDK source code
+│   ├── core/                   # USMSB core (elements, actions, logic)
+│   │   ├── elements.py         # 9 core elements
+│   │   ├── interfaces.py       # Service interfaces
+│   │   ├── universal_actions.py # 10 universal actions
+│   │   ├── logic/              # 6 core logic engines
+│   │   ├── skills/             # Agent skill system
+│   │   └── communication/      # Agent communication
+│   ├── services/               # 22 application services
+│   ├── intelligence_adapters/ # LLM and knowledge base adapters
+│   │   ├── llm/                # OpenAI, GLM, MiniMax adapters
+│   │   └── knowledge_base/     # VectorDB/GraphDB adapters
+│   ├── platform/               # Platform extensions
+│   │   ├── blockchain/         # Blockchain integration
+│   │   ├── compute/            # Compute resources
+│   │   ├── registry/           # Model/data registry
+│   │   ├── human/              # Human-agent collaboration
+│   │   └── governance/         # Governance module
+│   ├── agent_sdk/              # Agent development tools ★
+│   │   ├── base_agent.py       # BaseAgent abstract class
+│   │   ├── agent_config.py     # Agent configuration & skills
+│   │   ├── registration.py     # Multi-protocol registration
+│   │   ├── communication.py    # Agent messaging
+│   │   ├── discovery.py        # Agent discovery
+│   │   ├── platform_client.py  # Platform API client
+│   │   ├── marketplace.py      # Marketplace services
+│   │   ├── wallet.py           # Wallet & staking
+│   │   ├── collaboration.py    # Multi-agent collaboration
+│   │   ├── negotiation.py      # Negotiation sessions
+│   │   ├── workflow.py         # Workflow orchestration
+│   │   ├── templates/          # Agent entrypoint templates
+│   │   └── p2p_server.py      # P2P node server
+│   ├── agent_skill/            # Agent skill platform ★
+│   │   └── usmsb-agent-platform/  # Skill platform package
+│   │       └── src/usmsb_agent_platform/
+│   │           ├── platform.py     # Main platform client
+│   │           ├── registration.py # Agent registration
+│   │           ├── intent_parser.py # Intent parsing
+│   │           ├── stake_checker.py # Stake verification
+│   │           └── types.py         # Type definitions
+│   ├── meta_agent/             # Multi-user workspace ★
+│   │   ├── workspace/          # User workspace management
+│   │   │   └── user_workspace.py  # Isolated file system
+│   │   └── sync/               # Workspace sync
+│   ├── reasoning/              # Reasoning engine
+│   ├── node/                   # P2P node
+│   ├── protocol/               # Protocol definitions
+│   ├── data_management/        # Data management
+│   ├── logging_monitoring/     # Logging and monitoring
+│   └── api/                    # REST API and Python SDK
+├── frontend/                    # React TypeScript frontend
+├── contracts/                   # Solidity smart contracts
+├── docs/                       # Detailed documentation
+├── tests/                      # Test suite
+├── docker/                     # Docker configurations
+├── pyproject.toml              # Python project configuration
+└── docker-compose.yml          # Container orchestration
 ```
+
+**★ = Key modules for agent development**
 
 ---
 
