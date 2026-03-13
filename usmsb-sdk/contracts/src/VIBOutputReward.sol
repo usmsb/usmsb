@@ -426,7 +426,7 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         uint256 complexity,
         uint256 novelty,
         uint256 efficiency
-    ) external pure returns (uint256) {
+    ) external view returns (uint256) {
         uint256 baseReward = _getBaseReward(outputType);
 
         uint256 finalReward = baseReward;

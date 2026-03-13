@@ -47,7 +47,7 @@ describe("VIBStaking Dynamic APY", function () {
     });
 
     it("Should have correct APY range constants", async function () {
-      expect(await staking.MIN_APY()).to.equal(1);
+      expect(await staking.MIN_APY()).to.equal(3); // 白皮书修复: 统一为3%
       expect(await staking.MAX_APY()).to.equal(MAX_APY);
       expect(await staking.BASE_APY()).to.equal(BASE_APY);
     });

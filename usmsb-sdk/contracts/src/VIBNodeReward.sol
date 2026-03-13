@@ -433,7 +433,7 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
         uint256 qualityScore,
         uint256 productivityFactor,
         uint256 reliabilityFactor
-    ) external pure returns (uint256) {
+    ) external view returns (uint256) {
         uint256 baseReward = _calculateBaseReward(serviceType, duration, capacity);
 
         uint256 finalReward = baseReward;

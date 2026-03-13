@@ -19,8 +19,8 @@ describe("EmissionController", function () {
     await vibeToken.waitForDeployment();
     await vibeToken.mintTreasury();
 
-    // 部署 EmissionController
-    const EmissionController = await ethers.getContractFactory("EmissionController");
+    // 部署 EmissionController (使用完全限定名避免冲突)
+    const EmissionController = await ethers.getContractFactory("src/automation/EmissionController.sol:EmissionController");
     emissionController = await EmissionController.deploy(
       await vibeToken.getAddress(),
       stakingPool.address,
