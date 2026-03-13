@@ -168,19 +168,23 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                   ],
                 )}
               >
-                <item.icon
-                  size={20}
-                  className={clsx(
-                    'shrink-0 transition-all duration-200',
-                    isActive
-                      ? isDark ? 'text-neon-blue' : 'text-blue-600'
-                      : isDark ? 'text-gray-400' : 'text-gray-500'
-                  )}
-                />
-                <span className={clsx(
-                  'font-medium',
-                  isActive && isDark && 'font-cyber'
-                )}>{item.name}</span>
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      size={20}
+                      className={clsx(
+                        'shrink-0 transition-all duration-200',
+                        isActive
+                          ? isDark ? 'text-neon-blue' : 'text-blue-600'
+                          : isDark ? 'text-gray-400' : 'text-gray-500'
+                      )}
+                    />
+                    <span className={clsx(
+                      'font-medium',
+                      isActive && isDark && 'font-cyber'
+                    )}>{item.name}</span>
+                  </>
+                )}
               </NavLink>
             ))}
           </div>
@@ -214,19 +218,23 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                   ],
                 )}
               >
-                <item.icon
-                  size={20}
-                  className={clsx(
-                    'shrink-0 transition-all duration-200',
-                    isActive
-                      ? isDark ? 'text-neon-purple' : 'text-purple-600'
-                      : isDark ? 'text-gray-400' : 'text-gray-500'
-                  )}
-                />
-                <span className={clsx(
-                  'font-medium',
-                  isActive && isDark && 'font-cyber'
-                )}>{item.name}</span>
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      size={20}
+                      className={clsx(
+                        'shrink-0 transition-all duration-200',
+                        isActive
+                          ? isDark ? 'text-neon-purple' : 'text-purple-600'
+                          : isDark ? 'text-gray-400' : 'text-gray-500'
+                      )}
+                    />
+                    <span className={clsx(
+                      'font-medium',
+                      isActive && isDark && 'font-cyber'
+                    )}>{item.name}</span>
+                  </>
+                )}
               </NavLink>
             ))}
           </div>
@@ -272,34 +280,38 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                     ],
                   )}
                 >
-                  <div className={clsx(
-                    'p-1.5 rounded-md',
-                    isDark && action.color === 'blue' && 'bg-neon-blue/20',
-                    isDark && action.color === 'purple' && 'bg-neon-purple/20',
-                    isDark && action.color === 'green' && 'bg-neon-green/20',
-                  )}>
-                    <action.icon
-                      size={16}
-                      className={clsx(
-                        isDark && action.color === 'blue' && 'text-neon-blue',
-                        isDark && action.color === 'purple' && 'text-neon-purple',
-                        isDark && action.color === 'green' && 'text-neon-green',
-                        !isDark && action.color === 'blue' && 'text-blue-600',
-                        !isDark && action.color === 'purple' && 'text-purple-600',
-                        !isDark && action.color === 'green' && 'text-green-600',
-                      )}
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className={clsx(
-                      'text-sm font-medium',
-                      isActive && isDark && 'font-cyber'
-                    )}>{action.name}</span>
-                    <span className={clsx(
-                      'text-xs',
-                      isDark ? 'text-gray-500' : 'text-gray-500'
-                    )}>{action.desc}</span>
-                  </div>
+                  {({ isActive }) => (
+                    <>
+                      <div className={clsx(
+                        'p-1.5 rounded-md',
+                        isDark && action.color === 'blue' && 'bg-neon-blue/20',
+                        isDark && action.color === 'purple' && 'bg-neon-purple/20',
+                        isDark && action.color === 'green' && 'bg-neon-green/20',
+                      )}>
+                        <action.icon
+                          size={16}
+                          className={clsx(
+                            isDark && action.color === 'blue' && 'text-neon-blue',
+                            isDark && action.color === 'purple' && 'text-neon-purple',
+                            isDark && action.color === 'green' && 'text-neon-green',
+                            !isDark && action.color === 'blue' && 'text-blue-600',
+                            !isDark && action.color === 'purple' && 'text-purple-600',
+                            !isDark && action.color === 'green' && 'text-green-600',
+                          )}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={clsx(
+                          'text-sm font-medium',
+                          isActive && isDark && 'font-cyber'
+                        )}>{action.name}</span>
+                        <span className={clsx(
+                          'text-xs',
+                          isDark ? 'text-gray-500' : 'text-gray-500'
+                        )}>{action.desc}</span>
+                      </div>
+                    </>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -328,14 +340,18 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
               ],
             )}
           >
-            <Settings size={20} className={isDark ? 'text-neon-blue' : ''} />
-            <span className="font-medium">{t('nav.settings')}</span>
+            {({ isActive }) => (
+              <>
+                <Settings size={20} className={isActive && isDark ? 'text-neon-blue' : ''} />
+                <span className="font-medium">{t('nav.settings')}</span>
+              </>
+            )}
           </NavLink>
 
           {/* Back to Home */}
-          <NavLink
+          <Link
             to="/"
-            onClick={handleNavClick}
+            onClick={onClose}
             className={clsx(
               'flex items-center gap-3 px-3 py-2.5 mt-2 rounded-lg transition-all duration-200',
               isDark
@@ -345,7 +361,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           >
             <Home size={18} />
             <span className="text-sm">Back to Home</span>
-          </NavLink>
+          </Link>
         </div>
       </div>
     </>
