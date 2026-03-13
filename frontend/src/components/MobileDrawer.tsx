@@ -79,6 +79,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
       <div
         className={clsx(
           'fixed left-0 top-0 h-full w-80 max-w-[85vw] z-50 transform transition-transform duration-300 ease-in-out md:hidden',
+          'flex flex-col',
           isDark
             ? 'bg-cyber-card border-r border-neon-blue/20'
             : 'bg-white border-r border-gray-200',
@@ -137,8 +138,9 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100%-8rem)]">
+        {/* Navigation - with proper flex layout */}
+        <div className="flex flex-col h-[calc(100%-4rem)]">
+          <div className="flex-1 overflow-y-auto p-4 space-y-1">
           {/* Main Navigation Section */}
           <div className="mb-4">
             <p className={clsx(
@@ -316,11 +318,12 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
               ))}
             </div>
           </div>
-        </nav>
+          </div>
+        </div>
 
         {/* Bottom section */}
         <div className={clsx(
-          'absolute bottom-0 left-0 right-0 p-4 border-t',
+          'shrink-0 p-4 border-t',
           isDark ? 'border-neon-blue/20 bg-cyber-card/80' : 'border-gray-200 bg-white'
         )}>
           <NavLink
