@@ -1,7 +1,159 @@
+# Creative Economy Platform Technical Design Document
+
+**[English](#overview) | [中文](#概述)**
+
+## Overview
+
+> Z-Generation Creative Crowd Brand Solution Based on USMSB, IAP, and Athena Plan
+
+> Version: 1.0.0 | Date: 2025-02-23
+
+## Table of Contents
+
+| Chapter | File | Content |
+|---------|------|---------|
+| Chapter 1 | [01_overview.md](./01_overview.md) | Project Overview & Vision |
+| Chapter 2 | [02_architecture.md](./02_architecture.md) | System Architecture Design |
+| Chapter 3 | [03_joint_order.md](./03_joint_order.md) | Joint Order System Design |
+| Chapter 4 | [04_asset_fractionalization.md](./04_asset_fractionalization.md) | Asset Fractionalization NFT Design |
+| Chapter 5 | [05_zk_credential.md](./05_zk_credential.md) | zk-Credential Pass Design |
+| Chapter 6 | [06_smart_contracts.md](./06_smart_contracts.md) | Smart Contract Detailed Design |
+| Chapter 7 | [07_offchain_services.md](./07_offchain_services.md) | Off-chain Services Design |
+| Chapter 8 | [08_trust_scenarios.md](./08_trust_scenarios.md) | Platform Trust Scenarios |
+| Chapter 9 | [09_implementation_roadmap.md](./09_implementation_roadmap.md) | Implementation Roadmap |
+
+## Core Design Decisions
+
+### On-chain vs Off-chain Division Principle
+
+| Function Type | On-chain Implementation | Off-chain Implementation | Reason |
+|---------------|-------------------------|--------------------------|--------|
+| **Joint Order** | Escrow, State Management, Settlement Execution | Demand Aggregation, Bidding Evaluation | Escrow must be on-chain for security |
+| **Asset Fractionalization** | NFT Minting, Fraction Issuance, Revenue Distribution | Valuation Calculation, Fraction Pricing | Ownership must be transparent on-chain |
+| **zk-Credential Pass** | Proof Verification, Credential Issuance | Proof Generation, Data Aggregation | Verification needs to be public, generation needs privacy |
+
+### Gas Fee Strategy
+
+- **User Pays Full**: Basic operations
+- **Platform Subsidy**: Partial subsidy for complex operations
+- **Cost Sharing**: Joint orders share proportionally
+
+### On-chain Mode Selection
+
+The system provides two on-chain modes, selected automatically by users and agents:
+1. **Minimal On-chain**: Only escrow settlement, complex logic off-chain (Low Gas)
+2. **Full On-chain**: Complete logic executed on-chain (High Security)
+
+---
+
+## Quick Start
+
+### Smart Contract Directory
+
+```
+contracts/
+├── src/
+│   ├── JointOrder.sol       # Joint Order Contract
+│   ├── AssetVault.sol       # Asset Fractionalization Contract
+│   ├── ZKCredential.sol     # zk-Credential Pass Contract
+│   ├── VIBToken.sol         # Token Contract (existing)
+│   ├── VIBStaking.sol       # Staking Contract (existing)
+│   ├── VIBIdentity.sol      # Identity Contract (existing)
+│   └── VIBGovernance.sol    # Governance Contract (existing)
+```
+
+### Off-chain Services Directory
+
+```
+src/usmsb_sdk/services/
+├── joint_order_service.py       # Joint Order Service
+├── asset_fractionalization_service.py  # Asset Fractionalization Service
+├── zk_credential_service.py     # zk Proof Service
+├── dynamic_pricing_service.py   # Dynamic Pricing Service (existing)
+└── reputation_service.py        # Reputation Service (existing)
+```
+
+### Test Directory
+
+```
+tests/
+├── contracts/                   # Smart Contract Tests
+│   ├── test_joint_order.py
+│   ├── test_asset_vault.py
+│   └── test_zk_credential.py
+├── integration/                 # Integration Tests
+│   └── test_full_flow.py
+└── e2e/                         # End-to-End Tests
+    └── test_user_journey.py
+```
+
+---
+
+## Core Concepts Quick Reference
+
+### ISA (Intelligent Service Agent)
+
+```
+ISA = Decentralized Node + Meta Agent + Human Operator
+
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  P2PNode     │    │  Meta Agent  │    │   Human       │
+│(Decentralized│    │  (AI Agent)  │    │   Operator    │
+│   Node)      │    │              │    │(Decision/     │
+│              │    │              │    │  Supervision) │
+└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌─────────────────────────────────────────────────────┐
+│                    ISA Service Capabilities         │
+├─────────────────────────────────────────────────────┤
+│ • Service Registration & Discovery                  │
+│ • Smart Decision Making & Execution                 │
+│ • Protocol Governance Participation                 │
+│ • Local Service Escrow                              │
+│ • Reputation & Staking Management                   │
+│ • Exception Handling & Human Intervention           │
+└─────────────────────────────────────────────────────┘
+```
+
+### Joint Order Flow
+
+```
+Phase 1: Demand Aggregation
+  End user posts demand → AI agent matches similar demands → Form demand pool
+
+Phase 2: Reverse Bidding
+  Publish bidding request → Service providers submit quotes → System evaluates and selects
+
+Phase 3: Contract Execution
+  Smart contract escrows funds → Provider delivers → User confirms → Milestone payments
+```
+
+### zk-Credential Pass Core Principles
+
+```
+Prove attributes, not expose specific values
+Prove history, not expose specific transactions
+Prove eligibility, not expose reasons
+```
+
+---
+
+## Contact & Contribution
+
+- Technical Lead: AI Civilization Platform Team
+- Documentation: Auto-generated
+- Last Updated: 2025-02-23
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 创意经济平台技术设计文档
 
 > 基于USMSB、IAP与雅典娜计划的Z世代创意人群品牌方案
-> 
+>
 > 版本：1.0.0 | 日期：2025-02-23
 
 ## 文档目录
@@ -135,3 +287,5 @@ Phase 3: 合约执行
 - 技术负责人：AI Civilization Platform Team
 - 文档维护：自动生成
 - 最后更新：2025-02-23
+
+</details>

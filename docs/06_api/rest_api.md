@@ -1,6 +1,118 @@
 # REST API
 
+> USMSB SDK REST API Reference
+
+**[English](#rest-api) | [中文](#rest-api-1)**
+
+---
+
+## 1. Overview
+
+USMSB SDK provides a complete REST API for interacting with Agents and the platform.
+
+---
+
+## 2. API Endpoints
+
+### 2.1 Agent Management
+
+| Method | Endpoint | Function |
+|--------|----------|----------|
+| POST | `/api/v1/agents` | Register Agent |
+| GET | `/api/v1/agents` | List Agents |
+| GET | `/api/v1/agents/{id}` | Get Agent |
+| DELETE | `/api/v1/agents/{id}` | Delete Agent |
+
+### 2.2 Conversation
+
+| Method | Endpoint | Function |
+|--------|----------|----------|
+| POST | `/api/v1/chat` | Send Message |
+| GET | `/api/v1/conversations` | Get Conversation List |
+| GET | `/api/v1/conversations/{id}` | Get Conversation Details |
+
+### 2.3 Matching
+
+| Method | Endpoint | Function |
+|--------|----------|----------|
+| POST | `/api/v1/matching/match` | Match Supply and Demand |
+| GET | `/api/v1/matching/demands` | Get Demands |
+| POST | `/api/v1/matching/supply` | Register Supply |
+
+### 2.4 Governance
+
+| Method | Endpoint | Function |
+|--------|----------|----------|
+| POST | `/api/v1/governance/proposals` | Create Proposal |
+| POST | `/api/v1/governance/vote` | Vote |
+| GET | `/api/v1/governance/proposals` | Get Proposals |
+
+---
+
+## 3. Authentication
+
+API uses Bearer Token authentication:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     https://api.usmsb.com/v1/agents
+```
+
+---
+
+## 4. Request/Response Format
+
+### Request
+
+```json
+{
+  "agent_id": "agent_123",
+  "name": "MyAgent",
+  "capabilities": ["coding", "analysis"],
+  "metadata": {}
+}
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "agent_id": "agent_123",
+    "name": "MyAgent"
+  }
+}
+```
+
+---
+
+## 5. Error Handling
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 404 | Not Found |
+| 500 | Internal Server Error |
+
+---
+
+## 6. Rate Limiting
+
+- **Default**: 100 requests per minute
+- **Authenticated**: 1000 requests per minute
+
+---
+
+<details>
+<summary><h2>REST API</h2></summary>
+
+# REST API
+
 > USMSB SDK REST API 参考
+
+**[English](#rest-api) | [中文](#rest-api-1)**
 
 ---
 
@@ -58,7 +170,47 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 
 ---
 
-## 4. 相关文档
+## 4. 请求/响应格式
 
-- [Python SDK](./python_sdk.md) - Python SDK使用指南
-- [WebSocket API](./websocket_api.md) - WebSocket实时通信
+### 请求
+
+```json
+{
+  "agent_id": "agent_123",
+  "name": "MyAgent",
+  "capabilities": ["coding", "analysis"],
+  "metadata": {}
+}
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "data": {
+    "agent_id": "agent_123",
+    "name": "MyAgent"
+  }
+}
+```
+
+---
+
+## 5. 错误处理
+
+| 代码 | 描述 |
+|------|------|
+| 400 | 请求错误 |
+| 401 | 未授权 |
+| 404 | 未找到 |
+| 500 | 服务器内部错误 |
+
+---
+
+## 6. 速率限制
+
+- **默认**: 每分钟100次请求
+- **认证后**: 每分钟1000次请求
+
+</details>

@@ -1,3 +1,274 @@
+[Chapter 5: Off-Chain Services Design](#51-joint-order-service) | [中文](#51-联合订单服务)
+
+---
+
+## 5.1 Joint Order Service
+
+### Service Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        JointOrderService                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Off-Chain Logic                      On-Chain Interaction                  │
+│  ┌─────────────────┐                  ┌─────────────────┐                   │
+│  │  Demand Aggregation│              │                 │                   │
+│  │  - Similarity   │              │  JointOrder.sol  │                   │
+│  │    Matching     │              │                 │                   │
+│  │  - Pooling      │              │  Escrow Funds    │                   │
+│  │    Decision      │──────────────►│  State Management│                   │
+│  │  - Provider     │              │  Settlement      │                   │
+│  │    Invitation   │              │  Execution        │                   │
+│  └─────────────────┘              └─────────────────┘                       │
+│                                    │  Event Listener                      │
+│  ┌─────────────────┐              ┌─────────────────┐                       │
+│  │  Bid Evaluation │              │  Event Handler  │                       │
+│  │  - Price Score  │              │  State Sync     │                       │
+│  │  - Reputation   │              │  Data Update    │                       │
+│  │    Score        │              │                 │                       │
+│  │  - Comprehensive│              └─────────────────┘                       │
+│  │    Ranking      │                                                        │
+│  └─────────────────┘                                                        │
+│                                                                             │
+│  ┌─────────────────┐              ┌─────────────────┐                       │
+│  │  Contract       │◄─────────────│  Event Listener │                       │
+│  │  Interaction   │              │  Data Update    │                       │
+│  │  - Transaction │              │                 │                       │
+│  │    Building    │              │                 │                       │
+│  │  - Signature   │              │                 │                       │
+│  │    Authorization              │                 │                       │
+│  │  - Gas          │              │                 │                       │
+│  │    Optimization │              │                 │                       │
+│  └─────────────────┘              └─────────────────┘                       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core Class Design
+
+```python
+class JointOrderService:
+    """Joint Order Service"""
+
+    # Configuration
+    BIDDING_DURATION_DEFAULT = 86400  # 24 hours
+    DELIVERY_DEADLINE_DEFAULT = 604800  # 7 days
+    MIN_POOL_BUDGET = 100  # Minimum pool budget
+
+    async def create_demand(self, demand: Demand) -> str:
+        """Create demand"""
+
+    async def aggregate_demands(self, new_demand: Demand) -> Optional[OrderPool]:
+        """Aggregate demands into suitable pools"""
+
+    async def invite_providers(self, pool: OrderPool) -> List[str]:
+        """Invite providers to participate in bidding"""
+
+    async def submit_bid(self, pool_id: str, bid: Bid) -> bool:
+        """Submit bid"""
+
+    async def evaluate_bids(self, pool_id: str) -> Bid:
+        """Evaluate bids and select optimal"""
+
+    async def confirm_delivery(self, pool_id: str, user_id: str, rating: int) -> bool:
+        """Confirm delivery"""
+
+    async def withdraw_earnings(self, pool_id: str) -> bool:
+        """Withdraw earnings"""
+
+    async def raise_dispute(self, pool_id: str, reason: str) -> bool:
+        """Raise dispute"""
+```
+
+---
+
+## 5.2 Asset Fractionalization Service
+
+### Service Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      AssetFractionalizationService                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────┐                  ┌─────────────────┐                   │
+│  │  Dynamic        │                  │                 │                   │
+│  │  Valuation      │                  │  AssetVault.sol │                   │
+│  │  Engine         │                  │  NFT Deposit    │                   │
+│  │  - Market       │──────────────►   │  Fraction       │                   │
+│  │    Analysis     │                  │  Issuance       │                   │
+│  │  - Fraction     │                  │  Revenue        │                   │
+│  │    Pricing      │                  │  Distribution   │                   │
+│  │  - Issuance     │                  │                 │                   │
+│  │    Recommendation                │                 │                   │
+│  └─────────────────┘                  └─────────────────┘                       │
+│                                                                             │
+│  ┌─────────────────┐                                                        │
+│  │  NFT Metadata   │                                                        │
+│  │  Management      │                                                        │
+│  │  - Metadata     │                                                        │
+│  │    Storage      │                                                        │
+│  │  - IPFS Upload  │                                                        │
+│  │  - Copyright    │                                                        │
+│  │    Verification │                                                        │
+│  └─────────────────┘                                                        │
+│                                                                             │
+│  ┌─────────────────┐                  ┌─────────────────┐                   │
+│  │  Market Trading │                  │  Revenue        │                   │
+│  │  Service        │                  │  Calculation    │                   │
+│  │  - Transaction │                  │  - Dividend     │                   │
+│  │    Matching    │                  │    Calculation  │                   │
+│  │  - Price        │                  │  - Pending      │                   │
+│  │    Monitoring   │                  │    Claims       │                   │
+│  └─────────────────┘                  │    Update       │                   │
+│                                       └─────────────────┘                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core Class Design
+
+```python
+class AssetFractionalizationService:
+    """Asset Fractionalization Service"""
+
+    async def deposit_nft(
+        self,
+        nft_contract: str,
+        token_id: int,
+        metadata: NFTMetadata
+    ) -> str:
+        """Deposit NFT and prepare for fractionalization"""
+
+    async def calculate_fragmentation(
+        self,
+        asset_id: str,
+        market_data: MarketData
+    ) -> FragmentationPlan:
+        """Calculate fractionalization plan"""
+
+    async def issue_shares(
+        self,
+        asset_id: str,
+        plan: FragmentationPlan
+    ) -> bool:
+        """Issue shares"""
+
+    async def purchase_shares(
+        self,
+        asset_id: str,
+        buyer: str,
+        amount: int
+    ) -> bool:
+        """Purchase shares"""
+
+    async def distribute_earnings(
+        self,
+        asset_id: str,
+        amount: float
+    ) -> bool:
+        """Distribute earnings"""
+
+    async def claim_earnings(
+        self,
+        asset_id: str,
+        holder: str
+    ) -> float:
+        """Claim earnings"""
+```
+
+---
+
+## 5.3 ZK Proof Service
+
+### Service Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          ZKCredentialService                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────┐                  ┌─────────────────┐                   │
+│  │  Proof          │                  │                 │                   │
+│  │  Generation     │                  │ZKCredential.sol│                   │
+│  │  Engine         │                  │  Proof          │                   │
+│  │  - Circuit      │──────────────►   │  Verification   │                   │
+│  │    Compilation  │                  │  Credential     │                   │
+│  │  - Proof        │                  │  Issuance       │                   │
+│  │    Computation  │                  │  Access Control │                   │
+│  │  - Public Input │                  │                 │                   │
+│  │    Building     │                  │                 │                   │
+│  └─────────────────┘                  └─────────────────┘                       │
+│                                                                             │
+│  ┌─────────────────┐                                                        │
+│  │  Private Data   │                                                        │
+│  │  Management      │                                                        │
+│  │  - Encrypted     │                                                        │
+│  │    Storage       │                                                        │
+│  │  - Data          │                                                        │
+│  │    Aggregation  │                                                        │
+│  │  - Secure        │                                                        │
+│  │    Deletion     │                                                        │
+│  └─────────────────┘                                                        │
+│                                                                             │
+│  ┌─────────────────┐                  ┌─────────────────┐                   │
+│  │  Credential     │                  │  Verification   │                   │
+│  │  Management     │                  │  Key Management │                   │
+│  │  - Credential   │                  │  - Key Update   │                   │
+│  │    Storage      │                  │  - Key          │                   │
+│  │  - Validity     │                  │    Verification │                   │
+│  │    Check        │                  │                 │                   │
+│  └─────────────────┘                  └─────────────────┘                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core Class Design
+
+```python
+class ZKCredentialService:
+    """ZK Credential Pass Service"""
+
+    async def generate_proof(
+        self,
+        credential_type: CredentialType,
+        private_inputs: PrivateInputs
+    ) -> ZKProof:
+        """Generate zero-knowledge proof"""
+
+    async def issue_credential(
+        self,
+        credential_type: CredentialType,
+        proof: ZKProof,
+        holder: str
+    ) -> str:
+        """Issue credential"""
+
+    async def verify_credential(
+        self,
+        credential_id: str,
+        proof: ZKProof
+    ) -> bool:
+        """Verify credential"""
+
+    async def revoke_credential(
+        self,
+        credential_id: str,
+        reason: str
+    ) -> bool:
+        """Revoke credential"""
+
+    async def check_credential_validity(
+        self,
+        credential_id: str
+    ) -> CredentialStatus:
+        """Check credential validity"""
+```
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 第5章：链下服务设计
 
 ## 5.1 联合订单服务
@@ -39,33 +310,33 @@
 ```python
 class JointOrderService:
     """联合订单服务"""
-    
+
     # 配置
     BIDDING_DURATION_DEFAULT = 86400  # 24小时
     DELIVERY_DEADLINE_DEFAULT = 604800  # 7天
     MIN_POOL_BUDGET = 100  # 最低池预算
-    
+
     async def create_demand(self, demand: Demand) -> str:
         """创建需求"""
-        
+
     async def aggregate_demands(self, new_demand: Demand) -> Optional[OrderPool]:
         """聚合需求到合适的池"""
-        
+
     async def invite_providers(self, pool: OrderPool) -> List[str]:
         """邀请服务商参与竞价"""
-        
+
     async def submit_bid(self, pool_id: str, bid: Bid) -> bool:
         """提交竞价"""
-        
+
     async def evaluate_bids(self, pool_id: str) -> Bid:
         """评估竞价并选择最优"""
-        
+
     async def confirm_delivery(self, pool_id: str, user_id: str, rating: int) -> bool:
         """确认交付"""
-        
+
     async def withdraw_earnings(self, pool_id: str) -> bool:
         """提取收益"""
-        
+
     async def raise_dispute(self, pool_id: str, reason: str) -> bool:
         """发起争议"""
 ```
@@ -75,6 +346,7 @@ class JointOrderService:
 ## 5.2 资产碎片化服务
 
 ### 服务架构
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                      AssetFractionalizationService                           │
@@ -104,32 +376,33 @@ class JointOrderService:
 ```
 
 ### 核心类设计
+
 ```python
 class AssetFractionalizationService:
     """资产碎片化服务"""
-    
+
     async def deposit_nft(
-        self, 
-        nft_contract: str, 
+        self,
+        nft_contract: str,
         token_id: int,
         metadata: NFTMetadata
     ) -> str:
         """存入NFT并准备碎片化"""
-        
+
     async def calculate_fragmentation(
         self,
         asset_id: str,
         market_data: MarketData
     ) -> FragmentationPlan:
         """计算碎片化方案"""
-        
+
     async def issue_shares(
         self,
         asset_id: str,
         plan: FragmentationPlan
     ) -> bool:
         """发行碎片"""
-        
+
     async def purchase_shares(
         self,
         asset_id: str,
@@ -137,14 +410,14 @@ class AssetFractionalizationService:
         amount: int
     ) -> bool:
         """购买碎片"""
-        
+
     async def distribute_earnings(
         self,
         asset_id: str,
         amount: float
     ) -> bool:
         """分发收益"""
-        
+
     async def claim_earnings(
         self,
         asset_id: str,
@@ -158,6 +431,7 @@ class AssetFractionalizationService:
 ## 5.3 zk证明服务
 
 ### 服务架构
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          ZKCredentialService                                │
@@ -187,17 +461,18 @@ class AssetFractionalizationService:
 ```
 
 ### 核心类设计
+
 ```python
 class ZKCredentialService:
     """zk信用通行证服务"""
-    
+
     async def generate_proof(
         self,
         credential_type: CredentialType,
         private_inputs: PrivateInputs
     ) -> ZKProof:
         """生成零知识证明"""
-        
+
     async def issue_credential(
         self,
         credential_type: CredentialType,
@@ -205,24 +480,26 @@ class ZKCredentialService:
         holder: str
     ) -> str:
         """签发凭证"""
-        
+
     async def verify_credential(
         self,
         credential_id: str,
         proof: ZKProof
     ) -> bool:
         """验证凭证"""
-        
+
     async def revoke_credential(
         self,
         credential_id: str,
         reason: str
     ) -> bool:
         """撤销凭证"""
-        
+
     async def check_credential_validity(
         self,
         credential_id: str
     ) -> CredentialStatus:
         """检查凭证有效性"""
 ```
+
+</details>

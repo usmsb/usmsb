@@ -1,6 +1,620 @@
-# USMSB SDK 白皮书
+# USMSB SDK Whitepaper
+
+**[English](#usmsb-sdk-whitepaper) | [中文](#usmsb-sdk-白皮书)**
 
 **Universal System Model of Social Behavior - Software Development Kit**
+
+Version: 1.0.0
+Release Date: 2025
+
+---
+
+## Important Concept Distinction
+
+Before reading this document, please understand the distinction between these two core concepts:
+
+| Concept | Layer | Description |
+|---------|-------|-------------|
+| **USMSB Model** | Theory/Technical | Universal System Model of Social Behavior - a universal theoretical framework. USMSB SDK is the development kit that implements it as programmable tools. |
+| **Silicon Civilization Platform** | Application | Decentralized Agent collaboration application platform built on USMSB SDK - one specific application scenario of USMSB theory. |
+
+**Relationship Diagram:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Silicon Civilization Platform             │
+│        (Decentralized Agent Collaboration, Supply-Demand   │
+│         Matching, Reputation System, etc.)                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Based on
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        USMSB SDK                           │
+│    (Nine Elements, Six Core Logics, Nine Universal        │
+│     Action Interfaces Implementation)                       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Implements
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       USMSB Model                          │
+│         (Universal System Theory Framework for             │
+│                  Social Behavior)                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+This document primarily introduces USMSB SDK (technical layer), while also explaining its application in the Silicon Civilization Platform (application layer).
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [Project Vision and Mission](#2-project-vision-and-mission)
+3. [USMSB Model Theory Introduction](#3-usmsb-model-theory-introduction)
+4. [Technical Architecture Details](#4-technical-architecture-details)
+5. [Core Features](#5-core-features)
+6. [Application Scenarios and Use Cases](#6-application-scenarios-and-use-cases)
+7. [Development Roadmap](#7-development-roadmap)
+8. [Conclusion and Outlook](#8-conclusion-and-outlook)
+
+---
+
+## 1. Executive Summary
+
+### 1.1 Project Overview
+
+USMSB SDK (Universal System Model of Social Behavior Software Development Kit) is a groundbreaking software development kit designed to provide developers with a standardized, scalable interface and toolset for building applications based on the universal system model of social behavior. This SDK is particularly suitable for LLM-driven Agentic system development, deeply integrating large language models as the "intelligence source" within the USMSB model.
+
+### 1.2 Core Value Proposition
+
+- **Unified Framework**: Provides a unified theoretical framework for describing, analyzing, and deducing various complex social behaviors
+- **AI-Native Design**: Deep integration with Large Language Models (LLM) and Agentic frameworks, empowering intelligent system development
+- **Cross-Domain通用**: Applicable to education, healthcare, finance, manufacturing, management, social networks, and other industry domains
+- **Open Ecosystem**: Supports plugin-based extensions, building an open developer ecosystem
+
+### 1.3 Target Users
+
+- AI Application Developers
+- Enterprise Solution Architects
+- Social Science Researchers
+- Digital Transformation Consultants
+- Agentic System Developers
+
+---
+
+## 2. Project Vision and Mission
+
+### 2.1 Vision
+
+Build a "social operating system" capable of uniformly describing and deducing human social behaviors, contributing to building a more intelligent, efficient, and healthier digital society. We believe that the introduction of USMSB SDK will greatly promote the development of USMSB model in theoretical research and practical applications, ultimately achieving an intelligent civilization society where humans and AI coexist.
+
+### 2.2 Mission
+
+1. **Reduce Complexity**: Lower the barrier to building complex social behavior systems through abstraction and modularization
+2. **Accelerate Innovation**: Provide powerful tools for developers to accelerate the development and deployment of AI Agent applications
+3. **Promote Collaboration**: Build an open ecosystem, promoting cross-disciplinary and cross-domain knowledge sharing and collaboration
+4. **Responsible Development**: Integrate ethical considerations into technological development, ensuring responsible application of AI technology
+
+### 2.3 Core Philosophy
+
+USMSB SDK design follows these core philosophies:
+
+- **Systems Thinking**: View social activities as complex systems composed of interrelated elements
+- **Universality Pursuit**: Abstract basic concepts, actions, and logic applicable to all social activities
+- **Dynamic Evolution**: Emphasize the critical role of information flow, value flow, and feedback loops in system operation
+- **Human-Machine Collaboration**: Support efficient collaboration and value co-creation between humans and AI Agents
+
+---
+
+## 3. USMSB Model Theory Introduction
+
+### 3.1 Model Overview
+
+USMSB (Universal System Model of Social Behavior) is a theoretical framework designed to uniformly describe and deduce human social behaviors. It views social activities as open, adaptive complex systems, emphasizing core elements and their dynamic interactions. This model is not only applicable to social sciences but also has interdisciplinary universality.
+
+### 3.2 Nine Core Elements
+
+The USMSB model consists of nine core elements, which are the basic "atoms" for constructing any social activity system:
+
+| Element | English | Description |
+|---------|---------|-------------|
+| **主体** | Agent | Individuals or organizations with perception, decision-making, and action capabilities |
+| **客体** | Object | The target of activity, such as products, services, data |
+| **目标** | Goal | The expected state or result the agent hopes to achieve |
+| **资源** | Resource | All inputs required for the activity (tangible and intangible) |
+| **规则** | Rule | Norms, laws, and policies that constrain agent behavior |
+| **信息** | Information | Data and knowledge generated, transmitted, and processed in activities |
+| **价值** | Value | Benefits, meanings, or utilities generated by activities |
+| **风险** | Risk | Uncertainties in activities and their potential negative impacts |
+| **环境** | Environment | External conditions and context in which activities occur |
+
+### 3.3 Ten Universal Action Interfaces
+
+These actions are the basic behavior patterns commonly taken by agents in all social activities:
+
+1. **Perception (感知)**: Acquire and understand environment, object, and other agent information
+2. **Goal & Rule Interpretation (目标与规则解读)**: Interpret information based on goals and rules
+3. **Decision-making (决策)**: Evaluate options and choose optimal actions
+4. **Execution (执行)**: Implement the selected action plan
+5. **Interaction (交互)**: Interactions between agents, and between agents and objects/environment
+6. **Transformation (转化)**: Changes in the form, attributes, or value of resources or objects
+7. **Evaluation (评估)**: Measure activity progress, effects, and outputs
+8. **Feedback (反馈)**: Return evaluation results for adjustment and optimization
+9. **Risk Management (风险管理)**: Identify, evaluate, and respond to potential risks
+10. **Learning (学习)**: Acquire knowledge from experience and adjust behavior patterns
+
+### 3.4 Six Core Logics
+
+These logics are the fundamental laws driving all social activities:
+
+1. **Goal-Action-Outcome Loop (目标-行动-结果循环)**
+   - Set goals, take actions, produce outcomes, and continuously iterate based on results
+
+2. **Resource-Transformation-Value Chain (资源-转化-价值增值链)**
+   - Invest scarce resources, undergo transformation processes, achieve value creation and appreciation
+
+3. **Information-Decision-Control Loop (信息-决策-控制回路)**
+   - Information drives decisions, decisions guide actions, actions produce new information - a closed loop
+
+4. **System-Environment Interaction (系统-环境互动)**
+   - There are continuous inputs, outputs, and adaptive interactions between the system and environment
+
+5. **Emergence and Self-organization (涌现与自组织)**
+   - Macro patterns and behaviors spontaneously form through micro-agent interactions
+
+6. **Adaptation and Evolution (适应与演化)**
+   - Systems adapt to the environment and continuously evolve through learning and adjustment
+
+---
+
+## 4. Technical Architecture Details
+
+### 4.1 Layered Architecture Design
+
+USMSB SDK adopts a clear layered design to ensure clear responsibilities for each layer and reduce coupling:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  External Applications/Agentic Systems     │
+├─────────────────────────────────────────────────────────────┤
+│                      API Layer                               │
+│  ┌───────────────────┐    ┌───────────────────┐          │
+│  │    Python SDK     │    │   RESTful API     │          │
+│  └───────────────────┘    └───────────────────┘          │
+├─────────────────────────────────────────────────────────────┤
+│                  Application Services Layer                  │
+│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐│
+│  │  Behavior │ │ Decision  │ │   System  │ │  Workflow ││
+│  │Prediction │ │ Support   │ │Simulation │ │Orchestration│
+│  ├───────────┼───────────┼───────────┼───────────────┤│
+│  │ Active    │ │ Supply-  │ │ Network   │ │Collaborative│
+│  │ Matching  │ │ Demand    │ │ Explorer  │ │ Matching   ││
+│  ├───────────┼───────────┼───────────┼───────────────┤│
+│  │ Proactive │ │ Dynamic  │ │ Joint     │ │Asset        ││
+│  │ Learning  │ │ Pricing  │ │ Orders    │ │Fractionalization│
+│  ├───────────┼───────────┼───────────┼───────────────┤│
+│  │   ZK      │ │Governance│ │ Learning  │ │ Reputation  ││
+│  │Credential │ │ Service  │ │ Service   │ │ Service     ││
+│  └───────────┘ └───────────┘ └───────────┘ └───────────┘│
+├─────────────────────────────────────────────────────────────┤
+│                   Core Model Layer                          │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │ Nine Elements │ Universal Actions │ Six Core Logic │  │
+│  └─────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│               Intelligence Source Adaptation Layer          │
+│  ┌───────────┐ ┌───────────┐ ┌───────────────────┐        │
+│  │   LLM     │ │ Knowledge │ │  Agentic Framework│        │
+│  │ Adapter   │ │Base Adapter│ │    Adapter       │        │
+│  └───────────┘ └───────────┘ └───────────────────┘        │
+├─────────────────────────────────────────────────────────────┤
+│                    Infrastructure                           │
+│  ┌───────────┐ ┌───────────┐ ┌───────────────────┐        │
+│  │Data Mgmt  │ │ Config   │ │  Logging &        │        │
+│  │           │ │ Mgmt     │ │  Monitoring       │        │
+│  └───────────┘ └───────────┘ └───────────────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Core Model Layer
+
+The Core Model Layer is the foundation of the SDK, implementing the definition and coordination of USMSB model's core elements, universal action interfaces, and core logics.
+
+#### 4.2.1 Element Definitions
+
+All USMSB elements are defined as independent Python data classes, including basic properties, type hints, and validation logic:
+
+```python
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional
+
+@dataclass
+class Agent:
+    id: str
+    name: str
+    type: str  # "human", "ai_agent", "organization"
+    capabilities: List[str] = field(default_factory=list)
+    state: Dict[str, Any] = field(default_factory=dict)
+    goals: List[Goal] = field(default_factory=list)
+    resources: List[Resource] = field(default_factory=list)
+    rules: List[Rule] = field(default_factory=list)
+```
+
+#### 4.2.2 Universal Action Interfaces
+
+Universal actions are defined as abstract base classes, facilitating different intelligence source adapters to provide concrete implementations:
+
+```python
+from abc import ABC, abstractmethod
+
+class IDecisionService(ABC):
+    @abstractmethod
+    async def decide(self, agent: Agent, goal: Goal,
+                     context: Dict[str, Any] = None) -> Dict[str, Any]:
+        pass
+
+class IExecutionService(ABC):
+    @abstractmethod
+    async def execute(self, action: Dict[str, Any], agent: Agent,
+                     context: Dict[str, Any] = None) -> Any:
+        pass
+```
+
+### 4.3 Intelligence Source Adaptation Layer
+
+The Intelligence Source Adaptation Layer is a key innovation of the SDK, responsible for interacting with external LLMs, knowledge bases, and Agentic frameworks.
+
+#### 4.3.1 Supported Intelligence Sources
+
+| Type | Supported Adapters |
+|------|---------------------|
+| **LLM** | OpenAI GPT, ZhipuAI (GLM), MiniMax |
+| **Knowledge Base** | Vector Database (Pinecone, Weaviate, Milvus), Graph Database (Neo4j) |
+| **Agentic Framework** | LangChain, AutoGen, CrewAI |
+
+#### 4.3.2 Intelligence Source Manager
+
+`IntelligenceSourceManager` is responsible for managing and configuring available intelligence source instances, supporting dynamic registration, load balancing, and fault tolerance.
+
+### 4.4 Application Services Layer
+
+Based on the Core Model Layer and Intelligence Source Adaptation Layer, provides high-level services for specific application scenarios:
+
+1. **BehaviorPredictionService**: Predict future agent behaviors and system evolution trends
+2. **DecisionSupportService**: Provide multi-dimensional, intelligent decision suggestions
+3. **SystemSimulationService**: Build and run complex system simulations
+4. **AgenticWorkflowService**: Orchestrate and execute complex Agentic workflows
+5. **ActiveMatchingService**: Active matching service, supporting intelligent matching and negotiation between agents
+6. **SupplyDemandMatchingService**: Supply-demand matching service, supporting intelligent matching between providers and demanders
+7. **AgentNetworkExplorer**: Agent network exploration service, discovering and evaluating agent capabilities
+8. **CollaborativeMatchingService**: Collaborative matching service, supporting multi-agent collaboration
+9. **ProactiveLearningService**: Proactive learning service, continuous learning and optimization from interactions
+10. **DynamicPricingService**: Dynamic pricing service, intelligent price adjustment based on market supply and demand
+11. **JointOrderService**: Joint order service, supporting demand aggregation for group purchases
+12. **AssetFractionalizationService**: Asset fractionalization service, supporting asset ownership splitting
+13. **ZKCredentialService**: Zero-knowledge credential service, supporting privacy-preserving credential verification
+14. **GovernanceService**: Governance service, supporting decentralized governance and voting
+15. **LearningService**: Learning service, providing general learning capabilities
+16. **ReputationService**: Reputation service, managing agent reputation scores
+
+### 4.5 API Layer
+
+Provides unified, developer-friendly programming interfaces:
+
+#### Python SDK Example
+
+```python
+from usmsb_sdk import USMSBManager, Agent, Goal, Environment
+
+# Initialize SDK
+sdk_manager = USMSBManager(config_path="./config.yaml")
+await sdk_manager.initialize()
+
+# Create Agent and environment
+user_agent = Agent(
+    id="user_1",
+    name="Alice",
+    type="human",
+    capabilities=["learn", "decide"]
+)
+
+# Get behavior prediction service
+prediction_service = sdk_manager.get_service("BehaviorPredictionService")
+
+# Predict Agent behavior
+predicted_actions = await prediction_service.predict_behavior(
+    user_agent,
+    current_env,
+    goal=Goal(id="g1", name="Reduce commute time")
+)
+
+await sdk_manager.shutdown()
+```
+
+---
+
+## 5. Core Features
+
+### 5.1 Element Modeling and Management
+
+- **Agent Modeling**: Support creating heterogeneous, adaptive, bounded-rationality agent instances
+- **Resource Management**: Track resource allocation, consumption, and transformation processes
+- **Rule Engine**: Define and execute rule sets that constrain agent behavior
+- **Environment Simulation**: Build dynamic and complex simulation environments
+
+### 5.2 Intelligent Decision Support
+
+- **Strategy Generation**: Use LLM to generate multiple possible action strategies
+- **Reasoning and Judgment**: Perform complex logical reasoning and causal judgment
+- **Personalized Suggestions**: Generate customized decision suggestions based on individual preferences
+
+### 5.3 System Simulation and Prediction
+
+- **Multi-Agent Simulation**: Simulate interactions and emergent behaviors of large numbers of agents
+- **Trend Prediction**: Predict system evolution trends and potential outcomes
+- **Scenario Analysis**: Perform hypothetical analysis and stress testing
+
+### 5.4 Agentic Workflow Orchestration
+
+- **Task Decomposition**: Decompose complex tasks into executable subtasks
+- **Tool Calling**: Intelligently select and invoke external tools and APIs
+- **Multi-Agent Collaboration**: Coordinate division of labor and collaboration between multiple agents
+
+### 5.5 Data Management and Integration
+
+- **Multi-Database Support**: PostgreSQL, MongoDB, Redis, Vector Database
+- **Multi-Level Caching**: In-memory cache, distributed cache, LLM response caching
+- **Data Import/Export**: Support common formats like JSON, CSV
+
+### 5.6 Observability and Security
+
+- **Comprehensive Logging**: Structured logging, supporting multiple output targets
+- **Performance Monitoring**: Key metrics collection and exposure
+- **Security Management**: Data encryption, access control, API key management
+
+---
+
+## 6. Application Scenarios and Use Cases
+
+USMSB SDK, as a general framework, can be applied to multiple domains. The **Silicon Civilization Platform** is one of the core applications built on USMSB SDK.
+
+### 6.0 Silicon Civilization Platform (Core Application)
+
+**Scenario Description**: The Silicon Civilization Platform is a decentralized Agent collaboration network built on USMSB SDK, enabling intelligent matching, collaboration, and value exchange between AI Agents.
+
+**USMSB Mapping**:
+- Agent: AI Agents, Human Users, Organizational Entities
+- Object: Services, Demands, Transactions
+- Goal: Service Supply, Demand Fulfillment, Value Creation
+- Resource: Computing Resources, Data, Skills
+- Rule: Platform Protocols, Reputation Mechanisms, Transaction Rules
+- Information: Agent Capabilities, Supply-Demand Information, Transaction Records
+- Value: Service Value, Reputation Score, Economic Benefits
+- Risk: Service Quality Risk, Reputation Risk
+- Environment: Decentralized Network, Blockchain Infrastructure
+
+**Core Features**:
+- Multi-Protocol Agent Registration (Standard, MCP, A2A, Skills.md)
+- Intelligent Supply-Demand Matching Engine
+- VIBE Token Staking and Reputation System
+- Decentralized Collaboration Network
+- Negotiation and Transaction Settlement
+
+**Technical Architecture**:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                Silicon Civilization Platform App Layer     │
+│  Agent Management │ Supply-Demand │ Marketplace │ Reputation│
+│                    │ Matching      │            │ System   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                      USMSB SDK Core Layer                  │
+│  Nine Elements │ Universal Actions │ Core Logics │ Behavior │
+│                │ Interfaces       │             │ Prediction│
+└─────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                    Infrastructure Layer                    │
+│  LLM Adapter │ Knowledge Base │ Blockchain │ Data Storage  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 6.1 Smart City Traffic Management
+
+**Scenario Description**: Build an intelligent traffic management system using USMSB SDK to simulate and optimize urban traffic flow.
+
+**USMSB Mapping**:
+- Agent: Vehicles, Pedestrians, Traffic Signal Control Center
+- Object: Roads, Intersections, Parking Lots
+- Goal: Minimize travel time, maximize road utilization
+- Rule: Traffic regulations, signal light rules
+- Resource: Road capacity, Energy, Time
+
+**Implementation Effects**:
+- Real-time traffic flow prediction
+- Adaptive signal light control
+- Traffic congestion warning and management
+
+### 6.2 E-commerce Platform Optimization
+
+**Scenario Description**: Build an e-commerce platform behavior simulation and recommendation system.
+
+**USMSB Mapping**:
+- Agent: Consumers, Merchants, Platform Operators
+- Object: Products, Orders, Reviews
+- Goal: Maximize user satisfaction, improve conversion rate
+- Information: User behavior data, Product information
+- Value: Transaction volume, User loyalty
+
+**Implementation Effects**:
+- Consumer behavior prediction
+- Personalized recommendation optimization
+- Merchant strategy simulation
+
+### 6.3 Medical Health Management System
+
+**Scenario Description**: Build a personal health management and medical decision support system.
+
+**USMSB Mapping**:
+- Agent: Patients, Doctors, Medical Institutions
+- Object: Diseases, Health Indicators, Treatment Plans
+- Resource: Medical resources, Time, Cost
+- Risk: Diagnosis and treatment risk, Health risk
+
+**Implementation Effects**:
+- Health risk assessment
+- Treatment plan recommendation
+- Medical resource optimization
+
+### 6.4 Financial Investment Decision System
+
+**Scenario Description**: Build an intelligent investment decision and risk management platform.
+
+**USMSB Mapping**:
+- Agent: Investors, Financial Institutions, Regulatory Agencies
+- Object: Financial Products, Asset Portfolios
+- Resource: Capital, Information, Credit
+- Risk: Market risk, Credit risk
+
+**Implementation Effects**:
+- Market trend prediction
+- Investment portfolio optimization
+- Risk warning and management
+
+### 6.5 Enterprise Operations Management
+
+**Scenario Description**: Build an enterprise-level operations decision support system.
+
+**USMSB Mapping**:
+- Agent: Managers, Employees, Departments
+- Object: Projects, Tasks, Performance
+- Goal: Organization goal achievement
+- Resource: Human resources, Finance, Information
+
+**Implementation Effects**:
+- Decision support
+- Resource optimization
+- Organization efficiency improvement
+
+### 6.6 Personalized Education Learning
+
+**Scenario Description**: Build a personalized learning and education assessment system.
+
+**USMSB Mapping**:
+- Agent: Students, Teachers, Educational Institutions
+- Object: Knowledge, Courses, Assessments
+- Goal: Learning goal achievement
+- Resource: Teaching resources, Time
+
+**Implementation Effects**:
+- Personalized learning paths
+- Teaching effectiveness assessment
+- Educational resource optimization
+
+---
+
+## 7. Development Roadmap
+
+### 7.1 Phase 1: Core Construction (Q1 2025)
+
+- [x] Core Model Layer design and implementation
+- [x] Nine Elements data structure definition
+- [x] Universal Action Interface abstraction
+- [x] Basic configuration management module
+- [ ] Alpha version release
+
+### 7.2 Phase 2: Intelligence Source Integration (Q2 2025)
+
+- [ ] OpenAI GPT adapter
+- [ ] Google Gemini adapter
+- [ ] LangChain framework integration
+- [ ] Vector database adapter
+- [ ] Beta version release
+
+### 7.3 Phase 3: Application Services (Q3 2025)
+
+- [ ] Behavior prediction service
+- [ ] Decision support service
+- [ ] System simulation service
+- [ ] RESTful API interface
+- [ ] RC version release
+
+### 7.4 Phase 4: Ecosystem Expansion (Q4 2025)
+
+- [ ] Plugin architecture improvement
+- [ ] Developer documentation completion
+- [ ] Community building initiation
+- [ ] 1.0 official version release
+
+### 7.5 Phase 5: Continuous Evolution (2026+)
+
+- [ ] Multi-modal support
+- [ ] Edge computing support
+- [ ] Industry vertical solutions
+- [ ] Internationalization
+- [ ] Open source community operation
+
+---
+
+## 8. Conclusion and Outlook
+
+### 8.1 Core Advantages Summary
+
+USMSB SDK provides powerful support for building complex social behavior systems through the following core advantages:
+
+1. **Strong Theoretical Foundation**: Based on the validated USMSB theoretical model
+2. **Clear Architecture**: Layered design, modular, high cohesion and low coupling
+3. **AI-Native**: Deep integration with Large Language Models and Agentic frameworks
+4. **General and Flexible**: Applicable to multiple industries and application scenarios
+5. **Open and Extensible**: Supports plugin-based and custom extensions
+
+### 8.2 Application Prospects
+
+USMSB SDK will play an important role in the following areas:
+
+- **AI Agent Development**: Provides a unified framework for building intelligent Agents
+- **Digital Transformation**: Helps enterprises build intelligent operation systems
+- **Social Science Research**: Provides tool support for computational social science
+- **Policy Simulation**: Supports simulation and evaluation of policy effects
+- **Smart City**: Builds city-level intelligent decision systems
+
+### 8.3 Social Value
+
+The promotion and application of USMSB SDK will create the following social value:
+
+- **Empowering Individuals**: Improve personal productivity, create new employment opportunities
+- **Driving Industry Upgrade**: Accelerate intelligent transformation across industries
+- **Promoting Technological Progress**: Gather global resources, explore AI frontiers
+- **Responsible Development**: Ensure ethical application of AI technology
+
+### 8.4 Vision
+
+We believe that USMSB SDK will become an important infrastructure for building a human-AI symbiotic society, contributing to achieving a more intelligent, efficient, and healthier digital society.
+
+---
+
+**Document Information**
+
+- **Version**: 1.0.0
+- **Author**: USMSB SDK Team
+- **Last Updated**: 2025
+- **License**: Apache 2.0
+
+---
+
+*For more information, please visit our official website or contact our team.*
+
+---
+
+<details>
+<summary><h2>USMSB SDK 白皮书</h2></summary>
+
+# USMSB SDK 白皮书
+
+**通用社会行为系统模型 - 软件开发工具包**
 
 版本: 1.0.0
 发布日期: 2025年
@@ -593,3 +1207,5 @@ USMSB SDK的推广和应用将创造以下社会价值：
 ---
 
 *如需更多信息，请访问我们的官方网站或联系我们的团队。*
+
+</details>

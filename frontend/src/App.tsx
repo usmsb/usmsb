@@ -24,6 +24,7 @@ import Chat from './pages/Chat'
 import PitchPage from './pages/pitch'
 import BindingPage from './pages/BindingPage'
 import GeneCapsuleExplore from './pages/GeneCapsuleExplore'
+import Contracts from './pages/Contracts'
 import { useAuthStore } from './stores/authStore'
 import { StakeGuideModal } from './components/StakeGuideModal'
 
@@ -132,6 +133,7 @@ function App() {
           <Route path="chat" element={<Chat />} />
           <Route path="settings" element={<Settings />} />
           <Route path="gene-capsule/explore" element={<GeneCapsuleExplore />} />
+          <Route path="contracts" element={<Contracts />} />
 
           {/* User Actions */}
           <Route
@@ -166,6 +168,7 @@ function App() {
         <Route path="/analytics" element={<Navigate to="/app/analytics" replace />} />
         <Route path="/marketplace" element={<Navigate to="/app/marketplace" replace />} />
         <Route path="/governance" element={<Navigate to="/app/governance" replace />} />
+        <Route path="/contracts" element={<Navigate to="/app/contracts" replace />} />
         <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         <Route path="/publish/service" element={<Navigate to="/app/publish/service" replace />} />

@@ -1,3 +1,185 @@
+# Protocol Architecture
+
+> USMSB SDK Communication Protocol Architecture
+
+**[English](#1-protocol-overview) | [中文](#1-协议概述)**
+
+---
+
+## 1. Protocol Overview
+
+USMSB SDK supports multiple communication protocols to meet different scenario requirements:
+
+| Protocol | Use Case | Features |
+|----------|----------|----------|
+| **A2A** | Agent-to-Agent Communication | Designed specifically for Agents |
+| **MCP** | Model Context Protocol | Model Context Protocol |
+| **WebSocket** | Real-time Bidirectional Communication | Low latency, persistent connection |
+| **P2P** | Peer-to-Peer Communication | Decentralized |
+| **gRPC** | High-Performance RPC | Efficient, type-safe |
+| **HTTP** | RESTful API | General-purpose, standard |
+
+---
+
+## 2. Agent-to-Agent (A2A) Protocol
+
+### 2.1 Overview
+
+A2A protocol is designed by USMSB SDK specifically for communication between Agents.
+
+### 2.2 Message Format
+
+```json
+{
+  "id": "msg_123",
+  "type": "request",
+  "sender": "agent_1",
+  "receiver": "agent_2",
+  "action": "delegate_task",
+  "payload": {
+    "task": "...",
+    "context": "..."
+  },
+  "timestamp": "2026-02-26T10:00:00Z"
+}
+```
+
+### 2.3 Code Implementation
+
+```python
+# src/usmsb_sdk/protocol/a2a/
+client.py  # A2A Client
+server.py  # A2A Server
+```
+
+---
+
+## 3. Model Context Protocol (MCP)
+
+### 3.1 Overview
+
+MCP protocol is used for context interaction between models and external systems.
+
+### 3.2 Core Features
+
+- Tool Calling
+- Resource Access
+- Prompt Management
+
+### 3.3 Code Implementation
+
+```python
+# src/usmsb_sdk/protocol/mcp/
+types.py      # Type Definitions
+handler.py    # Message Handler
+adapter.py    # Protocol Adapter
+```
+
+---
+
+## 4. WebSocket Communication
+
+### 4.1 Overview
+
+WebSocket is used for scenarios requiring real-time bidirectional communication.
+
+### 4.2 Features
+
+- Persistent Connection
+- Bidirectional Communication
+- Heartbeat Keep-alive
+- Auto Reconnection
+
+### 4.3 Code Implementation
+
+```python
+# src/usmsb_sdk/protocol/websocket/
+client.py  # WebSocket Client
+server.py  # WebSocket Server
+```
+
+---
+
+## 5. P2P Communication
+
+### 5.1 Overview
+
+P2P protocol is used for decentralized Agent networks.
+
+### 5.2 Features
+
+- Decentralization
+- Peer-to-Peer Encryption
+- Node Discovery
+- Message Routing
+
+### 5.3 Code Implementation
+
+```python
+# src/usmsb_sdk/protocol/p2p/
+handler.py  # P2P Message Handler
+```
+
+---
+
+## 6. gRPC
+
+### 6.1 Overview
+
+gRPC is used for high-performance RPC calls.
+
+### 6.2 Features
+
+- Efficient Serialization (Protocol Buffers)
+- Streaming Support
+- Type Safety
+
+### 6.3 Code Implementation
+
+```python
+# src/usmsb_sdk/protocol/grpc/
+handler.py  # gRPC Handler
+```
+
+---
+
+## 7. HTTP/REST
+
+### 7.1 Overview
+
+HTTP is used for standard RESTful API interactions.
+
+### 7.2 Code Implementation
+
+```python
+# src/usmsb_sdk/protocol/http/
+client.py  # HTTP Client
+server.py  # HTTP Server
+```
+
+---
+
+## 8. Protocol Selection Guide
+
+| Scenario | Recommended Protocol |
+|----------|---------------------|
+| Agent Task Delegation | A2A |
+| LLM Context Interaction | MCP |
+| Real-time Chat | WebSocket |
+| Decentralized Network | P2P |
+| High-Performance Service Calls | gRPC |
+| General API | HTTP/REST |
+
+---
+
+## 9. Related Documentation
+
+- [System Architecture](./system_architecture.md) - Overall System Architecture
+- [REST API](../06_api/rest_api.md) - REST API Reference
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 协议架构
 
 > USMSB SDK 通信协议架构
@@ -174,3 +356,5 @@ server.py  # HTTP 服务器
 
 - [系统架构](./system_architecture.md) - 整体系统架构
 - [REST API](../06_api/rest_api.md) - REST API参考
+
+</details>

@@ -1,3 +1,201 @@
+# Chapter 1: Project Overview & Vision
+
+**[English](#chapter-1-project-overview--vision) | [中文](#第1章项目概述与愿景)**
+
+## 1.1 Background: Z-Generation Creative Wave and Challenges
+
+### Z-Generation Creative Crowd Characteristics
+
+| Characteristic | Description | Implications for Platform Design |
+|----------------|-------------|--------------------------------|
+| Digital Native | Integrate life into digital, not digital into life | Platform needs native digital experience |
+| Diversity & Individuality | Reject labeling, pursue diverse lifestyles and aesthetics | Need flexible identity and role system |
+| Interaction & Community | Desire two-way communication, form circles based on shared interests | Need strong social and collaboration features |
+| Value-oriented | Focus on actual value and cost-effectiveness, not brand loyalty | Need transparent value assessment and distribution mechanism |
+
+### Core Pain Points of Creative Crowd
+
+1. **Value Freeze**: Creative assets difficult to price and monetize
+2. **Lack of Liquidity**: Non-standard assets lack trading markets
+3. **High Trust Cost**: Lack of trust foundation for stranger collaboration
+4. **Weak Bargaining Power**: Individual creators have insufficient bargaining power against B-end
+
+### Platform Vision
+
+> Build a new creative economy ecosystem, empower Z-generation creative crowd, activate their potential, achieve **free flow** and **maximized value** of creative assets.
+
+---
+
+## 1.2 Three Technical Pillars
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              New Creative Economy Operating System              │
+├─────────────────┬─────────────────┬─────────────────────────────┤
+│    USMSB Model  │    IAP Protocol │      Athena Plan           │
+│  (Theoretical  │  (Protocol      │    (AI Brain)               │
+│   Foundation)   │   Layer)        │                            │
+├─────────────────┼─────────────────┼─────────────────────────────┤
+│ • Subject-Object│ • Dynamic       │ • Autonomous Economic       │
+│ • Goal-Action-  │   Valuation     │   Agents                    │
+│   Result        │   Engine        │ • Game Theory Optimization  │
+│ • Resource-     │ • Liquidity     │ • Networked Collaboration  │
+│   Transformation-│   Fractionaliz.│ • AI Digital Twin           │
+│   Value         │ • zk-Credential │                            │
+│ • Information-  │   Pass          │                            │
+│   Decision-    │ • Joint Order   │                            │
+│   Control      │   Contract      │                            │
+└─────────────────┴─────────────────┴─────────────────────────────┘
+```
+
+### USMSB Model
+
+A general system model of social behavior, emphasizing core elements and their dynamic interactions.
+
+| USMSB Element | Creative Economy Application |
+|--------------|------------------------------|
+| **Subject** | Z-generation creative crowd + AI economic agents |
+| **Goal** | Creative realization, value monetization, community collaboration |
+| **Resource** | Creative works, skills, time, digital assets |
+| **Object** | Creative projects, digital copyrights, service demands |
+| **Rule** | IAP protocol, smart contracts, community governance |
+| **Information** | Market trends, valuation data, demand matching |
+| **Value** | Creative monetization, efficiency improvement, influence |
+| **Risk** | Copyright infringement, undervaluation, collaboration failure |
+| **Environment** | Digital creative market, Web3 ecosystem |
+
+### IAP Protocol
+
+IAP is an **open-source, decentralized protocol layer** designed to become infrastructure for the digital native economy.
+
+**Core Principles:**
+- **Absolute Technology Driven**: Rely on algorithms, cryptography, and IoT for automated value discovery
+- **Serve Digital Natives**: Provide "geek-level" tools for programmers, designers, and similar groups
+- **Solve Essential Problems**: Address the core economic contradictions of value freeze and liquidity loss
+- **Disintermediation**: Eliminate traditional platform commission model, empower Intelligent Service Agents (ISA)
+
+**Four Core Functions:**
+1. Dynamic Value Discovery Engine
+2. Liquidity Fractionalization Protocol
+3. zk-Credential Pass
+4. Joint Order Contract
+
+### Athena Plan
+
+Athena is not a centralized AI platform, but a **distributed AI agent network**.
+
+**Core Features:**
+1. **Autonomous Economic Agent**: Each creator has an AI-driven "digital twin"
+2. **Game Theory & Optimization**: Complex multi-objective optimization and game decisions
+3. **Networked Collaboration**: AI agents directly communicate, negotiate, and reach cooperation
+
+---
+
+## 1.3 Brand Strategy
+
+### Four Core Strategies
+
+| Strategy | Specific Measures |
+|----------|------------------|
+| **Empower** | IAP protocol + Athena AI tools + Market insights |
+| **Connect** | Creative community + IAP joint order precise matching |
+| **Monetize** | Asset activation + Multiple revenue streams (sales/projects/skills/data contribution) |
+| **Co-create** | Deep user participation in protocol and ecosystem building |
+
+### Core Value Proposition
+
+> We are not just a platform, but a **technology-driven**, **decentralized** "new creative economy operating system" tailored for Z-generation creative crowd.
+
+---
+
+## 1.4 Four-Phase Roadmap
+
+```
+Phase 1              Phase 2              Phase 3              Phase 4
+Release Technical    Crowdfund Dataset    Incubate ISA         Value Capture
+    Manifesto             │                   │                   │
+    ▼                   ▼                   ▼                   ▼
+┌────────┐        ┌────────┐        ┌────────┐        ┌────────┐
+│Whitepaper│       │Valuation│        │Hackathon│        │Transaction│
+│Open Source│      │Model    │        │Recruit  │        │Fee Revenue│
+│Components│      │Training │        │Nodes    │        │Protocol   │
+│Developer │      │Data     │        │Ecosystem│        │Income     │
+│Edition   │      │Crowdsource│      │Incentive│        │Sustainable│
+└────────┘        └────────┘        └────────┘        └────────┘
+```
+
+### Cold Start Strategy
+
+**Problem**: Step 2 and Step 3 have circular dependency
+- Datasets need ISA to generate transaction data
+- ISA need datasets to optimize valuation model
+
+**Solutions:**
+1. Cold start: Use simulated data + small seed user base
+2. Incentivize early: Give higher incentive weight to early ISA
+3. Progressive opening: Start from specific verticals (e.g., design, code)
+
+---
+
+## 1.5 Target User Groups
+
+### B-end: From "Platform Entry" to "Protocol Participation"
+
+| Strategy | Implementation |
+|----------|----------------|
+| Technology evangelism | Attract tech-driven B-end through developer conferences, tech forums |
+| API services | Provide powerful, stable technical tools and APIs |
+| ISA Intelligent Service Agent | Decentralized service nodes composed of AI agents + few expert humans |
+
+### C-end: From "Consumer" to "Autonomous Economic Node"
+
+| Feature | Description |
+|---------|-------------|
+| Smarter | AI agents handle tedious operations, improve efficiency |
+| More autonomous | Users set goals and rules, AI executes |
+
+---
+
+## 1.6 ISA (Intelligent Service Agent) Definition
+
+```
+ISA = Decentralized Node + Meta Agent + Human Operator
+
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  P2PNode     │    │  Meta Agent  │    │   Human       │
+│(Decentralized│    │  (AI Agent)  │    │   Operator    │
+│   Node)      │    │              │    │(Decision/     │
+│              │    │              │    │  Supervision) │
+└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌─────────────────────────────────────────────────────┐
+│                    ISA Service Capabilities         │
+├─────────────────────────────────────────────────────┤
+│ • Service Registration & Discovery                 │
+│ • Smart Decision Making & Execution                 │
+│ • Protocol Governance Participation                 │
+│ • Local Service Escrow                             │
+│ • Reputation & Staking Management                   │
+│ • Exception Handling & Human Intervention           │
+└─────────────────────────────────────────────────────┘
+```
+
+**Code Mapping:**
+
+| Concept | Code Implementation | File Location |
+|---------|---------------------|---------------|
+| Decentralized node | `P2PNode` | `node/decentralized_node.py:315` |
+| Service registration | `DistributedServiceRegistry` | `node/decentralized_node.py:146` |
+| Service discovery | `discover_services()` | `node/decentralized_node.py:612` |
+| Node identity | `NodeIdentity` | `node/decentralized_node.py:57` |
+| AI agent | `MetaAgent` | `platform/external/meta_agent/agent.py` |
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 第1章：项目概述与愿景
 
 ## 1.1 背景：Z世代创意浪潮与挑战
@@ -175,3 +373,5 @@ ISA = 去中心化节点 + Meta Agent + 人类运营者
 | 服务发现 | `discover_services()` | `node/decentralized_node.py:612` |
 | 节点身份 | `NodeIdentity` | `node/decentralized_node.py:57` |
 | AI代理 | `MetaAgent` | `platform/external/meta_agent/agent.py` |
+
+</details>

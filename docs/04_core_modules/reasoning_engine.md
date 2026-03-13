@@ -1,3 +1,63 @@
+# Reasoning Engine
+
+> Multi-Engine Reasoning System
+
+**[English](#english-section) | [中文](#chinese-section)**
+
+---
+
+## English Section
+
+## 1. Overview
+
+The Reasoning Engine provides Agents with multiple reasoning capabilities, including logical reasoning, causal reasoning, common sense reasoning, and more.
+
+---
+
+## 2. Module Structure
+
+```
+reasoning/
+├── base.py            # Base class
+├── interfaces.py     # Interfaces
+├── chain_manager.py   # Chain management
+├── knowledge_integration.py  # Knowledge integration
+├── uncertainty.py    # Uncertainty
+└── engines/          # Reasoning engines
+    ├── meta.py       # Meta reasoning
+    ├── commonsense.py # Common sense reasoning
+    ├── temporal.py   # Temporal reasoning
+    ├── spatial.py    # Spatial reasoning
+    ├── analogical.py # Analogical reasoning
+    ├── causal.py     # Causal reasoning
+    └── logical.py    # Logical reasoning
+```
+
+---
+
+## 3. Reasoning Engines
+
+| Engine | Status | Function |
+|--------|--------|----------|
+| Meta Reasoning | ✅ | Reasoning strategy selection |
+| Common Sense | ✅ | Common sense knowledge reasoning |
+| Temporal | ✅ | Temporal relationship reasoning |
+| Spatial | ✅ | Spatial relationship reasoning |
+| Analogical | ✅ | Analogical thinking |
+| Causal | ✅ | Causal relationship analysis |
+| Logical | ✅ | Logical deduction |
+
+---
+
+## 4. Related Documentation
+
+- [Meta Agent Design](./meta_agent_design.md) - Super Agent System Design
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 推理引擎
 
 > 多引擎推理系统
@@ -48,3 +108,5 @@ reasoning/
 ## 4. 相关文档
 
 - [Meta Agent设计](./meta_agent_design.md) - 超级Agent系统设计
+
+</details>

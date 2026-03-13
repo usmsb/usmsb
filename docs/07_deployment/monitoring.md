@@ -1,3 +1,67 @@
+# Monitoring & Operations
+
+> USMSB SDK Monitoring and Operations
+
+**[English](#1-monitoring-metrics) | [中文](#1-监控指标)**
+
+---
+
+## 1. Monitoring Metrics
+
+### 1.1 System Metrics
+
+- CPU Usage
+- Memory Usage
+- Disk I/O
+- Network Traffic
+
+### 1.2 Business Metrics
+
+- API Request Volume
+- Response Time
+- Agent Online Count
+- Matching Success Rate
+
+---
+
+## 2. Logging
+
+### 2.1 Log Levels
+
+- DEBUG: Debug Information
+- INFO: General Information
+- WARNING: Warning
+- ERROR: Error
+- CRITICAL: Critical Error
+
+### 2.2 Log Format
+
+```json
+{
+  "timestamp": "2026-02-26T10:00:00Z",
+  "level": "INFO",
+  "message": "Agent registered",
+  "agent_id": "agent_123"
+}
+```
+
+---
+
+## 3. Alerts
+
+Configure alert rules:
+
+```yaml
+alerts:
+  - name: "high_cpu"
+    condition: "cpu > 80"
+    duration: "5m"
+    action: "notify"
+```
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 监控运维
 
 > USMSB SDK 监控与运维
@@ -56,3 +120,5 @@ alerts:
     duration: "5m"
     action: "notify"
 ```
+
+</details>

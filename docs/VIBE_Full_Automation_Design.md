@@ -1,3 +1,379 @@
+# VIBE Full Automation Decentralized Ecosystem Design Document
+
+**[English](#vibe-full-automation-decentralized-ecosystem-design-document) | [中文](#vibe-全自动化去中心化生态设计文档)**
+
+---
+
+> Created: 2026-02-24
+> Last Updated: 2026-02-24
+> Goal: Fully decentralized, code governance, AI governance, no dependency on anyone
+
+---
+
+## 1. Core Principles
+
+```
+┌─────────────────────────────────────────────────────────┐
+│            Fully Decentralized Ecosystem                │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ❌ Does not depend on anyone                           │
+│  ❌ No multi-sig approval required                    │
+│  ❌ No manual trigger needed                          │
+│  ❌ Does not trust anyone                             │
+│                                                         │
+│  ✅ Everything decided by code                         │
+│  ✅ Everything triggered by conditions                 │
+│  ✅ Everything transparent on-chain                   │
+│  ✅ Everything immutable                              │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Token Distribution Scheme (Final Version)
+
+### 2.1 Total & Distribution Ratio
+
+| Category | Ratio | Amount | Management | Trigger Condition |
+|----------|-------|--------|------------|-------------------|
+| Team | 8% | 80M | VIBVesting (4-year lockup) | Time auto-release |
+| Early Supporters | 4% | 40M | VIBVesting (2-year lockup) | Time auto-release |
+| Community Stable Fund | 6% | 60M | CommunityStableFund | Auto-buyback on price drop |
+| Liquidity Pool | 12% | 120M | LiquidityManager | Time-triggered market making |
+| Community Airdrop | 7% | 70M | AirdropDistributor | User self-claim |
+| Incentive Pool | 63% | 630M | EmissionController | Cycle auto-release |
+
+### 2.2 Incentive Pool Internal Distribution (63%)
+
+| Sub-pool | % of Pool | Amount | Who Can Get | Trigger |
+|----------|-----------|--------|-------------|---------|
+| Staking Rewards | 45% | 283.5M | Stakers | Stake VIBE |
+| Ecosystem Incentive | 30% | 189M | Developers/Builders | DApp usage/code contribution |
+| Governance Rewards | 15% | 94.5M | Governance Participants | Voting/Proposals |
+| Reserve | 10% | 63M | Emergency | Extreme situations |
+
+### 2.3 Core Principle: No "Future Talent" Concept
+
+```
+┌─────────────────────────────────────────────────────────┐
+│         Fully Decentralized Reward Mechanism            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ❌ No "future talent" concept                          │
+│  ❌ No manual approval process                         │
+│  ❌ No voting to decide who is talent                 │
+│                                                         │
+│  ✅ Anyone can participate                             │
+│  ✅ Contributions automatically identified             │
+│  ✅ Rewards automatically distributed                  │
+│  ✅ Fully code-driven                                 │
+│                                                         │
+│  Initial team/supporters: Reward for "past" contribution (one-time lockup) │
+│  Incentive pool participants: Reward for "present/future" contribution (continuous) │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2.4 Distribution Model
+
+**Adopt "one wallet per person" model, not "one total wallet per category"**
+
+- Team members: Individual wallet per person + individual lockup
+- Early supporters: Individual wallet per person + individual lockup
+- Other pools: Managed by dedicated contracts
+
+---
+
+## 3. Contract Architecture
+
+### 3.1 Completed Contracts (Deployed on Testnet)
+
+| Contract | Address | Status |
+|----------|---------|--------|
+| VIBEToken | 0x895BeA0E70F61C093E7Ef05b45Fe744ef45c2600 | ✅ |
+| VIBInflationControl | 0x82aA3F07B153DfFeCfb6464d0726c53dc2626464 | ✅ |
+| VIBStaking | 0xE6b7494bceAd5B092e8F870035aeD7f44F0Fc868 | ✅ |
+| VIBVesting | 0x4B898eBEA09b771e4EfD1Ea0986E2bF1f7734ACE | ✅ |
+| VIBIdentity | 0xFe1c819d193796B731A13da51a1D55E43C6521e3 | ✅ |
+| VIBGovernance | 0x732ae212c8961ae773d68Da3Ddf9F29b788992b1 | ✅ |
+| VIBTimelock | 0x8a9dc76bE021b6e36A43acB0088fcBe428FAdE3d | ✅ |
+| VIBDividend | 0x421844eC1a51d1246f7A740762998f308AA653db | ✅ |
+| VIBTreasury | 0x664C9E36C9328E9530407e0B44281cf9B1F14A5a | ✅ |
+| AgentRegistry | 0x2fc57E56e06A5cCC8c17fdE84eA768b76B51c644 | ✅ |
+| AgentWallet | 0x99AF837f7A154b244e3E92BaC962a0064AA1F053 | ✅ |
+| ZKCredential | 0x84cCAF1C87a88eB90f360112B2E87b49Ab216012 | ✅ |
+| AssetVault | 0x0D7a7e8353984330cB566E8Bc8951ed1728c236A | ✅ |
+| JointOrder | 0x578Ad702F3df5F5863CD7172FEa65cca4D0E44cD | ✅ |
+
+### 3.2 New Automation Contracts Needed (5)
+
+| Contract | Function | Trigger Mechanism |
+|----------|----------|-------------------|
+| CommunityStableFund | Market support buyback, emergency liquidity | Price oracle trigger |
+| LiquidityManager | DEX liquidity management, LP locking | Time trigger |
+| AirdropDistributor | Airdrop distribution | User claim |
+| EmissionController | Incentive release control | Time cycle trigger |
+| PriceOracle | Multi-source price aggregation | Real-time query |
+
+---
+
+## 4. Full Automation Design
+
+### 4.1 CommunityStableFund (Community Stable Fund 6%)
+
+```
+Function:
+├── Market support buyback (auto-buy and burn on price drop)
+├── Emergency liquidity injection (auto-inject when DEX liquidity insufficient)
+└── Parameters determined by oracle, no human intervention
+
+Trigger Conditions:
+├── Price 20% below 7-day average → Auto buyback and burn
+├── DEX liquidity below threshold → Auto inject liquidity
+└── Anyone can call, but only executes when conditions met
+```
+
+### 4.2 EmissionController (Incentive Pool 63%)
+
+```
+Function:
+├── Control incentive token release speed (5-year linear release)
+├── Auto-distribute to reward pools
+└── Decay mechanism (decrease each cycle)
+
+Distribution Ratio:
+├── Staking reward pool 45%
+├── Ecosystem incentive pool 30%
+├── Governance reward pool 15%
+└── Reserve pool 10%
+
+Trigger Mechanism (Hybrid):
+├── Normal: Fixed 7-day cycle release
+├── Emergency: Anyone can trigger emergency supplement when pool balance below threshold
+└── Trigger gets Gas subsidy + time-accrued reward
+```
+
+### 4.3 AirdropDistributor (Airdrop 7%)
+
+```
+Function:
+├── Merkle tree verification (Gas efficient)
+├── User self-claim
+├── Two-tier time mechanism (incentivize early participation)
+└── Unclaimed tokens auto-transfer to Community Stable Fund
+
+Time Mechanism:
+├── Months 1-6: 100% claimable (normal period)
+├── Months 7-12: 50% claimable (delayed period, other half auto-transfers to stable fund)
+└── After 12 months: Cannot claim, remaining all transfers to stable fund
+
+Trigger Conditions:
+├── User actively claims
+└── After 12 months, anyone can trigger recovery
+```
+
+### 4.4 LiquidityManager (Liquidity 12%)
+
+```
+Function:
+├── Auto-add liquidity to DEX
+├── LP tokens permanently locked
+├── Auto-compound returns
+└── No one can withdraw LP
+
+Trigger Conditions:
+├── Auto-execute initial add after deployment
+├── Auto-compound returns periodically
+└── Anyone can trigger
+```
+
+---
+
+## 5. Trigger Mechanism Design
+
+| Scenario | Traditional (Human) | Automation (Code) |
+|----------|---------------------|-------------------|
+| Market support buyback | ❌ Team decides when to buy | ✅ Auto-trigger on X% price drop |
+| Token release | ❌ Admin clicks to distribute | ✅ Auto-release at set time |
+| Emergency pause | ❌ Multi-sig vote | ✅ Auto-circuit break on condition |
+| Parameter adjustment | ❌ Manual proposal vote | ✅ Auto-adjust by preset rules |
+| Airdrop distribution | ❌ Manual transfer | ✅ User self-claim |
+
+---
+
+## 6. Technical Solution Decisions (Confirmed)
+
+### 6.1 Oracle Selection ✅ Confirmed: Multi-source aggregation + TWAP fallback
+
+```
+Solution: Take median price from multiple sources
+Sources:
+├── Chainlink price feed
+├── Uniswap V3 TWAP (1-hour window)
+└── SushiSwap TWAP
+
+Logic:
+├── Take median of three sources
+├── Ignore any single source deviation >15%
+└── If all sources have large deviation, use historical average
+
+Pros:
+✅ Highest security, difficult to manipulate
+✅ Fully decentralized
+✅ Single source failure doesn't affect system
+```
+
+### 6.2 Trigger Rewards ✅ Confirmed: Gas subsidy + time-accrued reward
+
+```
+Reward Formula:
+Total reward = Base reward + Gas subsidy + Time-accrued reward
+
+Parameters:
+├── Base reward: 0.0005 ETH
+├── Gas subsidy: Actual Gas cost × 120%
+├── Time-accrued: 0.0001 ETH per hour
+└── Max accrual: 24 hours
+
+Logic:
+├── Longer time since last trigger, higher reward
+├── Ensure Gas cost always covered
+└── Incentivize timely triggering
+```
+
+### 6.3 Parameter Adjustability ✅ Confirmed: Layered design
+
+```
+Layer 1: Permanently fixed (cannot change)
+├── Total token supply (1 billion)
+├── Inflation cap (2%/year)
+├── Circuit break threshold (0.5%/month)
+└── Distribution ratio (8%-4%-6%-12%-7%-63%)
+
+Layer 2: Governance adjustable (with range limits)
+├── Buyback trigger threshold (range: 15%-30%)
+├── Incentive release rate (range: ±20%)
+└── Trigger reward amount (range: ±50%)
+└── Requires: Governance vote >60% + 14-day timelock
+
+Layer 3: Auto-adjust (by preset rules)
+├── Gas subsidy (auto-adjust with Gas price)
+├── Time-accrued reward (auto-calculate)
+└── Release decay rate (auto-decrease per cycle)
+```
+
+### 6.4 Contract Upgrade ✅ Confirmed: Layered upgrade strategy
+
+```
+Non-upgradable contracts (Core layer):
+├── VIBEToken (Token body)
+├── VIBVesting (Lockup rules)
+└── VIBInflationControl (Inflation control)
+
+Upgradable contracts (Application layer) - UUPS proxy:
+├── CommunityStableFund
+├── LiquidityManager
+├── EmissionController
+└── AirdropDistributor
+
+Upgrade conditions:
+├── Governance vote >75% support
+├── 30-day timelock
+└── Anyone can execute (after conditions met)
+```
+
+---
+
+## 7. Discussion Records
+
+### 2026-02-24 Discussion Points
+
+1. **Testnet simulation version**
+   - User asked if simulation version needs deployment
+   - Lockup test can be accelerated by shortening time period (4 years → 4 hours)
+   - Decided to deploy simulation version
+
+2. **Token distribution method**
+   - Discussed "one total wallet per category" vs "one wallet per person"
+   - Decided: Team and investors use individual wallet + lockup
+   - Other pools use dedicated contracts
+
+3. **Contract vs wallet**
+   - User proposed: Community Stable Fund should go to contracts, not wallets
+   - Decided: All fund pools managed by contracts
+
+4. **Fully decentralized goal**
+   - User clarified: No dependency on anyone, fully code governance, AI governance
+   - Not afraid of high Gas fees or complexity
+   - All human intervention to be removed
+
+5. **Technical solution decisions**
+   - Oracle: Multi-source aggregation + TWAP fallback (take median from Chainlink, Uniswap, Sushi)
+   - Trigger rewards: Gas subsidy + time-accrued reward
+   - Parameter adjustment: Three-layer design (fixed/governance/auto)
+   - Contract upgrade: Core immutable + Application upgradable
+
+6. **Future talent pool discussion (cancelled)**
+   - Question: Where does revenue for new team members after mainnet launch come from?
+   - Found conflict: If fully decentralized, there shouldn't be "approve talent" concept
+   - Conclusion: Cancel "future talent pool", contributors get rewards from incentive pool automatically
+   - Principle: No "future talent" concept, anyone can earn rewards through contribution
+
+7. **Time parameter final decisions**
+   - Airdrop period: Two-tier mechanism (first 6 months 100%, 7-12 months 50%, after 12 months expire)
+   - Unclaimed airdrop: Transfer to Community Stable Fund
+   - Incentive release: Hybrid mode (fixed 7-day cycle + emergency supplement mechanism)
+   - Goal: Incentivize early participation while ensuring system stability
+
+---
+
+## 8. Contract Development Checklist
+
+### 8.1 Existing Contracts to Modify
+
+| Contract | Modification | Reason |
+|---------|--------------|--------|
+| VIBEToken | Add integration with EmissionController | Incentive release needs to call mint |
+| VIBStaking | Add integration with EmissionController | Receive staking rewards |
+| VIBGovernance | Add governance reward mechanism | Voting/proposals automatically get rewards |
+
+### 8.2 New Contracts Needed
+
+| # | Contract | Function | Priority |
+|---|----------|----------|----------|
+| 1 | PriceOracle | Multi-source price aggregation (Chainlink+TWAP) | High |
+| 2 | EmissionController | Incentive pool release and distribution | High |
+| 3 | CommunityStableFund | Market support buyback, liquidity injection | High |
+| 4 | AirdropDistributor | Airdrop distribution (Merkle) | Medium |
+| 5 | LiquidityManager | DEX liquidity management | Medium |
+
+---
+
+## 9. Next Steps
+
+### Completed ✅
+1. [x] Oracle selection analysis → Multi-source aggregation + TWAP
+2. [x] Trigger reward mechanism design → Gas subsidy + time-accrued
+3. [x] Parameter adjustability design → Three-layer
+4. [x] Contract upgrade design → Core immutable + Application upgradable
+5. [x] Token distribution confirmed → Cancel future talent pool
+
+### To Do
+6. [ ] Write 5 new contract codes
+7. [ ] Modify 3 existing contracts
+8. [ ] Deploy simulation test version (accelerated time period)
+9. [ ] Complete testing
+10. [ ] Mainnet deployment
+
+---
+
+*Document continuously updated...*
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # VIBE 全自动化去中心化生态设计文档
 
 > 创建时间: 2026-02-24
@@ -366,3 +742,5 @@
 ---
 
 *文档持续更新中...*
+
+</details>

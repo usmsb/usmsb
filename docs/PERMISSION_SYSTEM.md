@@ -1,3 +1,415 @@
+**[English](#permission-system) | [中文](#权限系统设计文档)**
+
+---
+
+# Permission System Design Document
+
+## Overview
+
+This document describes the permission system design for USMSB Meta Agent, combining the original 21 permission types with the new environment-based permission mechanism.
+
+---
+
+## 1. Role System
+
+The system defines 7 user roles:
+
+| Role | Description | Use Case |
+|------|-------------|----------|
+| superadmin | Super Administrator | System highest privilege manager |
+| developer | Developer | Users requiring full development capabilities |
+| node_admin | Node Administrator | Users managing nodes |
+| node_operator | Node Operator | Users operating nodes |
+| human | Regular User | Basic user |
+| ai_owner | AI Agent Owner | Users who own and manage AI Agents |
+| ai_agent | AI Agent | AI Agent itself |
+
+---
+
+## 2. Permission Types
+
+### 2.1 Original Permissions (21 types)
+
+#### Platform Management (3 types)
+| Permission | Description |
+|------------|-------------|
+| platform:admin | Platform administration |
+| platform:config | Platform configuration |
+| platform:deploy | Code deployment |
+
+#### Node Management (4 types)
+| Permission | Description |
+|------------|-------------|
+| node:start | Start node |
+| node:stop | Stop node |
+| node:monitor | Node monitoring |
+| node:config | Node configuration |
+
+#### Agent Management (3 types)
+| Permission | Description |
+|------------|-------------|
+| agent:register | Register Agent |
+| agent:unregister | Unregister Agent |
+| agent:manage | Manage Agent |
+
+#### Blockchain/Wallet (5 types)
+| Permission | Description |
+|------------|-------------|
+| wallet:create | Create wallet |
+| wallet:bind | Bind wallet |
+| blockchain:stake | Staking |
+| blockchain:vote | Voting |
+| blockchain:govern | Governance |
+
+#### Data Operations (3 types)
+| Permission | Description |
+|------------|-------------|
+| data:query | Query data |
+| data:write | Write data |
+| data:admin | Data administration |
+
+#### Conversation (2 types)
+| Permission | Description |
+|------------|-------------|
+| chat:basic | Basic chat |
+| chat:admin | Chat administration |
+
+#### System (3 types)
+| Permission | Description |
+|------------|-------------|
+| system:health | Health check |
+| system:metrics | System metrics |
+| system:logs | Log access |
+
+#### NPM Tools (5 types)
+| Permission | Description |
+|------------|-------------|
+| npm:public | npm view/search |
+| npm:install | npm install |
+| npm:run | npm run |
+| npm:global | npm global install |
+| npm:danger | Dangerous npm operations |
+
+#### Git Tools (6 types)
+| Permission | Description |
+|------------|-------------|
+| git:read | git read-only |
+| git:write | git write |
+| git:push | git push |
+| git:clone | git clone |
+| git:force | git force push |
+| git:danger | Dangerous git operations |
+
+### 2.2 New Permissions - Environment Isolation (4 types)
+
+New permissions based on user environment isolation mechanism. These permissions can be safely relaxed for regular users under isolation protection:
+
+| Permission | Description | Security |
+|------------|-------------|----------|
+| workspace | User workspace operations | User directory isolation + path validation + quota limits |
+| sandbox | Code execution sandbox | Process isolation + timeout + resource limits |
+| browser | Browser operations | Session isolation |
+| network | Network access | Optional domain whitelist |
+
+### 2.3 New Permissions - Agent Service (1 type)
+
+| Permission | Description |
+|------------|-------------|
+| agent:service | Agent recommendation, matching and other services |
+
+---
+
+## 3. Role Permission Configuration
+
+### 3.1 superadmin (Super Administrator)
+Has all permissions including:
+- All platform, node, agent, wallet, blockchain, data, chat, system permissions
+- All environment isolation permissions (workspace, sandbox, browser, network)
+- All NPM/Git permissions
+
+### 3.2 developer (Developer)
+| Permission Category | Specific Permissions |
+|---------------------|----------------------|
+| Platform | platform:config, platform:deploy |
+| Node | node:monitor |
+| Agent | agent:register, agent:manage, agent:service |
+| Wallet | wallet:bind |
+| Data | data:query, data:write |
+| Chat | chat:basic |
+| System | system:health, system:metrics, system:logs |
+| Environment | workspace, sandbox, browser, network |
+| NPM | npm:public, npm:install, npm:run, npm:global |
+| Git | git:read, git:write, git:push, git:clone |
+
+### 3.3 node_admin (Node Administrator)
+| Permission Category | Specific Permissions |
+|---------------------|----------------------|
+| Node | node:start, node:stop, node:monitor, node:config |
+| Agent | agent:register |
+| Wallet | wallet:bind, stake, vote |
+| Data | data:query, data:write |
+| Chat | chat:basic |
+| System | system:health, system:metrics, system:logs |
+| Environment | workspace, network |
+| NPM | npm:public, npm:install, npm:run |
+| Git | git:read, git:write, git:clone |
+
+### 3.4 node_operator (Node Operator)
+| Permission Category | Specific Permissions |
+|---------------------|----------------------|
+| Node | node:monitor, node:config |
+| Wallet | wallet:bind, stake, vote |
+| Data | data:query |
+| Chat | chat:basic |
+| System | system:health, system:metrics, system:logs |
+| Environment | workspace, network |
+| NPM | npm:public, npm:install |
+| Git | git:read |
+
+### 3.5 human (Regular User) ⚠️ Important Update
+| Permission Category | Specific Permissions | Description |
+|---------------------|----------------------|-------------|
+| Basic | chat:basic, data:query, system:health, wallet:bind | Basic functionality |
+| Environment Isolation | workspace, sandbox, browser, network | New, can be safely used based on isolation mechanism |
+| Agent Service | agent:service | New |
+| NPM/Git | npm:public, npm:install, npm:run, git:read | Basic development permissions |
+
+### 3.6 ai_owner (AI Agent Owner)
+| Permission Category | Specific Permissions |
+|---------------------|----------------------|
+| Agent | agent:register, agent:unregister, agent:manage, agent:service |
+| Wallet | wallet:bind, stake, vote |
+| Data | data:query, data:write |
+| Chat | chat:basic |
+| System | system:health |
+| Environment | workspace, network |
+| NPM | npm:public, npm:install, npm:run |
+| Git | git:read, git:write |
+
+### 3.7 ai_agent (AI Agent)
+| Permission Category | Specific Permissions |
+|---------------------|----------------------|
+| Agent | agent:register, agent:service |
+| Wallet | wallet:bind |
+| Data | data:query, data:write |
+| Chat | chat:basic |
+| System | system:health |
+| Environment | workspace, sandbox, browser, network |
+| NPM | npm:public |
+| Git | git:read |
+
+---
+
+## 4. Tool Permission Mapping
+
+### 4.1 Conversation Tools
+| Tool | Permission |
+|------|------------|
+| general_response | chat:basic |
+| search_knowledge | data:query |
+
+### 4.2 Search Tools
+| Tool | Permission |
+|------|------------|
+| search_web | network |
+| search_files | workspace |
+
+### 4.3 File Operations (Workspace Isolation)
+| Tool | Permission |
+|------|------------|
+| read_file | workspace |
+| write_file | workspace |
+| list_directory | workspace |
+| create_directory | workspace |
+| copy_file | workspace |
+| move_file | workspace |
+| delete_file | workspace |
+| get_file_info | workspace |
+| search_files | workspace |
+
+### 4.4 Code Execution (Sandbox Isolation)
+| Tool | Permission |
+|------|------------|
+| execute_python | sandbox |
+| execute_javascript | sandbox |
+| execute_command | sandbox |
+| run_program | sandbox |
+| parse_skill_md | sandbox |
+| execute_skill | sandbox |
+| list_skills | sandbox |
+
+### 4.5 Browser (Browser Isolation)
+| Tool | Permission |
+|------|------------|
+| browser_open | browser |
+| browser_click | browser |
+| browser_fill | browser |
+| browser_get_content | browser |
+| browser_screenshot | browser |
+| browser_close | browser |
+
+### 4.6 Network Access
+| Tool | Permission |
+|------|------------|
+| fetch_url | network |
+| parse_html | network |
+| download_file | network |
+| get_headers | network |
+| search_web | network |
+
+### 4.7 Data Operations
+| Tool | Permission |
+|------|------------|
+| query_db | data:query |
+| analyze_data | data:query |
+| generate_report | data:query |
+| insert_db | data:write |
+| update_db | data:write |
+| delete_db | data:admin |
+| upload_to_ipfs | data:write |
+| download_from_ipfs | data:query |
+| sync_to_ipfs | data:write |
+
+### 4.8 Node Management
+| Tool | Permission |
+|------|------------|
+| start_node | node:start |
+| stop_node | node:stop |
+| get_node_status | node:monitor |
+| set_threshold | node:config |
+| get_alerts | node:monitor |
+
+### 4.9 Wallet/Blockchain
+| Tool | Permission |
+|------|------------|
+| create_wallet | wallet:create |
+| get_balance | wallet:bind |
+| bind_wallet | wallet:bind |
+| switch_chain | wallet:bind |
+| get_chain_info | wallet:bind |
+| stake | blockchain:stake |
+| unstake | blockchain:stake |
+| vote | blockchain:vote |
+| delegate_vote | blockchain:vote |
+| get_vote_power | blockchain:vote |
+| list_proposals | blockchain:vote |
+| submit_proposal | blockchain:govern |
+
+### 4.10 Agent Services
+| Tool | Permission |
+|------|------------|
+| search_agents | agent:service |
+| recommend_agents | agent:service |
+| get_recommendation_history | agent:service |
+| rate_agent | agent:service |
+| get_agent_profile | agent:service |
+| get_all_agent_profiles | agent:service |
+| recommend_agents_for_demand | agent:service |
+| match_by_gene_capsule | agent:service |
+| generate_recommendation_explanation | agent:service |
+| proactively_notify_opportunity | agent:service |
+| scan_opportunities | agent:service |
+| auto_match_and_notify | agent:service |
+| consult_agent | agent:service |
+| route_message | agent:service |
+| get_load_balance_status | agent:service |
+| get_route_info | agent:service |
+| interview_agent | agent:service |
+| send_agent_message | agent:service |
+| receive_agent_showcase | agent:service |
+| retrieve_user_info | agent:service |
+| list_user_agents | agent:manage |
+| register_agent | agent:register |
+| unregister_agent | agent:unregister |
+
+### 4.11 System
+| Tool | Permission |
+|------|------------|
+| health_check | system:health |
+| get_system_health | system:health |
+| get_metrics | system:metrics |
+| get_system_metrics | system:metrics |
+| query_logs | system:logs |
+
+### 4.12 Platform Configuration
+| Tool | Permission |
+|------|------------|
+| get_config | platform:config |
+| update_config | platform:config |
+| generate_component | platform:config |
+| manage_page | platform:config |
+
+---
+
+## 5. Environment Isolation Mechanism
+
+The system uses three-layer environment isolation to protect system security:
+
+### 5.1 UserWorkspace (Workspace Directory Isolation)
+- Each user has an independent workspace directory
+- Path validation: prevents path traversal attacks
+- Quota limits: prevents disk exhaustion
+- Directory structure:
+  - workspace/uploads/ - Uploaded files
+  - workspace/output/ - Output files
+  - workspace/temp/ - Temporary files
+
+### 5.2 CodeSandbox (Code Execution Sandbox)
+- Process isolation: code runs in isolated processes
+- Timeout limits: prevents infinite loops
+- Resource limits: CPU/memory limits
+- Network isolation: configurable network access
+
+### 5.3 BrowserContext (Browser Session Isolation)
+- Each user has an independent browser session
+- Cookie/Storage isolation
+- Page isolation
+
+---
+
+## 6. Permission Check Process
+
+1. When user calls a tool, system obtains user role
+2. Retrieves permission list for that role from `ROLE_PERMISSIONS`
+3. Gets required permissions for the tool from `TOOL_PERMISSIONS`
+4. Checks if user permissions cover all tool required permissions
+5. If insufficient permissions, returns permission denial message
+
+---
+
+## 7. Permission Configuration Examples
+
+### 7.1 Typical Usage Scenarios for human Role
+
+Since the human role has workspace, sandbox, browser, network permissions, they can:
+
+✅ read_file/write files in their own workspace
+✅ Execute Python/JavaScript code (in sandbox)
+✅ Operate browser (in independent browser context)
+✅ Access network resources
+✅ Search for Agents and use Agent services
+
+❌ Access system database
+❌ Manage system configuration
+❌ Start/stop nodes
+
+---
+
+## 8. Changelog
+
+### 2026-03-02
+- Added 4 environment isolation permissions: workspace, sandbox, browser, network
+- Added 1 Agent service permission: agent:service
+- Updated human role permissions, added file operations, code execution, browser operation permissions
+- Updated node_operator role permissions, added workspace and network permissions
+- Updated ai_owner role permissions, added more Agent service permissions
+- Updated ai_agent role permissions, added complete environment isolation permissions
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 权限系统设计文档
 
 ## 概述
@@ -400,3 +812,5 @@
 - 更新 node_operator 角色权限，增加workspace和network权限
 - 更新 ai_owner 角色权限，增加更多Agent服务权限
 - 更新 ai_agent 角色权限，增加完整的环境隔离权限
+
+</details>

@@ -1,3 +1,7 @@
+**[English](#usmsb-sdk-terms-of-service) | [中文](#usmsb-sdk服务条款)**
+
+---
+
 # USMSB SDK Terms of Service
 
 **Universal System Model of Social Behavior - Terms of Service Agreement**

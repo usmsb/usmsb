@@ -1,3 +1,67 @@
+# Autonomous Evolution
+
+> Autonomous Learning and Evolution System
+
+**[English](#1-design-goals) | [中文](#1-设计目标)**
+
+---
+
+## 1. Design Goals
+
+### 1.1 Core Problems
+
+- **Memory Decay**: Key content from user historical conversations gets forgotten
+- **Knowledge Update Lag**: Unable to actively acquire new knowledge from external sources
+- **Lack of Autonomy**: Passive response, unable to actively learn and evolve
+- **Information Islands**: Internal knowledge isolated from external information
+
+### 1.2 Solution Approach
+
+Based on the USMSB model, treating Agent as a socially conscious behavioral agent:
+- **Agent**: Continuously running, self-driven Meta Agent
+- **Goal**: Self-set growth goals
+- **Environment**: Integrate external world information and internal state
+- **Learning**: Extract knowledge from multiple information sources, form memories
+
+---
+
+## 2. v2.0 Improvements (Based on Expert Debate)
+
+### 2.1 Deep Problems
+
+1. **Value Source Problem**: Who defines "good" for the Agent?
+2. **Knowledge Validation Problem**: How to judge the authenticity of learned knowledge?
+3. **Autonomy Boundary Problem**: True autonomy vs. goal execution
+4. **Constraint Mechanism Problem**: How to maintain human control?
+5. **Embodied Cognition Deficiency**: Lack of body, emotion, social embedding
+
+### 2.2 Solution Approach
+
+- **Constraints First**: Establish control mechanisms before pursuing autonomy
+- **Progressive Autonomy**: Start with limited autonomy, gradually expand boundaries
+- **Explicit Values**: Design values as configurable, auditable components
+- **Validation Loop**: Establish multi-level self-assessment and external feedback mechanisms
+
+---
+
+## 3. Implementation Status
+
+| Feature | Status | Description |
+|---------|--------|--------------|
+| Goal Engine | 🔄 Planning | Self-set goals |
+| Learning Engine | 🔄 Planning | Learn from experience |
+| Emergent Behavior | 🔄 Planning | Multi-Agent emergence |
+
+---
+
+## 4. Related Documentation
+
+- [Meta Agent Design](./meta_agent_design.md) - Super Agent System Design
+- [USMSB Model](../02_theory/usmsb_model.md) - Universal System Model for Social Behavior
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 自主进化
 
 > 自主学习与进化系统
@@ -56,3 +120,5 @@
 
 - [Meta Agent设计](./meta_agent_design.md) - 超级Agent系统设计
 - [USMSB模型](../02_theory/usmsb_model.md) - 社会行为通用系统模型
+
+</details>

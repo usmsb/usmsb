@@ -194,7 +194,7 @@ class PreMatchNegotiationService:
 
     def __init__(
         self,
-        db_session: Session,
+        db_session: Optional[Session] = None,
         gene_capsule_service: Optional[Any] = None,
         logger: Optional[logging.Logger] = None,
     ):

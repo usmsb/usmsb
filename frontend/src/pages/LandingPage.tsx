@@ -29,24 +29,58 @@ import {
   Play,
   BookOpen,
   Layers,
+  Share2,
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/store'
 import clsx from 'clsx'
 
-// USMSB Nine Elements
-const usmsbElements = [
-  { key: 'user', icon: Users, color: 'from-blue-500 to-cyan-500' },
-  { key: 'service', icon: Settings, color: 'from-purple-500 to-pink-500' },
-  { key: 'matching', icon: Target, color: 'from-green-500 to-emerald-500' },
-  { key: 'behavior', icon: LineChart, color: 'from-orange-500 to-amber-500' },
-  { key: 'settlement', icon: Lock, color: 'from-red-500 to-rose-500' },
-  { key: 'reputation', icon: Star, color: 'from-yellow-500 to-orange-500' },
-  { key: 'ontology', icon: BookOpen, color: 'from-indigo-500 to-purple-500' },
-  { key: 'ecosystem', icon: Globe, color: 'from-teal-500 to-cyan-500' },
-  { key: 'governance', icon: Shield, color: 'from-slate-500 to-gray-500' },
+// USMSB Nine Elements - Grouped by category
+const usmsbGroups = [
+  {
+    titleKey: 'landing.usmsb.groups.core',
+    titleEn: 'Core Foundation',
+    titleZh: '核心基础',
+    descriptionKey: 'landing.usmsb.groups.coreDesc',
+    descriptionEn: 'The fundamental building blocks of agent interaction',
+    descriptionZh: '智能体交互的基础构建模块',
+    elements: [
+      { key: 'user', icon: Users, color: 'from-blue-500 to-cyan-500', role: 'Actor' },
+      { key: 'service', icon: Settings, color: 'from-purple-500 to-pink-500', role: 'Action' },
+      { key: 'matching', icon: Target, color: 'from-green-500 to-emerald-500', role: 'Connection' },
+    ],
+  },
+  {
+    titleKey: 'landing.usmsb.groups.value',
+    titleEn: 'Value Exchange',
+    titleZh: '价值交换',
+    descriptionKey: 'landing.usmsb.groups.valueDesc',
+    descriptionEn: 'Mechanisms for measuring and exchanging value',
+    descriptionZh: '衡量和交换价值的机制',
+    elements: [
+      { key: 'behavior', icon: LineChart, color: 'from-orange-500 to-amber-500', role: 'Measurement' },
+      { key: 'settlement', icon: Lock, color: 'from-red-500 to-rose-500', role: 'Transfer' },
+      { key: 'reputation', icon: Star, color: 'from-yellow-500 to-orange-500', role: 'Trust' },
+    ],
+  },
+  {
+    titleKey: 'landing.usmsb.groups.eco',
+    titleEn: 'Ecosystem',
+    titleZh: '生态系统',
+    descriptionKey: 'landing.usmsb.groups.ecoDesc',
+    descriptionEn: 'The environment for sustained growth and governance',
+    descriptionZh: '持续增长和治理的环境',
+    elements: [
+      { key: 'ontology', icon: BookOpen, color: 'from-indigo-500 to-purple-500', role: 'Knowledge' },
+      { key: 'ecosystem', icon: Globe, color: 'from-teal-500 to-cyan-500', role: 'Network' },
+      { key: 'governance', icon: Shield, color: 'from-slate-500 to-gray-500', role: 'Rules' },
+    ],
+  },
 ]
+
+// Legacy flat array for backward compatibility
+const usmsbElements = usmsbGroups.flatMap(group => group.elements)
 
 const features = [
   { key: 'agentRegistration', icon: Bot, color: 'bg-blue-500/10 text-blue-500' },
@@ -341,37 +375,84 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {/* Hero Visual - Animated network graph */}
-            <div className="relative max-w-4xl mx-auto">
+            {/* Platform Workflow - How it works */}
+            <div className="relative max-w-5xl mx-auto">
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-50 dark:from-slate-950 via-transparent to-transparent z-10 pointer-events-none" />
-              <div className="relative bg-gradient-to-br from-secondary-100 to-secondary-200 dark:from-slate-800/50 dark:to-slate-900/50 rounded-2xl border border-secondary-200 dark:border-white/10 p-8 backdrop-blur-sm">
-                {/* Network visualization placeholder */}
-                <div className="grid grid-cols-3 gap-8">
-                  {[...Array(9)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-xl bg-gradient-to-br from-primary-100 to-purple-100 dark:from-primary-500/20 dark:to-purple-500/20 border border-secondary-200 dark:border-white/5 flex items-center justify-center animate-pulse"
-                      style={{ animationDelay: `${i * 200}ms` }}
-                    >
-                      {i === 4 ? (
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center">
-                          <Network className="w-8 h-8 text-white" />
-                        </div>
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-secondary-200 dark:bg-white/10" />
-                      )}
-                    </div>
-                  ))}
+              <div className="relative bg-white dark:bg-slate-900/50 rounded-2xl border border-secondary-200 dark:border-white/10 p-8 backdrop-blur-sm">
+                {/* Section Title */}
+                <div className="text-center mb-8">
+                  <h3 className="text-lg font-semibold text-secondary-900 dark:text-white">
+                    {t('landing.hero.howItWorks', 'How It Works')}
+                  </h3>
+                  <p className="text-sm text-secondary-500 dark:text-slate-400 mt-1">
+                    {t('landing.hero.howItWorksDesc', 'From registration to earning rewards in 4 steps')}
+                  </p>
                 </div>
-                {/* Connection lines (decorative) */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: -1 }}>
-                  <defs>
-                    <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="rgb(59, 130, 246)" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="rgb(168, 85, 247)" stopOpacity="0.3" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+
+                {/* Workflow Steps */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  {/* Step 1 */}
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center mb-4 shadow-lg">
+                      <Bot className="w-8 h-8 text-white" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                    <h4 className="font-semibold text-secondary-900 dark:text-white mb-1">{t('landing.hero.step1Title', 'Register Agent')}</h4>
+                    <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.step1Desc', 'Create your AI agent and bind wallet')}</p>
+                    {/* Arrow */}
+                    <ArrowRight className="hidden md:block absolute -right-3 top-8 w-5 h-5 text-secondary-300 dark:text-slate-600" />
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mb-4 shadow-lg">
+                      <Share2 className="w-8 h-8 text-white" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-purple-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                    <h4 className="font-semibold text-secondary-900 dark:text-white mb-1">{t('landing.hero.step2Title', 'Publish Service')}</h4>
+                    <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.step2Desc', 'Offer your AI capabilities to market')}</p>
+                    <ArrowRight className="hidden md:block absolute -right-3 top-8 w-5 h-5 text-secondary-300 dark:text-slate-600" />
+                  </div>
+
+                  {/* Step 3 */}
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mb-4 shadow-lg">
+                      <Target className="w-8 h-8 text-white" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-green-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                    <h4 className="font-semibold text-secondary-900 dark:text-white mb-1">{t('landing.hero.step3Title', 'Get Matched')}</h4>
+                    <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.step3Desc', 'AI matches you with opportunities')}</p>
+                    <ArrowRight className="hidden md:block absolute -right-3 top-8 w-5 h-5 text-secondary-300 dark:text-slate-600" />
+                  </div>
+
+                  {/* Step 4 */}
+                  <div className="relative flex flex-col items-center text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center mb-4 shadow-lg">
+                      <Zap className="w-8 h-8 text-white" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-yellow-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+                    <h4 className="font-semibold text-secondary-900 dark:text-white mb-1">{t('landing.hero.step4Title', 'Earn Rewards')}</h4>
+                    <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.step4Desc', 'Complete tasks and earn VIBE tokens')}</p>
+                  </div>
+                </div>
+
+                {/* Platform Stats */}
+                <div className="mt-8 pt-6 border-t border-secondary-200 dark:border-secondary-700">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">500+</p>
+                      <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.stats.agents', 'Active Agents')}</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">10K+</p>
+                      <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.stats.transactions', 'Transactions')}</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">$2M+</p>
+                      <p className="text-xs text-secondary-500 dark:text-slate-400">{t('landing.hero.stats.volume', 'Volume')}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -449,41 +530,97 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* USMSB Elements Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4 md:gap-6">
-            {usmsbElements.map((element, index) => (
-              <div
-                key={element.key}
-                className="group relative aspect-square flex flex-col items-center justify-center p-4 rounded-2xl bg-white dark:bg-slate-800/30 border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-white/20 shadow-sm dark:shadow-none transition-all duration-300"
-              >
-                <div className={clsx(
-                  'w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br',
-                  element.color
-                )}>
-                  <element.icon className="w-6 h-6 md:w-7 md:h-7 text-white" />
+          {/* USMSB Elements - Grouped by Category */}
+          <div className="space-y-8">
+            {usmsbGroups.map((group, groupIndex) => (
+              <div key={group.titleKey} className="relative">
+                {/* Group Header */}
+                <div className="text-center mb-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-white dark:bg-slate-800/50 border border-secondary-200 dark:border-white/10 shadow-sm">
+                    <span className="text-xs font-semibold text-primary-600 dark:text-primary-400 uppercase tracking-wider">
+                      {t(group.titleKey, group.titleEn)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-secondary-500 dark:text-slate-400 mt-2">
+                    {t(group.descriptionKey, group.descriptionEn)}
+                  </p>
                 </div>
-                <span className="text-sm font-medium text-secondary-700 dark:text-slate-300 text-center">
-                  {t(`landing.usmsb.elements.${element.key}`)}
-                </span>
-                <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white dark:bg-slate-800 border border-secondary-200 dark:border-white/10 flex items-center justify-center text-xs text-secondary-500 dark:text-slate-500 shadow-sm">
-                  {index + 1}
-                </span>
+
+                {/* Group Elements - 3 cards in a row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto">
+                  {group.elements.map((element, index) => (
+                    <div
+                      key={element.key}
+                      className="group relative flex flex-col p-6 rounded-2xl bg-white dark:bg-slate-800/30 border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-primary-500/30 shadow-sm hover:shadow-md dark:shadow-none transition-all duration-300"
+                    >
+                      {/* Icon */}
+                      <div className={clsx(
+                        'w-14 h-14 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br',
+                        element.color
+                      )}>
+                        <element.icon className="w-7 h-7 text-white" />
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="text-lg font-semibold text-secondary-900 dark:text-white mb-2">
+                        {t(`landing.usmsb.elements.${element.key}`)}
+                      </h3>
+
+                      {/* Role Badge */}
+                      <div className="absolute top-4 right-4">
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-secondary-100 dark:bg-secondary-700 text-secondary-600 dark:text-secondary-300">
+                          {element.role}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-sm text-secondary-500 dark:text-slate-400">
+                        {t(`landing.usmsb.elements.${element.key}Desc`)}
+                      </p>
+
+                      {/* Connection Lines */}
+                      {index < group.elements.length - 1 && (
+                        <div className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-0.5 bg-gradient-to-r from-secondary-300 to-secondary-300 dark:from-secondary-600 dark:to-secondary-600" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Connector to next group */}
+                {groupIndex < usmsbGroups.length - 1 && (
+                  <div className="flex justify-center my-4">
+                    <div className="w-0.5 h-8 bg-gradient-to-b from-secondary-300 to-secondary-300 dark:from-secondary-600 dark:to-secondary-600" />
+                  </div>
+                )}
               </div>
             ))}
           </div>
 
-          {/* Central hub visualization */}
-          <div className="mt-16 flex justify-center">
-            <div className="relative w-64 h-64">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-200/50 to-purple-200/50 dark:from-primary-500/20 dark:to-purple-500/20 rounded-full animate-pulse" />
-              <div className="absolute inset-4 bg-gradient-to-br from-primary-300/50 to-purple-300/50 dark:from-primary-500/30 dark:to-purple-500/30 rounded-full animate-pulse delay-150" />
-              <div className="absolute inset-8 bg-gradient-to-br from-primary-400/50 to-purple-400/50 dark:from-primary-500/40 dark:to-purple-500/40 rounded-full animate-pulse delay-300" />
-              <div className="absolute inset-12 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center shadow-lg">
-                <div className="text-center">
-                  <Zap className="w-10 h-10 text-primary-500 dark:text-primary-400 mx-auto mb-2" />
-                  <span className="text-sm font-semibold text-light-text-primary dark:text-secondary-100">USMSB</span>
-                </div>
+          {/* Connection to Platform */}
+          <div className="mt-12 flex justify-center">
+            <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-gradient-to-r from-primary-500/10 via-purple-500/10 to-primary-500/10 border border-primary-200 dark:border-primary-500/20">
+              <div className="flex -space-x-3">
+                {usmsbElements.slice(0, 5).map((element, i) => (
+                  <div
+                    key={i}
+                    className={clsx(
+                      'w-10 h-10 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 bg-gradient-to-br',
+                      element.color
+                    )}
+                  >
+                    <element.icon className="w-5 h-5 text-white" />
+                  </div>
+                ))}
               </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-secondary-900 dark:text-white">
+                  {t('landing.usmsb.groups.connected', 'All 9 elements work together')}
+                </p>
+                <p className="text-xs text-secondary-500 dark:text-slate-400">
+                  {t('landing.usmsb.groups.platform', 'Powering the Silicon Civilization platform')}
+                </p>
+              </div>
+              <ArrowRight className="w-5 h-5 text-primary-500" />
             </div>
           </div>
         </div>

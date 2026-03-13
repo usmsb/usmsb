@@ -1,6 +1,72 @@
-# 快速开始
+# Quick Start
 
-> USMSB SDK 快速入门指南
+**[English](#1-installation) | [中文](#1-安装)**
+
+---
+
+## 1. Installation
+
+```bash
+# Clone project
+git clone https://github.com/usmsb/usmsb.git
+cd usmsb-sdk
+
+# Install dependencies
+pip install -e .
+```
+
+---
+
+## 2. Configuration
+
+Create configuration file `config.yaml`:
+
+```yaml
+api:
+  base_url: "https://api.usmsb.com"
+  api_key: "your_api_key"
+
+llm:
+  provider: "openai"
+  api_key: "your_openai_key"
+
+database:
+  type: "sqlite"
+  path: "./data/usmsb.db"
+```
+
+---
+
+## 3. Run Example
+
+```python
+import asyncio
+from usmsb_sdk import USMSBClient
+
+async def main():
+    client = USMSBClient(api_key="your_api_key")
+
+    # Chat
+    response = await client.chat.send(
+        message="Hello!"
+    )
+    print(response)
+
+asyncio.run(main())
+```
+
+---
+
+## 4. Next Steps
+
+- [Python SDK](../06_api/python_sdk.md) - Detailed SDK usage
+- [Examples](./examples.md) - More examples
+- [REST API](../06_api/rest_api.md) - API reference
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
+# 快速开始
 
 ---
 
@@ -45,7 +111,7 @@ from usmsb_sdk import USMSBClient
 
 async def main():
     client = USMSBClient(api_key="your_api_key")
-    
+
     # 对话
     response = await client.chat.send(
         message="Hello!"
@@ -62,3 +128,5 @@ asyncio.run(main())
 - [Python SDK](../06_api/python_sdk.md) - 详细SDK用法
 - [示例代码](./examples.md) - 更多示例
 - [REST API](../06_api/rest_api.md) - API参考
+
+</details>

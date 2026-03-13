@@ -1,6 +1,95 @@
+# USMSB SDK Documentation Center
+
+> USMSB (Universal System Model of Social Behavior) Software Development Kit
+
+**[English](#documentation) | [中文](#文档目录)**
+
+---
+
+## Documentation
+
+### 1. Overview
+- [Platform Overview](./01_overview/platform-overview.md) - USMSB SDK platform overview
+- [Vision](./01_overview/vision.md) - Project vision and mission
+
+### 2. Theory Framework
+- [USMSB Model](./02_theory/usmsb_model.md) - Universal System Model of Social Behavior
+- [Agent Levels](./02_theory/agent_levels.md) - OpenAI Agent eight-level architecture and five tiers
+
+### 3. Architecture
+- [System Architecture](./03_architecture/system_architecture.md) - Overall system architecture
+- [Protocol Architecture](./03_architecture/protocol_architecture.md) - Communication protocol architecture
+- [Component Design](./03_architecture/component_design.md) - Core component design
+
+### 4. Core Modules
+- [Meta Agent Design](./04_core_modules/meta_agent_design.md) - Super Agent system design
+- [Agent SDK](./04_core_modules/agent_sdk.md) - Agent Software Development Kit
+- [Skill System](./04_core_modules/skill_system.md) - Dynamic skill extension mechanism
+- [Memory System](./04_core_modules/memory_system.md) - Intelligent memory and context management
+- [Reasoning Engine](./04_core_modules/reasoning_engine.md) - Multi-engine reasoning system
+- [Autonomous Evolution](./04_core_modules/autonomous_evolution.md) - Autonomous learning and evolution system
+
+### 5. Services
+- [Matching Service](./05_services/matching_service.md) - Intelligent supply-demand matching
+- [Collaboration Service](./05_services/collaboration_service.md) - Multi-Agent collaboration
+- [Governance Service](./05_services/governance_service.md) - Decentralized governance
+- [Learning Service](./05_services/learning_service.md) - Proactive learning service
+- [Environment Service](./05_services/environment_service.md) - Environment awareness and management
+
+### 6. API Reference
+- [REST API](./06_api/rest_api.md) - REST API reference
+- [WebSocket API](./06_api/websocket_api.md) - WebSocket real-time communication
+- [Python SDK](./06_api/python_sdk.md) - Python SDK usage guide
+
+### 7. Deployment & Operations
+- [Deployment Guide](./07_deployment/deployment_guide.md) - Quick deployment
+- [Configuration](./07_deployment/configuration.md) - System configuration
+- [Monitoring](./07_deployment/monitoring.md) - Monitoring and operations
+
+### 8. Development Guide
+- [Quick Start](./08_development/quickstart.md) - Getting started
+- [SDK Usage](./08_development/sdk_usage.md) - Detailed SDK usage
+- [Examples](./08_development/examples.md) - Examples and tutorials
+
+### 9. Testing
+- [Testing Guide](./09_testing/test_guide.md) - Testing guide
+
+### 10. Changelog
+- [Changelog](./10_changelog/CHANGELOG.md) - Version change records
+
+---
+
+## Research Documents
+
+### USMSB Theory
+- [USMSB Model Summary](./usmsb/doc/04-USMSB模型总结.md)
+- [USMSB SDK Architecture Design](./usmsb/doc/05-USMSB模型SDK总体架构设计.md)
+- [USMSB_SDK Detailed Design](./usmsb/doc/06-USMSB_SDK_Detailed_Design.md)
+
+### Expert Debates
+- [Economic Model Design Debate](./economic_model_design/) - Economic model design expert debates
+
+### Creative Economy Platform
+- [Creative Economy Platform Design](./creative_economy_platform_design/) - Creative economy platform architecture
+
+---
+
+## Related Resources
+
+- GitHub Repository: https://github.com/usmsb/usmsb
+- Issues: https://github.com/usmsb/usmsb/issues
+- Last Updated: 2026-02-26
+
+---
+
+<details>
+<summary><h2>文档目录</h2></summary>
+
 # USMSB SDK 文档中心
 
 > USMSB (Universal System Model of Social Behavior) 软件开发工具包
+
+**[English](#documentation) | [中文](#文档目录)**
 
 ---
 
@@ -77,3 +166,5 @@
 - GitHub仓库: https://github.com/usmsb/usmsb
 - 问题反馈: https://github.com/usmsb/usmsb/issues
 - 更新日期: 2026-02-26
+
+</details>

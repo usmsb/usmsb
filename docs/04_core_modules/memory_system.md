@@ -1,3 +1,51 @@
+# Memory System
+
+> Intelligent Memory and Context Management
+
+**[English](#english-section) | [中文](#chinese-section)**
+
+---
+
+## English Section
+
+## 1. Overview
+
+The Memory System provides Agents with intelligent context management and long-term memory capabilities.
+
+---
+
+## 2. Module Structure
+
+```
+platform/external/meta_agent/
+├── memory/
+│   └── memory_manager.py    # Memory management
+└── agi_core/
+    └── memory.py           # Core memory
+```
+
+---
+
+## 3. Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| Short-term Memory | ✅ | Conversation context |
+| Long-term Memory | ✅ | Vector storage |
+| Memory Retrieval | ✅ | Semantic search |
+| Memory Update | ✅ | Auto-update |
+
+---
+
+## 4. Related Documentation
+
+- [Meta Agent Design](./meta_agent_design.md) - Super Agent System Design
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 记忆系统
 
 > 智能记忆与上下文管理
@@ -36,3 +84,5 @@ platform/external/meta_agent/
 ## 4. 相关文档
 
 - [Meta Agent设计](./meta_agent_design.md) - 超级Agent系统设计
+
+</details>

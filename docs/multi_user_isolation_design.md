@@ -1,3 +1,329 @@
+# Meta Agent Multi-User Isolation Architecture Design Document
+
+**[English](#meta-agent-multi-user-isolation-architecture-design-document) | [中文](#meta-agent-多用户隔离架构设计文档)**
+
+---
+
+> Version: v1.1
+> Date: 2026-02-22
+> Status: Implemented
+
+---
+
+## 1. Project Background
+
+### 1.1 Problem Description
+
+Meta Agent has serious isolation issues in multi-user scenarios:
+
+| Problem Type | Current Status | Risk Level |
+|-------------|---------------|-------------|
+| Code execution environment | Global shared `exec()` | Severe |
+| Browser instance | Global variable `_browser_instance` | Severe |
+| Skills cache | Global shared `_skills_cache` | Medium |
+| File system | No user workspace isolation | Severe |
+| Data storage | Single database file | Medium |
+
+### 1.2 Design Goals
+
+1. **Security**: Complete isolation of data, execution environment, and resources between different users
+2. **Scalability**: Support distributed node deployment, users can migrate between nodes
+3. **Performance**: Isolation mechanism should not significantly impact system performance
+4. **User Experience**: Seamless switching, data accessible across nodes
+
+### 1.3 Architecture Decisions
+
+Based on discussions, the following decisions were confirmed:
+
+| Decision Point | Choice | Description |
+|---------------|--------|-------------|
+| User cross-node scenario | C: Fixed binding to node, occasional switch | Provide data migration instead of real-time sync |
+| Data sync strategy | B: Read-write separation | Write locally, can pull from IPFS for reads |
+| Docker isolation | C: Process-level + code sandbox | Session Context + RestrictedPython |
+
+---
+
+## 2. Overall Architecture
+
+### 2.1 Key Components
+
+- **Session Manager**: Manages all user sessions, ensures one active session per wallet address
+- **User Session**: Encapsulates all isolated resources and operation context for a single user
+- **Code Sandbox**: Provides secure, isolated code execution environment
+- **Browser Context**: Provides user-isolated browser sessions
+- **User Workspace**: Manages user file system isolation
+- **User Database**: Manages user-dedicated database connections
+- **IPFS Client**: Handles IPFS interactions for data sync
+- **Auto Sync Manager**: Manages automatic user data synchronization
+
+### 2.2 Data Flow
+
+```
+Distributed Node Network
+├── Node A (Docker)
+│   └── Session Manager
+│       ├── UserSession (0xAAA...)
+│       │   ├── workspace
+│       │   ├── sandbox
+│       │   ├── browser_context
+│       │   ├── db
+│       │   └── ipfs_client
+│       └── UserSession (0xBBB...)
+└── Node B (Docker)
+    └── Session Manager
+        └── ...
+
+[Write Flow - Local First, Sync to IPFS]
+User Action → UserSession → Write Local → (async) → Upload to IPFS → Return CID
+
+[Read Flow - Local First, Pull from IPFS if Needed]
+User Request → UserSession → Query Local → Has Data → Return
+                    │
+                    └── No Data → Query IPFS
+                                      │
+                                      ├── Has Data → Decrypt → Save Local → Return
+                                      │
+                                      └── No Data → Return Empty
+
+[Sync Flow - User-Triggered]
+User Triggers → Read Local Data → Encrypt → Upload IPFS → Return CID
+```
+
+---
+
+## 3. Data Storage Design
+
+### 3.1 Directory Structure
+
+```
+/data/
+├── users/                              # User data root
+│   ├── 0xAAA1111.../                   # User A (wallet address as directory name)
+│   │   ├── meta.json                   # User metadata
+│   │   ├── conversations.db            # Conversation history (local)
+│   │   ├── memory.db                   # Memory/profile (local + syncable)
+│   │   ├── knowledge.db                # Private knowledge base (local + syncable)
+│   │   ├── workspace/                  # Working directory
+│   │   │   ├── temp/
+│   │   │   ├── output/
+│   │   │   └── uploads/
+│   │   ├── sandbox/                    # Code execution sandbox
+│   │   │   └── exec_{timestamp}/
+│   │   └── browser/                    # Browser data
+│   │       └── user_data/
+│   ├── 0xBBB2222.../                   # User B
+│   └── ...
+├── shared/                             # Node-level shared data
+│   ├── system_knowledge.db
+│   ├── tools/
+│   └── skills/
+└── system/                             # System data
+    ├── node_config.json
+    ├── audit.log
+    └── metrics.db
+```
+
+### 3.2 Data Sync Strategy
+
+| Data Type | Storage Location | Sync | Sync Method |
+|-----------|-----------------|------|-------------|
+| Conversation history | Local conversations.db | No | - |
+| User profile | Local memory.db | Yes | Auto: 5 min + hourly full |
+| Private knowledge base | Local knowledge.db | Yes | Auto: 10 min + hourly full |
+| Workspace files | Local workspace/ | No | - |
+| Browser data | Local browser/ | No | - |
+
+---
+
+## 4. Core Modules
+
+### 4.1 UserSession
+
+**Responsibility**: Encapsulates all isolated resources and operation context for a single user
+
+```python
+class UserSession:
+    wallet_address: str          # User wallet address (primary key)
+    node_id: str                 # Current node ID
+    session_id: str              # Session unique identifier
+    is_primary_node: bool        # Whether user's primary node
+
+    workspace: UserWorkspace    # Workspace
+    sandbox: CodeSandbox        # Code sandbox
+    browser_context: Optional[BrowserContext]
+    db: UserDatabase            # Database connection
+    ipfs_client: IPFSClient     # IPFS client
+
+    created_at: float
+    last_active: float
+```
+
+### 4.2 SessionManager
+
+**Responsibility**: Manages lifecycle of all user sessions
+
+```python
+class SessionManager:
+    node_id: str
+    _sessions: Dict[str, UserSession]
+
+    async def get_or_create_session(wallet_address: str) -> UserSession
+    async def get_session(wallet_address: str) -> Optional[UserSession]
+    async def close_session(wallet_address: str) -> bool
+    async def close_all_sessions()
+    async def get_active_sessions() -> List[str]
+    async def cleanup_idle_sessions(max_idle_seconds: int = 3600) -> int
+```
+
+### 4.3 CodeSandbox
+
+**Responsibility**: Provides secure, isolated code execution environment
+
+```python
+class CodeSandbox:
+    ALLOWED_BUILTINS: Set[str] = {
+        'abs', 'all', 'any', 'bool', 'dict', 'enumerate', 'filter',
+        'float', 'format', 'frozenset', 'hash', 'hex', 'int', 'isinstance',
+        'len', 'list', 'map', 'max', 'min', 'ord', 'pow', 'print',
+        'range', 'repr', 'reversed', 'round', 'set', 'slice', 'sorted',
+        'str', 'sum', 'tuple', 'type', 'zip', 'True', 'False', 'None',
+    }
+
+    ALLOWED_MODULES: Set[str] = {
+        'math', 'random', 'datetime', 'json', 're', 'collections',
+        'itertools', 'functools', 'typing', 'decimal', 'fractions',
+        'statistics', 'string', 'textwrap', 'unicodedata',
+    }
+
+    async def execute(code: str, timeout: int = 30, max_memory_mb: int = 256) -> SandboxResult
+    def validate_code(code: str) -> List[str]
+    def create_safe_globals() -> Dict
+```
+
+---
+
+## 5. Implementation Plan
+
+### 5.1 Phase Division
+
+| Phase | Duration | Content |
+|-------|----------|---------|
+| Phase 1: Core Isolation (P0) | 5 days | UserSession, SessionManager, UserDatabase, CodeSandbox, MetaAgent core |
+| Phase 2: Enhanced Isolation (P1) | 3 days | BrowserContext, UserWorkspace, Tool改造, QuotaManager, AuditLogger |
+| Phase 3: Data Sync (P2) | 3 days | IPFSClient, Encryption, AutoSyncManager, Data migration, E2E testing |
+
+**Total: 13 working days**
+
+### 5.2 File Structure
+
+```
+meta_agent/
+├── session/                            # New: Session management
+│   ├── user_session.py
+│   └── session_manager.py
+├── sandbox/                            # New: Code sandbox
+│   └── code_sandbox.py
+├── browser/                            # New: Browser isolation
+│   └── browser_context.py
+├── workspace/                          # New: Workspace
+│   └── user_workspace.py
+├── database/                           # New: User database
+│   └── user_database.py
+├── ipfs/                               # New: IPFS client
+│   ├── ipfs_client.py
+│   └── encryption.py
+├── sync/                               # New: Auto sync
+│   └── auto_sync_manager.py
+├── audit/                              # New: Audit log
+│   └── audit_logger.py
+├── quota/                              # New: Quota management
+│   └── quota_manager.py
+├── tools/                              # Modified: Tool execution
+│   ├── registry.py
+│   └── execution.py
+└── agent.py                            # Modified: Core
+```
+
+---
+
+## 6. Security Features
+
+### 6.1 Code Sandbox Security
+
+- **Allowed builtins**: Mathematical, string, collection operations
+- **Allowed modules**: math, random, datetime, json, re, collections, etc.
+- **Blocked dangerous functions**: eval, exec, open, input, globals, locals, etc.
+- **Blocked dangerous modules**: os, sys, subprocess, socket, requests, etc.
+- **Execution limits**: Timeout (default 30s), Memory (default 256MB)
+
+### 6.2 Browser Isolation
+
+- **User data directory**: Each user has independent Chromium user data directory
+- **Cookie/LocalStorage**: Completely isolated between users
+- **Auto cleanup**: Browser closes after idle timeout, resources released
+
+### 6.3 File System Isolation
+
+- **Path validation**: All file operations validated against workspace root
+- **Directory permissions**: /data/users has drwxrwx--- (700)
+- **Path traversal protection**: Blocks ".." escape attempts
+
+### 6.4 Data Encryption
+
+- **Key derivation**: Uses EIP-191 personal signature to derive encryption key
+- **Encryption**: AES-256-GCM
+- **Key lifecycle**: Only exists in memory during session, cleared on session close
+
+---
+
+## 7. Configuration
+
+### 7.1 Environment Variables
+
+```bash
+NODE_ID=node-001
+NODE_ENV=production
+DATA_ROOT=/data
+SESSION_IDLE_TIMEOUT=1800          # 30 minutes
+SESSION_MAX_LIFETIME=28800         # 8 hours
+BROWSER_IDLE_TIMEOUT=600           # 10 minutes
+SANDBOX_MAX_TIMEOUT=60
+SANDBOX_MAX_MEMORY_MB=256
+IPFS_GATEWAYS=https://ipfs.io,...
+SYNC_PROFILE_DELAY=300             # 5 minutes
+SYNC_KNOWLEDGE_DELAY=600           # 10 minutes
+AUDIT_RETENTION_DAYS=90
+```
+
+### 7.2 Resource Quotas by Role
+
+| Role | Storage | Code Exec/Hour | Chat/Hour |
+|------|---------|----------------|-----------|
+| USER | 100MB | 50 | 200 |
+| DEVELOPER | 500MB | 200 | 1000 |
+| VALIDATOR | 200MB | 100 | 500 |
+| ADMIN | 1000MB | 1000 | 5000 |
+
+---
+
+## 8. Risk Assessment
+
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Sandbox bypass | High | Medium | Multi-layer protection (whitelist + resource limits + seccomp) |
+| IPFS network unavailable | Medium | Low | Local-first strategy, IPFS optional sync |
+| Session resource leak | Medium | Medium | Auto cleanup mechanism, regular checks |
+| Encryption key management | High | Low | Wallet signature-derived keys, no plaintext storage |
+| Performance degradation | Medium | Medium | Connection pools, lazy initialization |
+
+---
+
+*Document version: 1.1*
+*Created: 2026-02-22*
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # Meta Agent 多用户隔离架构设计文档
 
 > 版本: v1.1
@@ -55,69 +381,42 @@
 │    │  │  Session Manager   │  │     │  │  Session Manager   │  │       │
 │    │  │                    │  │     │  │                    │  │       │
 │    │  │ ┌──────┐ ┌──────┐  │  │     │  │ ┌──────┐ ┌──────┐  │  │       │
-│    │  │ │User A│ │User B│  │  │     │  │ │User C│ │User D│  │  │       │
-│    │  │ │Session│Session│  │  │     │  │ │Session│Session│  │  │       │
+│    │  │ │UserSsn│ │UserSsn│  │  │     │  │ │UserSsn│ │UserSsn│  │  │       │
+│    │  │ │0xAAA..│ │0xBBB..│  │  │     │  │ │0xCCC..│ │0xDDD..│  │  │       │
 │    │  │ └──────┘ └──────┘  │  │     │  │ └──────┘ └──────┘  │  │       │
 │    │  └────────────────────┘  │     │  └────────────────────┘  │       │
 │    │                          │     │                          │       │
-│    │  ┌────────────────────┐  │     │  ┌────────────────────┐  │       │
-│    │  │   Local Storage    │  │     │  │   Local Storage    │  │       │
-│    │  │   /data/users/     │  │     │  │   /data/users/     │  │       │
-│    │  └────────────────────┘  │     │  └────────────────────┘  │       │
-│    │                          │     │                          │       │
-│    │  ┌────────────────────┐  │     │  ┌────────────────────┐  │       │
-│    │  │    IPFS Client     │◄─┼─────┼──│    IPFS Client     │  │       │
-│    │  └────────────────────┘  │     │  └────────────────────┘  │       │
 │    └──────────────────────────┘     └──────────────────────────┘       │
-│                    │                            │                       │
-│                    └────────────┬───────────────┘                       │
-│                                 ▼                                       │
-│                    ┌────────────────────────┐                          │
-│                    │      IPFS 网络          │                          │
-│                    │                        │                          │
-│                    │  /users/{wallet}/      │                          │
-│                    │    ├── profile.enc     │                          │
-│                    │    └── knowledge.enc   │                          │
-│                    └────────────────────────┘                          │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 数据流架构
+### 2.2 数据流设计
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          数据读写流程                                    │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  【写入流程 - 始终写本地】                                               │
-│                                                                         │
-│   用户请求 ──► UserSession ──► Local Database                           │
-│                    │                                                    │
-│                    └──► Workspace (文件)                                │
-│                    └──► Sandbox (代码执行)                              │
-│                                                                         │
-│                                                                         │
-│  【读取流程 - 本地优先，可从IPFS拉取】                                    │
-│                                                                         │
-│   用户请求 ──► UserSession ──► 查询本地 ──► 有数据 ──► 返回             │
-│                    │               │                                    │
-│                    │               └──► 无数据 ──► 查询IPFS              │
-│                    │                              │                     │
-│                    │                              ├──► 有数据 ──► 解密   │
-│                    │                              │           │         │
-│                    │                              │           └──► 存本地│
-│                    │                              │              │      │
-│                    │                              │              └──► 返回│
-│                    │                              │                     │
-│                    │                              └──► 无数据 ──► 返回空 │
-│                                                                         │
-│                                                                         │
-│  【同步流程 - 用户主动触发】                                             │
-│                                                                         │
-│   用户触发 ──► 读取本地数据 ──► 加密 ──► 上传IPFS ──► 返回CID           │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+【写入流程 - 本地优先，异步同步到IPFS】
+
+  用户操作 ──► UserSession ──► 写入本地 ──► (异步) ──► 上传IPFS ──► 返回CID
+
+
+【读取流程 - 本地优先，可从IPFS拉取】
+
+   用户请求 ──► UserSession ──► 查询本地 ──► 有数据 ──► 返回
+                    │
+                    └──► 无数据 ──► 查询IPFS
+                                      │
+                                      ├──► 有数据 ──► 解码
+                                      │           │
+                                      │           └──► 存本地
+                                      │              │
+                                      │              └──► 返回
+                                      │
+                                      └──► 无数据 ──► 返回空
+
+
+【同步流程 - 用户主动触发】
+
+   用户触发 ──► 读取本地数据 ──► 加密 ──► 上传IPFS ──► 返回CID
 ```
 
 ### 2.3 用户会话隔离架构
@@ -359,24 +658,6 @@ CREATE INDEX idx_knowledge_user ON knowledge_items(user_id);
 │   4. 释放资源 ──► 关闭浏览器、清理沙箱、清除密钥                         │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
-```
-
-#### 3.3.2 IPFS存储结构
-
-```
-/ipfs/{cid}/
-├── metadata.json                       # 元数据
-│   {
-│     "version": "1.0",
-│     "wallet_address": "0xAAA...",
-│     "created_at": 1739875200,
-│     "encryption": "AES-256-GCM",
-│     "files": ["profile.enc", "knowledge.enc"]
-│   }
-│
-├── profile.enc                         # 加密的用户画像
-├── knowledge.enc                       # 加密的知识库
-└── checksum.sha256                     # 校验文件
 ```
 
 ---
@@ -824,14 +1105,6 @@ class AutoSyncManager:
         retry_attempts: int = 3               # 重试次数
         retry_delay: int = 60                 # 重试间隔（秒）
 
-    # ========== 属性 ==========
-
-    config: Config
-    _pending_syncs: Dict[str, asyncio.Task]  # wallet:sync_type -> task
-    _last_sync_time: Dict[str, float]         # wallet -> timestamp
-    _sync_lock: Dict[str, asyncio.Lock]       # wallet -> lock
-    _running: bool
-
     # ========== 核心方法 ==========
 
     async def start():
@@ -854,39 +1127,6 @@ class AutoSyncManager:
 
     async def get_sync_status(wallet_address: str) -> SyncStatus:
         """获取同步状态"""
-        # 返回：上次同步时间、待同步数据量、同步是否进行中
-```
-
-**同步时序示例**：
-
-```
-时间轴 ─────────────────────────────────────────────────────────────►
-
-00:00  用户登录
-  │
-00:05  用户更新偏好设置
-  │
-  ├──► 触发增量同步（延迟5分钟）
-  │
-00:08  用户又修改偏好（防抖重置5分钟）
-  │
-  ├──► 取消上次任务，重新计时
-  │
-00:13  增量同步执行 ✓
-  │
-00:30  用户添加知识条目
-  │
-  ├──► 触发知识库同步（延迟10分钟）
-  │
-00:40  知识库同步执行 ✓
-  │
-01:00  定期全量同步检查 ✓
-  │
-01:30  用户空闲超时
-  │
-  ├──► 会话关闭前同步 ✓
-  │
-会话关闭（数据已安全同步到IPFS）
 ```
 
 ---
@@ -1448,31 +1688,6 @@ class SessionTimeoutConfig:
     keepalive_heartbeat: int = 300         # 5分钟心跳检测
 ```
 
-**超时处理流程**：
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      会话超时管理流程                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  用户活动 ──► 更新 last_active 时间戳                           │
-│       │                                                         │
-│       ▼                                                         │
-│  后台检查器（每5分钟）                                           │
-│       │                                                         │
-│       ├──► 浏览器空闲 > 10分钟？ ──► 关闭浏览器，释放资源        │
-│       │                                                         │
-│       ├──► 会话空闲 > 30分钟？ ──►                              │
-│       │         │                                               │
-│       │         ├──► 有未同步数据？ ──► 提示用户 ──► 等待       │
-│       │         │                                               │
-│       │         └──► 无未同步数据？ ──► 关闭会话                │
-│       │                                                         │
-│       └──► 会话存在 > 8小时？ ──► 强制刷新会话（安全考虑）       │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ### 9.4 资源配额策略
 
 **决策：基于角色的智能配额 + 动态调整**
@@ -1524,75 +1739,6 @@ ROLE_QUOTAS = {
         max_chat_per_hour=5000,
     ),
 }
-
-
-class QuotaManager:
-    """
-    配额管理器
-
-    功能：
-    1. 基于角色的基础配额
-    2. 动态调整（根据系统负载）
-    3. 使用量统计和预警
-    """
-
-    async def check_quota(
-        self,
-        wallet_address: str,
-        resource_type: str,
-        requested: int = 1
-    ) -> Tuple[bool, str]:
-        """
-        检查是否超出配额
-
-        Returns:
-            (is_allowed, reason)
-        """
-        user_role = await self._get_user_role(wallet_address)
-        quota = ROLE_QUOTAS.get(user_role, ROLE_QUOTAS["USER"])
-
-        current_usage = await self._get_current_usage(wallet_address, resource_type)
-
-        if resource_type == "storage":
-            if current_usage + requested > quota.max_storage_mb * 1024 * 1024:
-                return False, f"存储空间不足，已使用 {current_usage // (1024*1024)}MB"
-
-        elif resource_type == "code_execution":
-            hourly_usage = await self._get_hourly_usage(wallet_address, "code_execution")
-            if hourly_usage >= quota.max_code_executions_per_hour:
-                return False, f"代码执行次数已达小时上限 ({quota.max_code_executions_per_hour})"
-
-        elif resource_type == "chat":
-            hourly_usage = await self._get_hourly_usage(wallet_address, "chat")
-            if hourly_usage >= quota.max_chat_per_hour:
-                return False, f"对话次数已达小时上限 ({quota.max_chat_per_hour})"
-
-        return True, "OK"
-
-    async def record_usage(
-        self,
-        wallet_address: str,
-        resource_type: str,
-        amount: int = 1
-    ):
-        """记录资源使用"""
-        # 使用 Redis 或内存存储记录
-        pass
-
-    async def get_usage_report(
-        self,
-        wallet_address: str
-    ) -> Dict:
-        """获取用户资源使用报告"""
-        return {
-            "storage_used_mb": await self._get_storage_used(wallet_address),
-            "code_executions_hour": await self._get_hourly_usage(wallet_address, "code_execution"),
-            "chat_count_hour": await self._get_hourly_usage(wallet_address, "chat"),
-            "quota_limit": ROLE_QUOTAS.get(
-                await self._get_user_role(wallet_address),
-                ROLE_QUOTAS["USER"]
-            ).__dict__
-        }
 ```
 
 ### 9.5 审计日志策略
@@ -1639,120 +1785,6 @@ class AuditConfig:
         "quota_exceeded",
         "suspicious_activity",
     ])
-
-
-class AuditLogger:
-    """
-    审计日志记录器
-
-    设计原则：
-    1. 只记录"发生了什么"，不记录"具体内容"
-    2. 用户ID哈希处理，保护隐私
-    3. 结构化日志，便于分析
-    4. 不可篡改（追加写入）
-    """
-
-    def __init__(self, config: AuditConfig):
-        self.config = config
-        self.log_file = "/data/system/audit.log"
-
-    async def log(
-        self,
-        event: str,
-        wallet_address: str,
-        details: Optional[Dict] = None,
-        result: str = "success"
-    ):
-        """
-        记录审计日志
-
-        Args:
-            event: 事件类型
-            wallet_address: 用户钱包地址
-            details: 事件详情（不包含敏感内容）
-            result: 结果 (success/failed/blocked)
-        """
-        if event not in self.config.audit_events:
-            return
-
-        # 用户ID哈希处理
-        user_hash = self._hash_user_id(wallet_address) if self.config.hash_user_id else wallet_address
-
-        log_entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "event": event,
-            "user_hash": user_hash,
-            "result": result,
-            "details": details or {},
-            "node_id": os.getenv("NODE_ID", "unknown"),
-        }
-
-        # 追加写入日志文件
-        await self._write_log(log_entry)
-
-    def _hash_user_id(self, wallet_address: str) -> str:
-        """哈希用户ID"""
-        import hashlib
-        return hashlib.sha256(
-            f"usmsb:{wallet_address}".encode()
-        ).hexdigest()[:16]
-
-    async def _write_log(self, entry: Dict):
-        """写入日志（追加模式）"""
-        import aiofiles
-        async with aiofiles.open(self.log_file, mode='a') as f:
-            await f.write(json.dumps(entry) + "\n")
-
-
-# 使用示例
-audit = AuditLogger(AuditConfig())
-
-# 记录会话创建
-await audit.log(
-    event="session_created",
-    wallet_address="0xAAA...",
-    details={"primary_node": "node-001"}
-)
-
-# 记录代码执行（不记录代码内容）
-await audit.log(
-    event="code_executed",
-    wallet_address="0xAAA...",
-    details={
-        "language": "python",
-        "timeout": 30,
-        "success": True
-    }
-)
-
-# 记录沙箱违规
-await audit.log(
-    event="sandbox_violation",
-    wallet_address="0xBBB...",
-    details={
-        "violation_type": "forbidden_import",
-        "module": "os",
-        "blocked": True
-    },
-    result="blocked"
-)
-```
-
-**审计日志格式**：
-
-```json
-{
-  "timestamp": "2026-02-21T10:30:00.000Z",
-  "event": "code_executed",
-  "user_hash": "a1b2c3d4e5f6g7h8",
-  "result": "success",
-  "details": {
-    "language": "python",
-    "timeout": 30,
-    "success": true
-  },
-  "node_id": "node-001"
-}
 ```
 
 ---
@@ -1797,41 +1829,49 @@ aiosqlite>=0.19.0
 # .env 环境变量配置
 
 # ========== 节点配置 ==========
+
 NODE_ID=node-001                           # 当前节点唯一标识
 NODE_ENV=production                        # 环境: development/staging/production
 
 # ========== 数据目录配置 ==========
+
 DATA_ROOT=/data                            # 数据根目录
 USERS_DIR=/data/users                      # 用户数据目录
 SHARED_DIR=/data/shared                    # 共享数据目录
 SYSTEM_DIR=/data/system                    # 系统数据目录
 
 # ========== 会话配置 ==========
+
 SESSION_IDLE_TIMEOUT=1800                  # 会话空闲超时（秒），默认30分钟
 SESSION_MAX_LIFETIME=28800                 # 会话最大生命周期（秒），默认8小时
 BROWSER_IDLE_TIMEOUT=600                   # 浏览器空闲超时（秒），默认10分钟
 
 # ========== 沙箱配置 ==========
+
 SANDBOX_MAX_TIMEOUT=60                     # 代码执行最大超时（秒）
 SANDBOX_MAX_MEMORY_MB=256                  # 代码执行最大内存（MB）
 SANDBOX_PERSIST_GLOBALS=true               # 是否在多次执行间保持变量
 
 # ========== IPFS 配置 ==========
+
 IPFS_GATEWAYS=https://ipfs.io,https://gateway.pinata.cloud,https://cloudflare-ipfs.com
 IPFS_TIMEOUT=30                            # IPFS 请求超时（秒）
 IPFS_RETRY_COUNT=3                         # IPFS 重试次数
 
 # ========== 同步配置 ==========
+
 SYNC_PROFILE_DELAY=300                     # 用户画像同步延迟（秒）
 SYNC_KNOWLEDGE_DELAY=600                   # 知识库同步延迟（秒）
 SYNC_FULL_INTERVAL=3600                    # 全量同步间隔（秒）
 
 # ========== 审计配置 ==========
+
 AUDIT_RETENTION_DAYS=90                    # 审计日志保留天数
 AUDIT_HASH_USER_ID=true                    # 是否哈希用户ID
 AUDIT_LOG_PATH=/data/system/audit.log      # 审计日志路径
 
 # ========== 配额配置 ==========
+
 QUOTA_USER_STORAGE_MB=100                  # 普通用户存储配额
 QUOTA_DEV_STORAGE_MB=500                   # 开发者存储配额
 QUOTA_ADMIN_STORAGE_MB=1000                # 管理员存储配额
@@ -1893,24 +1933,24 @@ QUOTA_ADMIN_STORAGE_MB=1000                # 管理员存储配额
 │   ├── system_knowledge.db     [-rw-r--r--] usmsb:usmsb
 │   │                           # 系统公共知识库
 │   │
-│   ├── tools/                  [drwxr-xr-x] usmsb:usmsb
-│   │   └── tool_configs.json   [-rw-r--r--] usmsb:usmsb
+│   ├── tools/                 [drwxr-xr-x] usmsb:usmsb
+│   │   └── tool_configs.json  [-rw-r--r--] usmsb:usmsb
 │   │                           # 工具配置
 │   │
-│   └── skills/                 [drwxr-xr-x] usmsb:usmsb
-│       └── *.md                [-rw-r--r--] usmsb:usmsb
+│   └── skills/                [drwxr-xr-x] usmsb:usmsb
+│       └── *.md               [-rw-r--r--] usmsb:usmsb
 │                               # 技能库
 │
-└── system/                     [drwxrwx---] usmsb:usmsb
+└── system/                    [drwxrwx---] usmsb:usmsb
     │                           # 系统数据目录
     │
-    ├── node_config.json        [-rw-rw----] usmsb:usmsb
+    ├── node_config.json       [-rw-rw----] usmsb:usmsb
     │                           # 节点配置
     │
-    ├── audit.log               [-rw-rw----] usmsb:usmsb
+    ├── audit.log              [-rw-rw----] usmsb:usmsb
     │                           # 审计日志（追加写入）
     │
-    └── metrics.db              [-rw-rw----] usmsb:usmsb
+    └── metrics.db             [-rw-rw----] usmsb:usmsb
                                 # 系统指标数据库
 ```
 
@@ -1927,7 +1967,7 @@ QUOTA_ADMIN_STORAGE_MB=1000                # 管理员存储配额
 │  用户A (0xAAA...)          用户B (0xBBB...)                             │
 │  ┌─────────────────┐       ┌─────────────────┐                          │
 │  │ /data/users/    │       │ /data/users/    │                          │
-│  │   0xAAA.../     │       │   0xBBB.../     │                          │
+│  │   0xAAA.../    │       │   0xBBB.../     │                          │
 │  │                 │       │                 │                          │
 │  │ ├─ workspace/ ◄─┼───────┼─✗ 无法访问     │                          │
 │  │ ├─ sandbox/     │       │                 │                          │
@@ -2047,6 +2087,7 @@ DANGEROUS_FUNCTIONS = {
 # CodeSandbox.ALLOWED_MODULES
 
 ALLOWED_MODULES = {
+
     # ========== 数学运算 ==========
     'math',          # 数学函数
     'random',        # 随机数
@@ -2498,44 +2539,9 @@ networks:
 - [Playwright Browser Context](https://playwright.dev/python/docs/browser-contexts)
 - [IPFS HTTP API](https://docs.ipfs.tech/reference/kubo/rpc/)
 
-### B. 术语表
-
-| 术语 | 定义 |
-|-----|------|
-| UserSession | 用户会话，封装单个用户的所有隔离资源 |
-| SessionManager | 会话管理器，管理所有用户会话的生命周期 |
-| CodeSandbox | 代码沙箱，提供安全的代码执行环境 |
-| BrowserContext | 浏览器上下文，提供用户隔离的浏览器会话 |
-| UserWorkspace | 用户工作空间，管理用户专属的文件系统空间 |
-| Primary Node | 主节点，用户首次访问的节点，存储用户元信息 |
-
-### C. 实现状态
-
-| 模块 | 文件位置 | 状态 | 测试覆盖 |
-|------|---------|------|---------|
-| UserSession | `session/user_session.py` | ✅ 已完成 | 100% |
-| SessionManager | `session/session_manager.py` | ✅ 已完成 | 100% |
-| CodeSandbox | `sandbox/code_sandbox.py` | ✅ 已完成 | 100% (52/52) |
-| BrowserContext | `browser/browser_context.py` | ✅ 已完成 | 功能验证 |
-| UserWorkspace | `workspace/user_workspace.py` | ✅ 已完成 | 100% (41/41) |
-| UserDatabase | `database/user_database.py` | ✅ 已完成 | 100% (18/18) |
-| IPFSClient | `ipfs/ipfs_client.py` | ✅ 已完成 | 100% (51/51) |
-| Encryption | `ipfs/encryption.py` | ✅ 已完成 | 100% |
-| AutoSyncManager | `sync/auto_sync_manager.py` | ✅ 已完成 | 100% (26/26) |
-| DataMigration | `migrate/data_migration.py` | ✅ 已完成 | 100% |
-| QuotaManager | `quota/quota_manager.py` | ✅ 已完成 | 100% |
-| AuditLogger | `audit/audit_logger.py` | ✅ 已完成 | 100% (17/17) |
-| ToolRegistry | `tools/registry.py` | ✅ 已改造 | 集成测试 |
-
-### D. Git 提交记录
-
-- `cc47541` - Initial multi-user isolation implementation
-- `7dd2415` - fix: CodeSandbox and BrowserContext improvements
-
 ---
 
-**文档结束**
+*文档版本: 1.1*
+*创建日期: 2026-02-22*
 
-> 版本: v1.1
-> 最后更新: 2026-02-22
-> 状态: 已实现并测试通过
+</details>
