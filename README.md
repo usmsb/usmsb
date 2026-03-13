@@ -1,563 +1,280 @@
-# USMSB SDK - AI 文明新世界平台
+# USMSB SDK
 
-Universal System Model of Social Behavior (USMSB) SDK - 构建去中心化 AI 文明新世界平台的完整解决方案。
+> A decentralized AI Agent collaboration platform powered by the Universal System Model of Social Behavior
 
-## 项目概述
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/Frontend-React+-61DAFB.svg)](https://reactjs.org/)
 
-USMSB SDK 是一个完全去中心化的分布式平台，每个部署的节点自动成为：
-- **服务发现节点** - 自动发现网络中的其他节点和服务
-- **服务注册节点** - 注册本地服务供其他节点发现
-- **服务提供节点** - 提供 LLM 推理、Agent 托管、计算、区块链等服务
-- **客户端节点** - 消费其他节点提供的服务
+## What is USMSB SDK?
 
-## 系统架构
+USMSB SDK is a comprehensive framework for building **decentralized AI Agent ecosystems**. It provides a unified programming model based on the Universal System Model of Social Behavior (USMSB), enabling AI agents to collaborate, trade, and evolve autonomously.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        USMSB 去中心化节点架构                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │   Frontend   │  │  Backend API │  │   P2P Node   │  │  Blockchain  │   │
-│  │  (React+TS)  │  │  (FastAPI)   │  │   (9001)     │  │   Node       │   │
-│  │   Port 3000  │  │   Port 8000  │  │              │  │              │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘   │
-│         │                 │                 │                 │           │
-│  ┌──────┴─────────────────┴─────────────────┴─────────────────┴──────┐    │
-│  │                    分布式服务注册表 (Gossip Protocol)               │    │
-│  └────────────────────────────────────────────────────────────────────┘    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                        LLM 适配器层                                  │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │   │
-│  │  │   OpenAI   │ │   GLM-5    │ │  MiniMax   │ │   Custom   │       │   │
-│  │  │  (GPT-4)   │ │  (智谱AI)  │ │            │ │  (Local)   │       │   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                        Agent 能力层                                  │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │   │
-│  │  │   Skills   │ │Communication│ │Transaction │ │  Chains    │       │   │
-│  │  │  技能系统  │ │ Agent通信  │ │ Agent交易  │ │ 双链支持   │       │   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+### Core Value Propositions
 
-## 核心功能
+| Value | Description |
+|-------|-------------|
+| **Unified Modeling** | 9 core elements (Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment) for describing any social behavior |
+| **Autonomous Collaboration** | 16+ built-in services for agent matching, collaboration, and trading |
+| **Decentralized Infrastructure** | P2P service discovery, blockchain-based reputation, and governance |
+| **Multi-LLM Support** | OpenAI, ZhipuAI (GLM), MiniMax adapters with unified interface |
+| **Production-Ready** | Complete stack with frontend, backend, smart contracts, and DevOps tools |
 
-### 1. LLM 适配器
-- **OpenAI** - GPT-4, GPT-3.5-turbo 支持
-- **GLM-5** - 智谱AI国产模型支持（中文原生NLU）
-- **MiniMax** - MiniMax AI 模型支持
-- **自定义适配器** - 支持本地模型
+### Target Users
 
-### 2. Agent 技能系统
-- 技能注册、发现和执行
-- 输入/输出验证
-- 内置技能：文本分析、数据转换、Web搜索、代码执行
-- 技能市场基础架构
-
-### 3. Agent 间通信
-- P2P 消息传递（直接/广播模式）
-- Pub/Sub 事件驱动模式
-- Request-Reply 同步模式
-- 任务委托、共识投票、资源共享协议
-
-### 4. Agent 间交易系统
-- Agent 间代币转账
-- 服务支付系统
-- 托管交易与条件释放
-- 质押/解质押机制
-
-### 5. 双区块链支持
-- **以太坊生态** - 通过 Web3.py 集成
-- **自建 USMSB Chain**:
-  - 2秒出块时间，专为 Agent 交易优化
-  - Agent 身份注册与声誉系统
-  - 链上治理与投票
-  - 跨链桥支持
-
-### 6. 去中心化 P2P 节点
-- Gossip 协议服务发现
-- 自动服务注册
-- 负载均衡服务路由
-- 节点声誉系统
-
-### 7. 10 大通用行动接口 (NEW)
-- **IPerceptionService** - 感知服务接口
-- **IDecisionService** - 决策服务接口
-- **IExecutionService** - 执行服务接口
-- **IInteractionService** - 交互服务接口
-- **ITransformationService** - 转化服务接口
-- **IEvaluationService** - 评估服务接口
-- **IFeedbackService** - 反馈服务接口
-- **ILearningService** - 学习服务接口
-- **IRiskManagementService** - 风险管理服务接口
-
-### 8. 6 大核心逻辑引擎 (NEW)
-- **GoalActionOutcomeEngine** - 目标-行动-结果循环引擎
-- **ResourceTransformationValueEngine** - 资源-转化-价值链引擎
-- **InformationDecisionControlEngine** - 信息-决策-控制循环引擎
-- **SystemEnvironmentEngine** - 系统-环境交互引擎
-- **EmergenceSelfOrganizationEngine** - 涌现与自组织引擎
-- **AdaptationEvolutionEngine** - 适应与进化引擎
-
-### 9. 知识库适配器 (NEW)
-- **VectorDB 适配器** - 支持 Chroma, Pinecone, Weaviate, Milvus, FAISS
-- **GraphDB 适配器** - 支持 Neo4j, ArangoDB
-- **RAG 支持** - 检索增强生成集成
-- **内存模式** - 无需外部依赖的快速开发
-
-### 10. 决策支持服务 (NEW)
-- 多准则决策分析 (MCDA)
-- 风险评估决策支持
-- 目标对齐推荐生成
-- 资源感知优化
-- 敏感性分析
-
-### 11. 系统仿真服务 (NEW)
-- Agent-Based Modeling (ABM)
-- 离散事件仿真 (DES)
-- Monte Carlo 仿真
-- 涌现行为检测
-- 仿真结果分析
-
-### 12. 数据管理模块 (NEW)
-- SQLAlchemy 异步模型
-- Repository 模式抽象
-- 支持多种数据库 (SQLite, PostgreSQL, MySQL)
-- 数据迁移支持
-
-### 13. 日志与监控模块 (NEW)
-- 结构化 JSON 日志
-- 事件总线 (Pub/Sub)
-- 指标收集 (Counter, Gauge, Histogram, Timer)
-- Prometheus 格式导出
-- 请求追踪与关联 ID
-
-## 目录结构
-
-```
-├── src/usmsb_sdk/                # Python SDK 源代码
-│   ├── core/                     # 核心模块
-│   │   ├── elements.py           # 9大核心要素
-│   │   ├── interfaces.py         # 服务接口
-│   │   ├── universal_actions.py  # 10大通用行动接口
-│   │   ├── logic/
-│   │   │   ├── goal_action_outcome.py
-│   │   │   └── core_engines.py   # 6大核心逻辑引擎
-│   │   ├── skills/               # Agent 技能系统
-│   │   └── communication/        # Agent 通信系统
-│   ├── intelligence_adapters/    # 智能源适配器
-│   │   ├── llm/
-│   │   │   ├── openai_adapter.py # OpenAI 适配器
-│   │   │   ├── glm_adapter.py    # GLM-5 适配器
-│   │   │   └── minimax_adapter.py # MiniMax 适配器
-│   │   ├── knowledge_base/
-│   │   │   └── adapters.py       # VectorDB/GraphDB 适配器
-│   │   └── manager.py            # 智能源管理器
-│   ├── services/                 # 应用服务 (16+个)
-│   │   ├── behavior_prediction_service.py
-│   │   ├── agentic_workflow_service.py
-│   │   ├── decision_support_service.py
-│   │   ├── system_simulation_service.py
-│   │   ├── active_matching_service.py
-│   │   ├── supply_demand_matching_service.py
-│   │   ├── collaborative_matching_service.py
-│   │   ├── proactive_learning_service.py
-│   │   ├── dynamic_pricing_service.py
-│   │   ├── joint_order_service.py
-│   │   ├── asset_fractionalization_service.py
-│   │   ├── zk_credential_service.py
-│   │   ├── governance_service.py
-│   │   ├── learning_service.py
-│   │   └── reputation_service.py
-│   ├── data_management/          # 数据管理模块
-│   │   ├── models.py             # SQLAlchemy 数据模型
-│   │   └── repositories.py       # Repository 模式实现
-│   ├── logging_monitoring/       # 日志监控模块
-│   │   ├── logger.py             # 结构化日志
-│   │   ├── metrics.py            # 指标收集
-│   │   └── event_bus.py          # 事件总线
-│   ├── platform/                 # 平台扩展
-│   │   ├── blockchain/           # 区块链模块
-│   │   │   ├── adapter.py        # 以太坊适配器
-│   │   │   ├── custom_chain_adapter.py # 自建链
-│   │   │   └── agent_transactions.py   # Agent 交易
-│   │   ├── compute/              # 计算资源
-│   │   ├── registry/             # 模型/数据注册
-│   │   ├── human/                # 人机协作
-│   │   └── governance/           # 治理模块
-│   ├── node/                     # 去中心化节点
-│   │   └── decentralized_node.py
-│   ├── agent_sdk/                # Agent SDK
-│   │   ├── base_agent.py
-│   │   ├── registration.py
-│   │   ├── discovery.py
-│   │   ├── communication.py
-│   │   └── ...
-│   ├── config/
-│   │   └── settings.py           # 配置管理
-│   └── api/
-│       ├── python/               # Python SDK
-│       └── rest/                 # REST API
-├── contracts/                    # 智能合约 (Hardhat)
-│   ├── src/                      # Solidity 合约
-│   ├── test/                     # 合约测试
-│   └── scripts/                  # 部署脚本
-├── frontend/                     # React 前端
-│   ├── src/
-│   │   ├── pages/                # 页面组件
-│   │   ├── components/           # UI 组件
-│   │   ├── store/                # 状态管理
-│   │   └── lib/api.ts            # API 客户端
-├── docs/                         # 项目文档
-├── docker/                       # Docker 配置
-├── tests/                        # 测试目录
-├── pyproject.toml                # Python 项目配置
-├── pytest.ini                    # 测试配置
-├── Dockerfile                    # Docker 镜像
-└── docker-compose.yml            # Docker 编排
-```
-
-## 快速开始
-
-### 环境要求
-- Python 3.11+
-- Node.js 18+
-- npm 或 yarn
-
-### 安装依赖
-
-```bash
-# 安装 Python 依赖
-pip install pydantic pydantic-settings python-dotenv pyyaml httpx aiohttp aiofiles fastapi uvicorn python-multipart sqlalchemy aiosqlite structlog click rich
-
-# 安装前端依赖
-cd frontend && npm install
-```
-
-### 启动服务
-
-#### 方式一：Docker 部署（推荐）
-
-```bash
-# 1. 创建 .env 文件配置必要的环境变量
-cp .env.example .env
-
-# 2. 编辑 .env 文件，填入您的 API Key
-# 必须配置以下环境变量之一：
-#   - OPENAI_API_KEY=sk-xxx    # OpenAI API Key
-#   - ZHIPU_API_KEY=xxx        # 智谱AI API Key
-#   - MINIMAX_API_KEY=xxx      # MiniMax API Key
-
-# 3. 构建并启动所有服务
-docker-compose up -d
-
-# 4. 查看日志
-docker-compose logs -f
-```
-
-**必需的环境变量：**
-
-| 变量名 | 说明 | 必需 |
-|--------|------|------|
-| `OPENAI_API_KEY` | OpenAI API Key | 是（至少配置一个LLM） |
-| `ZHIPU_API_KEY` | 智谱AI API Key | 否 |
-| `MINIMAX_API_KEY` | MiniMax API Key | 否 |
-
-**可选的环境变量：**
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `ETH_RPC_URL` | Ethereum RPC URL | - |
-| `JWT_SECRET` | JWT 密钥 | 自动生成 |
-| `DATABASE_URL` | 数据库连接串 | sqlite:///data/usmsb.db |
-| `REDIS_URL` | Redis 连接串 | redis://redis:6379 |
-| `LOG_LEVEL` | 日志级别 | INFO |
-
-#### 方式二：分别启动各服务
-
-```bash
-# 1. 启动后端 API (端口 8000)
-# 需要先配置 .env 文件中的 LLM API Key
-python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
-
-# 2. 启动前端 (端口 3000)
-cd frontend && npm run dev
-```
-
-#### 方式二：Docker 部署
-
-```bash
-# 构建并启动所有服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-```
-
-### 访问地址
-
-| 服务 | 地址 | 说明 |
-|------|------|------|
-| 前端界面 | http://localhost:3000 | React Dashboard |
-| API 文档 | http://localhost:8000/docs | Swagger UI |
-| API 健康检查 | http://localhost:8000/health | 服务状态 |
-| P2P 节点 | http://localhost:9001 | P2P 服务 |
-
-## 调试过程
-
-### 1. 后端 API 调试
-
-**测试健康检查：**
-```bash
-curl http://localhost:8000/health
-```
-
-**成功响应：**
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "timestamp": 1771067804.483002,
-  "services": {
-    "llm": "unavailable",
-    "prediction": "unavailable",
-    "workflow": "unavailable"
-  }
-}
-```
-
-**创建 Agent：**
-```bash
-curl -X POST http://localhost:8000/agents \
-  -H "Content-Type: application/json" \
-  -d '{"name": "TestAgent", "type": "ai_agent", "capabilities": ["reasoning", "planning"]}'
-```
-
-**成功响应：**
-```json
-{
-  "id": "7fad6015-a203-4df8-b63a-963b85f8451d",
-  "name": "TestAgent",
-  "type": "ai_agent",
-  "capabilities": ["reasoning", "planning"],
-  "state": {},
-  "goals_count": 0,
-  "resources_count": 0,
-  "created_at": 1771067153.371745
-}
-```
-
-### 2. P2P 节点调试
-
-**测试 P2P 节点启动：**
-```python
-import asyncio
-import sys
-sys.path.insert(0, 'src')
-from usmsb_sdk.node.decentralized_node import DecentralizedPlatform
-
-async def test():
-    config = {
-        'port': 9001,
-        'capabilities': ['llm', 'agent_hosting', 'compute', 'blockchain'],
-    }
-    platform = DecentralizedPlatform(config)
-    success = await platform.start()
-    if success:
-        info = await platform.node.get_node_info()
-        print(f"Node ID: {info['node_id']}")
-        print(f"Status: {info['status']}")
-        print(f"Port: {info['identity']['port']}")
-        await platform.stop()
-        return True
-    return False
-
-asyncio.run(test())
-```
-
-**成功输出：**
-```
-P2P Node Started!
-Node ID: node_12a4a8ce075f5dc8
-Status: active
-Port: 9001
-P2P Node tested successfully!
-```
-
-### 3. 区块链节点调试
-
-**测试区块链启动：**
-```python
-import asyncio
-import sys
-sys.path.insert(0, 'src')
-from usmsb_sdk.platform.blockchain.custom_chain_adapter import CustomChainAdapter, CustomChainNetwork
-
-async def test():
-    chain = CustomChainAdapter(CustomChainNetwork.LOCAL)
-    success = await chain.initialize({})
-    if success:
-        info = await chain.get_chain_info()
-        print(f"Network: {info['network']}")
-        print(f"Node ID: {info['node_id']}")
-        print(f"Block Height: {info['block_height']}")
-        wallet = await chain.create_wallet()
-        print(f"Wallet: {wallet['address']}")
-        print(f"Balance: {wallet['balance']} USMSB")
-        await chain.shutdown()
-        return True
-    return False
-
-asyncio.run(test())
-```
-
-**成功输出：**
-```
-Blockchain Node Started!
-Network: usmsb_local
-Node ID: 8dd4a8f3
-Block Height: 0
-Test Wallet: usmsb_0afb1abd5655d805c89d1f99d3dbc332
-Balance: 1000.0 USMSB
-Blockchain node tested successfully!
-```
-
-### 4. 前端调试
-
-**启动前端开发服务器：**
-```bash
-cd frontend && npm run dev
-```
-
-**成功输出：**
-```
-VITE v5.4.21  ready in 801 ms
-
-➜  Local:   http://localhost:3000/
-➜  Network: use --host to expose
-```
-
-**验证前端状态：**
-```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
-# 应返回: 200
-```
-
-## 状态说明
-
-### 服务状态指标
-
-| 状态 | 说明 |
-|------|------|
-| `healthy` | 服务正常运行 |
-| `active` | P2P 节点已激活 |
-| `unavailable` | 服务未配置（如 LLM 需要配置 API Key） |
-
-### LLM 服务状态
-
-LLM 服务显示 `unavailable` 是正常现象，需要配置 API Key：
-
-```bash
-# 创建 .env 文件
-cat > .env << EOF
-# 使用 OpenAI
-OPENAI_API_KEY=sk-your-key-here
-
-# 或使用国产 GLM-5
-ZHIPU_API_KEY=your-zhipu-key-here
-EOF
-```
-
-配置后重启服务，LLM 状态将变为 `available`。
-
-### 端口占用问题
-
-如果遇到端口占用错误：
-```
-[Errno 10048] error while attempting to bind on address
-```
-
-解决方案：
-1. 检查端口占用：`netstat -an | grep LISTEN | grep 8080`
-2. 修改配置文件中的端口号
-3. 或关闭占用端口的进程
-
-## USMSB 核心模型
-
-### 9 大核心要素
-
-1. **Agent（智能体）** - 具有感知、决策和行动能力的实体
-2. **Object（对象）** - 智能体行为的目标
-3. **Goal（目标）** - 智能体期望达到的状态
-4. **Resource（资源）** - 活动所需的输入
-5. **Rule（规则）** - 智能体行为的规范和约束
-6. **Information（信息）** - 系统中的数据和知识
-7. **Value（价值）** - 活动产生的收益
-8. **Risk（风险）** - 潜在的负面影响
-9. **Environment（环境）** - 外部环境和条件
-
-### 6 大核心逻辑
-
-1. **目标-行动-结果循环** - 持续的目标驱动行为周期
-2. **资源-转化-价值链** - 资源配置和价值创造
-3. **信息-决策-控制循环** - 信息驱动的决策制定
-4. **系统-环境交互** - 环境状态管理
-5. **涌现与自组织** - 宏观行为模式识别
-6. **适应与进化** - 长期系统优化
-
-## 配置说明
-
-创建 `.env` 文件：
-
-```env
-# LLM 配置
-OPENAI_API_KEY=your-openai-key
-OPENAI_MODEL=gpt-4-turbo-preview
-
-# 或使用国产 GLM-5
-ZHIPU_API_KEY=your-zhipu-key
-GLM_MODEL=glm-4
-
-# 数据库配置
-DATABASE_URL=sqlite+aiosqlite:///./usmsb.db
-
-# Redis 配置 (可选)
-REDIS_URL=redis://localhost:6379/0
-
-# API 配置
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# 日志配置
-LOG_LEVEL=INFO
-```
-
-## 开发指南
-
-### 运行测试
-
-```bash
-pytest tests/ -v --cov=usmsb_sdk
-```
-
-### 代码风格
-
-```bash
-# 格式化代码
-black src/usmsb_sdk
-
-# 类型检查
-mypy src/usmsb_sdk
-```
-
-## 许可证
-
-MIT License
+- **AI Application Developers** - Build agentic applications with rich collaboration features
+- **Platform Builders** - Create decentralized marketplaces, agent networks, or AI ecosystems
+- **Enterprise Architects** - Design autonomous systems with governance and economic models
+- **Researchers** - Simulate social behaviors and study emergent AI systems
 
 ---
 
-**AI 文明新世界平台** - 构建去中心化的 AI 智能体生态系统
+## Key Features
+
+### 1. Universal System Model
+
+A theoretical framework with **9 core elements** and **10 universal action interfaces** that can describe any social behavior:
+
+- **Elements**: Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment
+- **Actions**: Perception, Decision, Execution, Interaction, Transformation, Evaluation, Feedback, Learning, Risk Management, Goal/Rule Interpretation
+
+### 2. Agent Collaboration Services (16+)
+
+| Service | Purpose |
+|---------|---------|
+| BehaviorPrediction | Predict agent behaviors and system evolution |
+| DecisionSupport | Multi-criteria decision analysis |
+| SystemSimulation | Agent-based modeling and simulation |
+| AgenticWorkflow | Orchestrate complex agent workflows |
+| ActiveMatching | Intelligent agent demand-supply matching |
+| SupplyDemandMatching | Supply-demand optimization |
+| AgentNetworkExplorer | Discover and evaluate agent capabilities |
+| CollaborativeMatching | Multi-agent collaboration planning |
+| ProactiveLearning | Continuous learning from interactions |
+| DynamicPricing | Market-based pricing optimization |
+| JointOrder | Group purchasing for bulk discounts |
+| AssetFractionalization | NFT-based asset sharing |
+| ZKCredential | Privacy-preserving credentials |
+| Governance | Decentralized voting and proposals |
+| Reputation | Trust and reputation management |
+
+### 3. Intelligence Adapters
+
+- **LLM Adapters**: OpenAI GPT, ZhipuAI GLM, MiniMax
+- **Knowledge Bases**: Chroma, Pinecone, Weaviate, Milvus, FAISS, Neo4j
+- **RAG Support**: Built-in retrieval-augmented generation
+
+### 4. Blockchain Integration
+
+- **VIBE Token**: ERC-20 token on Base (Ethereum L2)
+- **Staking**: Tiered staking with APY rewards
+- **Identity (SBT)**: Soul-bound tokens for agent/human identity
+- **Governance**: On-chain voting and proposals
+
+### 5. Decentralized Infrastructure
+
+- **P2P Node**: Gossip protocol for service discovery
+- **Service Registry**: Automatic service registration and routing
+- **Reputation System**: Blockchain-based trust scores
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Frontend (React)                            │
+│                   http://localhost:3000                            │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Backend API (FastAPI)                            │
+│                   http://localhost:8000                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │   Python     │  │    REST      │  │  WebSocket  │          │
+│  │     SDK      │  │     API      │  │     API     │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+├─────────────────────────────────────────────────────────────────────┤
+│                     Application Services Layer                        │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Matching │ │Trading │ │Learning │ │Governance│ │Workflow│   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                      USMSB Core Layer                               │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Elements│ │Actions │ │ Logic  │ │ Skills │ │Memory  │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Intelligence Adaptation Layer                      │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │  OpenAI │ │  GLM   │ │MiniMax│ │VectorDB│ │ RAG    │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│   P2P Network   │    │  Blockchain      │    │   Database       │
+│   (Gossip)      │    │  (Base/VIBE)     │    │   (SQLite/PG)    │
+└──────────────────┘    └──────────────────┘    └──────────────────┘
+```
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- Docker (optional, recommended)
+
+### Option 1: Docker (Recommended)
+
+```bash
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Configure at least one LLM provider
+# Edit .env and add your API key:
+#   - OPENAI_API_KEY=sk-xxx
+#   - OR ZHIPU_API_KEY=xxx
+#   - OR MINIMAX_API_KEY=xxx
+
+# 3. Start all services
+docker-compose up -d
+
+# 4. Access the application
+# Frontend: http://localhost:3000
+# API Docs: http://localhost:8000/docs
+```
+
+### Option 2: Local Development
+
+```bash
+# 1. Install Python dependencies
+pip install -e .
+
+# 2. Install frontend dependencies
+cd frontend && npm install
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# 4. Start backend
+python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
+
+# 5. Start frontend (in another terminal)
+cd frontend && npm run dev
+```
+
+---
+
+## Project Structure
+
+```
+.
+├── src/usmsb_sdk/          # Python SDK source code
+│   ├── core/               # USMSB core (elements, actions, logic)
+│   ├── services/           # 16+ application services
+│   ├── intelligence_adapters/  # LLM and knowledge base adapters
+│   ├── platform/           # Blockchain, compute, governance
+│   ├── agent_sdk/         # Agent development tools
+│   └── api/               # REST API and Python SDK
+├── frontend/                # React TypeScript frontend
+├── contracts/              # Solidity smart contracts (VIBE token, staking)
+├── docs/                   # Detailed documentation
+├── tests/                  # Test suite
+├── docker/                 # Docker configurations
+├── pyproject.toml          # Python project configuration
+└── docker-compose.yml      # Container orchestration
+```
+
+---
+
+## Configuration
+
+### Required Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENAI_API_KEY` | OpenAI API key | Yes (one of LLM keys) |
+| `ZHIPU_API_KEY` | ZhipuAI API key | No |
+| `MINIMAX_API_KEY` | MiniMax API key | No |
+
+### Optional Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | sqlite:///./usmsb.db | Database connection |
+| `REDIS_URL` | redis://localhost:6379 | Redis cache |
+| `ETH_RPC_URL` | - | Ethereum RPC URL |
+| `LOG_LEVEL` | INFO | Logging level |
+
+---
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check |
+| `POST /api/agents` | Register agent |
+| `GET /api/agents` | List agents |
+| `POST /api/matching` | Match agents |
+| `POST /api/demands` | Create demand |
+| `POST /api/workflows` | Execute workflow |
+| `POST /api/governance/proposals` | Create proposal |
+
+Full API documentation: http://localhost:8000/docs
+
+---
+
+## Use Cases
+
+### 1. AI Service Marketplace
+Build a platform where AI agents can offer services (coding, design, analysis) and clients can discover and hire them automatically.
+
+### 2. Decentralized AI Workforce
+Create a network of specialized AI agents that collaborate on complex projects, splitting rewards based on contributions.
+
+### 3. Simulation & Research
+Use the USMSB model to simulate social behaviors, study emergent AI systems, or test economic hypotheses.
+
+### 4. Enterprise Automation
+Deploy autonomous agents that handle business processes, make decisions, and integrate with existing systems.
+
+---
+
+## Documentation
+
+- [Architecture Guide](./docs/03_architecture/system_architecture.md)
+- [Core Concepts](./docs/02_theory/usmsb_model.md)
+- [API Reference](./docs/06_api/rest_api.md)
+- [Python SDK](./docs/06_api/python_sdk.md)
+- [Smart Contracts](./contracts/README.md)
+- [Whitepaper](./docs/whitepaper.md)
+
+---
+
+## License
+
+MIT License - see [LICENSE](./LICENSE)
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines and code of conduct before submitting PRs.
+
+---
+
+## Contact
+
+- GitHub: https://github.com/usmsb/usmsb
+- Issues: https://github.com/usmsb/usmsb/issues
+
+---
+
+**Build the future of decentralized AI collaboration with USMSB SDK**
