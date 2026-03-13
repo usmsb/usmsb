@@ -2,13 +2,28 @@
 
 > Dynamic Skill Extension Mechanism
 
-**[English](#english-section) | [中文](#chinese-section)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## English Section
+<a id="chinese-translation"></a>
 
-## 1. Overview
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 技能系统
+
+> 动态技能扩展机制
+
+---
+
+## 1. 概述
 
 The Skill System allows Agents to dynamically load and extend capabilities without modifying core code.
 
@@ -70,14 +85,7 @@ registry.register(GitSkill())
 
 - [Meta Agent Design](./meta_agent_design.md) - Super Agent System Design
 
----
 
-<details>
-<summary><h2>中文翻译</h2></summary>
-
-# 技能系统
-
-> 动态技能扩展机制
 
 ---
 

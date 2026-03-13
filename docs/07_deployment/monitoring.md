@@ -2,11 +2,28 @@
 
 > USMSB SDK Monitoring and Operations
 
-**[English](#1-monitoring-metrics) | [中文](#1-监控指标)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Monitoring Metrics
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 监控运维
+
+> USMSB SDK 监控与运维
+
+---
+
+## 1. 监控指标
 
 ### 1.1 System Metrics
 
@@ -59,10 +76,7 @@ alerts:
     action: "notify"
 ```
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# 监控运维
 
 > USMSB SDK 监控与运维
 

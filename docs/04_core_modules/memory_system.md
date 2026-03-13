@@ -2,13 +2,28 @@
 
 > Intelligent Memory and Context Management
 
-**[English](#english-section) | [中文](#chinese-section)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## English Section
+<a id="chinese-translation"></a>
 
-## 1. Overview
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 记忆系统
+
+> 智能记忆与上下文管理
+
+---
+
+## 1. 概述
 
 The Memory System provides Agents with intelligent context management and long-term memory capabilities.
 
@@ -41,14 +56,7 @@ platform/external/meta_agent/
 
 - [Meta Agent Design](./meta_agent_design.md) - Super Agent System Design
 
----
 
-<details>
-<summary><h2>中文翻译</h2></summary>
-
-# 记忆系统
-
-> 智能记忆与上下文管理
 
 ---
 

@@ -2,13 +2,28 @@
 
 > Super Agent System Design Document
 
-**[English](#english-section) | [中文](#chinese-section)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## English Section
+<a id="chinese-translation"></a>
 
-## 1. System Overview
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# Meta Agent 设计
+
+> 超级 Agent 系统设计文档
+
+---
+
+## 1. 系统概述
 
 ### 1.1 Goals
 
@@ -200,10 +215,7 @@ src/usmsb_sdk/platform/external/meta_agent/
 - [Component Design](../03_architecture/component_design.md) - Core Component Design
 - [Autonomous Evolution](./autonomous_evolution.md) - Autonomous Learning and Evolution System
 
----
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
 # Meta Agent 设计
 

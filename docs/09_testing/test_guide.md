@@ -1,10 +1,25 @@
 # Test Guide
 
-**[English](#1-running-tests) | [中文](#1-运行测试)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Running Tests
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 测试指南
+
+---
+
+## 1. 运行测试
 
 ```bash
 # Install test dependencies
@@ -43,10 +58,7 @@ async def test_chat():
     assert response.content is not None
 ```
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# 测试指南
 
 ---
 

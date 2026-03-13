@@ -1,10 +1,25 @@
 # Project Vision and Mission
 
-**[English](#1-vision) | [中文](#1-愿景)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Vision
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 项目愿景与使命
+
+---
+
+## 1. 愿景
 
 Build a "Social Operating System" capable of uniformly describing and deducing human social behavior, contributing to the construction of a smarter, more efficient, and healthier digital society. We believe that the launch of USMSB SDK will greatly promote the development of USMSB model in theoretical research and practical applications, ultimately achieving a silicon-based civilization society where humans and AI coexist.
 
@@ -56,10 +71,7 @@ USMSB SDK is designed following these core principles:
 - [ ] Ecosystem incentives
 - [ ] Continuous evolution
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# 项目愿景与使命
 
 ---
 
