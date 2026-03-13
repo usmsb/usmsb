@@ -10,22 +10,28 @@
 
 USMSB SDK is a comprehensive framework for building **decentralized AI Agent ecosystems**. It provides a unified programming model based on the Universal System Model of Social Behavior (USMSB), enabling AI agents to collaborate, trade, and evolve autonomously.
 
+### One-Sentence Positioning
+
+> USMSB SDK is a framework for building AI agent marketplaces where autonomous agents can discover, hire, collaborate, and trade with each other — enabling businesses to create distributed AI workforces without centralized control.
+
 ### Core Value Propositions
 
-| Value | Description |
-|-------|-------------|
-| **Unified Modeling** | 9 core elements (Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment) for describing any social behavior |
-| **Autonomous Collaboration** | 16+ built-in services for agent matching, collaboration, and trading |
-| **Decentralized Infrastructure** | P2P service discovery, blockchain-based reputation, and governance |
-| **Multi-LLM Support** | OpenAI, ZhipuAI (GLM), MiniMax adapters with unified interface |
-| **Production-Ready** | Complete stack with frontend, backend, smart contracts, and DevOps tools |
+| # | Value Proposition | User Benefit |
+|---|-------------------|--------------|
+| 1 | **Build Agent Marketplaces in Days** | Pre-built matching, trading, and collaboration services let you launch AI agent networks without rebuilding core infrastructure |
+| 2 | **Autonomous Agent Economy** | Agents self-organize, negotiate, and split rewards — reducing manual orchestration overhead |
+| 3 | **Multi-LLM Flexibility** | Swap between OpenAI, ZhipuAI, and MiniMax with a single interface — avoid vendor lock-in |
+| 4 | **Decentralized Trust** | Blockchain-based reputation and governance eliminate single points of failure and create transparent incentive systems |
+| 5 | **Production-Ready Stack** | From smart contracts to React frontend — deploy full-stack agent ecosystems without piecing together multiple tools |
 
 ### Target Users
 
-- **AI Application Developers** - Build agentic applications with rich collaboration features
-- **Platform Builders** - Create decentralized marketplaces, agent networks, or AI ecosystems
-- **Enterprise Architects** - Design autonomous systems with governance and economic models
-- **Researchers** - Simulate social behaviors and study emergent AI systems
+| Persona | Pain Points | Why USMSB |
+|---------|-------------|-----------|
+| **Startup Founder** | Wants to build an AI agent marketplace but lacks blockchain expertise | Pre-built P2P infrastructure, smart contracts, and matching algorithms |
+| **Enterprise AI Lead** | Needs to coordinate multiple AI agents with governance and audit trails | Decentralized governance + reputation system provides transparency |
+| **Developer Tool Builder** | Building AI-powered developer productivity tools | Multi-LLM adapter + agent SDK speeds integration |
+| **Web3 Protocol Team** | Wants to add AI agent capabilities to existing DeFi/DAO | Modular services integrate into existing blockchain ecosystems |
 
 ---
 
@@ -33,12 +39,12 @@ USMSB SDK is a comprehensive framework for building **decentralized AI Agent eco
 
 ### 1. Universal System Model
 
-A theoretical framework with **9 core elements** and **10 universal action interfaces** that can describe any social behavior:
+A theoretical framework with **9 core elements** and **10 universal action interfaces**:
 
-- **Elements**: Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment
-- **Actions**: Perception, Decision, Execution, Interaction, Transformation, Evaluation, Feedback, Learning, Risk Management, Goal/Rule Interpretation
+- **9 Elements**: Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment
+- **10 Actions**: Perception, Decision, Execution, Interaction, Transformation, Evaluation, Feedback, Learning, Risk Management, Goal/Rule Interpretation
 
-### 2. Agent Collaboration Services (16+)
+### 2. Agent Collaboration Services (22 Services)
 
 | Service | Purpose |
 |---------|---------|
@@ -57,6 +63,8 @@ A theoretical framework with **9 core elements** and **10 universal action inter
 | ZKCredential | Privacy-preserving credentials |
 | Governance | Decentralized voting and proposals |
 | Reputation | Trust and reputation management |
+| HybridMatching | Hybrid matching algorithms |
+| PreMatchNegotiation | Pre-match negotiation support |
 
 ### 3. Intelligence Adapters
 
@@ -90,34 +98,86 @@ A theoretical framework with **9 core elements** and **10 universal action inter
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    Backend API (FastAPI)                            │
-│                   http://localhost:8000                            │
+│                   http://localhost:8000/docs                       │
 ├─────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
-│  │   Python     │  │    REST      │  │  WebSocket  │          │
-│  │     SDK      │  │     API      │  │     API     │          │
+│  │   Python     │  │    REST      │  │  WebSocket   │          │
+│  │     SDK       │  │     API       │  │     API      │          │
 │  └──────────────┘  └──────────────┘  └──────────────┘          │
 ├─────────────────────────────────────────────────────────────────────┤
-│                     Application Services Layer                        │
+│                     Application Services Layer (22 services)        │
 │   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
 │   │Matching │ │Trading │ │Learning │ │Governance│ │Workflow│   │
 │   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
-│                      USMSB Core Layer                               │
+│                      USMSB Core Layer                              │
 │   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
 │   │Elements│ │Actions │ │ Logic  │ │ Skills │ │Memory  │   │
 │   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
-│                    Intelligence Adaptation Layer                      │
+│                    Intelligence Adaptation Layer                    │
 │   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
-│   │  OpenAI │ │  GLM   │ │MiniMax│ │VectorDB│ │ RAG    │   │
+│   │  OpenAI │ │  GLM   │ │MiniMax │ │VectorDB│ │ RAG    │   │
 │   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                         Platform Layer                              │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Blockchain│ │ Compute │ │Registry│ │Human   │ │Govern  │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Meta Agent & Reasoning                           │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐               │
+│   │MetaAgent│ │Reasoning│ │Protocol │ │ P2P    │               │
+│   └────────┘ └────────┘ └────────┘ └────────┘               │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
 ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
 │   P2P Network   │    │  Blockchain      │    │   Database       │
-│   (Gossip)      │    │  (Base/VIBE)     │    │   (SQLite/PG)    │
+│   (Gossip)      │    │  (Base/VIBE)    │    │   (SQLite/PG)    │
 └──────────────────┘    └──────────────────┘    └──────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+.
+├── src/usmsb_sdk/          # Python SDK source code
+│   ├── core/               # USMSB core (elements, actions, logic)
+│   │   ├── elements.py     # 9 core elements
+│   │   ├── interfaces.py   # Service interfaces
+│   │   ├── universal_actions.py  # 10 universal actions
+│   │   ├── logic/         # 6 core logic engines
+│   │   ├── skills/        # Agent skill system
+│   │   └── communication/ # Agent communication
+│   ├── services/          # 22 application services
+│   ├── intelligence_adapters/  # LLM and knowledge base adapters
+│   │   ├── llm/          # OpenAI, GLM, MiniMax adapters
+│   │   └── knowledge_base/  # VectorDB/GraphDB adapters
+│   ├── platform/         # Platform extensions
+│   │   ├── blockchain/   # Blockchain integration
+│   │   ├── compute/      # Compute resources
+│   │   ├── registry/     # Model/data registry
+│   │   ├── human/        # Human-agent collaboration
+│   │   └── governance/    # Governance module
+│   ├── agent_sdk/        # Agent development tools
+│   ├── meta_agent/       # Meta agent implementation
+│   ├── reasoning/        # Reasoning engine
+│   ├── node/             # P2P node
+│   ├── protocol/         # Protocol definitions
+│   ├── data_management/  # Data management
+│   ├── logging_monitoring/ # Logging and monitoring
+│   ├── agent_skill/      # Agent skill platform
+│   └── api/              # REST API and Python SDK
+├── frontend/              # React TypeScript frontend
+├── contracts/             # Solidity smart contracts
+├── docs/                  # Detailed documentation
+├── tests/                 # Test suite
+├── docker/                # Docker configurations
+├── pyproject.toml         # Python project configuration
+└── docker-compose.yml    # Container orchestration
 ```
 
 ---
@@ -172,25 +232,49 @@ cd frontend && npm run dev
 
 ---
 
-## Project Structure
+## Use Cases
 
-```
-.
-├── src/usmsb_sdk/          # Python SDK source code
-│   ├── core/               # USMSB core (elements, actions, logic)
-│   ├── services/           # 16+ application services
-│   ├── intelligence_adapters/  # LLM and knowledge base adapters
-│   ├── platform/           # Blockchain, compute, governance
-│   ├── agent_sdk/         # Agent development tools
-│   └── api/               # REST API and Python SDK
-├── frontend/                # React TypeScript frontend
-├── contracts/              # Solidity smart contracts (VIBE token, staking)
-├── docs/                   # Detailed documentation
-├── tests/                  # Test suite
-├── docker/                 # Docker configurations
-├── pyproject.toml          # Python project configuration
-└── docker-compose.yml      # Container orchestration
-```
+### 1. AI Service Marketplace
+Build a platform where AI agents can offer services (coding, design, analysis) and clients can discover and hire them automatically.
+
+### 2. Decentralized AI Workforce
+Create a network of specialized AI agents that collaborate on complex projects, splitting rewards based on contributions.
+
+### 3. Enterprise Copilot Network
+Deploy specialized AI agents (legal, finance, engineering) that collaborate on complex projects, with automatic request routing.
+
+### 4. DeFi AI Assistant
+AI agents that monitor on-chain opportunities, execute trading strategies, and manage DeFi portfolios with governance tokens.
+
+### 5. Simulation & Research
+Use the USMSB model to simulate social behaviors, study emergent AI systems, or test economic hypotheses.
+
+---
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check |
+| `POST /api/agents` | Register agent |
+| `GET /api/agents` | List agents |
+| `POST /api/matching` | Match agents |
+| `POST /api/demands` | Create demand |
+| `POST /api/workflows` | Execute workflow |
+| `POST /api/governance/proposals` | Create proposal |
+
+Full API documentation: http://localhost:8000/docs
+
+---
+
+## Documentation
+
+- [Architecture Guide](./docs/03_architecture/system_architecture.md)
+- [Core Concepts](./docs/02_theory/usmsb_model.md)
+- [API Reference](./docs/06_api/rest_api.md)
+- [Python SDK](./docs/06_api/python_sdk.md)
+- [Smart Contracts](./contracts/README.md)
+- [Whitepaper](./docs/whitepaper.md)
 
 ---
 
@@ -215,49 +299,6 @@ cd frontend && npm run dev
 
 ---
 
-## API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/health` | Health check |
-| `POST /api/agents` | Register agent |
-| `GET /api/agents` | List agents |
-| `POST /api/matching` | Match agents |
-| `POST /api/demands` | Create demand |
-| `POST /api/workflows` | Execute workflow |
-| `POST /api/governance/proposals` | Create proposal |
-
-Full API documentation: http://localhost:8000/docs
-
----
-
-## Use Cases
-
-### 1. AI Service Marketplace
-Build a platform where AI agents can offer services (coding, design, analysis) and clients can discover and hire them automatically.
-
-### 2. Decentralized AI Workforce
-Create a network of specialized AI agents that collaborate on complex projects, splitting rewards based on contributions.
-
-### 3. Simulation & Research
-Use the USMSB model to simulate social behaviors, study emergent AI systems, or test economic hypotheses.
-
-### 4. Enterprise Automation
-Deploy autonomous agents that handle business processes, make decisions, and integrate with existing systems.
-
----
-
-## Documentation
-
-- [Architecture Guide](./docs/03_architecture/system_architecture.md)
-- [Core Concepts](./docs/02_theory/usmsb_model.md)
-- [API Reference](./docs/06_api/rest_api.md)
-- [Python SDK](./docs/06_api/python_sdk.md)
-- [Smart Contracts](./contracts/README.md)
-- [Whitepaper](./docs/whitepaper.md)
-
----
-
 ## License
 
 MIT License - see [LICENSE](./LICENSE)
@@ -266,7 +307,7 @@ MIT License - see [LICENSE](./LICENSE)
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines and code of conduct before submitting PRs.
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
 
 ---
 
