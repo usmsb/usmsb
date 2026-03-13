@@ -49,6 +49,8 @@ const resources = {
         publishServiceDesc: 'Let AI Agents discover you',
         publishDemand: 'Publish Demand',
         publishDemandDesc: 'Let service providers find you',
+        investorPresentation: 'Investor Presentation',
+        vibeIntroduction: 'VIBE Project Introduction',
       },
       // Chat
       chat: {
@@ -118,6 +120,67 @@ const resources = {
         capabilities: 'capabilities',
         goals: 'goals',
         systemResources: 'System Resources',
+        recentTransactions: 'Recent Transactions',
+        systemStatus: 'System Status',
+        version: 'Version',
+        uptime: 'Uptime',
+        services: 'Services',
+        platform: 'Platform',
+      },
+      // Wallet
+      wallet: {
+        title: 'Wallet',
+        totalAssets: 'Total Assets',
+        balance: 'Balance',
+        staked: 'Staked',
+        locked: 'Locked',
+        rewards: 'Rewards',
+        tier: 'Stake Tier',
+        transactions: 'Transactions',
+        allTypes: 'All',
+        deposits: 'Deposits',
+        withdrawals: 'Withdrawals',
+        payments: 'Payments',
+        noTransactions: 'No transactions yet',
+        txType: {
+          deposit: 'Deposit',
+          withdraw: 'Withdraw',
+          reward: 'Reward',
+          payment: 'Payment',
+        },
+        status: {
+          completed: 'Completed',
+          pending: 'Pending',
+          failed: 'Failed',
+        },
+      },
+      // Reputation
+      reputation: {
+        title: 'Reputation',
+        score: 'Reputation Score',
+        progressTo: 'Progress to {{tier}}',
+        needed: '{{amount}} points to {{tier}}',
+        totalTx: 'Total Transactions',
+        successRate: 'Success Rate',
+        avgRating: 'Avg Rating',
+        totalRatings: 'Total Ratings',
+        history: 'Recent Activity',
+        tiers: 'Reputation Tiers',
+      },
+      // Blockchain
+      blockchain: {
+        title: 'Blockchain Status',
+        connected: 'Connected',
+        connectionError: 'Blockchain connection failed',
+        network: 'Network',
+        chainId: 'Chain ID',
+        blockNumber: 'Block Height',
+        token: 'Token',
+        taxRate: 'Tax Rate',
+        viewOnExplorer: 'View on Explorer',
+        balanceChecker: 'Token Balance Checker',
+        address: 'Address',
+        balance: 'Balance',
       },
       // Agents
       agents: {
@@ -929,6 +992,7 @@ const resources = {
           faq: 'FAQ',
           login: 'Login',
           getStarted: 'Get Started',
+          pitch: 'Pitch',
         },
         hero: {
           badge: 'Next Generation AI Agent Platform',
@@ -1279,6 +1343,24 @@ const resources = {
           desc: 'Your votes shape the future of the platform. Stake VIBE tokens to get voting power.',
         },
       },
+      // Stake Modal
+      stake: {
+        required: 'Stake Required',
+        toAccess: 'to access',
+        description: 'Stake VIBE tokens to unlock all platform features. Staking is not just a participation threshold, but a commitment to network security.',
+        minimumRequired: 'Minimum Stake Amount',
+        benefits: 'Staking Benefits',
+        benefit1Title: 'Publish Services',
+        benefit1Desc: 'Offer your professional skills to the marketplace',
+        benefit2Title: 'Publish Demands',
+        benefit2Desc: 'Post task requirements to find suitable service providers',
+        benefit3Title: 'Register Agents',
+        benefit3Desc: 'Register your AI Agents to participate in network collaboration',
+        benefit4Title: 'Governance Voting',
+        benefit4Desc: 'Participate in platform governance decisions',
+        later: 'Later',
+        stakeNow: 'Stake Now',
+      },
       // Pitch Page (Investor Presentation)
       pitch: {
         cover: {
@@ -1568,6 +1650,8 @@ const resources = {
         publishServiceDesc: '让AI Agent发现您',
         publishDemand: '发布我的需求',
         publishDemandDesc: '让服务方找您',
+        investorPresentation: '投资人演示',
+        vibeIntroduction: 'VIBE 项目介绍',
       },
       // Chat
       chat: {
@@ -1628,6 +1712,69 @@ const resources = {
         findSuppliers: '寻找供给方',
         findDemanders: '寻找需求方',
         searchDemands: '搜索需求',
+        recentTransactions: '最近交易',
+        systemStatus: '系统状态',
+        version: '版本',
+        uptime: '运行时间',
+        services: '服务',
+        platform: '平台',
+        capabilities: '能力',
+        goals: '目标',
+      },
+      // Wallet
+      wallet: {
+        title: '钱包',
+        totalAssets: '总资产',
+        balance: '余额',
+        staked: '已质押',
+        locked: '锁定',
+        rewards: '奖励',
+        tier: '质押等级',
+        transactions: '交易记录',
+        allTypes: '全部',
+        deposits: '充值',
+        withdrawals: '提现',
+        payments: '支付',
+        noTransactions: '暂无交易记录',
+        txType: {
+          deposit: '充值',
+          withdraw: '提现',
+          reward: '奖励',
+          payment: '支付',
+        },
+        status: {
+          completed: '已完成',
+          pending: '处理中',
+          failed: '失败',
+        },
+      },
+      // Reputation
+      reputation: {
+        title: '信誉',
+        score: '信誉分数',
+        progressTo: '进度: {{tier}}',
+        needed: '{{amount}} 积分至 {{tier}}',
+        totalTx: '总交易',
+        successRate: '成功率',
+        avgRating: '平均评分',
+        totalRatings: '总评分',
+        history: '最近活动',
+        tiers: '信誉等级',
+      },
+      // Blockchain
+      blockchain: {
+        title: '区块链状态',
+        connected: '已连接',
+        connectionError: '区块链连接失败',
+        network: '网络',
+        chainId: '链ID',
+        blockNumber: '区块高度',
+        token: '代币',
+        taxRate: '交易税率',
+        viewOnExplorer: '在区块浏览器中查看',
+        balanceChecker: '代币余额查询',
+        address: '地址',
+        balance: '余额',
       },
       // Agents
       agents: {
@@ -2393,6 +2540,7 @@ const resources = {
           faq: '常见问题',
           login: '登录',
           getStarted: '立即开始',
+          pitch: '演示',
         },
         hero: {
           badge: '下一代AI Agent平台',
@@ -2574,6 +2722,24 @@ const resources = {
           },
           copyright: '© {{year}} 硅基文明 Silicon Civilization. 保留所有权利。',
         },
+      },
+      // Stake Modal
+      stake: {
+        required: '需要质押',
+        toAccess: '访问',
+        description: '质押 VIBE 代币以解锁平台全部功能。质押不仅是参与门槛，更是对网络安全的承诺。',
+        minimumRequired: '最低质押金额',
+        benefits: '质押权益',
+        benefit1Title: '发布服务',
+        benefit1Desc: '向市场提供您的专业技能',
+        benefit2Title: '发布需求',
+        benefit2Desc: '发布任务需求找到合适的服务商',
+        benefit3Title: '注册 Agent',
+        benefit3Desc: '注册您的 AI Agent 参与网络协作',
+        benefit4Title: '治理投票',
+        benefit4Desc: '参与平台治理决策',
+        later: '稍后再说',
+        stakeNow: '立即质押',
       },
       // Pitch Page (投资人演示)
       pitch: {
@@ -3020,6 +3186,7 @@ const resources = {
           faq: 'よくある質問',
           login: 'ログイン',
           getStarted: '始める',
+          pitch: 'ピッチ',
         },
         hero: {
           badge: '次世代AIエージェントプラットフォーム',
@@ -3190,6 +3357,8 @@ const resources = {
         publishServiceDesc: 'AIエージェントに発見してもらいましょう',
         publishDemand: 'ニーズを公開',
         publishDemandDesc: 'サービス提供者を見つけましょう',
+        investorPresentation: '投資家向けデモ',
+        vibeIntroduction: 'VIBEプロジェクト紹介',
       },
       // Header
       header: {
@@ -3941,6 +4110,7 @@ const resources = {
           faq: '자주 묻는 질문',
           login: '로그인',
           getStarted: '시작하기',
+          pitch: '피치',
         },
         hero: {
           badge: '차세대 AI 에이전트 플랫폼',
@@ -4111,6 +4281,8 @@ const resources = {
         publishServiceDesc: 'AI 에이전트가 당신을 발견하도록 하세요',
         publishDemand: '수요 공개',
         publishDemandDesc: '서비스 제공자가 당신을 찾도록 하세요',
+        investorPresentation: '투자자 데모',
+        vibeIntroduction: 'VIBE 프로젝트 소개',
       },
       // Header
       header: {
@@ -4862,6 +5034,7 @@ const resources = {
           faq: 'Часто задаваемые вопросы',
           login: 'Вход',
           getStarted: 'Начать',
+          pitch: 'Питч',
         },
         hero: {
           badge: 'Платформа AI агентов нового поколения',
@@ -5032,6 +5205,8 @@ const resources = {
         publishServiceDesc: 'Позвольте AI агентам найти вас',
         publishDemand: 'Опубликовать потребность',
         publishDemandDesc: 'Позвольте поставщикам услуг найти вас',
+        investorPresentation: 'Инвесторская презентация',
+        vibeIntroduction: 'Знакомство с VIBE',
       },
       // Header
       header: {
@@ -5783,6 +5958,7 @@ const resources = {
           faq: 'FAQ',
           login: 'Connexion',
           getStarted: 'Commencer',
+          pitch: 'Pitch',
         },
         hero: {
           badge: 'Plateforme d\'agents IA de nouvelle génération',
@@ -5952,6 +6128,8 @@ const resources = {
         publishServiceDesc: 'Laissez les agents IA vous découvrir',
         publishDemand: 'Publier une demande',
         publishDemandDesc: 'Laissez les fournisseurs de services vous trouver',
+        investorPresentation: 'Présentation aux investisseurs',
+        vibeIntroduction: 'Présentation du projet VIBE',
       },
       // Header
       header: {
@@ -6688,6 +6866,7 @@ const resources = {
           faq: 'FAQ',
           login: 'Anmelden',
           getStarted: 'Loslegen',
+          pitch: 'Pitch',
         },
         hero: {
           badge: 'KI-Agenten-Plattform der nächsten Generation',
@@ -6857,6 +7036,8 @@ const resources = {
         publishServiceDesc: 'Lassen Sie KI-Agenten Sie entdecken',
         publishDemand: 'Bedarf veröffentlichen',
         publishDemandDesc: 'Lassen Sie Dienstanbieter Sie finden',
+        investorPresentation: 'Investorenpräsentation',
+        vibeIntroduction: 'VIBE Projektvorstellung',
       },
       // Header
       header: {
@@ -7593,6 +7774,7 @@ const resources = {
           faq: 'Preguntas frecuentes',
           login: 'Iniciar sesión',
           getStarted: 'Comenzar',
+          pitch: 'Pitch',
         },
         hero: {
           badge: 'Plataforma de agentes IA de siguiente generación',
@@ -7762,6 +7944,8 @@ const resources = {
         publishServiceDesc: 'Permite que los agentes IA te descubran',
         publishDemand: 'Publicar demanda',
         publishDemandDesc: 'Permite que los proveedores de servicios te encuentren',
+        investorPresentation: 'Presentación para inversores',
+        vibeIntroduction: 'Introducción del proyecto VIBE',
       },
       // Header
       header: {
@@ -8498,6 +8682,7 @@ const resources = {
           faq: 'Perguntas frequentes',
           login: 'Entrar',
           getStarted: 'Começar',
+          pitch: 'Pitch',
         },
         hero: {
           badge: 'Plataforma de agentes IA de próxima geração',
@@ -8667,6 +8852,8 @@ const resources = {
         publishServiceDesc: 'Deixe os agentes IA descobrirem você',
         publishDemand: 'Publicar demanda',
         publishDemandDesc: 'Deixe os fornecedores de serviços encontrar você',
+        investorPresentation: 'Apresentação para investidores',
+        vibeIntroduction: 'Apresentação do projeto VIBE',
       },
       // Header
       header: {

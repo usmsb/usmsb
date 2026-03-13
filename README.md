@@ -6,9 +6,17 @@
 [![Python Version](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![React](https://img.shields.io/badge/Frontend-React+-61DAFB.svg)](https://reactjs.org/)
 
-**[English](#what-is-usmsb-sdk) | [中文](#usmsb-sdk-是什么)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**🌐 Language / 语言:** <a href="#chinese-translation">🇺🇸 English</a> | <a href="#chinese-translation">🇨🇳 中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
+
+<a id="chinese-translation"></a>
 
 ## What is USMSB SDK?
 
@@ -557,16 +565,12 @@ Contributions are welcome! Please read our contributing guidelines before submit
 
 ---
 
-<details>
-<summary><h2>中文翻译</h2></summary>
+<details id="chinese-translation">
+<summary><h2>🇨🇳 中文翻译 (Click to expand / 点击展开)</h2></summary>
 
 # USMSB SDK
 
 > 基于社会行为通用系统模型（USMSB）的去中心化AI Agent协作平台
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![React](https://img.shields.io/badge/Frontend-React+-61DAFB.svg)](https://reactjs.org/)
 
 **[English](#what-is-usmsb-sdk) | [中文](#usmsb-sdk-是什么)**
 

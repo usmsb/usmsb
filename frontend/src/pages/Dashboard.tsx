@@ -359,7 +359,10 @@ export default function Dashboard() {
       {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent agents */}
-        <div className="card lg:col-span-2">
+        <div className={clsx(
+          'card lg:col-span-2',
+          isDark && 'border-neon-blue/20'
+        )}>
           <div className="flex items-center justify-between mb-4">
             <h3 className={clsx(
               'text-lg font-semibold',
@@ -384,26 +387,27 @@ export default function Dashboard() {
               <ListItemSkeleton />
             </div>
           ) : agents && agents.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {agents?.map((agent, index) => (
                 <div
                   key={agent.id ?? `agent-${index}`}
                   className={clsx(
                     'flex items-center justify-between p-4 rounded-lg transition-all duration-300',
-                    'bg-secondary-50',
-                    isDark && 'bg-cyber-dark/50 border border-neon-blue/10 hover:border-neon-blue/30 hover:shadow-[0_0_15px_rgba(0,245,255,0.1)]'
+                    isDark
+                      ? 'bg-cyber-dark/30 border border-gray-800 hover:border-neon-blue/30 hover:shadow-[0_0_15px_rgba(0,245,255,0.1)]'
+                      : 'bg-white border border-gray-100 hover:border-blue-200 hover:shadow-md'
                   )}
                   style={isDark ? { animationDelay: `${index * 100}ms` } : undefined}
                 >
                   <div className="flex items-center gap-4">
                     <div className={clsx(
                       'w-10 h-10 rounded-full flex items-center justify-center',
-                      'bg-primary-100',
-                      isDark && 'bg-neon-blue/10 border border-neon-blue/30'
+                      isDark
+                        ? 'bg-neon-blue/10 border border-neon-blue/30'
+                        : 'bg-blue-50 border border-blue-100'
                     )}>
                       <Users className={clsx(
-                        'text-primary-600',
-                        isDark && 'text-neon-blue'
+                        isDark ? 'text-neon-blue' : 'text-blue-500'
                       )} size={20} />
                     </div>
                     <div>
@@ -422,17 +426,16 @@ export default function Dashboard() {
                   <div className="text-right">
                     <p className={clsx(
                       'text-sm font-medium',
-                      'text-light-text-primary',
-                      isDark && 'text-neon-green'
+                      isDark ? 'text-neon-green' : 'text-green-600'
                     )}>
-                      {agent.capabilities.length} capabilities
+                      {agent.capabilities.length} {t('dashboard.capabilities', 'capabilities')}
                     </p>
                     <p className={clsx(
                       'text-sm',
                       'text-light-text-muted',
                       isDark && 'text-gray-500'
                     )}>
-                      {agent.goals_count} goals
+                      {agent.goals_count} {t('dashboard.goals', 'goals')}
                     </p>
                   </div>
                 </div>
@@ -542,12 +545,15 @@ export default function Dashboard() {
 
       {/* Transactions & Blockchain Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
+        <div className={clsx(
+          'card',
+          isDark && 'border-neon-blue/20'
+        )}>
           <h3 className={clsx(
             'text-lg font-semibold mb-4',
             'text-light-text-primary',
             isDark && 'text-neon-blue font-cyber'
-          )}>{t('dashboard.recentTransactions', 'Recent Transactions')}</h3>
+          )}>{t('dashboard.recentTransactions')}</h3>
           <TransactionList limit={5} />
         </div>
         <TokenBalanceChecker />
@@ -555,45 +561,85 @@ export default function Dashboard() {
 
       {/* System Status */}
       {systemStatus && (
-        <div className="card">
+        <div className={clsx(
+          'card',
+          isDark && 'border-neon-green/20'
+        )}>
           <h3 className={clsx(
             'text-lg font-semibold mb-4',
             'text-light-text-primary',
             isDark && 'text-neon-green font-cyber'
-          )}>{t('dashboard.systemStatus', 'System Status')}</h3>
+          )}>{t('dashboard.systemStatus')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-gray-800/30 rounded-lg">
-              <p className="text-sm text-gray-400">Version</p>
-              <p className="text-lg font-bold text-white">{systemStatus.version}</p>
+            <div className={clsx(
+              'p-4 rounded-lg',
+              isDark ? 'bg-cyber-dark/50 border border-neon-blue/20' : 'bg-gray-50'
+            )}>
+              <p className={clsx(
+                'text-sm',
+                isDark ? 'text-gray-400' : 'text-gray-500'
+              )}>{t('dashboard.version')}</p>
+              <p className={clsx(
+                'text-lg font-bold',
+                isDark ? 'text-neon-blue font-cyber' : 'text-gray-900'
+              )}>{systemStatus.version}</p>
             </div>
-            <div className="p-4 bg-gray-800/30 rounded-lg">
-              <p className="text-sm text-gray-400">Uptime</p>
-              <p className="text-lg font-bold text-white">{systemStatus.uptime.days}d {Math.floor(systemStatus.uptime.hours % 24)}h</p>
+            <div className={clsx(
+              'p-4 rounded-lg',
+              isDark ? 'bg-cyber-dark/50 border border-neon-blue/20' : 'bg-gray-50'
+            )}>
+              <p className={clsx(
+                'text-sm',
+                isDark ? 'text-gray-400' : 'text-gray-500'
+              )}>{t('dashboard.uptime')}</p>
+              <p className={clsx(
+                'text-lg font-bold',
+                isDark ? 'text-neon-blue font-cyber' : 'text-gray-900'
+              )}>{systemStatus.uptime.days}d {Math.floor(systemStatus.uptime.hours % 24)}h</p>
             </div>
-            <div className="p-4 bg-gray-800/30 rounded-lg">
-              <p className="text-sm text-gray-400">Services</p>
-              <div className="flex items-center gap-2">
+            <div className={clsx(
+              'p-4 rounded-lg',
+              isDark ? 'bg-cyber-dark/50 border border-neon-blue/20' : 'bg-gray-50'
+            )}>
+              <p className={clsx(
+                'text-sm',
+                isDark ? 'text-gray-400' : 'text-gray-500'
+              )}>{t('dashboard.services')}</p>
+              <div className="flex items-center gap-2 mt-1">
                 <span className={clsx(
                   'w-2 h-2 rounded-full',
-                  systemStatus.services.llm ? 'bg-green-400' : 'bg-red-400'
+                  systemStatus.services.llm ? 'bg-green-500' : 'bg-red-500',
+                  isDark && (systemStatus.services.llm ? 'shadow-[0_0_8px_#00ff88]' : 'shadow-[0_0_8px_#ff0055]')
                 )} />
                 <span className={clsx(
                   'w-2 h-2 rounded-full',
-                  systemStatus.services.meta_agent ? 'bg-green-400' : 'bg-red-400'
+                  systemStatus.services.meta_agent ? 'bg-green-500' : 'bg-red-500',
+                  isDark && (systemStatus.services.meta_agent ? 'shadow-[0_0_8px_#00ff88]' : 'shadow-[0_0_8px_#ff0055]')
                 )} />
                 <span className={clsx(
                   'w-2 h-2 rounded-full',
-                  systemStatus.services.prediction ? 'bg-green-400' : 'bg-red-400'
+                  systemStatus.services.prediction ? 'bg-green-500' : 'bg-red-500',
+                  isDark && (systemStatus.services.prediction ? 'shadow-[0_0_8px_#00ff88]' : 'shadow-[0_0_8px_#ff0055]')
                 )} />
                 <span className={clsx(
                   'w-2 h-2 rounded-full',
-                  systemStatus.services.workflow ? 'bg-green-400' : 'bg-red-400'
+                  systemStatus.services.workflow ? 'bg-green-500' : 'bg-red-500',
+                  isDark && (systemStatus.services.workflow ? 'shadow-[0_0_8px_#00ff88]' : 'shadow-[0_0_8px_#ff0055]')
                 )} />
               </div>
             </div>
-            <div className="p-4 bg-gray-800/30 rounded-lg">
-              <p className="text-sm text-gray-400">Platform</p>
-              <p className="text-lg font-bold text-white">{systemStatus.platform.system}</p>
+            <div className={clsx(
+              'p-4 rounded-lg',
+              isDark ? 'bg-cyber-dark/50 border border-neon-blue/20' : 'bg-gray-50'
+            )}>
+              <p className={clsx(
+                'text-sm',
+                isDark ? 'text-gray-400' : 'text-gray-500'
+              )}>{t('dashboard.platform')}</p>
+              <p className={clsx(
+                'text-lg font-bold',
+                isDark ? 'text-neon-blue font-cyber' : 'text-gray-900'
+              )}>{systemStatus.platform.system}</p>
             </div>
           </div>
         </div>

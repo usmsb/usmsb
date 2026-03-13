@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { getReputation, getReputationHistory } from '@/lib/api'
 import clsx from 'clsx'
+import { useAppStore } from '@/store'
 
 interface ReputationDisplayProps {
   showHistory?: boolean
@@ -28,6 +29,9 @@ const REPUTATION_TIERS = [
 
 export function ReputationDisplay({ showHistory = false }: ReputationDisplayProps) {
   const { t } = useTranslation()
+  const { theme } = useAppStore()
+  const isDark = theme === 'dark'
+
   const [reputation, setReputation] = useState<{
     score: number
     tier: string
@@ -95,25 +99,47 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
   const getEventIcon = (eventType: string) => {
     switch (eventType) {
       case 'transaction_success':
-        return <TrendingUp className="w-4 h-4 text-green-400" />
+        return <TrendingUp className="w-4 h-4" />
       case 'transaction_fail':
-        return <TrendingUp className="w-4 h-4 text-red-400 rotate-180" />
+        return <TrendingUp className="w-4 h-4 rotate-180" />
       case 'positive_review':
-        return <Star className="w-4 h-4 text-yellow-400" />
+        return <Star className="w-4 h-4" />
       case 'negative_review':
-        return <Star className="w-4 h-4 text-gray-400" />
+        return <Star className="w-4 h-4" />
       case 'stake_bonus':
-        return <Award className="w-4 h-4 text-neon-blue" />
+        return <Award className="w-4 h-4" />
       default:
-        return <Award className="w-4 h-4 text-gray-400" />
+        return <Award className="w-4 h-4" />
+    }
+  }
+
+  const getEventColor = (eventType: string, isPositive: boolean) => {
+    if (!isPositive) {
+      return isDark ? 'text-red-400' : 'text-red-600'
+    }
+    switch (eventType) {
+      case 'transaction_success':
+        return isDark ? 'text-neon-green' : 'text-green-600'
+      case 'positive_review':
+        return isDark ? 'text-yellow-400' : 'text-yellow-600'
+      case 'stake_bonus':
+        return isDark ? 'text-neon-blue' : 'text-blue-600'
+      default:
+        return isDark ? 'text-gray-400' : 'text-gray-600'
     }
   }
 
   if (isLoading) {
     return (
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-neon-blue" />
+      <div className={clsx(
+        'card',
+        isDark && 'border-neon-purple/20'
+      )}>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className={clsx(
+            'w-5 h-5 animate-spin',
+            isDark ? 'text-neon-purple' : 'text-purple-500'
+          )} />
         </div>
       </div>
     )
@@ -121,10 +147,13 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
 
   if (error) {
     return (
-      <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6">
-        <div className="flex items-center gap-2 text-red-400">
-          <AlertCircle className="w-5 h-5" />
-          <span>{error}</span>
+      <div className={clsx(
+        'card',
+        isDark ? 'border-red-500/30 bg-red-900/10' : 'border-red-200 bg-red-50'
+      )}>
+        <div className="flex items-center gap-2">
+          <AlertCircle size={20} className={isDark ? 'text-red-400' : 'text-red-500'} />
+          <span className={isDark ? 'text-red-400' : 'text-red-700'}>{error}</span>
         </div>
       </div>
     )
@@ -134,16 +163,28 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
   const nextTier = getNextTier()
 
   return (
-    <div className="bg-gray-800/50 rounded-xl border border-gray-700 p-6 space-y-4">
+    <div className={clsx(
+      'card',
+      isDark && 'hover:border-neon-purple/50'
+    )}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Star className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-lg font-semibold text-white">{t('reputation.title', 'Reputation')}</h3>
+          <Star size={20} className={isDark ? 'text-yellow-400' : 'text-yellow-500'} />
+          <h3 className={clsx(
+            'text-lg font-semibold',
+            'text-light-text-primary',
+            isDark && 'text-neon-purple font-cyber'
+          )}>{t('reputation.title', '信誉')}</h3>
         </div>
         <button
           onClick={loadReputation}
-          className="p-2 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+          className={clsx(
+            'p-2 rounded-lg transition-colors',
+            isDark
+              ? 'hover:bg-neon-purple/10 text-gray-400 hover:text-neon-purple'
+              : 'hover:bg-purple-50 text-gray-500 hover:text-purple-600'
+          )}
         >
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -162,18 +203,29 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
             {currentTier.name}
           </span>
         </div>
-        <p className="text-4xl font-bold text-white">{reputation?.score || 0}</p>
-        <p className="text-sm text-gray-400 mt-1">{t('reputation.score', 'Reputation Score')}</p>
+        <p className={clsx(
+          'text-4xl font-bold',
+          isDark ? 'text-white' : 'text-gray-900'
+        )}>{reputation?.score || 0}</p>
+        <p className={clsx(
+          'text-sm mt-1',
+          isDark ? 'text-gray-400' : 'text-gray-500'
+        )}>{t('reputation.score', '信誉分数')}</p>
       </div>
 
       {/* Progress to Next Tier */}
       {nextTier && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-400">{t('reputation.progressTo', 'Progress to {{tier}}', { tier: nextTier.name })}</span>
+            <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
+              {t('reputation.progressTo', '进度: {{tier}}', { tier: nextTier.name })}
+            </span>
             <span style={{ color: nextTier.color }}>{nextTier.name}</span>
           </div>
-          <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+          <div className={clsx(
+            'h-2 rounded-full overflow-hidden',
+            isDark ? 'bg-gray-800' : 'bg-gray-200'
+          )}>
             <div
               className="h-full rounded-full transition-all"
               style={{
@@ -185,8 +237,11 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
               }}
             />
           </div>
-          <p className="text-xs text-gray-500">
-            {t('reputation.needed', '{{amount}} points to {{tier}}', {
+          <p className={clsx(
+            'text-xs',
+            isDark ? 'text-gray-500' : 'text-gray-400'
+          )}>
+            {t('reputation.needed', '{{amount}} 积分至 {{tier}}', {
               amount: nextTier.min - (reputation?.score || 0),
               tier: nextTier.name,
             })}
@@ -195,42 +250,87 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-700/50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-white">{reputation?.total_transactions || 0}</p>
-          <p className="text-xs text-gray-400">{t('reputation.totalTx', 'Total Transactions')}</p>
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className={clsx(
+          'rounded-lg p-3 text-center',
+          isDark ? 'bg-cyber-dark/50 border border-gray-700/50' : 'bg-gray-50 border border-gray-100'
+        )}>
+          <p className={clsx(
+            'text-2xl font-bold',
+            isDark ? 'text-white' : 'text-gray-900'
+          )}>{reputation?.total_transactions || 0}</p>
+          <p className={clsx(
+            'text-xs',
+            isDark ? 'text-gray-400' : 'text-gray-500'
+          )}>{t('reputation.totalTx', '总交易')}</p>
         </div>
-        <div className="bg-gray-700/50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-green-400">{reputation?.success_rate || 0}%</p>
-          <p className="text-xs text-gray-400">{t('reputation.successRate', 'Success Rate')}</p>
+        <div className={clsx(
+          'rounded-lg p-3 text-center',
+          isDark ? 'bg-cyber-dark/50 border border-neon-green/20' : 'bg-green-50 border border-green-100'
+        )}>
+          <p className={clsx(
+            'text-2xl font-bold',
+            isDark ? 'text-neon-green' : 'text-green-600'
+          )}>{reputation?.success_rate || 0}%</p>
+          <p className={clsx(
+            'text-xs',
+            isDark ? 'text-gray-400' : 'text-gray-500'
+          )}>{t('reputation.successRate', '成功率')}</p>
         </div>
-        <div className="bg-gray-700/50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-yellow-400 flex items-center justify-center gap-1">
+        <div className={clsx(
+          'rounded-lg p-3 text-center',
+          isDark ? 'bg-cyber-dark/50 border border-gray-700/50' : 'bg-gray-50 border border-gray-100'
+        )}>
+          <p className={clsx(
+            'text-2xl font-bold flex items-center justify-center gap-1',
+            isDark ? 'text-yellow-400' : 'text-yellow-500'
+          )}>
             <Star className="w-4 h-4 fill-current" />
             {reputation?.avg_rating?.toFixed(1) || '0.0'}
           </p>
-          <p className="text-xs text-gray-400">{t('reputation.avgRating', 'Avg Rating')}</p>
+          <p className={clsx(
+            'text-xs',
+            isDark ? 'text-gray-400' : 'text-gray-500'
+          )}>{t('reputation.avgRating', '平均评分')}</p>
         </div>
-        <div className="bg-gray-700/50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-white">{reputation?.total_ratings || 0}</p>
-          <p className="text-xs text-gray-400">{t('reputation.totalRatings', 'Total Ratings')}</p>
+        <div className={clsx(
+          'rounded-lg p-3 text-center',
+          isDark ? 'bg-cyber-dark/50 border border-gray-700/50' : 'bg-gray-50 border border-gray-100'
+        )}>
+          <p className={clsx(
+            'text-2xl font-bold',
+            isDark ? 'text-white' : 'text-gray-900'
+          )}>{reputation?.total_ratings || 0}</p>
+          <p className={clsx(
+            'text-xs',
+            isDark ? 'text-gray-400' : 'text-gray-500'
+          )}>{t('reputation.totalRatings', '总评分')}</p>
         </div>
       </div>
 
       {/* History Toggle */}
       {showHistory && history.length > 0 && (
-        <div>
+        <div className="mt-4">
           <button
             onClick={() => setShowHistoryPanel(!showHistoryPanel)}
-            className="w-full flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/50 transition-colors"
+            className={clsx(
+              'w-full flex items-center justify-between p-3 rounded-lg transition-colors',
+              isDark
+                ? 'bg-cyber-dark/30 hover:bg-cyber-dark/50 border border-gray-800'
+                : 'bg-gray-50 hover:bg-gray-100 border border-gray-100'
+            )}
           >
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className={clsx(
+              'flex items-center gap-2',
+              isDark ? 'text-gray-400' : 'text-gray-500'
+            )}>
               <History className="w-4 h-4" />
-              <span>{t('reputation.history', 'Recent Activity')}</span>
+              <span>{t('reputation.history', '最近活动')}</span>
             </div>
             <ChevronRight
               className={clsx(
-                'w-4 h-4 text-gray-400 transition-transform',
+                'w-4 h-4 transition-transform',
+                isDark ? 'text-gray-400' : 'text-gray-500',
                 showHistoryPanel && 'rotate-90'
               )}
             />
@@ -241,15 +341,29 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
               {history.slice(0, 5).map((event, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-gray-700/20 rounded-lg"
+                  className={clsx(
+                    'flex items-center justify-between p-3 rounded-lg',
+                    isDark ? 'bg-cyber-dark/30 border border-gray-800' : 'bg-gray-50 border border-gray-100'
+                  )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
-                      {getEventIcon(event.event_type)}
+                    <div className={clsx(
+                      'w-8 h-8 rounded-full flex items-center justify-center',
+                      isDark ? 'bg-gray-800' : 'bg-white'
+                    )}>
+                      <span className={getEventColor(event.event_type, event.change > 0)}>
+                        {getEventIcon(event.event_type)}
+                      </span>
                     </div>
                     <div>
-                      <p className="text-sm text-white">{event.reason}</p>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                      <p className={clsx(
+                        'text-sm',
+                        isDark ? 'text-white' : 'text-gray-900'
+                      )}>{event.reason}</p>
+                      <div className={clsx(
+                        'flex items-center gap-1 text-xs',
+                        isDark ? 'text-gray-500' : 'text-gray-400'
+                      )}>
                         <Clock className="w-3 h-3" />
                         <span>{formatDate(event.timestamp)}</span>
                       </div>
@@ -258,7 +372,9 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
                   <span
                     className={clsx(
                       'font-medium',
-                      event.change > 0 ? 'text-green-400' : 'text-red-400'
+                      event.change > 0
+                        ? (isDark ? 'text-neon-green' : 'text-green-600')
+                        : (isDark ? 'text-red-400' : 'text-red-600')
                     )}
                   >
                     {event.change > 0 ? '+' : ''}{event.change}
@@ -271,8 +387,11 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
       )}
 
       {/* Tier Badges */}
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-gray-400">{t('reputation.tiers', 'Reputation Tiers')}</p>
+      <div className="space-y-2 mt-4">
+        <p className={clsx(
+          'text-sm font-medium',
+          isDark ? 'text-gray-400' : 'text-gray-500'
+        )}>{t('reputation.tiers', '信誉等级')}</p>
         <div className="flex flex-wrap gap-2">
           {REPUTATION_TIERS.map((tier) => {
             const isCurrent = reputation?.tier?.toLowerCase() === tier.name.toLowerCase()
@@ -282,14 +401,13 @@ export function ReputationDisplay({ showHistory = false }: ReputationDisplayProp
                 key={tier.name}
                 className={clsx(
                   'px-3 py-1 rounded-full text-xs font-medium transition-all',
-                  isCurrent
-                    ? 'ring-2 ring-offset-2 ring-offset-gray-800'
-                    : '',
+                  isCurrent ? 'ring-2' : '',
                   isAchieved ? 'opacity-100' : 'opacity-40'
                 )}
                 style={{
                   backgroundColor: `${tier.color}20`,
                   color: tier.color,
+                  ...(isCurrent && isDark ? { boxShadow: `0 0 10px ${tier.color}50` } : {}),
                 }}
               >
                 {tier.name}

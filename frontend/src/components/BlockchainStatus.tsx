@@ -6,10 +6,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Link, ExternalLink, Wallet, Coins, TrendingUp, AlertCircle } from 'lucide-react'
+import { Link, ExternalLink, Wallet, Coins, TrendingUp, AlertCircle, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
-import { getBlockchainStatus, getTaxBreakdown } from '@/lib/api'
+import { getBlockchainStatus, getTaxBreakdown, getTokenBalance } from '@/lib/api'
 import { useAppStore } from '@/store'
+import { useState } from 'react'
 
 export function BlockchainStatusCard() {
   const { t } = useTranslation()
@@ -19,7 +20,7 @@ export function BlockchainStatusCard() {
   const { data: status, isLoading: statusLoading, error: statusError } = useQuery({
     queryKey: ['blockchain-status'],
     queryFn: getBlockchainStatus,
-    refetchInterval: 30000, // 每30秒刷新
+    refetchInterval: 30000,
   })
 
   const { data: tax1000, isLoading: taxLoading } = useQuery({
@@ -29,11 +30,23 @@ export function BlockchainStatusCard() {
 
   if (statusLoading) {
     return (
-      <div className="card">
+      <div className={clsx(
+        'card',
+        isDark && 'border-neon-green/20'
+      )}>
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className={clsx(
+            'h-4 rounded w-1/2',
+            isDark ? 'bg-gray-700' : 'bg-gray-200'
+          )}></div>
+          <div className={clsx(
+            'h-8 rounded w-3/4',
+            isDark ? 'bg-gray-700' : 'bg-gray-200'
+          )}></div>
+          <div className={clsx(
+            'h-4 rounded w-1/3',
+            isDark ? 'bg-gray-700' : 'bg-gray-200'
+          )}></div>
         </div>
       </div>
     )
@@ -41,12 +54,21 @@ export function BlockchainStatusCard() {
 
   if (statusError) {
     return (
-      <div className="card border-red-200 dark:border-red-800">
-        <div className="flex items-center gap-3 text-red-500">
-          <AlertCircle size={20} />
+      <div className={clsx(
+        'card',
+        isDark ? 'border-red-500/30 bg-red-900/10' : 'border-red-200'
+      )}>
+        <div className="flex items-center gap-3">
+          <AlertCircle size={20} className={isDark ? 'text-red-400' : 'text-red-500'} />
           <div>
-            <p className="font-medium">{t('blockchain.connectionError', '区块链连接失败')}</p>
-            <p className="text-sm opacity-75">{(statusError as Error).message}</p>
+            <p className={clsx(
+              'font-medium',
+              isDark ? 'text-red-400' : 'text-red-700'
+            )}>{t('blockchain.connectionError', '区块链连接失败')}</p>
+            <p className={clsx(
+              'text-sm',
+              isDark ? 'text-red-400/70' : 'text-red-500/70'
+            )}>{(statusError as Error).message}</p>
           </div>
         </div>
       </div>
@@ -69,8 +91,16 @@ export function BlockchainStatusCard() {
           {t('blockchain.title', '区块链状态')}
         </h3>
         {status?.connected && (
-          <span className="flex items-center gap-1.5 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          <span className={clsx(
+            'flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full',
+            isDark
+              ? 'bg-green-900/30 text-green-400 border border-green-500/30'
+              : 'bg-green-100 text-green-700'
+          )}>
+            <span className={clsx(
+              'w-2 h-2 rounded-full',
+              isDark ? 'bg-green-400 shadow-[0_0_8px_#00ff88]' : 'bg-green-500'
+            )}></span>
             {t('blockchain.connected', '已连接')}
           </span>
         )}
@@ -79,7 +109,10 @@ export function BlockchainStatusCard() {
       {/* Network Info */}
       <div className="space-y-3">
         {/* Network */}
-        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+        <div className={clsx(
+          'flex items-center justify-between py-2',
+          isDark ? 'border-gray-700/50' : 'border-gray-100'
+        )}>
           <span className={clsx(
             'text-sm',
             'text-light-text-muted',
@@ -93,7 +126,10 @@ export function BlockchainStatusCard() {
         </div>
 
         {/* Chain ID */}
-        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+        <div className={clsx(
+          'flex items-center justify-between py-2',
+          isDark ? 'border-gray-700/50' : 'border-gray-100'
+        )}>
           <span className={clsx(
             'text-sm',
             'text-light-text-muted',
@@ -107,7 +143,10 @@ export function BlockchainStatusCard() {
         </div>
 
         {/* Block Number */}
-        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+        <div className={clsx(
+          'flex items-center justify-between py-2',
+          isDark ? 'border-gray-700/50' : 'border-gray-100'
+        )}>
           <span className={clsx(
             'text-sm',
             'text-light-text-muted',
@@ -121,7 +160,10 @@ export function BlockchainStatusCard() {
         </div>
 
         {/* Token Info */}
-        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+        <div className={clsx(
+          'flex items-center justify-between py-2',
+          isDark ? 'border-gray-700/50' : 'border-gray-100'
+        )}>
           <span className={clsx(
             'text-sm flex items-center gap-1.5',
             'text-light-text-muted',
@@ -139,7 +181,10 @@ export function BlockchainStatusCard() {
 
         {/* Tax Info */}
         {!taxLoading && tax1000 && (
-          <div className="flex items-center justify-between py-2">
+          <div className={clsx(
+            'flex items-center justify-between py-2',
+            isDark ? 'border-gray-700/50' : 'border-gray-100'
+          )}>
             <span className={clsx(
               'text-sm flex items-center gap-1.5',
               'text-light-text-muted',
@@ -163,8 +208,9 @@ export function BlockchainStatusCard() {
           rel="noopener noreferrer"
           className={clsx(
             'flex items-center justify-center gap-2 mt-4 py-2 px-4 rounded-lg text-sm font-medium transition-all',
-            'bg-gray-100 hover:bg-gray-200 text-gray-700',
-            isDark && 'bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue border border-neon-blue/30'
+            isDark
+              ? 'bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue border border-neon-blue/30 hover:border-neon-blue/50'
+              : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200'
           )}
         >
           <ExternalLink size={16} />
@@ -218,10 +264,11 @@ export function TokenBalanceChecker() {
           placeholder="0x..."
           className={clsx(
             'flex-1 px-3 py-2 rounded-lg text-sm',
-            'border border-gray-200 dark:border-gray-700',
-            'bg-white dark:bg-gray-800',
-            'focus:outline-none focus:ring-2 focus:ring-primary-500',
-            isDark && 'font-mono'
+            'border',
+            isDark
+              ? 'border-gray-700 bg-cyber-dark text-white placeholder-gray-500 focus:border-neon-blue focus:ring-1 focus:ring-neon-blue/50'
+              : 'border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50',
+            'focus:outline-none transition-colors'
           )}
         />
         <button
@@ -229,8 +276,10 @@ export function TokenBalanceChecker() {
           disabled={!address}
           className={clsx(
             'px-4 py-2 rounded-lg text-sm font-medium transition-all',
-            'bg-primary-500 text-white hover:bg-primary-600',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
+            isDark
+              ? 'bg-neon-blue text-black hover:bg-neon-blue/90 disabled:opacity-50'
+              : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50',
+            'disabled:cursor-not-allowed'
           )}
         >
           {t('common.search', '查询')}
@@ -240,34 +289,43 @@ export function TokenBalanceChecker() {
       {/* Results */}
       {isLoading && (
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+          <div className={clsx(
+            'h-4 rounded w-1/2 mb-2',
+            isDark ? 'bg-gray-700' : 'bg-gray-200'
+          )}></div>
+          <div className={clsx(
+            'h-8 rounded w-3/4',
+            isDark ? 'bg-gray-700' : 'bg-gray-200'
+          )}></div>
         </div>
       )}
 
       {error && (
-        <div className="text-red-500 text-sm">
+        <div className={clsx(
+          'text-sm',
+          isDark ? 'text-red-400' : 'text-red-600'
+        )}>
           {(error as Error).message}
         </div>
       )}
 
       {balance && (
         <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className={clsx('text-sm', isDark && 'text-gray-400')}>
+          <div className="flex justify-between items-center">
+            <span className={clsx('text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>
               {t('blockchain.address', '地址')}
             </span>
-            <span className={clsx('text-sm font-mono', isDark && 'text-white')}>
+            <span className={clsx('text-sm font-mono', isDark ? 'text-white' : 'text-gray-900')}>
               {balance.address.slice(0, 6)}...{balance.address.slice(-4)}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className={clsx('text-sm', isDark && 'text-gray-400')}>
+          <div className="flex justify-between items-center">
+            <span className={clsx('text-sm', isDark ? 'text-gray-400' : 'text-gray-500')}>
               {t('blockchain.balance', '余额')}
             </span>
             <span className={clsx(
               'text-lg font-bold',
-              isDark && 'text-neon-green'
+              isDark ? 'text-neon-green' : 'text-green-600'
             )}>
               {balance.balance_vibe.toLocaleString()} {balance.symbol}
             </span>
@@ -277,7 +335,3 @@ export function TokenBalanceChecker() {
     </div>
   )
 }
-
-// 需要导入useState
-import { useState } from 'react'
-import { getTokenBalance } from '@/lib/api'
