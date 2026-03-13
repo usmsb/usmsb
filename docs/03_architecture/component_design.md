@@ -1,3 +1,149 @@
+# Component Design
+
+> USMSB SDK Core Component Design
+
+**[English](#1-component-overview) | [中文](#1-组件概览)**
+
+---
+
+## 1. Component Overview
+
+### 1.1 Core Components
+
+| Component | Path | Status | Description |
+|-----------|------|--------|-------------|
+| **Meta Agent** | `platform/external/meta_agent/` | ✅ Implemented | Super Agent |
+| **Agent SDK** | `agent_sdk/` | ✅ Implemented | Agent Development Kit |
+| **LLM Adapter** | `intelligence_adapters/llm/` | ✅ Implemented | Multi-LLM Support |
+| **Skill System** | `core/skills/` | ✅ Implemented | Dynamic Skills |
+| **Memory System** | `platform/external/meta_agent/memory/` | ✅ Implemented | Context Management |
+| **Reasoning Engine** | `reasoning/` | ✅ Implemented | Multi-Engine Reasoning |
+| **Tool Registry** | `platform/external/meta_agent/tools/` | ✅ Implemented | Tool Management |
+| **Wallet Module** | `agent_sdk/wallet.py` | ✅ Implemented | Blockchain Wallet |
+| **Governance Service** | `services/governance_service.py` | ✅ Implemented | Decentralized Governance |
+| **Matching Service** | `services/matching_engine.py` | ✅ Implemented | Intelligent Matching |
+| **Collaboration Service** | `agent_sdk/collaboration.py` | ✅ Implemented | Multi-Agent Collaboration |
+
+### 1.2 Pending Components
+
+| Component | Path | Status | Description |
+|-----------|------|--------|-------------|
+| **Goal Engine** | `platform/external/meta_agent/goals/` | 🔄 Planning | Goal Management |
+| **Autonomous Learning** | `platform/external/meta_agent/learning/` | 🔄 Planning | Autonomous Evolution |
+| **Emergent Behavior** | - | 🔄 Planning | Multi-Agent Emergence |
+
+---
+
+## 2. Meta Agent Component
+
+### 2.1 Architecture
+
+```
+meta_agent/
+├── agent.py              # Main Agent Class
+├── config.yaml           # Configuration
+├── core/                 # Core Capabilities
+│   ├── perception.py    # Perception
+│   ├── decision.py      # Decision Making
+│   ├── execution.py     # Execution
+│   ├── learning.py      # Learning
+│   └── risk_manager.py  # Risk Management
+├── info/                 # Information Extraction
+│   ├── extractor.py     # Information Extractor
+│   ├── intent_analyzer.py
+│   ├── candidate_search.py
+│   └── validator.py
+├── memory/              # Memory System
+├── tools/               # Tool Set
+├── skills/              # Skills
+├── wallet/              # Wallet
+└── workspace/           # Workspace
+```
+
+### 2.2 Core Class
+
+```python
+class MetaAgent:
+    def __init__(self, config: AgentConfig):
+        self.llm_manager = LLMManager()
+        self.tool_registry = ToolRegistry()
+        self.skill_manager = SkillManager()
+        self.memory = MemoryContext()
+        self.wallet = AgentWallet()
+
+    async def chat(self, message: str): ...
+    async def execute_task(self, task: Task): ...
+```
+
+---
+
+## 3. Agent SDK Component
+
+### 3.1 Modules
+
+```
+agent_sdk/
+├── base_agent.py        # Base Agent
+├── discovery.py        # Agent Discovery
+├── registration.py     # Agent Registration
+├── workflow.py         # Workflow
+├── collaboration.py    # Collaboration
+├── negotiation.py      # Negotiation
+├── wallet.py          # Wallet
+├── marketplace.py     # Marketplace
+├── communication.py   # Communication
+└── templates/         # Templates
+```
+
+---
+
+## 4. Service Layer Components
+
+### 4.1 Core Services
+
+| Service | Path | Function |
+|---------|------|----------|
+| **Matching Engine** | `services/matching_engine.py` | Intelligent Matching |
+| **Governance Service** | `services/governance_service.py` | Governance |
+| **Learning Service** | `services/learning_service.py` | Learning |
+| **Environment Service** | `services/environment_service.py` | Environment |
+| **Reputation Service** | `services/reputation_service.py` | Reputation |
+| **Active Matching** | `services/active_matching_service.py` | Active Matching |
+
+---
+
+## 5. Reasoning Engine
+
+### 5.1 Architecture
+
+```
+reasoning/
+├── base.py            # Base Class
+├── interfaces.py     # Interfaces
+├── chain_manager.py   # Chain Management
+├── knowledge_integration.py  # Knowledge Integration
+├── uncertainty.py    # Uncertainty
+└── engines/          # Reasoning Engines
+    ├── meta.py       # Meta Reasoning
+    ├── commonsense.py # Commonsense Reasoning
+    ├── temporal.py   # Temporal Reasoning
+    ├── spatial.py    # Spatial Reasoning
+    ├── analogical.py # Analogical Reasoning
+    ├── causal.py     # Causal Reasoning
+    └── logical.py    # Logical Reasoning
+```
+
+---
+
+## 6. Related Documentation
+
+- [System Architecture](./system_architecture.md) - Overall System Architecture
+- [Meta Agent Design](../04_core_modules/meta_agent_design.md) - Super Agent System Design
+- [Agent SDK](../04_core_modules/agent_sdk.md) - Agent Development Kit
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 组件设计
 
 > USMSB SDK 核心组件设计
@@ -68,7 +214,7 @@ class MetaAgent:
         self.skill_manager = SkillManager()
         self.memory = MemoryContext()
         self.wallet = AgentWallet()
-    
+
     async def chat(self, message: str): ...
     async def execute_task(self, task: Task): ...
 ```
@@ -138,3 +284,5 @@ reasoning/
 - [系统架构](./system_architecture.md) - 整体系统架构
 - [Meta Agent设计](../04_core_modules/meta_agent_design.md) - 超级Agent系统设计
 - [Agent SDK](../04_core_modules/agent_sdk.md) - Agent开发包
+
+</details>

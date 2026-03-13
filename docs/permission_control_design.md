@@ -1,3 +1,538 @@
+# Meta Agent Permission Control Design Document
+
+**[English](#meta-agent-permission-control-design-document) | [中文](#meta-agent-权限控制设计文档)**
+
+---
+
+## 1. Overview
+
+This document describes the permission control design of Meta Agent in multi-user environments, covering user identity authentication, resource isolation, tool execution permissions, data access control, etc. Special focus on security management of npm/npx, git and other development tools.
+
+---
+
+## 2. Existing Permission System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              Existing Permission Control Components              │
+├─────────────────────────────────────────────────────────────────┤
+│  1. PermissionManager (permission/manager.py)                  │
+│     - User role management (UserRole)                          │
+│     - Permission check (PermissionType)                        │
+│     - Tool access control                                      │
+│                                                                  │
+│  2. SessionManager (session/session_manager.py)                 │
+│     - User session lifecycle management                         │
+│     - Session isolation (one session per wallet address)       │
+│                                                                  │
+│  3. UserSession (session/user_session.py)                      │
+│     - Workspace isolation                                      │
+│     - Sandbox isolation                                        │
+│     - Browser context isolation                                │
+│     - Database isolation                                       │
+│     - IPFS isolation                                           │
+│                                                                  │
+│  4. ToolRegistry (tools/registry.py)                           │
+│     - requires_session flag                                    │
+│     - required_permissions list                                │
+│     - security_level                                           │
+│                                                                  │
+│  5. Security (tools/security.py)                               │
+│     - ALLOWED_COMMANDS whitelist                               │
+│     - SecurityLevel                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Permission Control Points
+
+### 3.1 User Identity & Authentication
+
+| Control Point | Description | Current Status | Risk Level |
+|---------------|-------------|----------------|------------|
+| **Wallet Address Verification** | Verify user owns the wallet address | ❌ Not implemented | 🔴 High |
+| **Anonymous User Restrictions** | What operations can unbound users do | ⚠️ Partially implemented | 🟡 Medium |
+| **Multi-wallet Binding** | Can one user bind multiple wallets | ❌ Not implemented | 🟡 Medium |
+| **Session Hijacking Prevention** | Prevent session from being accessed by others | ⚠️ Basic exists | 🟡 Medium |
+
+### 3.2 Conversation Context Isolation
+
+| Control Point | Description | Current Status | Risk Level |
+|---------------|-------------|----------------|------------|
+| **Conversation History Access** | Users can only access their own history | ✅ Implemented | - |
+| **Memory Context** | User profile/preferences only visible to owner | ⚠️ Partially implemented | 🟡 Medium |
+| **Smart Recall Scope** | Recall only searches user's own memory | ⚠️ Partially implemented | 🟡 Medium |
+| **Cross-user Message Injection** | Prevent message pollution to other users | ❌ Not implemented | 🔴 High |
+
+### 3.3 Tool Execution Permissions
+
+| Control Point | Description | Current Status | Risk Level |
+|---------------|-------------|----------------|------------|
+| **Session Requirement Check** | Tools requiring session must provide one | ✅ Implemented | - |
+| **Permission Check** | Check tool permissions based on PermissionType | ⚠️ Framework exists, not integrated | 🟡 Medium |
+| **Blacklist Commands** | Commands outside whitelist in security.py | ⚠️ Partially implemented | 🟡 Medium |
+| **Command Execution Path** | Prevent accessing other user directories | ⚠️ Basic exists | 🟡 Medium |
+| **High-risk Operation Confirmation** | Delete/format operations require confirmation | ❌ Not implemented | 🔴 High |
+
+### 3.4 Resource Quotas
+
+| Control Point | Description | Current Status | Risk Level |
+|---------------|-------------|----------------|------------|
+| **Session Count Limit** | Max sessions per user | ❌ Not implemented | 🟡 Medium |
+| **API Call Frequency** | Max calls per minute | ❌ Not implemented | 🟡 Medium |
+| **Code Execution Time** | Max timeout | ⚠️ Has config | 🟢 Low |
+| **Memory Limit** | Max sandbox memory | ⚠️ Has config | 🟢 Low |
+| **Storage Space Limit** | User workspace size | ❌ Not implemented | 🟡 Medium |
+| **Bandwidth Limit** | IPFS/browser traffic | ❌ Not implemented | 🟡 Medium |
+
+### 3.5 Sensitive Operations Control
+
+| Control Point | Description | Current Status | Risk Level |
+|---------------|-------------|----------------|------------|
+| **Delete Operations** | Delete files/database records | ❌ Not implemented | 🔴 High |
+| **Format Operations** | Clear workspace/database | ❌ Not implemented | 🔴 High |
+| **Network Requests** | Allowed network request scope | ⚠️ Has whitelist | 🟡 Medium |
+| **External Command Execution** | Shell command execution | ⚠️ Whitelist | 🟡 Medium |
+| **Sensitive Info Access** | View API Key/password | ❌ Not implemented | 🔴 High |
+| **System Operations** | Modify config/restart service | ❌ Not implemented | 🔴 High |
+
+### 3.6 Data Access Control
+
+| Control Point | Description | Current Status | Risk Level |
+|---------------|-------------|----------------|------------|
+| **Vector Database** | User knowledge base isolation | ⚠️ Partially implemented | 🟡 Medium |
+| **Conversation Database** | User conversation record isolation | ✅ Implemented | 🟢 Low |
+| **User Profile** | User preference/settings isolation | ⚠️ Partially implemented | 🟡 Medium |
+| **Experience Learning** | User learning experience isolation | ❌ Not implemented | 🟡 Medium |
+
+### 3.7 Roles & Permission Levels
+
+| Role | Current Permissions | Needs Additional Control |
+|------|---------------------|-------------------------|
+| **SUPERADMIN** | All permissions | Requires 2FA |
+| **DEVELOPER** | Deploy/config permissions | Requires approval process |
+| **NODE_ADMIN** | Node management permissions | Requires staking |
+| **HUMAN** | Basic operation permissions | Requires wallet verification |
+| **Anonymous** | Very limited permissions | Needs strict restrictions |
+
+---
+
+## 4. npm/npx Command Permission Control Design
+
+### 4.1 Permission Requirements Analysis
+
+npm/npx commands are core development tools with special characteristics:
+
+| Characteristic | Risk | Impact |
+|----------------|------|--------|
+| **Network Access** | May access malicious packages | Security/privacy |
+| **Disk Write** | Install packages to local directory | Space/filesystem |
+| **Code Execution** | Package may contain malicious code | Server compromised |
+| **Dependency Install** | May install large number of packages | DoS attack |
+| **Global Install** | Affects system environment | System security |
+
+### 4.2 Permission Scenario Levels
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              npm/npx Permission Scenario Levels                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 1: Read-only Operations (Lowest Risk)               │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - npm view <package>      View package info                   │
+│  - npm search <keyword>    Search packages                     │
+│  - npm ls                  List installed packages             │
+│  - npm outdated            Check outdated packages             │
+│                                                                  │
+│  Permission: Can execute without wallet, but rate limited      │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 2: Local Development Operations (Medium Risk)       │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - npm install <package>     Install to project               │
+│  - npm run <script>          Run script                       │
+│  - npx <command>             Execute npx command              │
+│  - npm init                  Initialize project                │
+│                                                                  │
+│  Permission: Requires wallet + workspace permission            │
+│  Restriction: Only within user workspace directory            │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 3: System-level Operations (High Risk)             │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - npm install -g <package>  Global install                   │
+│  - npm install -g <package>  Global uninstall                 │
+│  - npm config edit           Edit global config               │
+│                                                                  │
+│  Permission: SUPERADMIN/DEVELOPER only                        │
+│  Requires:     Confirmation + operation log                    │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 4: Dynamic Skill Registration (Highest Risk)       │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - Wrap npx command as system Skill                           │
+│  - Execute user-defined npm commands                          │
+│                                                                  │
+│  Permission: SUPERADMIN only                                  │
+│  Requires:     Code review + sandbox execution                │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 Permission Control Strategy
+
+```python
+# npm/npx Permission Configuration
+NPM_PERMISSION_CONFIG = {
+    # 1. Basic permission requirements
+    "require_wallet": True,              # Requires wallet binding
+    "require_workspace": True,           # Requires workspace
+
+    # 2. Operation restrictions
+    "allowed_operations": {
+        # Public operations (no wallet required)
+        "public": ["view", "search", "ls", "outdated", "info"],
+        # Operations requiring wallet
+        "wallet": ["install", "uninstall", "run", "init", "test", "build"],
+        # Operations requiring admin
+        "admin": ["install -g", "uninstall -g", "config edit"],
+    },
+
+    # 3. Workspace restrictions
+    "workspace_restriction": {
+        "enabled": True,
+        "allowed_paths": ["$WORKSPACE", "$TEMP"],  # User workspace
+        "blocked_paths": ["/", "/etc", "/usr", "/var"],
+    },
+
+    # 4. Resource limits
+    "resource_limits": {
+        "max_install_size_mb": 500,          # Max 500MB per install
+        "max_total_packages": 1000,           # Max packages
+        "max_daily_installs": 50,             # Max daily installs
+        "command_timeout": 300,               # Timeout
+    },
+
+    # 5. Security checks
+    "security_checks": {
+        "scan_packages": True,                # Scan before install
+        "block_known_malicious": True,        # Block known malicious
+        "sandbox_execution": True,            # Sandbox execution
+    },
+}
+```
+
+### 4.4 Permission Matrix
+
+| Operation | Anonymous | HUMAN | DEVELOPER | SUPERADMIN |
+|-----------|-----------|-------|-----------|------------|
+| npm view | ✅ (rate limited) | ✅ | ✅ | ✅ |
+| npm search | ✅ (rate limited) | ✅ | ✅ | ✅ |
+| npm install | ❌ | ✅ (workspace only) | ✅ | ✅ |
+| npm run | ❌ | ✅ (workspace only) | ✅ | ✅ |
+| npx | ❌ | ✅ (whitelist) | ✅ | ✅ |
+| npm install -g | ❌ | ❌ | ✅ | ✅ |
+| Register as Skill | ❌ | ❌ | ❌ | ✅ |
+
+---
+
+## 5. git Command Permission Control Design
+
+### 5.1 Permission Requirements Analysis
+
+git commands involve version control with special characteristics:
+
+| Characteristic | Risk | Impact |
+|----------------|------|--------|
+| **Code Repository Access** | May clone malicious repository | Security/privacy |
+| **Remote Operations** | push/pull to remote | Data leakage/overwrite |
+| **Credential Management** | Involves SSH/GitHub tokens | Credential leakage |
+| **History Operations** | May view sensitive commits | Information leakage |
+
+### 5.2 Permission Scenario Levels
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              git Permission Scenario Levels                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 1: Local Read-only Operations (Lowest Risk)          │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                       │
+│  - git status           View status                             │
+│  - git log              View log                               │
+│  - git diff             View diff                              │
+│  - git show             View commit                            │
+│  - git branch           View branches                          │
+│                                                                  │
+│  Permission: Requires workspace permission                     │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 2: Local Write Operations (Medium Risk)              │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - git init                Initialize repository               │
+│  - git add                 Stage files                         │
+│  - git commit              Commit changes                      │
+│  - git checkout            Checkout branch/file                │
+│  - git branch (create)     Create branch                      │
+│                                                                  │
+│  Permission: Requires wallet + workspace write permission       │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 3: Remote Operations (High Risk)                    │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - git clone           Clone repository                        │
+│  - git fetch           Fetch remote updates                    │
+│  - git pull            Pull remote updates                    │
+│  - git push                                                     │
+│  - git remote          Manage remote repositories              │
+│                                                                  │
+│  Permission: Requires wallet + remote push credential verification + network whitelist
+│  Restriction: Only specific remote repositories allowed        │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Scenario 4: Dangerous Operations (Highest Risk)              │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  - git reset --hard     Hard reset                             │
+│  - git push --force     Force push                            │
+│  - git filter-branch   History rewrite                        │
+│  - git rm --cached     Remove from index                      │
+│                                                                  │
+│  Permission: Requires confirmation + audit log                 │
+│  Requires:     Pre-operation prompt + backup                   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 5.3 Permission Control Strategy
+
+```python
+# git Permission Configuration
+GIT_PERMISSION_CONFIG = {
+    # 1. Basic permission requirements
+    "require_wallet": True,              # Requires wallet binding
+    "require_workspace": True,           # Requires workspace
+
+    # 2. Operation restrictions
+    "allowed_operations": {
+        # Workspace operations (requires wallet)
+        "workspace": [
+            "status", "log", "diff", "show", "branch",
+            "add", "commit", "checkout", "switch", "merge",
+            "stash", "stash pop", "init"
+        ],
+        # Remote operations (requires extra verification)
+        "remote": ["clone", "fetch", "pull", "push", "remote"],
+        # Dangerous operations (requires confirmation)
+        "dangerous": [
+            "reset --hard", "reset --mixed",
+            "push --force", "filter-branch"
+        ],
+    },
+
+    # 3. Remote repository whitelist
+    "remote_whitelist": {
+        "enabled": True,
+        "allowed_domains": [
+            "github.com",
+            "gitlab.com",
+            "bitbucket.org",
+        ],
+        "blocked_patterns": [
+            "*internal-secret*",
+            "*credentials*",
+        ],
+    },
+
+    # 4. Credential handling
+    "credential_handling": {
+        "store_locally": False,           # Don't store locally
+        "use_agent": True,                # Use ssh-agent
+        "require_explicit": True,          # Requires explicit each time
+    },
+
+    # 5. Network restrictions
+    "network_restrictions": {
+        "allowed_protocols": ["https", "ssh"],
+        "blocked_ports": [22],            # Limit non-standard SSH
+        "rate_limit": {
+            "push_per_hour": 10,
+            "clone_per_day": 20,
+        },
+    },
+}
+```
+
+### 5.4 Permission Matrix
+
+| Operation | Anonymous | HUMAN | DEVELOPER | SUPERADMIN |
+|-----------|-----------|-------|-----------|------------|
+| git status | ❌ | ✅ | ✅ | ✅ |
+| git log | ❌ | ✅ | ✅ | ✅ |
+| git diff | ❌ | ✅ | ✅ | ✅ |
+| git add | ❌ | ✅ | ✅ | ✅ |
+| git commit | ❌ | ✅ | ✅ | ✅ |
+| git checkout | ❌ | ✅ | ✅ | ✅ |
+| git init | ❌ | ✅ (workspace) | ✅ | ✅ |
+| git clone | ❌ | ✅ (whitelist) | ✅ | ✅ |
+| git pull | ❌ | ✅ (whitelist) | ✅ | ✅ |
+| git push | ❌ | ❌ | ✅ (whitelist) | ✅ |
+| git reset --hard | ❌ | ❌ | ⚠️ Confirm | ✅ |
+| git push --force | ❌ | ❌ | ❌ | ⚠️ Confirm |
+
+---
+
+## 6. Development Tools Permission Summary
+
+### 6.1 npm vs git Permission Comparison
+
+| Dimension | npm/npx | git |
+|-----------|---------|-----|
+| **Core Risk** | Malicious packages/code execution | Code leakage/remote overwrite |
+| **Network Dependency** | High (needs npm registry) | Medium (optional offline) |
+| **Storage Impact** | Large (install many packages) | Small (only repository) |
+| **Permission Required** | Workspace + wallet | Workspace + wallet |
+| **Dangerous Operations** | Global install | Force push/reset |
+| **Most Used** | install, run | status, log, add, commit |
+
+### 6.2 Unified Permission Model
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│           Unified Permission Model for Development Tools         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. Authentication Layer                                        │
+│     ├── Wallet binding verification                             │
+│     ├── Session Token verification                              │
+│     └── Anonymous user basic quota                             │
+│                                                                  │
+│  2. Authorization Layer                                         │
+│     ├── Role permissions (ROLE_PERMISSIONS)                    │
+│     ├── Operation permissions (TOOL_PERMISSIONS)               │
+│     └── Resource permissions (workspace/sandbox)               │
+│                                                                  │
+│  3. Access Control Layer                                        │
+│     ├── Path restrictions (whitelist/blacklist)                 │
+│     ├── Network restrictions (domain/protocol whitelist)       │
+│     └── Credential management (keys/tokens)                    │
+│                                                                  │
+│  4. Quota Layer                                                 │
+│     ├── Rate limits (per minute/hour)                          │
+│     ├── Resource limits (memory/disk/time)                     │
+│     └── Quota limits (operation count/size)                    │
+│                                                                  │
+│  5. Audit Layer                                                 │
+│     ├── Operation logs (who, when, where)                      │
+│     ├── Change tracking (version/content)                       │
+│     └── Anomaly detection (unusual patterns/frequent errors)  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 7. Risks from Missing Permission Control
+
+| Risk Type | Scenario Description | Impact | Related Tools |
+|-----------|---------------------|--------|---------------|
+| **Data Leakage** | User A accesses User B's workspace | Privacy leak | npm, git |
+| **Resource Exhaustion** | Unlimited anonymous calls cause service unavailable | DoS attack | npm |
+| **Privilege Escalation** | Regular user gains admin via vulnerability | System compromised | npm |
+| **Session Hijacking** | Attacker gets other user's session | Impersonation | All |
+| **Command Injection** | Execute dangerous system commands via tools | Server hacked | npm, git |
+| **Malicious Code** | Install npm package with malicious code | Server compromised | npm |
+| **Repository Overwrite** | Force push to others' repository | Code loss | git |
+| **Credential Leakage** | GitHub Token obtained by other users | Account stolen | git |
+
+---
+
+## 8. Recommended Implementation Priority
+
+### 8.1 High Priority (P0 - Security Vulnerabilities)
+
+| # | Function | Description | Related Tools |
+|---|----------|-------------|---------------|
+| 1 | Workspace path isolation | Prevent ../ escape | npm, git |
+| 2 | npm global install restriction | Prevent system compromise | npm |
+| 3 | git force push restriction | Prevent repository destruction | git |
+| 4 | Credential isolation | Prevent credential leakage | git |
+| 5 | Anonymous user strict restrictions | Prevent resource exhaustion | npm, git |
+
+### 8.2 Medium Priority (P1 - Feature Completion)
+
+| # | Function | Description | Related Tools |
+|---|----------|-------------|---------------|
+| 6 | Permission system integration | Integrate PermissionManager into tool execution | npm, git |
+| 7 | Operation audit logs | Log all sensitive operations | npm, git |
+| 8 | Network domain whitelist | Limit accessible remote repositories | npm, git |
+| 9 | Resource quota limits | Limit disk/memory/frequency | npm |
+| 10 | Operation confirmation mechanism | Secondary confirmation for dangerous ops | npm, git |
+
+### 8.3 Low Priority (P2 - Experience Optimization)
+
+| # | Function | Description |
+|---|----------|-------------|
+| 11 | Permission application process | Users can apply for higher permissions |
+| 12 | Operation preview | Show impact before dangerous operations |
+| 13 | Batch authorization | Batch manage user permissions |
+| 14 | Permission usage report | Show permission usage |
+
+---
+
+## 9. Next Action Plan
+
+### 9.1 Immediate Execution
+
+1. **Improve npm/npx permission configuration**
+   - Add `NPM_OPERATION` permission type in `permission/models.py`
+   - Implement workspace path check
+   - Restrict global installs
+
+2. **Improve git permission configuration**
+   - Add `GIT_OPERATION` permission type in `permission/models.py`
+   - Implement remote repository whitelist
+   - Restrict dangerous operations
+
+3. **Integrate permission checks into tool execution**
+   - Add permission validation in `ToolRegistry.execute()`
+   - Implement role-based tool filtering
+
+### 9.2 Subsequent Iterations
+
+1. Implement complete audit log system
+2. Implement resource quota limits
+3. Implement operation confirmation mechanism
+4. Improve anonymous user restrictions
+
+---
+
+## 10. Related Files
+
+- `permission/manager.py` - Permission manager
+- `permission/models.py` - Permission model definitions
+- `session/session_manager.py` - Session manager
+- `session/user_session.py` - User session
+- `tools/registry.py` - Tool registry
+- `tools/security.py` - Security checks
+- `core/skills/npm_skill.py` - npm skill
+- `core/skills/git_skill.py` - git skill
+
+---
+
+*Document version: 1.0*
+*Created: 2026-02-26*
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # Meta Agent 权限控制设计文档
 
 ## 一、概述
@@ -21,7 +556,7 @@
 │     - 用户会话生命周期管理                                        │
 │     - 会话隔离 (每个钱包地址一个会话)                             │
 │                                                                  │
-│  3. UserSession (session/user_session.py)                      │
+│  3. UserSession (session/user_session.py)                       │
 │     - 工作空间隔离 (workspace)                                   │
 │     - 沙箱隔离 (sandbox)                                        │
 │     - 浏览器隔离 (browser_context)                               │
@@ -144,22 +679,22 @@ npm/npx 命令是开发环境的核心工具，具有以下特殊性：
 │                    npm/npx 权限场景分级                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 1: 只读操作 (最低风险)                                     │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│  场景 1: 只读操作 (最低风险)                                      │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
 │  - npm view <package>      查看包信息                            │
 │  - npm search <keyword>    搜索包                                │
 │  - npm ls                  列出已安装包                          │
-│  - npm outdated            检查过期包                           │
+│  - npm outdated            检查过期包                            │
 │                                                                  │
-│  权限要求: 无钱包也可执行，但限制频率                             │
+│  权限要求: 无钱包也可执行，但限制频率                              │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 2: 本地开发操作 (中等风险)                                 │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
-│  - npm install <package>     安装到项目                         │
-│  - npm run <script>          运行脚本                           │
-│  - npx <command>             执行 npx 命令                      │
+│  场景 2: 本地开发操作 (中等风险)                                  │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - npm install <package>     安装到项目                          │
+│  - npm run <script>          运行脚本                            │
+│  - npx <command>             执行 npx 命令                       │
 │  - npm init                  初始化项目                         │
 │                                                                  │
 │  权限要求: 需钱包绑定 + 工作空间权限                              │
@@ -167,24 +702,24 @@ npm/npx 命令是开发环境的核心工具，具有以下特殊性：
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 3: 系统级操作 (高风险)                                     │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
-│  - npm install -g <package>  全局安装                           │
-│  - npm install -g <package>  全局卸载                           │
-│  - npm config edit           修改全局配置                       │
+│  场景 3: 系统级操作 (高风险)                                      │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - npm install -g <package>  全局安装                            │
+│  - npm install -g <package>  全局卸载                            │
+│  - npm config edit           修改全局配置                        │
 │                                                                  │
-│  权限要求: 仅 SUPERADMIN/DEVELOPER                              │
-│  需要:     二次确认 + 操作日志                                   │
+│  权限要求: 仅 SUPERADMIN/DEVELOPER                               │
+│  需要:     二次确认 + 操作日志                                    │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 4: 动态 Skill 注册 (最高风险)                             │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
-│  - 将 npx 命令封装为系统 Skill                                  │
-│  - 执行用户定义的 npm 命令                                       │
+│  场景 4: 动态 Skill 注册 (最高风险)                              │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - 将 npx 命令封装为系统 Skill                                   │
+│  - 执行用户定义的 npm 命令                                        │
 │                                                                  │
 │  权限要求: 仅 SUPERADMIN                                         │
-│  需要:     代码审查 + 沙箱执行                                   │
+│  需要:     代码审查 + 沙箱执行                                    │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -197,7 +732,7 @@ NPM_PERMISSION_CONFIG = {
     # 1. 基本权限要求
     "require_wallet": True,              # 需要绑定钱包
     "require_workspace": True,           # 需要工作空间
-    
+
     # 2. 操作限制
     "allowed_operations": {
         # 公开操作（无需钱包）
@@ -207,14 +742,14 @@ NPM_PERMISSION_CONFIG = {
         # 需要高级权限的操作
         "admin": ["install -g", "uninstall -g", "config edit"],
     },
-    
+
     # 3. 工作空间限制
     "workspace_restriction": {
         "enabled": True,
         "allowed_paths": ["$WORKSPACE", "$TEMP"],  # 用户工作空间
         "blocked_paths": ["/", "/etc", "/usr", "/var"],
     },
-    
+
     # 4. 资源限制
     "resource_limits": {
         "max_install_size_mb": 500,          # 单次安装最大500MB
@@ -222,7 +757,7 @@ NPM_PERMISSION_CONFIG = {
         "max_daily_installs": 50,             # 每日最大安装次数
         "command_timeout": 300,               # 超时时间
     },
-    
+
     # 5. 安全检查
     "security_checks": {
         "scan_packages": True,                # 安装前扫描
@@ -266,52 +801,52 @@ git 命令涉及版本控制，具有以下特殊性：
 │                    git 权限场景分级                               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 1: 本地只读操作 (最低风险)                                 │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                       │
-│  - git status           查看状态                                │
-│  - git log              查看日志                                │
-│  - git diff             查看差异                                │
-│  - git show             查看提交                                │
-│  - git branch           查看分支                               │
+│  场景 1: 本地只读操作 (最低风险)                                  │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - git status           查看状态                                 │
+│  - git log              查看日志                                 │
+│  - git diff             查看差异                                 │
+│  - git show             查看提交                                 │
+│  - git branch           查看分支                                 │
 │                                                                  │
-│  权限要求: 需工作空间权限                                       │
-│                                                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  场景 2: 本地写入操作 (中等风险)                                │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                       │
-│  - git init                初始化仓库                          │
-│  - git add                 暂存文件                            │
-│  - git commit              提交更改                            │
-│  - git checkout            检出分支/文件                        │
-│  - git branch (create)     创建分支                            │
-│                                                                  │
-│  权限要求: 需钱包绑定 + 工作空间写入权限                         │
+│  权限要求: 需工作空间权限                                        │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 3: 远程操作 (高风险)                                     │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                       │
-│  - git clone           克隆仓库                                 │
-│  - git fetch           获取远程更新                             │
-│  - git pull            拉取远程更新                             │
-│  - git push                                         │
-│  - git remote          管理远程仓库                             │
+│  场景 2: 本地写入操作 (中等风险)                                 │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - git init                初始化仓库                            │
+│  - git add                 暂存文件                             │
+│  - git commit              提交更改                             │
+│  - git checkout            检出分支/文件                         │
+│  - git branch (create)     创建分支                             │
 │                                                                  │
-│  权限要求: 需钱包绑定 +  推送到远程凭据验证 + 网络白名单                    │
-│  限制:     仅允许特定远程仓库                                   │
+│  权限要求: 需钱包绑定 + 工作空间写入权限                          │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  场景 4: 危险操作 (最高风险)                                   │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                       │
-│  - git reset --hard     硬重置                                  │
-│  - git push --force     强制推送                                │
-│  - git filter-branch   历史重写                                │
-│  - git rm --cached     从索引删除                               │
+│  场景 3: 远程操作 (高风险)                                      │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - git clone           克隆仓库                                  │
+│  - git fetch           获取远程更新                               │
+│  - git pull            拉取远程更新                               │
+│  - git push                                                       │
+│  - git remote          管理远程仓库                               │
 │                                                                  │
-│  权限要求: 需确认 + 审计日志                                    │
-│  需要:     操作前提示 + 备份                                   │
+│  权限要求: 需钱包绑定 + 推送到远程凭据验证 + 网络白名单           │
+│  限制:     仅允许特定远程仓库                                    │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  场景 4: 危险操作 (最高风险)                                     │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                        │
+│  - git reset --hard     硬重置                                   │
+│  - git push --force     强制推送                                 │
+│  - git filter-branch   历史重写                                  │
+│  - git rm --cached     从索引删除                                 │
+│                                                                  │
+│  权限要求: 需确认 + 审计日志                                     │
+│  需要:     操作前提示 + 备份                                     │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -324,7 +859,7 @@ GIT_PERMISSION_CONFIG = {
     # 1. 基本权限要求
     "require_wallet": True,              # 需要绑定钱包
     "require_workspace": True,           # 需要工作空间
-    
+
     # 2. 操作限制
     "allowed_operations": {
         # 工作空间内操作（需钱包）
@@ -337,34 +872,32 @@ GIT_PERMISSION_CONFIG = {
         "remote": ["clone", "fetch", "pull", "push", "remote"],
         # 危险操作（需确认）
         "dangerous": [
-            "reset --hard", "reset --mixed", 
+            "reset --hard", "reset --mixed",
             "push --force", "filter-branch"
         ],
     },
-    
+
     # 3. 远程仓库白名单
     "remote_whitelist": {
         "enabled": True,
         "allowed_domains": [
             "github.com",
-            "gitlab.com", 
+            "gitlab.com",
             "bitbucket.org",
-            # 企业 GitLab
-            # 自建 Git 服务器
         ],
         "blocked_patterns": [
             "*internal-secret*",
             "*credentials*",
         ],
     },
-    
+
     # 4. 凭据管理
     "credential_handling": {
         "store_locally": False,           # 不本地存储凭据
         "use_agent": True,                # 使用 ssh-agent
         "require_explicit": True,          # 每次需显式提供
     },
-    
+
     # 5. 网络限制
     "network_restrictions": {
         "allowed_protocols": ["https", "ssh"],
@@ -536,3 +1069,5 @@ GIT_PERMISSION_CONFIG = {
 
 *文档版本: 1.0*
 *创建日期: 2026-02-26*
+
+</details>

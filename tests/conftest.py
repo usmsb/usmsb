@@ -217,3 +217,232 @@ def pytest_configure(config: pytest.Config):
     config.addinivalue_line(
         "markers", "requires_network: mark test as requiring network access"
     )
+
+
+# ============================================================================
+# API Client Fixture for Business Tests
+# ============================================================================
+
+import uuid
+import time
+from httpx import AsyncClient, ASGITransport
+
+# 设置测试环境变量
+os.environ.setdefault("TESTING", "true")
+
+
+@pytest.fixture(scope="session")
+def test_db_path(tmp_path_factory):
+    """创建临时测试数据库 - session级别，所有测试共享"""
+    db_dir = tmp_path_factory.mktemp("test_data")
+    return db_dir / "test_civilization.db"
+
+
+@pytest.fixture(scope="session")
+def database_module(test_db_path):
+    """设置测试数据库路径并返回数据库模块"""
+    import usmsb_sdk.api.database as db_module
+    db_module.DATABASE_PATH = str(test_db_path)
+    db_module.init_db()
+    return db_module
+
+
+@pytest.fixture(scope="session")
+def clean_db(database_module):
+    """可选: 每个测试前清理数据库"""
+    clean_between_tests = os.environ.get("CLEAN_DB_BETWEEN_TESTS", "0") == "1"
+
+    if clean_between_tests:
+        import os
+        db_path = database_module.get_db_path()
+        if os.path.exists(db_path):
+            os.remove(db_path)
+        database_module.init_db()
+
+    yield
+
+
+@pytest.fixture
+async def api_client(database_module):
+    """创建测试API客户端 - 带认证"""
+    from usmsb_sdk.api.rest.main import app
+    import hashlib
+    import time
+
+    database_module.init_db()
+
+    # 创建测试Agent用于认证
+    test_agent_id = "test_agent_system"
+    test_api_key = "test_api_key_12345"
+    test_key_hash = hashlib.sha256(test_api_key.encode()).hexdigest()
+
+    with database_module.get_db() as conn:
+        cursor = conn.cursor()
+        # 创建测试Agent
+        cursor.execute("""
+            INSERT OR IGNORE INTO agents (
+                agent_id, name, agent_type, description, capabilities,
+                endpoint, protocol, status, stake, balance,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            test_agent_id,
+            "TestSystemAgent",
+            "ai_agent",
+            "System test agent for API testing",
+            '["reasoning", "planning"]',
+            "http://localhost:8080",
+            "standard",
+            "active",
+            10000.0,
+            5000.0,
+            time.time(),
+            time.time()
+        ))
+
+        # 创建测试API Key
+        cursor.execute("""
+            INSERT OR IGNORE INTO agent_api_keys (
+                id, agent_id, key_hash, key_prefix, name,
+                permissions, level, expires_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            f"key-{uuid.uuid4().hex[:8]}",
+            test_agent_id,
+            test_key_hash,
+            test_api_key[:8],
+            "Test API Key",
+            '["read", "write", "execute"]',
+            10,
+            None,
+            time.time()
+        ))
+        conn.commit()
+
+    # 测试用的认证头
+    headers = {
+        "X-API-Key": test_api_key,
+        "X-Agent-ID": test_agent_id,
+    }
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver/api",
+        timeout=30.0,
+        headers=headers
+    ) as client:
+        yield client
+
+
+# ============================================================================
+# Test Data Fixtures
+# ============================================================================
+
+@pytest.fixture
+def sample_agent_data():
+    """样例Agent数据"""
+    agent_id = f"test_agent_{uuid.uuid4().hex[:8]}"
+    return {
+        "agent_id": agent_id,
+        "name": f"TestAgent_{agent_id[-6:]}",
+        "agent_type": "ai_agent",
+        "description": "Test agent for integration testing",
+        "capabilities": ["reasoning", "planning", "execution"],
+        "skills": [
+            {"name": "python", "level": "advanced"},
+            {"name": "data_analysis", "level": "intermediate"}
+        ],
+        "endpoint": "http://localhost:8080",
+        "chat_endpoint": "http://localhost:8081/chat",
+        "protocol": "standard",
+        "stake": 1000.0,
+        "balance": 500.0,
+    }
+
+
+@pytest.fixture
+def sample_demand_data(sample_agent_data):
+    """样例需求数据"""
+    return {
+        "agent_id": sample_agent_data["agent_id"],
+        "title": "Need AI agent for data analysis",
+        "description": "Professional data analysis required",
+        "category": "data_analysis",
+        "required_skills": ["python", "ml", "statistics"],
+        "budget_min": 100.0,
+        "budget_max": 500.0,
+        "deadline": "2026-12-31",
+        "priority": "high",
+    }
+
+
+@pytest.fixture
+def sample_service_data(sample_agent_data):
+    """样例服务数据"""
+    return {
+        "agent_id": sample_agent_data["agent_id"],
+        "service_name": "DataAnalysisService",
+        "description": "Professional data analysis",
+        "category": "data_analysis",
+        "skills": [
+            {"name": "python", "level": "advanced"},
+            {"name": "pandas", "level": "advanced"},
+            {"name": "ml", "level": "intermediate"}
+        ],
+        "price": 200.0,
+        "price_type": "fixed",
+    }
+
+
+@pytest.fixture
+def sample_workflow_data(sample_agent_data):
+    """样例工作流数据"""
+    return {
+        "agent_id": sample_agent_data["agent_id"],
+        "name": "DataAnalysisWorkflow",
+        "task_description": "Execute complete data analysis",
+        "steps": [
+            {"step": 1, "action": "collect_data", "status": "pending"},
+            {"step": 2, "action": "analyze", "status": "pending"},
+            {"step": 3, "action": "report", "status": "pending"},
+        ]
+    }
+
+
+@pytest.fixture
+def sample_proposal_data():
+    """样例提案数据"""
+    return {
+        "title": "System Upgrade Proposal",
+        "description": "Upgrade to v2.0 with new features",
+        "proposer_id": f"test_proposer_{uuid.uuid4().hex[:8]}",
+        "quorum": 3,
+        "deadline": "2026-12-31",
+    }
+
+
+@pytest.fixture
+def test_wallet():
+    """生成测试钱包地址"""
+    return f"0x{uuid.uuid4().hex[:40]}"
+
+
+@pytest.fixture
+def auth_headers():
+    """认证请求头"""
+    return {
+        "X-API-Key": "test_api_key",
+        "X-Agent-ID": "test_agent",
+    }
+
+
+@pytest.fixture
+def test_api_key():
+    """测试API密钥"""
+    return "test_api_key"
+
+
+@pytest.fixture
+def test_agent_id():
+    """测试Agent ID"""
+    return f"test_agent_{uuid.uuid4().hex[:8]}"

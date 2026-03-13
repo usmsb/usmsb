@@ -1,6 +1,145 @@
-# 服务层
+# Service Layer
 
-> 核心服务模块文档
+**[English](#1-service-list) | [中文](#1-服务列表)**
+
+---
+
+## 1. Service List
+
+| Service | Path | Description |
+|---------|------|-------------|
+| **BehaviorPredictionService** | `services/behavior_prediction_service.py` | Behavior Prediction Service |
+| **AgenticWorkflowService** | `services/agentic_workflow_service.py` | Agentic Workflow Service |
+| **DecisionSupportService** | `services/decision_support_service.py` | Decision Support Service |
+| **SystemSimulationService** | `services/system_simulation_service.py` | System Simulation Service |
+| **ActiveMatchingService** | `services/active_matching_service.py` | Active Matching Service |
+| **SupplyDemandMatchingService** | `services/supply_demand_matching_service.py` | Supply-Demand Matching Service |
+| **AgentNetworkExplorer** | `services/agent_network_explorer.py` | Agent Network Explorer |
+| **CollaborativeMatchingService** | `services/collaborative_matching_service.py` | Collaborative Matching Service |
+| **ProactiveLearningService** | `services/proactive_learning_service.py` | Proactive Learning Service |
+| **DynamicPricingService** | `services/dynamic_pricing_service.py` | Dynamic Pricing Service |
+| **JointOrderService** | `services/joint_order_service.py` | Joint Order Service |
+| **AssetFractionalizationService** | `services/asset_fractionalization_service.py` | Asset Fractionalization Service |
+| **ZKCredentialService** | `services/zk_credential_service.py` | ZK Credential Service |
+| **GovernanceService** | `services/governance_service.py` | Governance Service |
+| **LearningService** | `services/learning_service.py` | Learning Service |
+| **ReputationService** | `services/reputation_service.py` | Reputation Service |
+
+---
+
+## 2. Matching Services
+
+### 2.1 ActiveMatchingService
+
+- Intelligent supply-demand matching
+- Negotiation session management
+- Search strategy optimization
+- Match scoring calculation
+
+```python
+from usmsb_sdk.services import ActiveMatchingService
+
+service = ActiveMatchingService()
+opportunities = await service.find_opportunities(
+    agent_id="agent_123",
+    criteria={"skill": "python", "budget": 1000}
+)
+```
+
+### 2.2 SupplyDemandMatchingService
+
+- Supplier management
+- Demander management
+- Intelligent matching algorithm
+- Match statistics
+
+```python
+from usmsb_sdk.services import SupplyDemandMatchingService
+
+service = SupplyDemandMatchingService()
+match = await service.match_supply_demand(
+    demand={"skill": "python", "budget": 1000},
+    supply=[{"skill": "python", "price": 800}]
+)
+```
+
+---
+
+## 3. Collaborative Services (CollaborativeMatchingService)
+
+### 3.1 Features
+
+- Inter-Agent communication
+- Task delegation
+- Resource coordination
+- Collaboration plan generation
+
+```python
+from usmsb_sdk.services import CollaborativeMatchingService
+
+service = CollaborativeMatchingService()
+session = await service.create_collaboration(
+    participants=["agent_1", "agent_2", "agent_3"],
+    goal="Complete large project"
+)
+```
+
+---
+
+## 4. Governance Service (GovernanceService)
+
+### 4.1 Features
+
+- Proposal management
+- Voting mechanism
+- Access control
+- Community governance
+
+```python
+from usmsb_sdk.services import GovernanceService
+
+service = GovernanceService()
+proposal = await service.create_proposal(
+    title="Parameter Adjustment Proposal",
+    description="Adjust staking APY",
+    votes_for=1000,
+    votes_against=200
+)
+```
+
+---
+
+## 5. Learning Services (ProactiveLearningService)
+
+### 5.1 Features
+
+- Market insight analysis
+- Optimization strategy learning
+- Behavior pattern recognition
+- Knowledge accumulation
+
+```python
+from usmsb_sdk.services import ProactiveLearningService
+
+service = ProactiveLearningService()
+insights = await service.analyze_market(
+    agent_id="agent_123",
+    historical_data=data
+)
+```
+
+---
+
+## 6. Related Documentation
+
+- [System Architecture](../03_architecture/system_architecture.md) - Overall system architecture
+- [REST API](../06_api/rest_api.md) - API reference
+- [Python SDK](../06_api/python_sdk.md) - Python SDK usage guide
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
+# 服务层
 
 ---
 
@@ -135,3 +274,5 @@ insights = await service.analyze_market(
 - [系统架构](../03_architecture/system_architecture.md) - 整体系统架构
 - [REST API](../06_api/rest_api.md) - API参考
 - [Python SDK](../06_api/python_sdk.md) - Python SDK使用指南
+
+</details>

@@ -1,3 +1,301 @@
+# AGI Knowledge Base and Memory System Design Document
+
+**[English](#overview) | [中文](#overview)**
+
+---
+
+## Overview
+
+> Version: 2.0
+> Date: 2026-02-23
+> Based on USMSB Model Design
+
+---
+
+## 1. System Architecture Overview
+
+### 1.1 Integrated Folder Structure
+
+```
+meta_agent/
+├── agi_core/                      # Core integration layer (local + professional)
+│   ├── __init__.py                # Unified exports
+│   ├── memory.py                  # Multi-layer memory system (local)
+│   ├── knowledge_graph.py         # Dynamic knowledge graph (local)
+│   └── integration.py             # Integration system (calls professional)
+│
+├── evolution_v2/                  # Professional evolution system
+│   ├── models.py                  # Data models
+│   ├── meta_learner.py            # Meta-learner
+│   ├── capability_assessor.py     # Capability assessor
+│   ├── knowledge_solidifier.py    # Knowledge solidifier
+│   ├── curiosity_engine.py        # Curiosity engine
+│   ├── self_optimizer.py          # Self-optimizer
+│   ├── goal_generator.py          # Goal generator
+│   ├── engine.py                  # Main engine
+│   └── ARCHITECTURE.md            # Architecture documentation
+│
+└── [Other components...]
+
+usmsb_sdk/
+└── reasoning/                     # Professional reasoning system
+    ├── interfaces.py              # Interface definitions
+    ├── base.py                    # Base classes
+    ├── engines/                   # Reasoning engines
+    │   ├── logical.py             # Deductive/inductive/abductive
+    │   ├── causal.py              # Causal reasoning
+    │   ├── analogical.py          # Analogical reasoning
+    │   ├── spatial.py             # Spatial reasoning
+    │   ├── temporal.py            # Temporal reasoning
+    │   ├── commonsense.py         # Commonsense reasoning
+    │   └── meta.py                # Meta-reasoning
+    ├── uncertainty.py             # Uncertainty management
+    ├── chain_manager.py           # Reasoning chain management
+    └── knowledge_integration.py   # Knowledge graph integration
+```
+
+### 1.2 Component Relationship Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           AGI Core System                                        │
+│                    (integration.py - Unified Interface)                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  ┌───────────────────────────────────────────────────────────────────────────┐  │
+│  │                         Local Components (agi_core/)                     │  │
+│  │                                                                            │  │
+│  │   ┌─────────────────────┐       ┌─────────────────────┐                   │  │
+│  │   │   AGIMemorySystem   │       │ DynamicKnowledgeGraph│                   │  │
+│  │   │   (memory.py)       │       │ (knowledge_graph.py) │                   │  │
+│  │   │                     │       │                       │                   │  │
+│  │   │ • Working Memory    │       │ • Entity nodes       │                   │  │
+│  │   │   (7 items)         │       │ • Relationship edges │                   │  │
+│  │   │ • Episodic Memory   │       │ • Causal chains      │                   │  │
+│  │   │   (2000 items)      │       │ • USMSB indexing     │                   │  │
+│  │   │ • Semantic Memory   │       │ • Temporal evolution │                   │  │
+│  │   │   (10000 items)     │       │                       │                   │  │
+│  │   │ • Permanent Memory  │       │                       │                   │  │
+│  │   │   (unlimited)        │       │                       │                   │  │
+│  │   │ • Importance        │       │                       │                   │  │
+│  │   │   assessment         │       │                       │                   │  │
+│  │   │ • Forgetting curve  │       │                       │                   │  │
+│  │   └─────────────────────┘       └─────────────────────┘                   │  │
+│  └───────────────────────────────────────────────────────────────────────────┘  │
+│                                       │                                          │
+│                                       ▼                                          │
+│  ┌───────────────────────────────────────────────────────────────────────────┐  │
+│  │                         Professional Components                           │  │
+│  │                                                                            │  │
+│  │   ┌─────────────────────────────┐  ┌─────────────────────────────┐        │  │
+│  │   │   SelfEvolutionEngine       │  │   ReasoningChainManager     │        │  │
+│  │   │   (evolution_v2/engine.py)  │  │   (reasoning/)              │        │  │
+│  │   │                             │  │                             │        │  │
+│  │   │ • MetaLearner              │  │ • DeductiveEngine          │        │  │
+│  │   │ • CapabilityAssessor       │  │ • InductiveEngine          │        │  │
+│  │   │ • KnowledgeSolidifier     │  │ • AbductiveEngine          │        │  │
+│  │   │ • CuriosityEngine          │  │ • CausalEngine             │        │  │
+│  │   │ • SelfOptimizer            │  │ • AnalogicalEngine         │        │  │
+│  │   │ • GoalGenerator           │  │ • Uncertainty management   │        │  │
+│  │   └─────────────────────────────┘  └─────────────────────────────┘        │  │
+│  └───────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Core Components Detail
+
+### 2.1 Multi-Layer Memory System (memory.py)
+
+| Layer | Capacity | Duration | Features |
+|-------|----------|----------|----------|
+| Working Memory | 7±2 items | Seconds-minutes | Currently processing information |
+| Episodic Memory | 2000 items | Hours-days | Personal experiences and events |
+| Semantic Memory | 10000 items | Long-term | Facts and conceptual knowledge |
+| Permanent Memory | Unlimited | Never lost | Critical important information |
+
+**Core Features:**
+- Importance assessment algorithm (frequency + emotion + usefulness + recency)
+- Ebbinghaus forgetting curve
+- Automatic memory consolidation
+- Permanent memory never lost
+
+### 2.2 Dynamic Knowledge Graph (knowledge_graph.py)
+
+**Node Attributes:**
+- USMSB nine-element mapping
+- Confidence and importance scores
+- Access statistics
+
+**Relationship Types:**
+- IS_A, HAS_A, CAUSES, USES, RELATES
+- USMSB element relationships
+
+### 2.3 Professional Evolution System (evolution_v2/)
+
+**Core Components:**
+| Component | Function |
+|-----------|----------|
+| MetaLearner | Learning to learn, 8 learning strategies |
+| CapabilityAssessor | 15 core capability assessments |
+| KnowledgeSolidifier | Knowledge consolidation (temporary → permanent) |
+| CuriosityEngine | Curiosity-driven exploration |
+| SelfOptimizer | Self-optimizing parameters and strategies |
+| GoalGenerator | Autonomous learning goal generation |
+
+**Evolution Stages:**
+```
+EXPLORATION → ACQUISITION → CONSOLIDATION → OPTIMIZATION → MASTERY
+```
+
+### 2.4 Professional Reasoning System (reasoning/)
+
+**Reasoning Engines:**
+| Engine | Type | Usage |
+|--------|------|-------|
+| DeductiveEngine | Deductive | General to specific |
+| InductiveEngine | Inductive | Specific to general |
+| AbductiveEngine | Abductive | Best explanation |
+| CausalEngine | Causal | Cause-effect |
+| AnalogicalEngine | Analogical | Similarity mapping |
+
+---
+
+## 3. Usage
+
+### 3.1 Basic Usage
+
+```python
+from usmsb_sdk.platform.external.meta_agent.agi_core import AGICoreSystem, AGICoreConfig
+
+# Initialize
+config = AGICoreConfig(
+    memory_db="data/agi_memory.db",
+    knowledge_db="data/agi_knowledge.db",
+    enable_evolution=True,
+    enable_inference=True
+)
+system = AGICoreSystem(config, llm_manager=llm, data_dir="data")
+
+# Initialize system
+await system.init()
+
+# Process input (auto memory + learning)
+result = await system.process_input(
+    content="User's important preferences",
+    user_id="user_001",
+    usmsb_element="agent"
+)
+
+# Smart recall
+recall = await system.smart_recall(
+    query="What were the user's previous preferences?",
+    user_id="user_001"
+)
+
+# Build context
+context = await system.build_context(
+    query="Help user make decisions",
+    user_id="user_001"
+)
+```
+
+### 3.2 Autonomous Learning
+
+```python
+# Execute autonomous learning
+learning_result = await system.autonomous_learning()
+
+# Self-reflection
+reflection = await system.self_reflect()
+
+# Get system status
+stats = system.get_system_stats()
+```
+
+### 3.3 Adding USMSB Knowledge
+
+```python
+# Add goal knowledge
+await system.add_usmsb_knowledge(
+    element="goal",
+    content="Improve user experience"
+)
+
+# Add risk knowledge
+await system.add_usmsb_knowledge(
+    element="risk",
+    content="Data leakage risk"
+)
+```
+
+---
+
+## 4. File Inventory
+
+### 4.1 Local Components (agi_core/)
+
+```
+C:\Users\1\Documents\vibecode\usmsb-sdk\src\usmsb_sdk\platform\external\meta_agent\agi_core\
+├── __init__.py           # Unified export interface
+├── memory.py             # Multi-layer memory system
+├── knowledge_graph.py    # Dynamic knowledge graph
+└── integration.py        # Integration system (core)
+```
+
+### 4.2 Professional Evolution System (evolution_v2/)
+
+```
+C:\Users\1\Documents\vibecode\usmsb-sdk\src\usmsb_sdk\platform\external\meta_agent\evolution_v2\
+├── __init__.py
+├── models.py             # Data models
+├── meta_learner.py       # Meta-learner
+├── capability_assessor.py # Capability assessment
+├── knowledge_solidifier.py # Knowledge solidifier
+├── curiosity_engine.py   # Curiosity engine
+├── self_optimizer.py     # Self-optimization
+├── goal_generator.py     # Goal generation
+├── engine.py             # Main engine
+└── ARCHITECTURE.md       # Architecture documentation
+```
+
+### 4.3 Professional Reasoning System (reasoning/)
+
+```
+C:\Users\1\Documents\vibecode\usmsb-sdk\src\usmsb_sdk\reasoning\
+├── __init__.py
+├── interfaces.py         # Interface definitions
+├── base.py               # Base classes
+├── engines/              # Reasoning engine directory
+│   └── [Various reasoning engines]
+├── uncertainty.py        # Uncertainty management
+├── chain_manager.py      # Reasoning chain management
+└── knowledge_integration.py # Knowledge integration
+```
+
+---
+
+## 5. Core Problem Solutions
+
+| Problem | Solution | Implementation Location |
+|---------|----------|-------------------------|
+| **Forgetting** | Permanent memory + importance assessment + forgetting curve | `agi_core/memory.py` |
+| **Not intelligent enough** | 5 reasoning engines + knowledge graph | `reasoning/` |
+| **Context limits** | Smart recall + importance ranking | `agi_core/integration.py` |
+| **Lack of evolution** | Meta-learning + curiosity-driven + knowledge consolidation | `evolution_v2/` |
+
+---
+
+*Document Version: 2.0*
+*Last Updated: 2026-02-23*
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # AGI知识库与记忆系统设计文档
 
 > 版本: 2.0
@@ -279,3 +577,5 @@ C:\Users\1\Documents\vibecode\usmsb-sdk\src\usmsb_sdk\reasoning\
 
 *文档版本: 2.0*
 *最后更新: 2026-02-23*
+
+</details>

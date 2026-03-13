@@ -19,6 +19,7 @@ import {
   Bot,
   Presentation,
   Dna,
+  FileCode,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useState } from 'react'
@@ -45,6 +46,7 @@ export default function Sidebar() {
     { name: t('nav.marketplace'), href: '/app/marketplace', icon: Store, group: 'tools' },
     { name: t('nav.governance'), href: '/app/governance', icon: Scale, group: 'tools' },
     { name: t('nav.geneCapsule'), href: '/app/gene-capsule/explore', icon: Dna, group: 'tools' },
+    { name: t('nav.contracts', 'Contracts'), href: '/app/contracts', icon: FileCode, group: 'tools' },
   ]
 
   const quickActions = [

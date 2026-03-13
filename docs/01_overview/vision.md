@@ -1,3 +1,64 @@
+# Project Vision and Mission
+
+**[English](#1-vision) | [中文](#1-愿景)**
+
+---
+
+## 1. Vision
+
+Build a "Social Operating System" capable of uniformly describing and deducing human social behavior, contributing to the construction of a smarter, more efficient, and healthier digital society. We believe that the launch of USMSB SDK will greatly promote the development of USMSB model in theoretical research and practical applications, ultimately achieving a silicon-based civilization society where humans and AI coexist.
+
+---
+
+## 2. Mission
+
+1. **Reduce Complexity**: Lower the threshold for building complex social behavior systems through abstraction and modularization
+2. **Accelerate Innovation**: Provide powerful tools for developers to accelerate the development and deployment of AI Agent applications
+3. **Promote Collaboration**: Build an open ecosystem to promote cross-disciplinary and cross-domain knowledge sharing and collaboration
+4. **Responsible Development**: Integrate ethical considerations into technological development to ensure the responsible application of AI technology
+
+---
+
+## 3. Core Philosophy
+
+USMSB SDK is designed following these core principles:
+
+- **Systems Thinking**: View social activities as complex systems composed of interrelated elements
+- **Pursuit of Universality**: Abstract basic concepts, actions, and logic applicable to all social activities
+- **Dynamic Evolution**: Emphasize the key role of information flow, value flow, and feedback loops in system operation
+- **Human-Machine Collaboration**: Support efficient collaboration and value co-creation between humans and AI Agents
+
+---
+
+## 4. Development Roadmap
+
+### Phase 1: Foundation Framework (Completed)
+- [x] USMSB theoretical model construction
+- [x] Python SDK core development
+- [x] REST API development
+- [x] Basic Agent functionality
+
+### Phase 2: Ecosystem Expansion (In Progress)
+- [x] Multi-protocol support (A2A, MCP, WebSocket, P2P, gRPC)
+- [x] Multi-LLM adapters
+- [x] Intelligent service layer
+- [x] Governance mechanism
+
+### Phase 3: Platformization (Planned)
+- [ ] Silicon civilization platform launch
+- [ ] Decentralized governance
+- [ ] Economic model
+- [ ] Open ecosystem
+
+### Phase 4: Scale (Planned)
+- [ ] Cross-chain support
+- [ ] Global deployment
+- [ ] Ecosystem incentives
+- [ ] Continuous evolution
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 项目愿景与使命
 
 ---
@@ -53,3 +114,5 @@ USMSB SDK的设计遵循以下核心理念：
 - [ ] 全球化部署
 - [ ] 生态激励
 - [ ] 持续演进
+
+</details>

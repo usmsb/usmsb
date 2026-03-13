@@ -1,3 +1,399 @@
+**[English](#communication) | [中文](#usmsb-sdk通信架构文档)**
+
+---
+
+# USMSB SDK Communication Architecture Document
+
+> Document Version: 1.0
+> Created: 2025-02-19
+> Status: Completed
+
+This document details the communication roles, protocol selection recommendations, endpoint specifications, and message formats between Platform and Agent in USMSB SDK.
+
+---
+
+## 1. Communication Role Definitions
+
+### 1.1 Role Classification
+
+| Role | Description | Location |
+|------|-------------|----------|
+| **Agent** | Intelligent agent providing skills and services | `usmsb_sdk.agent_sdk` |
+| **Platform** | Platform managing Agent registration, discovery, matching | `usmsb_sdk.api.rest` |
+| **Frontend** | Frontend application, user interaction interface | `usmsb_sdk.frontend` |
+| **External Agent** | External AI services (e.g., Claude, GPT) | `usmsb_sdk.platform.external` |
+
+### 1.2 Communication Patterns
+
+```
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│   Frontend  │◄───────►│   Platform  │◄───────►│   Agents    │
+└─────────────┘   HTTP  └─────────────┘  HTTP   └─────────────┘
+                              │                        │
+                              │         P2P            │
+                              └────────────────────────┘
+```
+
+---
+
+## 2. Communication Scenarios
+
+### 2.1 Agent Registration
+
+**Scenario:** Agent registers with Platform after startup
+
+| Property | Value |
+|----------|-------|
+| Initiator | Agent |
+| Receiver | Platform |
+| Protocol | HTTP |
+| Endpoint | `POST /agent-auth/register` |
+
+**Request Example:**
+```json
+{
+    "agent_id": "agent_001",
+    "name": "DataProcessor",
+    "description": "Data processing agent",
+    "capabilities": ["text_processing", "data_analysis"],
+    "skills": ["process_text", "analyze_data"],
+    "endpoint": "http://localhost:5001",
+    "protocols": ["http", "websocket"],
+    "stake_amount": 100.0
+}
+```
+
+**Response Example:**
+```json
+{
+    "success": true,
+    "agent_id": "agent_001",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "registered_at": "2025-02-19T10:00:00Z"
+}
+```
+
+### 2.2 Agent Heartbeat
+
+**Scenario:** Agent sends heartbeat to Platform periodically
+
+| Property | Value |
+|----------|-------|
+| Initiator | Agent |
+| Receiver | Platform |
+| Protocol | HTTP |
+| Endpoint | `POST /agent-auth/agents/{agent_id}/heartbeat` |
+| Frequency | Every 30 seconds |
+
+### 2.3 Agent Discovery
+
+**Scenario:** Platform or Agent queries available Agents
+
+| Property | Value |
+|----------|-------|
+| Initiator | Platform / Agent |
+| Receiver | Platform |
+| Protocol | HTTP |
+| Endpoint | `GET /agents` |
+
+**Query Parameters:**
+- `capability`: Filter by capability
+- `status`: Filter by status (active/inactive)
+- `page`: Pagination
+
+### 2.4 Invoking Agent
+
+**Scenario:** Platform/Frontend invokes Agent's skills
+
+| Property | Value |
+|----------|-------|
+| Initiator | Platform / Frontend |
+| Receiver | Agent |
+| Protocol | HTTP / WebSocket |
+| Endpoint | `POST /invoke` |
+
+**Request Example:**
+```json
+{
+    "method": "process_text",
+    "params": {
+        "text": "Hello, World!",
+        "language": "en"
+    },
+    "sender_id": "frontend_001"
+}
+```
+
+### 2.5 Agent-to-Agent Communication
+
+**Scenario:** Direct communication between Agents
+
+| Scenario | Protocol | Description |
+|----------|----------|-------------|
+| Simple request-response | HTTP | Suitable for one-time calls |
+| Real-time communication | WebSocket | Suitable for continuous dialogue |
+| Decentralized communication | P2P | Suitable for scenarios without central server |
+
+---
+
+## 3. Protocol Selection Recommendations
+
+### 3.1 Protocol Comparison
+
+| Protocol | Advantages | Disadvantages | Use Cases |
+|----------|------------|---------------|-----------|
+| **HTTP** | Simple, widely supported, firewall-friendly | Stateless, overhead | REST API, one-time calls |
+| **WebSocket** | Real-time, bidirectional, low latency | Complex connection management | Real-time dialogue, continuous communication |
+| **P2P** | Decentralized, scalable | Complex NAT traversal | Distributed systems, serverless scenarios |
+| **MCP** | AI service standard, feature-rich | Complex implementation | LLM integration, external AI services |
+| **A2A** | Agent-specific, semantically rich | Relatively niche | Agent-to-agent collaboration |
+| **gRPC** | High performance, type-safe | Requires Proto definition | Internal services, high-performance scenarios |
+
+### 3.2 Decision Tree
+
+```
+Need real-time communication?
+├── Yes → Need decentralization?
+│   ├── Yes → Use P2P
+│   └── No → Use WebSocket
+└── No → Need AI service integration?
+    ├── Yes → Use MCP
+    └── No → Agent-to-agent collaboration?
+        ├── Yes → Use A2A
+        └── No → Use HTTP
+```
+
+### 3.3 Recommended Configurations
+
+**Development Environment:**
+```python
+config = AgentConfig(
+    name="my_agent",
+    protocols={
+        ProtocolType.HTTP: ProtocolConfig(port=5001),
+    }
+)
+```
+
+**Production Environment:**
+```python
+config = AgentConfig(
+    name="my_agent",
+    protocols={
+        ProtocolType.HTTP: ProtocolConfig(port=5001),
+        ProtocolType.WEBSOCKET: ProtocolConfig(port=8765),
+        ProtocolType.P2P: ProtocolConfig(port=9001),
+    }
+)
+```
+
+---
+
+## 4. Endpoint Specifications
+
+### 4.1 Agent HTTP Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/` | GET | Agent information |
+| `/invoke` | POST | Invoke skill |
+| `/chat` | POST | Chat message |
+| `/heartbeat` | POST | Heartbeat |
+| `/message` | POST | Generic message |
+| `/skills` | GET | Skills list |
+
+### 4.2 Platform API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/agent-auth/register` | POST | Agent registration |
+| `/agent-auth/agents/{id}/heartbeat` | POST | Agent heartbeat |
+| `/agent-auth/agents/{id}` | DELETE | Agent unregistration |
+| `/agents` | GET | Agent list |
+| `/agents/{id}` | GET | Agent details |
+| `/demands` | POST | Create demand |
+| `/matching` | POST | Execute matching |
+
+### 4.3 WebSocket Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/ws/agent/{agent_id}` | Agent WebSocket connection |
+| `/ws/platform` | Platform WebSocket connection |
+
+---
+
+## 5. Message Formats
+
+### 5.1 Standard Message Format
+
+```python
+@dataclass
+class Message:
+    type: MessageType          # REQUEST, RESPONSE, NOTIFICATION
+    sender_id: str             # Sender ID
+    receiver_id: Optional[str] # Receiver ID (empty for broadcast)
+    content: Dict[str, Any]    # Message content
+    message_id: str            # Unique message ID
+    timestamp: float           # Timestamp
+    correlation_id: Optional[str]  # Correlation ID (for request-response)
+    metadata: Dict[str, Any]   # Metadata
+```
+
+### 5.2 Request Message
+
+```json
+{
+    "type": "request",
+    "sender_id": "agent_001",
+    "receiver_id": "agent_002",
+    "message_id": "msg_12345",
+    "timestamp": 1708334400.0,
+    "content": {
+        "action": "process_data",
+        "params": {
+            "data": "...",
+            "format": "json"
+        }
+    }
+}
+```
+
+### 5.3 Response Message
+
+```json
+{
+    "type": "response",
+    "sender_id": "agent_002",
+    "receiver_id": "agent_001",
+    "message_id": "msg_12346",
+    "correlation_id": "msg_12345",
+    "timestamp": 1708334401.0,
+    "content": {
+        "status": "success",
+        "result": {
+            "processed": true,
+            "output": "..."
+        }
+    }
+}
+```
+
+### 5.4 Notification Message
+
+```json
+{
+    "type": "notification",
+    "sender_id": "platform",
+    "message_id": "notif_12345",
+    "timestamp": 1708334400.0,
+    "content": {
+        "event": "agent_registered",
+        "agent_id": "agent_003"
+    }
+}
+```
+
+---
+
+## 6. Error Handling
+
+### 6.1 Error Response Format
+
+```json
+{
+    "success": false,
+    "error": {
+        "code": "AGENT_NOT_FOUND",
+        "message": "Agent with ID 'agent_001' not found",
+        "details": {
+            "agent_id": "agent_001"
+        }
+    },
+    "timestamp": "2025-02-19T10:00:00Z"
+}
+```
+
+### 6.2 Error Codes
+
+| Code | HTTP Status | Description |
+|------|------------|-------------|
+| `AGENT_NOT_FOUND` | 404 | Agent does not exist |
+| `AGENT_INACTIVE` | 503 | Agent is not active |
+| `INVALID_REQUEST` | 400 | Invalid request format |
+| `UNAUTHORIZED` | 401 | Unauthorized |
+| `SKILL_NOT_FOUND` | 404 | Skill does not exist |
+| `EXECUTION_ERROR` | 500 | Execution error |
+| `TIMEOUT` | 504 | Timeout |
+
+---
+
+## 7. Security Considerations
+
+### 7.1 Authentication Methods
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| API Key | Simple key authentication | Development environment |
+| JWT | Token authentication | Production environment |
+| Wallet | Wallet signature authentication | Blockchain scenarios |
+
+### 7.2 Communication Encryption
+
+- **HTTP:** Use HTTPS (TLS 1.2+)
+- **WebSocket:** Use WSS (TLS 1.2+)
+- **P2P:** Use TLS or custom encryption
+
+### 7.3 Message Verification
+
+```python
+# Message signing example
+def sign_message(message: Dict, private_key: str) -> str:
+    import hashlib
+    import hmac
+    payload = json.dumps(message, sort_keys=True)
+    return hmac.new(
+        private_key.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+```
+
+---
+
+## 8. Best Practices
+
+### 8.1 Connection Management
+
+1. **Use connection pools** - Reuse HTTP connections
+2. **Heartbeat mechanism** - Keep connections alive
+3. **Reconnection** - Automatically reconnect WebSocket
+4. **Timeout settings** - Set reasonable timeout values
+
+### 8.2 Message Handling
+
+1. **Idempotency** - Message processing should support repeated calls
+2. **Asynchronous processing** - Use async for long-running operations
+3. **Message acknowledgment** - Critical messages need acknowledgment
+4. **Error retry** - Reasonable retry strategy
+
+### 8.3 Performance Optimization
+
+1. **Batch operations** - Batch send messages
+2. **Compression** - Compress large messages
+3. **Caching** - Cache frequently used data
+4. **Rate limiting** - Prevent message flooding
+
+---
+
+*End of Document*
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # USMSB SDK 通信架构文档
 
 > 文档版本: 1.0
@@ -384,3 +780,5 @@ def sign_message(message: Dict, private_key: str) -> str:
 ---
 
 *文档结束*
+
+</details>

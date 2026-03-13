@@ -1,3 +1,228 @@
+# System Architecture
+
+> USMSB SDK Overall System Architecture Design
+
+**[English](#english-section) | [中文](#chinese-section)**
+
+---
+
+## English Section
+
+## 1. Overall Architecture
+
+USMSB SDK adopts a layered architecture design, from top to bottom:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              User Layer                                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
+│  │  Web UI     │  │  CLI        │  │  API        │  │  Agent Chat │       │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Meta Agent (Super Agent)                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                        USMSB Core  Integration                      │    │
+│  │  ┌───────────────────────────────────────────────────────────────┐  │    │
+│  │  │  Agent (9 Elements)  │  Goal (目标)  │  Environment (环境)    │  │    │
+│  │  │  Resource (资源)      │  Rule (规则)  │  Information (信息)    │  │    │
+│  │  │  Value (价值)         │  Risk (风险)  │  Object (对象)        │  │    │
+│  │  └───────────────────────────────────────────────────────────────┘  │    │
+│  │  ┌───────────────────────────────────────────────────────────────┐  │    │
+│  │  │         10 Universal Actions                                  │  │    │
+│  │  │  Perception │ Decision │ Execution │ Interaction │           │  │    │
+│  │  │  Transformation │ Evaluation │ Feedback │ Learning │ RiskMgmt│  │    │
+│  │  └───────────────────────────────────────────────────────────────┘  │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                        Agent Core                                    │    │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐          │    │
+│  │  │ LLM Manager   │  │ Planner       │  │ Executor      │          │    │
+│  │  │ (Multi-LLM)   │  │ (Task Plan)   │  │ (Executor)    │          │    │
+│  │  └───────────────┘  └───────────────┘  └───────────────┘          │    │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐          │    │
+│  │  │ Goal Engine   │  │ Learning      │  │ Wallet        │          │    │
+│  │  │ (Goal Engine) │  │ (Autonomous)  │  │ (Blockchain)  │          │    │
+│  │  └───────────────┘  └───────────────┘  └───────────────┘          │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  ┌──────────────┬──────────────┬──────────────┬────────────────────┐     │
+│  │ Tools        │ Skills       │ Memory       │ Knowledge          │     │
+│  │ Registry     │ Manager      │ Context      │ Base               │     │
+│  └──────────────┴──────────────┴──────────────┴────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │                              │                              │
+        ▼                              ▼                              ▼
+┌───────────────┐            ┌───────────────┐            ┌───────────────┐
+│ System Agents │            │ External      │            │  Storage     │
+│ (SubAgent     │            │ Services      │            │  Layer       │
+│  Swarm)       │            │               │            │              │
+├───────────────┤            ├───────────────┤            ├───────────────┤
+│ MonitorAgent  │            │ Blockchain    │            │ SQLite        │
+│ Recommender   │            │ Network       │            │ Vector DB    │
+│ RouterAgent   │            │ IPFS Storage  │            │ File System  │
+│ LoggerAgent   │            │ External API  │            │               │
+│               │            │ LLM Services  │            │               │
+└───────────────┘            └───────────────┘            └───────────────┘
+```
+
+---
+
+## 2. Module Division
+
+### 2.1 Core Modules
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| **core** | `src/usmsb_sdk/core/` | Core logic (elements, interfaces, universal actions) |
+| **intelligence_adapters** | `src/usmsb_sdk/intelligence_adapters/` | Intelligence adapters (LLM, knowledge base) |
+| **agent_sdk** | `src/usmsb_sdk/agent_sdk/` | Agent SDK |
+| **platform** | `src/usmsb_sdk/platform/` | Platform features (blockchain, compute, environment, governance) |
+
+### 2.2 Service Layer
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| **services** | `src/usmsb_sdk/services/` | Core services (16+ services) |
+| **node** | `src/usmsb_sdk/node/` | Node functionality |
+| **data_management** | `src/usmsb_sdk/data_management/` | Data management |
+| **logging_monitoring** | `src/usmsb_sdk/logging_monitoring/` | Logging monitoring |
+| **platform** | `src/usmsb_sdk/platform/` | Platform features (blockchain, compute, governance) |
+
+### 2.3 API Layer
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| **api/python** | `src/usmsb_sdk/api/python/` | Python SDK |
+| **api/rest** | `src/usmsb_sdk/api/rest/` | RESTful API |
+| **agent_sdk** | `src/usmsb_sdk/agent_sdk/` | Agent SDK |
+
+---
+
+## 3. Core Components
+
+### 3.1 Meta Agent
+
+Meta Agent is the core of the entire system, featuring:
+
+- **9 Universal Actions Implementation**
+- **Multi-LLM Support**
+- **Dynamic Skill System**
+- **Intelligent Memory System**
+- **Blockchain Wallet**
+- **Autonomous Learning and Evolution**
+
+### 3.2 LLM Adapters
+
+Supports multiple LLM providers:
+
+- OpenAI GPT
+- Zhipu AI (GLM)
+- MiniMax
+
+### 3.3 Tool Registry
+
+Dynamically register and manage tools:
+
+```python
+class ToolRegistry:
+    def register(self, tool: Tool): ...
+    def get_tool(self, name: str): ...
+    def list_tools(self): ...
+    def execute(self, name: str, **kwargs): ...
+```
+
+---
+
+## 4. Data Flow
+
+```
+User Input
+    │
+    ▼
+┌─────────────┐
+│ Perception  │ ← Parse input, extract intent
+└─────────────┘
+    │
+    ▼
+┌─────────────┐
+│ Reasoning   │ ← Logical reasoning, causal analysis
+└─────────────┘
+    │
+    ▼
+┌─────────────┐
+│ Planning    │ ← Task decomposition, path planning
+└─────────────┘
+    │
+    ▼
+┌─────────────┐
+│ Execution   │ ← Call tools, execute actions
+└─────────────┘
+    │
+    ▼
+┌─────────────┐
+│ Evaluation  │ ← Evaluate results, quality checks
+└─────────────┘
+    │
+    ▼
+┌─────────────┐
+│ Learning    │ ← Knowledge accumulation, capability improvement
+└─────────────┘
+    │
+    ▼
+  User Output
+```
+
+---
+
+## 5. Deployment Architecture
+
+### 5.1 Single Node Deployment
+
+```
+┌─────────────────────────────────────────────┐
+│                 Meta Agent                   │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐     │
+│  │  API    │ │ Agent   │ │ Storage │     │
+│  │ Server  │ │ Engine  │ │         │     │
+│  └─────────┘ └─────────┘ └─────────┘     │
+└─────────────────────────────────────────────┘
+```
+
+### 5.2 Distributed Deployment
+
+```
+┌─────────────────────────────────────────────┐
+│              Load Balancer                   │
+└─────────────────────────────────────────────┘
+                    │
+        ┌───────────┼───────────┐
+        ▼           ▼           ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │ Node 1  │ │ Node 2  │ │ Node N  │
+   └─────────┘ └─────────┘ └─────────┘
+        │           │           │
+        └───────────┼───────────┘
+                    ▼
+            ┌─────────────┐
+            │  Shared DB  │
+            └─────────────┘
+```
+
+---
+
+## 6. Related Documentation
+
+- [Protocol Architecture](./protocol_architecture.md) - Communication Protocol Architecture
+- [Component Design](./component_design.md) - Core Component Design
+- [Meta Agent Design](../04_core_modules/meta_agent_design.md) - Super Agent System Design
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 系统架构
 
 > USMSB SDK 整体系统架构设计
@@ -211,3 +436,5 @@ class ToolRegistry:
 - [协议架构](./protocol_architecture.md) - 通信协议架构
 - [组件设计](./component_design.md) - 核心组件设计
 - [Meta Agent设计](../04_core_modules/meta_agent_design.md) - 超级Agent系统设计
+
+</details>

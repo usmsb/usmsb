@@ -1,3 +1,521 @@
+**[English](#production-grade-infrastructure-upgrade-plan) | [中文](#生产级基础设施改造方案)**
+
+---
+
+# Production-Grade Infrastructure Upgrade Plan
+
+> Version: 1.0
+> Date: 2026-02-15
+> Goal: Wallet Authentication System Production Deployment
+
+## 1. Database Transformation
+
+### 1.1 Migration from SQLite to PostgreSQL
+
+**Reason:**
+- SQLite single file cannot support high concurrency
+- PostgreSQL supports ACID, connection pooling, replication, backup
+
+**Implementation Plan:**
+
+```python
+# New file: src/usmsb_sdk/api/database_postgres.py
+
+import asyncpg
+from typing import Optional, Dict, List
+import os
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/civilization")
+
+class DatabasePool:
+    _pool: Optional[asyncpg.Pool] = None
+
+    @classmethod
+    async def get_pool(cls) -> asyncpg.Pool:
+        if cls._pool is None:
+            cls._pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                min_size=5,
+                max_size=20,
+                command_timeout=60
+            )
+        return cls._pool
+
+    @classmethod
+    async def close(cls):
+        if cls._pool:
+            await cls._pool.close()
+
+async def get_db():
+    pool = await DatabasePool.get_pool()
+    async with pool.acquire() as conn:
+        yield conn
+```
+
+**Migration Script:**
+```sql
+-- Create extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Users table (enhanced version)
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    wallet_address VARCHAR(42) UNIQUE NOT NULL,
+    did VARCHAR(100) UNIQUE,
+    agent_id UUID,
+    stake DECIMAL(18, 8) DEFAULT 0,
+    reputation DECIMAL(5, 4) DEFAULT 0.5,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Authentication sessions table (enhanced version)
+CREATE TABLE auth_sessions (
+    session_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    address VARCHAR(42) NOT NULL,
+    did VARCHAR(100),
+    agent_id UUID,
+    access_token_hash VARCHAR(64) NOT NULL,  -- Store hash instead of plaintext
+    refresh_token_hash VARCHAR(64),
+    ip_address INET,
+    user_agent TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index optimization
+CREATE INDEX idx_sessions_address ON auth_sessions(address);
+CREATE INDEX idx_sessions_token ON auth_sessions(access_token_hash);
+CREATE INDEX idx_sessions_expires ON auth_sessions(expires_at);
+
+-- Nonce table (enhanced version)
+CREATE TABLE auth_nonces (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    address VARCHAR(42) NOT NULL,
+    nonce VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_nonces_lookup ON auth_nonces(address, nonce, expires_at);
+```
+
+---
+
+## 2. Caching System (Redis)
+
+### 2.1 Redis Configuration
+
+```python
+# New file: src/usmsb_sdk/api/cache.py
+
+import redis.asyncio as redis
+import os
+import json
+from typing import Optional, Dict, Any
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+class CacheManager:
+    _client: Optional[redis.Redis] = None
+
+    @classmethod
+    async def get_client(cls) -> redis.Redis:
+        if cls._client is None:
+            cls._client = redis.from_url(
+                REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True
+            )
+        return cls._client
+
+    @classmethod
+    async def close(cls):
+        if cls._client:
+            await cls._client.close()
+
+# Nonce Cache
+class NonceCache:
+    PREFIX = "nonce:"
+
+    @staticmethod
+    async def set(address: str, nonce: str, ttl: int = 300):
+        client = await CacheManager.get_client()
+        await client.setex(f"{NonceCache.PREFIX}{address}", ttl, nonce)
+
+    @staticmethod
+    async def get(address: str) -> Optional[str]:
+        client = await CacheManager.get_client()
+        return await client.get(f"{NonceCache.PREFIX}{address}")
+
+    @staticmethod
+    async def delete(address: str):
+        client = await CacheManager.get_client()
+        await client.delete(f"{NonceCache.PREFIX}{address}")
+
+# Session Cache
+class SessionCache:
+    PREFIX = "session:"
+
+    @staticmethod
+    async def set(session_id: str, data: Dict[str, Any], ttl: int = 86400 * 7):
+        client = await CacheManager.get_client()
+        await client.setex(
+            f"{SessionCache.PREFIX}{session_id}",
+            ttl,
+            json.dumps(data)
+        )
+
+    @staticmethod
+    async def get(session_id: str) -> Optional[Dict]:
+        client = await CacheManager.get_client()
+        data = await client.get(f"{SessionCache.PREFIX}{session_id}")
+        return json.loads(data) if data else None
+
+    @staticmethod
+    async def delete(session_id: str):
+        client = await CacheManager.get_client()
+        await client.delete(f"{SessionCache.PREFIX}{session_id}")
+
+# Token Blacklist
+class TokenBlacklist:
+    PREFIX = "blacklist:"
+
+    @staticmethod
+    async def add(token: str, ttl: int = 86400 * 7):
+        client = await CacheManager.get_client()
+        await client.setex(f"{TokenBlacklist.PREFIX}{token}", ttl, "1")
+
+    @staticmethod
+    async def is_blacklisted(token: str) -> bool:
+        client = await CacheManager.get_client()
+        return await client.exists(f"{TokenBlacklist.PREFIX}{token}") > 0
+
+# Rate Limiting
+class RateLimiter:
+    PREFIX = "rate:"
+
+    @staticmethod
+    async def check(address: str, action: str, limit: int = 5, window: int = 60) -> bool:
+        """Check if rate limit is exceeded"""
+        client = await CacheManager.get_client()
+        key = f"{RateLimiter.PREFIX}{action}:{address}"
+
+        current = await client.incr(key)
+        if current == 1:
+            await client.expire(key, window)
+
+        return current <= limit
+
+    @staticmethod
+    async def get_remaining(address: str, action: str, limit: int = 5) -> int:
+        client = await CacheManager.get_client()
+        key = f"{RateLimiter.PREFIX}{action}:{address}"
+        current = await client.get(key)
+        return max(0, limit - int(current or 0))
+```
+
+---
+
+## 3. Security Enhancement
+
+### 3.1 Signature Verification (Fix TODO)
+
+```python
+# Update file: src/usmsb_sdk/api/rest/auth.py
+
+from eth_account.messages import encode_defunct
+from web3 import Web3
+
+def verify_siwe_signature(message: str, signature: str, expected_address: str) -> bool:
+    """Verify SIWE signature"""
+    try:
+        # Use web3.py to recover signature address
+        w3 = Web3()
+        encoded_message = encode_defunct(text=message)
+        recovered_address = w3.eth.account.recover_message(
+            encoded_message,
+            signature=signature
+        )
+        return recovered_address.lower() == expected_address.lower()
+    except Exception as e:
+        logger.error(f"Signature verification failed: {e}")
+        return False
+
+@router.post("/verify", response_model=VerifyResponse)
+async def verify_signature(request: VerifyRequest):
+    address = request.address.lower()
+
+    # 1. Check rate limit
+    if not await RateLimiter.check(address, "verify", limit=5, window=300):
+        raise HTTPException(status_code=429, detail="Too many attempts")
+
+    # 2. Verify nonce
+    nonce = extract_nonce_from_message(request.message)
+    cached_nonce = await NonceCache.get(address)
+
+    if not cached_nonce or cached_nonce != nonce:
+        raise HTTPException(status_code=400, detail="Invalid or expired nonce")
+
+    # 3. Verify signature (Critical fix!)
+    if not verify_siwe_signature(request.message, request.signature, address):
+        raise HTTPException(status_code=400, detail="Signature verification failed")
+
+    # 4. Delete used nonce
+    await NonceCache.delete(address)
+
+    # ... Continue creating session
+```
+
+### 3.2 JWT Token Enhancement
+
+```python
+# New file: src/usmsb_sdk/api/security.py
+
+import jwt
+import os
+import secrets
+from datetime import datetime, timedelta
+from typing import Optional, Dict
+
+JWT_SECRET = os.getenv("JWT_SECRET")  # Must be obtained from environment variable
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE = 3600  # 1 hour
+REFRESH_TOKEN_EXPIRE = 86400 * 7  # 7 days
+
+def generate_tokens(session_id: str, address: str) -> Dict[str, str]:
+    """Generate access token and refresh token"""
+
+    if not JWT_SECRET:
+        raise ValueError("JWT_SECRET must be set in environment")
+
+    now = datetime.utcnow()
+
+    # Access Token
+    access_payload = {
+        "sub": address,
+        "sid": session_id,
+        "type": "access",
+        "iat": now,
+        "exp": now + timedelta(seconds=ACCESS_TOKEN_EXPIRE),
+        "jti": secrets.token_hex(16)
+    }
+    access_token = jwt.encode(access_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    # Refresh Token
+    refresh_payload = {
+        "sub": address,
+        "sid": session_id,
+        "type": "refresh",
+        "iat": now,
+        "exp": now + timedelta(seconds=REFRESH_TOKEN_EXPIRE),
+        "jti": secrets.token_hex(16)
+    }
+    refresh_token = jwt.encode(refresh_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "expires_in": ACCESS_TOKEN_EXPIRE
+    }
+
+def verify_token(token: str, expected_type: str = "access") -> Optional[Dict]:
+    """Verify JWT Token"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+        if payload.get("type") != expected_type:
+            return None
+
+        # Check blacklist
+        if await TokenBlacklist.is_blacklisted(payload.get("jti")):
+            return None
+
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+async def revoke_token(token: str):
+    """Revoke Token (add to blacklist)"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        jti = payload.get("jti")
+        exp = payload.get("exp", 0)
+        ttl = max(0, exp - int(datetime.utcnow().timestamp()))
+        await TokenBlacklist.add(jti, ttl)
+    except:
+        pass
+```
+
+### 3.3 Environment Variable Configuration
+
+```bash
+# New file: .env.example
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/civilization
+
+# Redis
+REDIS_URL=redis://localhost:6379/0
+
+# Security (Must be set!)
+JWT_SECRET=your-super-secret-key-at-least-32-characters
+
+# Session
+SESSION_DURATION_HOURS=168
+
+# Rate Limiting
+RATE_LIMIT_VERIFY_PER_MINUTE=5
+RATE_LIMIT_NONCE_PER_MINUTE=10
+
+# CORS
+CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+```
+
+---
+
+## 4. Audit Log
+
+```python
+# New file: src/usmsb_sdk/api/audit.py
+
+import json
+from datetime import datetime
+from typing import Optional, Dict, Any
+from enum import Enum
+
+class AuditAction(str, Enum):
+    LOGIN = "login"
+    LOGOUT = "logout"
+    SIGN_MESSAGE = "sign_message"
+    STAKE = "stake"
+    PROFILE_UPDATE = "profile_update"
+    FAILED_AUTH = "failed_auth"
+
+async def log_audit(
+    action: AuditAction,
+    address: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    success: bool = True
+):
+    """Record audit log"""
+    log_entry = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "action": action.value,
+        "address": address,
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "details": details or {},
+        "success": success
+    }
+
+    # Store to database (using async)
+    # await db.execute("""
+    #     INSERT INTO audit_logs
+    #     (action, address, ip_address, user_agent, details, success, created_at)
+    #     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    # """, ...)
+
+    # Also output to logging system
+    print(json.dumps(log_entry))
+```
+
+---
+
+## 5. Dependency Updates
+
+```txt
+# requirements.txt additions
+
+# Database
+asyncpg>=0.29.0
+sqlalchemy[asyncio]>=2.0.0
+alembic>=1.13.0
+
+# Cache
+redis[hiredis]>=5.0.0
+
+# Security
+pyjwt>=2.8.0
+web3>=6.15.0
+eth-account>=0.12.0
+passlib[bcrypt]>=1.7.4
+
+# Rate Limiting
+slowapi>=0.1.9
+```
+
+---
+
+## 6. Deployment Architecture
+
+```
+                    ┌─────────────────┐
+                    │   Load Balancer │
+                    │    (Nginx)      │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+       ┌──────▼──────┐ ┌─────▼─────┐ ┌──────▼──────┐
+       │  FastAPI 1  │ │ FastAPI 2 │ │  FastAPI 3  │
+       │  (Uvicorn)  │ │ (Uvicorn) │ │  (Uvicorn)  │
+       └──────┬──────┘ └─────┬─────┘ └──────┬──────┘
+              │              │              │
+              └──────────────┼──────────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+  ┌──────▼──────┐    ┌───────▼───────┐    ┌─────▼─────┐
+  │  PostgreSQL │    │  Redis Cluster│    │  IPFS/    │
+  │   Primary   │    │  (Sentinel)   │    │  S3       │
+  │  + Replica  │    │               │    │(File Storage)│
+  └─────────────┘    └───────────────┘    └───────────┘
+```
+
+---
+
+## 7. Implementation Priority
+
+| Priority | Task | Estimated Hours | Risk |
+|----------|------|----------------|------|
+| P0 | Fix signature verification | 2h | High |
+| P0 | JWT_SECRET environment variable | 0.5h | High |
+| P1 | Migrate to PostgreSQL | 4h | Medium |
+| P1 | Add Redis caching | 3h | Medium |
+| P1 | Rate limiting | 2h | Low |
+| P2 | Audit log | 3h | Low |
+| P2 | Token blacklist | 2h | Low |
+| P3 | Database migration script | 4h | Medium |
+| P3 | Backup strategy | 2h | Low |
+
+---
+
+## 8. Test Acceptance Checklist
+
+- [ ] Signature verification works correctly
+- [ ] JWT Token correctly generated and verified
+- [ ] Token automatically rejected after expiration
+- [ ] Rate limiting effective (5 times/minute)
+- [ ] Session correctly cached in Redis
+- [ ] Database connection pool working properly
+- [ ] Audit log correctly recorded
+- [ ] CORS configured correctly
+- [ ] Environment variables loaded correctly
+- [ ] HTTPS configured correctly
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 生产级基础设施改造方案
 
 > 版本: 1.0
@@ -506,3 +1024,5 @@ slowapi>=0.1.9
 - [ ] CORS 配置正确
 - [ ] 环境变量正确加载
 - [ ] HTTPS 正确配置
+
+</details>

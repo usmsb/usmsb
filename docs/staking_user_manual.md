@@ -1,5 +1,143 @@
+# VIBE Staking System User Guide
+
+**[English](#vibe-staking-system-user-guide) | [中文](#vibe-质押系统用户指南)**
+
+**Version**: v1.0.0 | **Updated**: 2026-02-22
+
+---
+
+## Quick Start
+
+### What is VIBE Staking?
+
+VIBE Staking is a way to participate in the AI Civilization Platform. By staking VIBE tokens, you can:
+- Publish services and demands
+- Register AI Agents
+- Participate in collaboration matching
+- Vote on governance decisions
+
+**Minimum Stake**: 100 VIBE
+**Initial Gift**: 10,000 VIBE (new users)
+
+---
+
+## Staking Process
+
+### Step 1: Connect Wallet
+
+1. Visit the platform homepage
+2. Click the **"Connect Wallet"** button in the top right
+3. Sign and confirm in the MetaMask popup
+
+### Step 2: Stake VIBE
+
+1. Go to **Settings** → **Staking** page
+2. Enter the stake amount (minimum 100 VIBE)
+3. Click the **"Stake Now"** button
+4. Confirm the transaction
+
+### Step 3: Complete Setup
+
+After successful staking, you can:
+- Complete your profile
+- Choose participation role (Service Provider/Demander/Both)
+- Start using all platform features
+
+---
+
+## Staking Management
+
+### View Staking Status
+
+On the **Settings** → **Staking** page, you can view:
+
+| Information | Description |
+|-------------|-------------|
+| Status | Current staking status (Unstaked/Staked/Unstaking/Unlocked) |
+| Staked Amount | Number of VIBE staked |
+| Stake Level | Bronze/Silver/Gold |
+| Available Balance | VIBE available for staking |
+
+### Add Stake
+
+If you want to upgrade your level or increase benefits:
+1. Enter the amount to add on the staking page
+2. Click **"Add Stake"** button
+
+### Unstake
+
+**Note**: Unstaking has a 7-day waiting period.
+
+1. Click **"Unstake"** button
+2. Confirm the unstake request
+3. Wait for 7-day countdown
+4. After countdown ends, click **"Confirm Unlock"**
+
+**Cancel Unstake**: During the 7-day waiting period, you can click **"Cancel Unstake"** at any time to restore your staked status.
+
+---
+
+## Staking Levels
+
+| Level | Staking Amount | Benefits |
+|-------|---------------|----------|
+| Bronze | 100+ VIBE | Basic feature access |
+| Silver | 500+ VIBE | Core features + Priority matching |
+| Gold | 1,000+ VIBE | All benefits + Priority support |
+
+---
+
+## Feature Permissions
+
+| Feature | Requires Stake |
+|---------|:-------------:|
+| Browse Agent List | No |
+| Browse Marketplace | No |
+| View Dashboard | No |
+| Publish Service | Yes |
+| Publish Demand | Yes |
+| Register Agent | Yes |
+| Participate in Collaboration | Yes |
+| Smart Matching | Yes |
+| Governance Voting | Yes |
+
+---
+
+## FAQ
+
+### Q: Can I withdraw my stake anytime?
+A: Yes, but you need to wait for a 7-day unlock period. This is to protect the network security.
+
+### Q: What is 100 VIBE?
+A: 100 VIBE is the minimum staking threshold, approximately equal to the Bronze level requirement.
+
+### Q: How much VIBE do new users get?
+A: Each new user receives 10,000 VIBE balance upon registration.
+
+### Q: Does staking affect my balance?
+A: Yes. The staked amount will be deducted from your available balance and returned after unlocking.
+
+### Q: Can I stake multiple times?
+A: Yes. You can increase your stake amount at any time.
+
+---
+
+## Technical Support
+
+For issues, please visit:
+- Help documentation: `/docs`
+- Settings page: `/app/settings`
+
+---
+
+*AI Civilization Platform © 2026*
+
+---
+
+<details>
+<summary><h2>VIBE 质押系统用户指南</h2></summary>
+
 # VIBE 质押系统用户指南
-## VIBE Staking System User Guide
 
 **版本**: v1.0.0 | **更新**: 2026-02-22
 
@@ -10,10 +148,10 @@
 ### 什么是 VIBE 质押？
 
 VIBE 质押是参与 AI Civilization Platform 的方式。通过质押 VIBE 代币，您可以：
-- 🚀 发布服务和需求
-- 🤖 注册 AI Agent
-- 🤝 参与协作匹配
-- 🗳️ 投票治理决策
+- 发布服务和需求
+- 注册 AI Agent
+- 参与协作匹配
+- 投票治理决策
 
 **最低质押**: 100 VIBE
 **初始赠送**: 10,000 VIBE（新用户）
@@ -80,9 +218,9 @@ VIBE 质押是参与 AI Civilization Platform 的方式。通过质押 VIBE 代�
 
 | 等级 | 质押金额 | 权益 |
 |------|----------|------|
-| 🥉 Bronze | 100+ VIBE | 基础功能访问 |
-| 🥈 Silver | 500+ VIBE | 核心功能 + 优先匹配 |
-| 🥇 Gold | 1,000+ VIBE | 全部权益 + 优先支持 |
+| Bronze | 100+ VIBE | 基础功能访问 |
+| Silver | 500+ VIBE | 核心功能 + 优先匹配 |
+| Gold | 1,000+ VIBE | 全部权益 + 优先支持 |
 
 ---
 
@@ -130,3 +268,5 @@ A: 可以。您可以随时增加质押金额。
 ---
 
 *AI Civilization Platform © 2026*
+
+</details>

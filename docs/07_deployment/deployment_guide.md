@@ -1,6 +1,63 @@
-# 部署指南
+# Deployment Guide
 
-> USMSB SDK 部署指南
+**[English](#1-environment-requirements) | [中文](#1-环境要求)**
+
+---
+
+## 1. Environment Requirements
+
+- Python 3.10+
+- SQLite
+- 4GB+ RAM
+
+---
+
+## 2. Local Deployment
+
+```bash
+# Clone
+git clone https://github.com/usmsb/usmsb.git
+cd usmsb-sdk
+
+# Install
+pip install -e .
+
+# Run
+python -m usmsb_sdk.api.rest.main
+```
+
+---
+
+## 3. Docker Deployment
+
+```bash
+# Build
+docker build -t usmsb-sdk .
+
+# Run
+docker run -p 8000:8000 usmsb-sdk
+```
+
+---
+
+## 4. Configuration
+
+Edit `config.yaml`:
+
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+database:
+  type: "sqlite"
+  path: "./data/usmsb.db"
+```
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
+# 部署指南
 
 ---
 
@@ -53,3 +110,5 @@ database:
   type: "sqlite"
   path: "./data/usmsb.db"
 ```
+
+</details>

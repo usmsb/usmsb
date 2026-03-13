@@ -1,6 +1,488 @@
+**[English](#english) | [中文](#chinese)**
+
+---
+
+# English
+
+# Agent SDK Skill Technical Design Document
+
+> This document is for developers, guiding how to develop and maintain Agent SDK Skill programs
+
+---
+
+## 1. Project Overview
+
+### Goals
+
+Package Agent SDK functionality as a Skill package conforming to [Agent Skills Standard](https://agentskills.io), enabling all agents supporting skills to directly use platform features.
+
+### Core Features
+
+- **Standards Compliant**: Follows Agent Skills standard (SKILL.md format)
+- **Unified Entry**: One skill contains all platform features
+- **Natural Language**: Supports natural language invocation
+- **Stake Verification**: Earning features require 100 VIBE stake
+- **Standards Compatible**: Supports OpenAPI, MCP, A2A formats
+
+---
+
+## 2. Skill Package Structure
+
+```
+src/usmsb_sdk/core/skills/usmsb-agent-platform/
+├── SKILL.md              # Required: Skill description + metadata (for LLM)
+├── scripts/              # Optional: Executable code
+│   └── platform.py       # Full implementation code
+├── references/           # Optional: Reference documentation
+│   └── api-reference.md  # API detailed documentation
+└── assets/               # Optional: Resource files
+    └── examples/
+        ├── python_examples.md
+        └── nodejs_examples.md
+```
+
+### SKILL.md Format
+
+```markdown
+---
+name: usmsb-agent-platform
+description: USMSB Agent Platform skill for collaboration, marketplace...
+license: Apache-2.0
+metadata:
+  author: USMSB
+  version: "1.0.0"
+  compatibility:
+    - mcp
+    - openai-actions
+    - a2a
+  min_stake: 100
+  stake_token: VIBE
+---
+
+# USMSB Agent Platform
+
+[Markdown content for LLM reading instructions...]
+```
+
+---
+
+## 3. Architecture Design
+
+### Overall Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Agent (Supports Skills)               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Read SKILL.md                                       │  │
+│  │  Call scripts/platform.py                           │  │
+│  └───────────────────────┬───────────────────────────────┘  │
+└──────────────────────────┼──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     AgentPlatform                           │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 1. IntentParser - Parse natural language requests  │   │
+│  │ 2. StakeChecker - Verify stake requirements         │   │
+│  │ 3. PlatformClient - Call platform API               │   │
+│  │ 4. PlatformResult - Return results                  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
+│  │Collabora-│ │Market-   │ │Discovery │ │Negotia-  │    │
+│  │tionAPI   │ │placeAPI  │ │API       │ │tionAPI   │    │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Platform API                           │
+│                   (http://localhost:8000)                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Core Implementation
+
+### 1. Type Definitions (scripts/platform.py)
+
+```python
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+
+class StakeTier(Enum):
+    """Stake tier - Whitepaper definition"""
+    NONE = 0
+    BRONZE = 100      # 100-999 VIBE
+    SILVER = 1000     # 1000-4999 VIBE
+    GOLD = 5000       # 5000-9999 VIBE
+    PLATINUM = 10000  # 10000+ VIBE
+
+
+class ActionType(Enum):
+    """Action types and stake requirements"""
+    # Actions requiring stake
+    COLLABORATION_CREATE = ("collaboration", "create", True)
+    COLLABORATION_CONTRIBUTE = ("collaboration", "contribute", True)
+    MARKETPLACE_PUBLISH_SERVICE = ("marketplace", "publish_service", True)
+    NEGOTIATION_ACCEPT = ("negotiation", "accept", True)
+    WORKFLOW_EXECUTE = ("workflow", "execute", True)
+
+    # Actions not requiring stake
+    COLLABORATION_JOIN = ("collaboration", "join", False)
+    MARKETPLACE_FIND_WORK = ("marketplace", "find_work", False)
+    DISCOVERY_BY_CAPABILITY = ("discovery", "by_capability", False)
+    # ... more actions
+
+    def __init__(self, category: str, action: str, requires_stake: bool):
+        self.category = category
+        self.action = action
+        self.requires_stake = requires_stake
+
+
+@dataclass
+class StakeInfo:
+    """Stake information"""
+    agent_id: str
+    staked_amount: int
+    tier: StakeTier
+    locked_until: Optional[int] = None
+
+    @classmethod
+    def from_amount(cls, agent_id: str, amount: int) -> "StakeInfo":
+        tier = StakeTier.NONE
+        for t in reversed(StakeTier):
+            if amount >= t.value:
+                tier = t
+                break
+        return cls(agent_id=agent_id, staked_amount=amount, tier=tier)
+
+    def can_perform(self, action: ActionType) -> bool:
+        if not action.requires_stake:
+            return True
+        return self.staked_amount >= StakeTier.BRONZE.value
+
+
+@dataclass
+class Intent:
+    """Parsed intent"""
+    action: ActionType
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    confidence: float = 1.0
+
+
+@dataclass
+class PlatformResult:
+    """Platform returned result"""
+    success: bool
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    code: Optional[str] = None
+    message: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = {"success": self.success}
+        if self.result:
+            d["result"] = self.result
+        if self.error:
+            d["error"] = self.error
+        if self.code:
+            d["code"] = self.code
+        if self.message:
+            d["message"] = self.message
+        return d
+```
+
+### 2. Intent Parser
+
+```python
+class IntentParser:
+    """Parse natural language requests into intents"""
+
+    PATTERNS = {
+        ActionType.COLLABORATION_CREATE: [
+            r"创建.*协作", r"建立.*合作", r"start.*collaboration",
+        ],
+        ActionType.MARKETPLACE_PUBLISH_SERVICE: [
+            r"发布.*服务", r"提供.*服务", r"publish.*service",
+        ],
+        ActionType.MARKETPLACE_FIND_WORK: [
+            r"找.*工作", r"找工作", r"find.*work",
+        ],
+        # ... more patterns
+    }
+
+    def parse(self, request: str) -> Intent:
+        request_lower = request.lower()
+
+        for action, patterns in self.PATTERNS.items():
+            for pattern in patterns:
+                if re.search(pattern, request_lower, re.IGNORECASE):
+                    params = self._extract_parameters(request, action)
+                    return Intent(action=action, parameters=params)
+
+        raise ValueError(f"Cannot parse request: {request}")
+
+    def _extract_parameters(self, request: str, action: ActionType) -> Dict:
+        params = {}
+        # Extract price
+        price_match = re.search(r"(\d+)\s*(VIBE)?", request)
+        if price_match and "publish_service" in action.action:
+            params["price"] = int(price_match.group(1))
+        # Extract skills
+        # ...
+        return params
+```
+
+### 3. Stake Checker
+
+```python
+class StakeChecker:
+    """Check stake requirements"""
+
+    def __init__(self, platform_client):
+        self.client = platform_client
+        self._cache: Dict[str, StakeInfo] = {}
+
+    async def get_stake_info(self, agent_id: str) -> StakeInfo:
+        if agent_id in self._cache:
+            return self._cache[agent_id]
+
+        staked_amount = await self.client.get_staked_amount(agent_id)
+        info = StakeInfo.from_amount(agent_id, staked_amount)
+        self._cache[agent_id] = info
+        return info
+
+    async def verify_stake(self, agent_id: str, action: ActionType) -> bool:
+        info = await self.get_stake_info(agent_id)
+        return info.can_perform(action)
+```
+
+### 4. AgentPlatform Main Class
+
+```python
+class AgentPlatform:
+    """Agent Platform SDK main class"""
+
+    def __init__(
+        self,
+        api_key: str,
+        agent_id: str,
+        base_url: str = "http://localhost:8000"
+    ):
+        self.api_key = api_key
+        self.agent_id = agent_id
+        self.base_url = base_url
+        self.intent_parser = IntentParser()
+        self._client = None
+        self._stake_checker = None
+
+    async def call(self, request: str) -> PlatformResult:
+        """Execute natural language request"""
+        try:
+            # 1. Parse intent
+            intent = self.intent_parser.parse(request)
+
+            # 2. Check stake
+            if intent.action.requires_stake:
+                checker = await self._get_stake_checker()
+                if not await checker.verify_stake(self.agent_id, intent.action):
+                    return PlatformResult(
+                        success=False,
+                        error=f"Action requires minimum stake of {StakeTier.BRONZE.value} VIBE",
+                        code="INSUFFICIENT_STAKE"
+                    )
+
+            # 3. Execute action
+            return await self._execute(intent)
+
+        except ValueError as e:
+            return PlatformResult(success=False, error=str(e), code="PARSE_ERROR")
+        except Exception as e:
+            return PlatformResult(success=False, error=str(e), code="INTERNAL_ERROR")
+
+    async def _execute(self, intent: Intent) -> PlatformResult:
+        """Execute intent"""
+        client = self._get_client()
+
+        handler_map = {
+            "collaboration": client.collaboration,
+            "marketplace": client.marketplace,
+            "discovery": client.discovery,
+            "negotiation": client.negotiation,
+            "workflow": client.workflow,
+            "learning": client.learning,
+        }
+
+        handler = handler_map.get(intent.action.category)
+        method = getattr(handler, intent.action.action)
+        result = await method(**intent.parameters)
+
+        return PlatformResult(
+            success=True,
+            result=result,
+            message=f"Action '{intent.action.action}' completed"
+        )
+```
+
+---
+
+## 5. Standards Compatible Adapters
+
+### 1. MCP Format
+
+```python
+def to_mcp_format() -> dict:
+    return {
+        "tools": [{
+            "name": "agent_platform",
+            "description": "AI platform capabilities - collaboration, marketplace, discovery, negotiation, etc.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "request": {
+                        "type": "string",
+                        "description": "Natural language request"
+                    }
+                },
+                "required": ["request"]
+            }
+        }]
+    }
+```
+
+### 2. OpenAPI Format
+
+```python
+def to_openapi_format() -> dict:
+    return {
+        "openapi": "3.0.0",
+        "info": {
+            "title": "USMSB Agent Platform",
+            "version": "1.0.0"
+        },
+        "paths": {
+            "/api/agent_platform": {
+                "post": {
+                    "operationId": "agent_platform",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "request": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "ApiKeyAuth": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-API-Key"
+                }
+            }
+        }
+    }
+```
+
+### 3. A2A Format
+
+```python
+def to_a2a_format() -> dict:
+    return {
+        "schema_version": "v1",
+        "name": "usmsb_agent_platform",
+        "skills": [{
+            "id": "agent_platform",
+            "name": "Agent Platform",
+            "description": "AI platform capabilities",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "request": {"type": "string"}
+                }
+            }
+        }]
+    }
+```
+
+---
+
+## 6. Stake Rules
+
+### Whitepaper Rules (Cannot Be Modified)
+
+| Tier | Stake Amount | Agent Registration Limit |
+|------|-------------|------------------------|
+| BRONZE | 100-999 VIBE | 1 |
+| SILVER | 1,000-4,999 VIBE | 3 |
+| GOLD | 5,000-9,999 VIBE | 10 |
+| PLATINUM | 10,000+ VIBE | 50 |
+
+### Platform Rules
+
+| Category | Requires Stake | No Stake Required |
+|----------|---------------|------------------|
+| Collaboration | create, contribute | join, list |
+| Marketplace | publish_service | find_work, find_workers, hire |
+| Discovery | - | all |
+| Negotiation | accept | initiate, reject, propose |
+| Workflow | execute | create, list |
+| Learning | - | all |
+
+---
+
+## 7. Development Tasks
+
+- [x] 1. Create Skill package directory structure
+- [x] 2. Write SKILL.md (conforming to Agent Skills standard)
+- [x] 3. Implement scripts/platform.py
+- [x] 4. Write references/api-reference.md
+- [x] 5. Write assets/examples/
+- [ ] 6. Integrate with platform API
+- [ ] 7. Write unit tests
+- [ ] 8. Publish to pip / npm
+
+---
+
+## 8. Related Documents
+
+| Document | Purpose |
+|----------|---------|
+| [skills.md](./skills.md) | Entry file |
+| [skills_user_manual.md](./skills_user_manual.md) | User manual |
+| [SKILL.md](../src/usmsb_sdk/core/skills/usmsb-agent-platform/SKILL.md) | Skill definition |
+| [api-reference.md](../src/usmsb_sdk/core/skills/usmsb-agent-platform/references/api-reference.md) | API reference |
+| [python_examples.md](../src/usmsb_sdk/core/skills/usmsb-agent-platform/assets/examples/python_examples.md) | Python examples |
+| [nodejs_examples.md](../src/usmsb_sdk/core/skills/usmsb-agent-platform/assets/examples/nodejs_examples.md) | Node.js examples |
+
+---
+
+## 9. Reference Resources
+
+- [Agent Skills Standard](https://agentskills.io) - SKILL.md format specification
+- [MCP Protocol](https://modelcontextprotocol.io) - Model Context Protocol
+- [OpenAPI Specification](https://swagger.io/specification/) - OpenAPI 3.0
+- [A2A Protocol](https://github.com/google/A2A) - Agent-to-Agent Protocol
+
+---
+
+<h2 id="chinese">中文翻译</h2>
+
 # Agent SDK Skill 技术设计方案
 
-> 本文档给开发者使用，指导如何开发和维护 Agent SDK Skill 程序
+> 本文档给开发者使用,指导如何开发和维护 Agent SDK Skill 程序
 
 ---
 
@@ -8,7 +490,7 @@
 
 ### 目标
 
-将 Agent SDK 的功能封装为符合 [Agent Skills 标准](https://agentskills.io) 的 Skill 包，让所有支持 skills 的 Agent 能够直接使用平台功能。
+将 Agent SDK 的功能封装为符合 [Agent Skills 标准](https://agentskills.io) 的 Skill 包,让所有支持 skills 的 Agent 能够直接使用平台功能。
 
 ### 核心特性
 

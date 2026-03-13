@@ -1,3 +1,7 @@
+**[English](#usmsb-sdk-privacy-policy) | [中文](#usmsb-sdk隐私政策)**
+
+---
+
 # USMSB SDK Privacy Policy
 
 **Universal System Model of Social Behavior - Privacy Policy**

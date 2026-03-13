@@ -1,3 +1,210 @@
+# Meta Agent Design
+
+> Super Agent System Design Document
+
+**[English](#english-section) | [中文](#chinese-section)**
+
+---
+
+## English Section
+
+## 1. System Overview
+
+### 1.1 Goals
+
+Build an LLM-based Super Agent (Meta Agent) capable of:
+- Interacting with users through natural language
+- Managing and scheduling all platform functions
+- Integrating existing System Agents
+- Supporting dynamic expansion of new capabilities
+- **Autonomous operation, autonomous learning, autonomous evolution**
+- **Having permanent goals, perception, decision-making, and execution capabilities**
+- **Having its own blockchain wallet**
+
+### 1.2 Core Capabilities (Based on USMSB Model)
+
+```
+User Natural Language Input
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Meta Agent Core                          │
+│  ┌─────────────────────────────────────────────────────┐  │
+│  │       USMSB 9 Universal Actions                      │  │
+│  │  1. Perception   - Understand input, extract info   │  │
+│  │  2. Decision     - Planning, strategy selection      │  │
+│  │  3. Execution    - Call tools, execute actions      │  │
+│  │  4. Interaction - Chat with Agents/real humans      │  │
+│  │  5. Transformation - Data processing, format conv   │  │
+│  │  6. Evaluation   - Evaluate results, quality check  │  │
+│  │  7. Feedback     - Feedback adjustment, optimization │  │
+│  │  8. Learning     - Learn from experience            │  │
+│  │  9. RiskManagement - Risk identification, control    │  │
+│  └─────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. User Roles and Permission System
+
+### 2.1 Role Definitions
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| **Developer** | Platform technical developer | Code deployment, config modification |
+| **Node Admin** | Node operations management | Node management, Agent monitoring |
+| **Node Operator** | Daily operations | Operations statistics, basic operations |
+| **Human** | Regular user, wallet holder | Basic queries, chat |
+| **AI Owner** | AI Agent owner | Own Agent management |
+| **AI Agent** | Registered intelligent Agent | Platform service usage |
+
+---
+
+## 3. Core Function Modules
+
+### 3.1 Platform Management Module
+
+| Function | Status | Description |
+|----------|--------|-------------|
+| Node Management | ✅ | Start, stop, monitor |
+| Configuration Management | ✅ | Read and modify config |
+| User Management | ✅ | Wallet binding, permission assignment |
+| Agent Registration | ✅ | Register and unregister |
+
+### 3.2 Monitoring Alert Module
+
+| Function | Status | Description |
+|----------|--------|-------------|
+| Health Check | ✅ | Check system status |
+| Metrics Collection | ✅ | CPU/memory/network |
+| Alert Management | ✅ | Alert rules and notifications |
+
+### 3.3 Recommendation Matching Module
+
+| Function | Status | Description |
+|----------|--------|-------------|
+| Agent Recommendation | ✅ | Recommend based on requirements |
+| Skill Matching | ✅ | Similarity calculation |
+| Rating System | ✅ | Agent rating |
+
+### 3.4 Communication Module
+
+| Function | Status | Description |
+|----------|--------|-------------|
+| Agent Chat | ✅ | Chat with Agent |
+| Human Chat | ✅ | Chat with user |
+| Broadcast Message | ✅ | Broadcast |
+
+### 3.5 Blockchain Module
+
+| Function | Status | Description |
+|----------|--------|-------------|
+| Wallet Management | ✅ | Create/import/query |
+| Staking Operations | ✅ | Stake/unstake |
+| Voting Governance | ✅ | Proposal voting |
+
+---
+
+## 4. Tool Registry
+
+### 4.1 Tool Structure
+
+```python
+class Tool:
+    name: str              # Tool name
+    description: str       # Tool description
+    parameters: dict       # Parameter definition
+    handler: Callable      # Handler function
+    required_permissions: List[str]  # Required permissions
+```
+
+### 4.2 Core Tool List
+
+```python
+# Platform Management
+"start_node", "stop_node", "get_node_status"
+"get_config", "update_config"
+"bind_wallet", "set_permission"
+"register_agent", "unregister_agent"
+
+# Monitoring Alert
+"health_check", "get_metrics", "set_threshold", "get_alerts"
+
+# Recommendation Matching
+"recommend_agent", "match_skills", "rate_agent"
+
+# Communication
+"chat_with_agent", "chat_with_human", "broadcast_message"
+
+# Blockchain
+"create_wallet", "get_balance", "stake", "unstake", "vote", "submit_proposal"
+```
+
+---
+
+## 5. Directory Structure
+
+```
+src/usmsb_sdk/platform/external/meta_agent/
+├── agent.py              # Meta Agent main class
+├── config.yaml           # Configuration file
+│
+├── core/                # Core capabilities
+│   ├── perception.py    # Perception service
+│   ├── decision.py      # Decision service
+│   ├── execution.py     # Execution service
+│   ├── learning.py      # Learning service
+│   └── risk_manager.py  # Risk management
+│
+├── tools/               # Toolset
+│   ├── registry.py      # Tool registry
+│   ├── platform.py      # Platform management tools
+│   └── ...
+│
+├── memory/             # Memory and context
+│   └── context.py
+│
+├── skills/              # Skill extension
+│   └── ...
+│
+├── wallet/             # Blockchain wallet
+│   └── manager.py
+│
+└── goals/              # Goal management
+    └── engine.py
+```
+
+---
+
+## 6. Implementation Status
+
+| Function | Status | Code Location |
+|----------|--------|---------------|
+| Agent Core | ✅ Implemented | `platform/external/meta_agent/agent.py` |
+| LLM Integration | ✅ Implemented | `intelligence_adapters/llm/` |
+| Tool Registration | ✅ Implemented | `platform/external/meta_agent/tools/` |
+| Skill System | ✅ Implemented | `core/skills/` |
+| Memory System | ✅ Implemented | `platform/external/meta_agent/memory/` |
+| Blockchain Wallet | ✅ Implemented | `agent_sdk/wallet.py` |
+| Goal Engine | 🔄 Planned | - |
+| Autonomous Learning | 🔄 Planned | - |
+| Emergent Behavior | 🔄 Planned | - |
+
+---
+
+## 7. Related Documentation
+
+- [USMSB Model](../02_theory/usmsb_model.md) - Social Behavior Universal System Model
+- [System Architecture](../03_architecture/system_architecture.md) - Overall System Architecture
+- [Component Design](../03_architecture/component_design.md) - Core Component Design
+- [Autonomous Evolution](./autonomous_evolution.md) - Autonomous Learning and Evolution System
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # Meta Agent 设计
 
 > 超级 Agent 系统设计文档
@@ -195,3 +402,5 @@ src/usmsb_sdk/platform/external/meta_agent/
 - [系统架构](../03_architecture/system_architecture.md) - 整体系统架构
 - [组件设计](../03_architecture/component_design.md) - 核心组件设计
 - [自主进化](./autonomous_evolution.md) - 自主学习与进化系统
+
+</details>

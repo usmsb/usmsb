@@ -1,3 +1,441 @@
+**[English](#english) | [中文](#chinese)**
+
+---
+
+# English
+
+# Agent Private Key Management Solution
+
+> Version: 1.0.0
+> Date: 2026-03-03
+> Status: Confirmed
+
+---
+
+## 1. Core Concepts
+
+### 1.1 AgentWallet Contract Structure
+
+```
+AgentWallet contract stores:
+- owner: Owner's EOA address
+- agent: Agent's EOA address (Agent backend service address)
+- vibeToken: VIBEToken contract address
+- Balance: VIBE tokens on contract address
+```
+
+### 1.2 Why Agent Private Key is Needed
+
+```solidity
+// AgentWallet.sol
+modifier onlyAgent() {
+    require(msg.sender == agent, "AgentWallet: caller is not agent");
+    _;
+}
+
+function executeTransfer(address to, uint256 amount) external onlyAgent {
+    vibeToken.safeTransfer(to, amount);
+}
+```
+
+**Key Points**:
+- `executeTransfer` can only be called by Agent address
+- On Ethereum, calling contract methods requires sending transactions
+- Sending transactions requires private key signing
+- **Without private key, cannot call contract**
+
+### 1.3 Who Initiates Agent Transactions
+
+```
+Agent backend service (program) → Sign with private key → Call AgentWallet contract → Contract executes transfer
+
+The entire process: No human involvement, fully automated, 24/7 running
+```
+
+---
+
+## 2. Private Key Management Solution
+
+### 2.1 Adopt Hybrid Approach
+
+| Role | Responsibilities |
+|------|------------------|
+| **Platform** | 1. Generate key pair when creating Agent<br>2. Encrypt private key and pass to Agent service<br>3. Do not keep plaintext private key (optionally keep encrypted backup) |
+| **Agent Service** | 1. Receive and securely store private key<br>2. Execute transfers autonomously<br>3. Auto-initiate approval for large transfers |
+
+### 2.2 Security Mechanisms (Already Implemented at Contract Layer)
+
+| Mechanism | Description |
+|-----------|-------------|
+| Daily limit | Even if private key leaked, loss controllable (default 1000 VIBE/day) |
+| Per-transaction limit | Default 500 VIBE/transaction |
+| Large transfer approval | Requires Owner confirmation above limit |
+| Whitelist | Can only transfer to system Agents or whitelisted addresses |
+| Emergency pause | Owner can pause wallet anytime |
+| Time lock | emergencyWithdraw requires 2-day wait |
+
+### 2.3 Agent Creation Process
+
+```
+Step 1: Platform generates key pair (off-chain)
+┌────────────────────────────────────────────────────────────┐
+│ from eth_account import Account                            │
+│ account = Account.create()                                 │
+│ agent_address = account.address      # e.g. 0x1234...   │
+│ agent_private_key = account.key.hex() # Private key       │
+└────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+Step 2: Deploy AgentWallet contract (on-chain)
+┌────────────────────────────────────────────────────────────┐
+│ constructor(                                               │
+│     _owner: owner's EOA address,                        │
+│     _agent: agent's EOA address,  ← Only pass address    │
+│     _vibeToken: VIBEToken address,                       │
+│     _registry: AgentRegistry address,                     │
+│     _stakingContract: VIBStaking address                  │
+│ )                                                          │
+└────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+Step 3: Private key passed to Agent service (secure channel)
+┌────────────────────────────────────────────────────────────┐
+│ - Encrypt private key                                     │
+│ - Pass through secure API or message queue               │
+│ - Agent service decrypts and stores in memory (not disk) │
+└────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+Step 4: Agent service operates autonomously
+┌────────────────────────────────────────────────────────────┐
+│ - Holds private key, autonomously signs transactions     │
+│ - Transfers within limit auto-executed                   │
+│ - Large transfers auto-request Owner approval            │
+│ - 7x24 hour unmanned operation                          │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Agent Transfer Process (Agent A → Agent B)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Pre-transfer state:                                                     │
+│  - Agent A Wallet: 0xContractA, balance 1000 VIBE                     │
+│  - Agent B Wallet: 0xContractB, balance 500 VIBE                      │
+│  - Agent A private key: Held by Agent A service                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 1: Agent A service initiates transfer                            │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ Agent A service (program auto-executes):                         │   │
+│  │ - Decides transfer: 100 VIBE to Agent B                        │   │
+│  │ - Builds transaction: executeTransfer(0xContractB, 100VIBE)    │   │
+│  │ - Signs with private key: msg.sender = 0x111... (Agent A addr) │   │
+│  │ - Sends transaction to blockchain                              │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Step 2: AgentWallet A contract executes                               │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │ Verify: msg.sender == agent ✓                                   │   │
+│  │ Check: 100 VIBE <= maxPerTx ✓                                  │   │
+│  │ Check: 100 VIBE <= remainingDailyLimit ✓                       │   │
+│  │ Execute: vibeToken.safeTransfer(0xContractB, 100VIBE)          │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Post-transfer state:                                                   │
+│  - Agent A Wallet: 0xContractA, balance 900 VIBE                     │
+│  - Agent B Wallet: 0xContractB, balance 600 VIBE                     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Understanding**:
+- VIBE transferred from contract address (0xContractA → 0xContractB)
+- msg.sender is Agent's EOA address (requires private key signing)
+- Contract verifies msg.sender == agent before allowing execution
+
+---
+
+## 4. Private Key Loss Recovery Solution
+
+### 4.1 Current Limitations
+
+**AgentWallet contract has no `setAgent` method, Owner cannot directly change Agent address.**
+
+What Owner can do:
+- `updateLimits()` - Update limits
+- `updateWhitelist()` - Update whitelist
+- `pause()/unpause()` - Pause/resume
+- `emergencyWithdraw()` - Emergency withdrawal (2-day time lock)
+
+What Owner cannot do:
+- ❌ Change Agent address
+- ❌ Execute transfers on behalf of Agent
+
+### 4.2 Recovery Process
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Agent Private Key Loss Recovery Process               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Step 1: Owner initiates emergency withdrawal (requires 2-day lock)   │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ // Day 1                                                         │  │
+│  │ AgentWallet.emergencyWithdraw(                                   │  │
+│  │     token: VIBEToken address,                                  │  │
+│  │     to: owner address,                                          │  │
+│  │     amount: full balance                                         │  │
+│  │ )                                                                │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                              │                                          │
+│                              ▼ Wait 2 days                             │
+│                                                                         │
+│  Step 2: Owner confirms withdrawal                                    │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ // Day 3                                                         │  │
+│  │ AgentWallet.confirmEmergencyWithdraw()                            │  │
+│  │ // Funds transferred from old wallet to Owner address            │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                              │                                          │
+│                              ▼                                          │
+│  Step 3: Create new AgentWallet                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ 1. Generate new Agent key pair (new address + new private key) │  │
+│  │ 2. Deploy new AgentWallet contract                              │  │
+│  │ 3. Register to AgentRegistry                                    │  │
+│  │ 4. Owner transfers funds to new wallet                           │  │
+│  │ 5. Pass new private key to Agent service                        │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                              │                                          │
+│                              ▼                                          │
+│  Step 4: Cleanup and update                                           │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │ - Update wallet address in database                              │  │
+│  │ - Notify relevant parties of address change                      │  │
+│  │ - Agent service uses new private key                             │  │
+│  │ - Old wallet decommissioned (balance cleared)                    │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 Recovery Costs
+
+| Cost Item | Description |
+|-----------|-------------|
+| Time | At least 2 days (time lock) |
+| Gas fee | emergencyWithdraw + deploy new contract + deposit |
+| Address change | Wallet address changes, need to update multiple places |
+| Operation complexity | Requires manual Owner operation |
+
+### 4.4 Prevention Measures
+
+To avoid private key loss:
+
+1. **Private key backup**: Platform keeps encrypted private key backup
+2. **Secure storage**: Agent service uses professional key management (e.g., HashiCorp Vault)
+3. **Multiple backups**: Private key shards stored in different locations
+4. **Monitoring alerts**: Monitor Agent service status, notify on anomalies
+
+---
+
+## 5. Code Implementation Reference
+
+### 5.1 Platform Side - Create Agent
+
+```python
+from eth_account import Account
+from cryptography.fernet import Fernet
+
+class AgentCreator:
+    def __init__(self, encryption_key: str):
+        self.cipher = Fernet(encryption_key)
+
+    def create_agent(self, owner_address: str) -> dict:
+        # 1. Generate key pair
+        account = Account.create()
+        agent_address = account.address
+        agent_private_key = account.key.hex()
+
+        # 2. Deploy AgentWallet contract
+        wallet_address = await self.deploy_wallet(owner_address, agent_address)
+
+        # 3. Encrypt private key
+        encrypted_key = self.cipher.encrypt(agent_private_key.encode()).decode()
+
+        # 4. Pass to Agent service
+        await self.send_to_agent(agent_address, encrypted_key)
+
+        # 5. Optional: Keep encrypted backup for recovery
+        await self.backup_key(agent_address, encrypted_key)
+
+        return {
+            "agent_address": agent_address,
+            "wallet_address": wallet_address
+        }
+```
+
+### 5.2 Agent Service Side - Use Private Key
+
+```python
+class AgentWalletClient:
+    def __init__(self, wallet_address: str):
+        self.wallet_address = wallet_address
+        self.private_key = None  # In memory, not on disk
+
+    def load_key(self, encrypted_key: str, cipher: Fernet):
+        """Load private key at startup"""
+        decrypted = cipher.decrypt(encrypted_key.encode()).decode()
+        self.private_key = decrypted
+
+    async def transfer(self, to: str, amount: int) -> str:
+        """Execute transfer autonomously"""
+        if not self.private_key:
+            raise Exception("Private key not loaded")
+
+        # Build and sign transaction (automatic, no human involvement)
+        tx = self.contract.functions.executeTransfer(to, amount).build_transaction({
+            'from': self.agent_address,
+            'nonce': await self.web3.eth.get_transaction_count(self.agent_address),
+            'chainId': 84532
+        })
+
+        signed = self.web3.eth.account.sign_transaction(tx, self.private_key)
+        tx_hash = await self.web3.eth.send_raw_transaction(signed.rawTransaction)
+
+        return tx_hash.hex()
+```
+
+### 5.3 Owner Side - Emergency Recovery
+
+```python
+class WalletRecovery:
+    async def recover_lost_key(self, wallet_address: str, owner_key: str) -> dict:
+        """Recovery process after private key loss"""
+
+        # Step 1: Initiate emergency withdrawal
+        wallet = AgentWalletClient(wallet_address)
+        balance = await wallet.get_balance()
+
+        # Day 1: Initiate request
+        await wallet.initiate_emergencyWithdraw(
+            token=VIBE_TOKEN_ADDRESS,
+            to=owner_address,
+            amount=balance,
+            owner_private_key=owner_key
+        )
+
+        return {
+            "status": "waiting",
+            "message": "Wait 2 days before calling confirm_emergency_withdraw",
+            "effective_time": datetime.now() + timedelta(days=2)
+        }
+
+    async def confirm_and_recreate(
+        self,
+        old_wallet: str,
+        owner_address: str,
+        owner_key: str
+    ) -> dict:
+        """Confirm withdrawal and create new wallet"""
+
+        # Step 2: Confirm withdrawal (2 days later)
+        await wallet.confirm_emergency_withdraw(owner_key)
+
+        # Step 3: Create new AgentWallet
+        new_agent = Account.create()
+        new_wallet = await self.deploy_wallet(owner_address, new_agent.address)
+
+        # Step 4: Transfer funds to new wallet
+        await self.token.approve(new_wallet, balance, owner_key)
+        await self.wallet_deposit(new_wallet, balance, owner_key)
+
+        return {
+            "new_agent_address": new_agent.address,
+            "new_agent_private_key": new_agent.key.hex(),
+            "new_wallet_address": new_wallet
+        }
+```
+
+---
+
+## 6. Security Best Practices
+
+### 6.1 Private Key Storage
+
+| Storage Method | Security Level | Use Case |
+|---------------|----------------|----------|
+| Plaintext config file | ❌ Low | Forbidden |
+| Environment variables | ⚠️ Medium-Low | Development/Testing |
+| Encrypted config file | ⚠️ Medium | Simple scenarios |
+| Professional key management (Vault) | ✅ High | Production |
+| Hardware Security Module (HSM) | ✅ Highest | Financial level |
+
+### 6.2 Operation Recommendations
+
+1. **Least privilege**: Agent private key can only call executeTransfer, cannot manage wallet settings
+2. **Limit control**: Set reasonable daily limits based on business needs
+3. **Monitoring alerts**: Monitor abnormal transfer behavior
+4. **Regular audits**: Regularly check Agent wallet status
+5. **Backup strategy**: Keep encrypted private key backup for disaster recovery
+
+---
+
+## 7. FAQ
+
+### Q1: What's the difference between Agent private key and Owner private key?
+
+| Private Key | Can Do | Limitations |
+|-------------|--------|-------------|
+| Owner private key | Deposit, approve large transfers, manage settings, emergency withdrawal | Cannot execute routine transfers |
+| Agent private key | Execute routine transfers (within limit), request large transfers | Subject to limit and whitelist restrictions |
+
+### Q2: What to do if Agent private key is leaked?
+
+1. Owner immediately calls `pause()` to pause wallet
+2. Initiate emergencyWithdraw process
+3. Wait 2 days to withdraw funds
+4. Create new AgentWallet
+
+### Q3: Why does emergencyWithdraw require 2 days?
+
+This is security design (time lock), preventing:
+- Immediate fund transfer after Owner private key theft
+- Malicious Owner running away suddenly
+
+The 2-day window gives relevant parties time to react and intervene.
+
+### Q4: Where does Agent service get private key after restart?
+
+There are two approaches:
+1. **Load from encrypted storage**: Platform passes encrypted private key at startup, Agent decrypts and uses
+2. **Recover from backup**: Agent reads encrypted private key from secure backup location
+
+---
+
+## 8. Related Documents
+
+- [Smart Contract Integration Solution](./BLOCKCHAIN_INTEGRATION.md)
+- [AgentWallet Contract Source Code](../contracts/src/AgentWallet.sol)
+
+---
+
+**End of Document**
+
+---
+
+<h2 id="chinese">中文翻译</h2>
+
 # Agent私钥管理方案
 
 > 版本: 1.0.0

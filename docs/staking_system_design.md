@@ -1,3 +1,588 @@
+# Staking System Optimization Design
+
+**[English](#staking-system-optimization-design) | [中文](#质押系统优化设计方案)**
+
+## Context
+
+The staking feature on the `/app/onboarding` page currently has the following issues:
+1. **No permission check**: No validation of user balance or staking status during staking
+2. **Profile API 500 error**: `request.hourly_rate` should be `request.hourlyRate` in `auth.py`
+3. **Invalid documentation links**: `href="#"` has no actual navigation address
+4. **Missing staking management features**: Users cannot unstake or add more stake later
+5. **Missing global toggle**: Cannot disable staking restrictions in test/single-node mode
+
+This solution aims to address the above issues and establish a complete staking system.
+
+---
+
+## 1. Staking State Machine Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   User Staking State Transitions                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   [Not Connected] ──Connect Wallet──> [Connected/Unstaked]    │
+│                              │                                  │
+│                              ├──Stake──> [Staked]              │
+│                              │          │                       │
+│                              │          ├──Add Stake──> [Staked]│
+│                              │          │    (amount accumulates)│
+│                              │          │                       │
+│                              │          └──Request Unstake──> [Unstaking]│
+│                              │                    │              │
+│                              │                    ├──After 7 days──> [Unstaked] ≈ [Unstaked]│
+│                              │                    │              │
+│                              │                    └──Cancel Unstake──> [Staked]│
+│                              │                                  │
+│                              └──Skip──> [Connected/Unstaked]   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### State Definitions
+
+| State | Description | stake Value | Executable Operations |
+|-------|-------------|-------------|----------------------|
+| `none` | Not staked | 0 | Stake |
+| `staked` | Staked | >= 100 | Add stake, Request unstake |
+| `unstaking` | Unstaking | >= 100 (locked) | Cancel unstake, Wait for unlock |
+| `unlocked` | Unlocked | 0 | Re-stake |
+
+---
+
+## 2. Feature Permission Matrix
+
+| Feature Page | Route | Unstaked User | Staked User | Description |
+|--------------|-------|---------------|-------------|-------------|
+| Dashboard | `/app/dashboard` | Read-only | Full | Statistics |
+| Agents List | `/app/agents` | Read-only | Full | Browse Agents |
+| Agent Detail | `/app/agents/:id` | Read-only | Full | View Details |
+| **Publish Service** | `/app/publish-service` | No | Yes | Requires stake |
+| **Publish Demand** | `/app/publish-demand` | No | Yes | Requires stake |
+| **Register Agent** | `/app/register-agent` | No | Yes | Requires stake |
+| **Collaboration** | `/app/collaborations` | No | Yes | Requires stake |
+| **Matching** | `/app/matching` | No | Yes | Requires stake |
+| **Governance Vote** | `/app/governance` | No | Yes | Requires stake |
+| Chat | `/app/chat` | Yes | Yes | Basic feature |
+| Settings | `/app/settings` | Yes | Yes | Includes staking management |
+| Marketplace | `/app/marketplace` | Read-only | Full | Browse marketplace |
+
+---
+
+## 3. Global Staking Toggle
+
+### 3.1 Configuration Method
+
+**Environment Variable (Recommended)**:
+```bash
+# .env file
+STAKE_REQUIRED=true   # Enable staking restrictions (default, production)
+STAKE_REQUIRED=false  # Disable staking restrictions (test/single-node mode)
+```
+
+**Startup Parameter**:
+```bash
+# Pass via environment variable
+STAKE_REQUIRED=false python -m uvicorn main:app
+
+# Or export directly
+export STAKE_REQUIRED=false
+python -m uvicorn main:app
+```
+
+### 3.2 Toggle Behavior
+
+| Configuration | STAKE_REQUIRED=true | STAKE_REQUIRED=false |
+|--------------|---------------------|----------------------|
+| **Use Case** | Production/Multi-node network | Single-node/Test/Development |
+| **Staking API** | Normal validation | Skip validation, return success directly |
+| **Feature Access** | Requires stake | Unrestricted access |
+| **Frontend Prompt** | Show staking guidance | Don't show staking restrictions |
+| **User Status** | Normal stake record | Stake status meaningless |
+
+### 3.3 API Response Changes
+
+When `STAKE_REQUIRED=false`:
+
+```python
+# GET /auth/config - Frontend gets configuration
+{
+  "stakeRequired": false,
+  "minStakeAmount": 100,
+  "defaultBalance": 10000
+}
+
+# POST /auth/stake - Staking endpoint
+{
+  "success": true,
+  "skipped": true,  // Flag indicating actual staking was skipped
+  "message": "Stake requirement is disabled in current mode"
+}
+```
+
+---
+
+## 4. Staking Lock Period Design
+
+### 4.1 Unstake Flow
+
+```
+User clicks "Unstake"
+        │
+        ▼
+Check if status is 'staked'
+        │
+        ▼
+Update status to 'unstaking'
+Record unlock_available_at = now + 7 days
+        │
+        ▼
+Show countdown UI
+Provide "Cancel Unstake" button
+        │
+        ├──────────────────────────┐
+        ▼                          ▼
+Auto-unlock after 7 days    User clicks "Cancel Unstake"
+        │                          │
+        ▼                          ▼
+stake -> 0                  Restore status to 'staked'
+status -> 'unlocked'        Delete unlock_available_at
+Balance increases                  │
+        │                          │
+        └──────────────────────────┘
+```
+
+### 4.2 Data Model
+
+```python
+# New fields in users table
+class User:
+    # Existing fields...
+    vibe_balance: float = 10000.0      # VIBE balance (simulated)
+    stake_status: str = 'none'          # none/staked/unstaking/unlocked
+    locked_stake: float = 0             # Locked amount
+    unlock_available_at: float = None   # Unlock available timestamp
+```
+
+---
+
+## 5. API Design
+
+### 5.1 New/Modified API Endpoints
+
+#### GET /auth/config
+Get staking configuration (called during frontend initialization)
+
+```python
+class StakeConfigResponse(BaseModel):
+    stakeRequired: bool          # Whether staking restrictions are enabled
+    minStakeAmount: float        # Minimum stake amount 100
+    defaultBalance: float        # Initial simulated balance 10000
+    unstakingPeriodDays: int     # Unlock waiting days 7
+
+@router.get("/config", response_model=StakeConfigResponse)
+async def get_stake_config():
+    stake_required = os.environ.get("STAKE_REQUIRED", "true").lower() == "true"
+    return StakeConfigResponse(
+        stakeRequired=stake_required,
+        minStakeAmount=100.0,
+        defaultBalance=10000.0,
+        unstakingPeriodDays=7
+    )
+```
+
+#### GET /auth/balance
+Get user VIBE balance
+
+```python
+class BalanceResponse(BaseModel):
+    balance: float              # Available balance
+    stakedAmount: float         # Staked amount
+    lockedAmount: float         # Locked amount
+    totalBalance: float         # Total balance
+
+@router.get("/balance", response_model=BalanceResponse)
+async def get_balance(user: dict = Depends(get_current_user)):
+    ...
+```
+
+#### POST /auth/stake (Modified)
+Add validation
+
+```python
+@router.post("/stake", response_model=StakeResponse)
+async def stake_tokens(request: StakeRequest, user: dict = Depends(get_current_user)):
+    stake_required = os.environ.get("STAKE_REQUIRED", "true").lower() == "true"
+
+    # If staking restrictions are disabled, return success directly
+    if not stake_required:
+        return StakeResponse(success=True, skipped=True, ...)
+
+    # Validation 1: Minimum amount
+    if request.amount < 100:
+        raise HTTPException(400, "Minimum stake is 100 VIBE")
+
+    # Validation 2: Sufficient balance
+    if user['vibe_balance'] < request.amount:
+        raise HTTPException(400, "Insufficient VIBE balance")
+
+    # Validation 3: Status check (allow adding stake in staked state)
+    if user['stake_status'] == 'unstaking':
+        raise HTTPException(400, "Cannot stake while unstaking")
+
+    # Execute staking...
+```
+
+#### POST /auth/stake (New)
+Request to unstake
+
+```python
+class UnstakeRequest(BaseModel):
+    amount: Optional[float] = None  # None = unstake all
+
+class UnstakeResponse(BaseModel):
+    success: bool
+    lockedAmount: float
+    unlockAvailableAt: int  # Timestamp
+
+@router.post("/unstake", response_model=UnstakeResponse)
+async def unstake_tokens(request: UnstakeRequest, user: dict = Depends(get_current_user)):
+    # Validate status
+    if user['stake_status'] != 'staked':
+        raise HTTPException(400, "No stake to unstake")
+
+    # Set unstaking status
+    # unlock_available_at = now + 7 days
+    ...
+```
+
+#### POST /auth/unstake/cancel (New)
+Cancel unstake
+
+```python
+@router.post("/unstake/cancel")
+async def cancel_unstake(user: dict = Depends(get_current_user)):
+    if user['stake_status'] != 'unstaking':
+        raise HTTPException(400, "Not in unstaking state")
+    # Restore to staked status
+    ...
+```
+
+#### POST /auth/unstake/confirm (New)
+Confirm unlock (called after 7 days)
+
+```python
+@router.post("/unstake/confirm")
+async def confirm_unstake(user: dict = Depends(get_current_user)):
+    if user['stake_status'] != 'unstaking':
+        raise HTTPException(400, "Not in unstaking state")
+    if datetime.now().timestamp() < user['unlock_available_at']:
+        raise HTTPException(400, "Unlock period not completed")
+    # Return balance, clear stake
+    ...
+```
+
+#### POST /auth/profile (Fixed)
+Fix 500 error
+
+```python
+# Modify line 308
+# Error: 'hourly_rate': request.hourly_rate
+# Correct: 'hourly_rate': request.hourlyRate
+```
+
+---
+
+## 6. Frontend Design
+
+### 6.1 authStore Extension
+
+```typescript
+// stores/authStore.ts new fields
+interface AuthState {
+  // Existing fields...
+
+  // New staking related
+  vibeBalance: number           // VIBE available balance
+  stakedAmount: number          // Staked amount
+  lockedAmount: number          // Locked amount
+  stakeStatus: StakeStatus      // 'none' | 'staked' | 'unstaking' | 'unlocked'
+  unlockAvailableAt: number | null  // Unlock available time
+
+  // Configuration related
+  stakeRequired: boolean        // Backend staking toggle status
+
+  // New Actions
+  updateStakeInfo: (info: StakeInfo) => void
+}
+```
+
+### 6.2 Staking Guide Modal Component
+
+**File**: `components/StakeGuideModal.tsx`
+
+```tsx
+interface StakeGuideModalProps {
+  isOpen: boolean
+  onClose: () => void
+  featureName: string  // Feature name that triggered the modal
+  requiredStake?: number
+}
+
+// Modal content:
+// 1. Explain staking is required to use this feature
+// 2. List staking benefits
+// 3. Provide "Stake Now" and "Later" buttons
+// 4. Click "Stake Now" redirects to /app/onboarding or settings page
+```
+
+### 6.3 useStakeGuard Hook
+
+**File**: `hooks/useStakeGuard.ts`
+
+```tsx
+export function useStakeGuard() {
+  const { stakeStatus, stakeRequired, accessToken } = useAuthStore()
+  const [showGuideModal, setShowGuideModal] = useState(false)
+  const [targetFeature, setTargetFeature] = useState('')
+
+  // Check if user has permission to access a feature
+  const checkAccess = useCallback((featureName: string): boolean => {
+    // If backend disabled staking restrictions, allow directly
+    if (!stakeRequired) return true
+
+    // If not logged in
+    if (!accessToken) {
+      setTargetFeature(featureName)
+      setShowGuideModal(true)
+      return false
+    }
+
+    // If not staked
+    if (stakeStatus !== 'staked') {
+      setTargetFeature(featureName)
+      setShowGuideModal(true)
+      return false
+    }
+
+    return true
+  }, [stakeRequired, accessToken, stakeStatus])
+
+  return {
+    checkAccess,
+    showGuideModal,
+    targetFeature,
+    closeGuideModal: () => setShowGuideModal(false)
+  }
+}
+```
+
+### 6.4 Staking Management Page (New Tab in Settings)
+
+**File**: `pages/Settings.tsx` new staking management section
+
+```
+┌────────────────────────────────────────┐
+│  Staking Management                    │
+├────────────────────────────────────────┤
+│                                        │
+│  Status: ✅ Staked                     │
+│  Staked Amount: 1,000 VIBE             │
+│  Stake Level: 🥈 Silver                 │
+│  Available Balance: 9,000 VIBE         │
+│  Total Assets: 10,000 VIBE             │
+│                                        │
+│  [Add Stake]     [Unstake]             │
+│                                        │
+├────────────────────────────────────────┤
+│  Staking Benefits                      │
+│  • Publish services and demands         │
+│  • Register AI Agents                   │
+│  • Participate in collaboration matching│
+│  • Governance voting rights            │
+└────────────────────────────────────────┘
+```
+
+### 6.5 Route Guard Implementation
+
+**Modify**: `App.tsx`
+
+```tsx
+// Create ProtectedRoute component
+function StakeProtectedRoute({ children, featureName }: { children: ReactNode, featureName: string }) {
+  const { checkAccess, showGuideModal, targetFeature, closeGuideModal } = useStakeGuard()
+
+  if (!checkAccess(featureName)) {
+    return (
+      <>
+        {children}  // Or show restricted notice
+        <StakeGuideModal
+          isOpen={showGuideModal}
+          onClose={closeGuideModal}
+          featureName={targetFeature}
+        />
+      </>
+    )
+  }
+
+  return <>{children}</>
+}
+
+// Use on protected routes
+<Route path="publish-service" element={
+  <StakeProtectedRoute featureName="Publish Service">
+    <PublishService />
+  </StakeProtectedRoute>
+} />
+```
+
+---
+
+## 7. Database Changes
+
+### 7.1 New Fields in users Table
+
+```sql
+ALTER TABLE users ADD COLUMN vibe_balance REAL DEFAULT 10000.0;
+ALTER TABLE users ADD COLUMN stake_status TEXT DEFAULT 'none';
+ALTER TABLE users ADD COLUMN locked_stake REAL DEFAULT 0;
+ALTER TABLE users ADD COLUMN unlock_available_at REAL;
+```
+
+### 7.2 Update init_db Function
+
+**File**: `usmsb_sdk/api/database.py`
+
+```python
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        wallet_address TEXT UNIQUE NOT NULL,
+        did TEXT UNIQUE,
+        agent_id TEXT,
+        stake REAL DEFAULT 0,
+        reputation REAL DEFAULT 0.5,
+        vibe_balance REAL DEFAULT 10000.0,    -- New
+        stake_status TEXT DEFAULT 'none',     -- New
+        locked_stake REAL DEFAULT 0,          -- New
+        unlock_available_at REAL,             -- New
+        created_at REAL,
+        updated_at REAL
+    )
+''')
+```
+
+---
+
+## 8. Implementation Steps
+
+### Phase 1: Backend Basics (Priority)
+1. Modify `database.py` - Add new fields to users table
+2. Modify `auth.py` - Add config API and balance API
+3. Fix `auth.py` line 308 `hourly_rate` error
+4. Add global staking toggle support
+
+### Phase 2: Staking API Enhancement
+5. Modify `/auth/stake` - Add balance validation
+6. Implement `/auth/unstake` - Request unstake
+7. Implement `/auth/unstake/cancel` - Cancel unstake
+8. Implement `/auth/unstake/confirm` - Confirm unlock
+
+### Phase 3: Frontend Infrastructure
+9. Modify `authStore.ts` - Add new fields
+10. Create `useStakeGuard.ts` Hook
+11. Create `StakeGuideModal.tsx` component
+12. Add API calls (`authService.ts`)
+
+### Phase 4: Feature Integration
+13. Modify `App.tsx` - Add route guards
+14. Modify `Settings.tsx` - Add staking management Tab
+15. Modify `Onboarding.tsx` - Fix documentation links
+
+### Phase 5: Testing and Verification
+16. Test staking flow
+17. Test unstake flow (with 7-day wait)
+18. Test STAKE_REQUIRED=false mode
+19. Test restricted feature access
+
+---
+
+## 9. Key File List
+
+| File Path | Changes |
+|-----------|---------|
+| `usmsb_sdk/api/database.py` | users table new fields |
+| `usmsb_sdk/api/rest/auth.py` | Fix bug + new API |
+| `usmsb_sdk/config/settings.py` | Add stake_required config |
+| `frontend/src/stores/authStore.ts` | New staking status fields |
+| `frontend/src/hooks/useStakeGuard.ts` | New - Permission guard Hook |
+| `frontend/src/components/StakeGuideModal.tsx` | New - Staking guide modal |
+| `frontend/src/services/authService.ts` | New API calls |
+| `frontend/src/App.tsx` | Add route guards |
+| `frontend/src/pages/Settings.tsx` | Add staking management |
+| `frontend/src/pages/Onboarding.tsx` | Fix documentation links |
+
+---
+
+## 10. Verification Plan
+
+### 10.1 Backend Testing
+
+```bash
+# 1. Start backend (with staking restrictions)
+STAKE_REQUIRED=true python -m uvicorn usmsb_sdk.api.rest.main:app
+
+# 2. Test config API
+curl http://localhost:8000/api/auth/config
+# Expected: {"stakeRequired": true, ...}
+
+# 3. Start backend (without staking restrictions)
+STAKE_REQUIRED=false python -m uvicorn usmsb_sdk.api.rest.main:app
+
+# 4. Test config API again
+curl http://localhost:8000/api/auth/config
+# Expected: {"stakeRequired": false, ...}
+```
+
+### 10.2 Frontend Testing
+
+1. **Unstaked user accessing restricted feature**
+   - Visit `/app/publish-service`
+   - Expected: Show staking guide modal
+
+2. **After disabling staking restrictions**
+   - Set `STAKE_REQUIRED=false`
+   - Visit `/app/publish-service`
+   - Expected: Direct access, no modal
+
+3. **Staking flow**
+   - Stake 100 VIBE in settings page
+   - Expected: Status changes to staked
+
+4. **Unstake flow**
+   - Click unstake
+   - Expected: Status changes to unstaking, show countdown
+   - Click cancel unstake
+   - Expected: Restore to staked
+
+### 10.3 API 500 Error Verification
+
+```bash
+# Test profile API
+curl -X POST http://localhost:8000/api/auth/profile \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "test", "bio": "test", "skills": [], "hourlyRate": 100}'
+
+# Expected: 200 OK, not 500
+```
+
+---
+
+<details>
+<summary><h2>质押系统优化设计方案</h2></summary>
+
 # 质押系统优化设计方案
 
 ## Context（背景）
@@ -575,3 +1160,5 @@ curl -X POST http://localhost:8000/api/auth/profile \
 
 # 期望: 200 OK，不再是 500
 ```
+
+</details>

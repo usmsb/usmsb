@@ -1,3 +1,7 @@
+**[English](#usmsb-sdk-copyright-and-license-notice) | [中文](#usmsb-sdk版权与许可声明)**
+
+---
+
 # USMSB SDK Copyright and License Notice
 
 **Universal System Model of Social Behavior - Intellectual Property and Licensing**

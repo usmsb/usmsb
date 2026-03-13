@@ -1,3 +1,604 @@
+# USMSB Theory Detailed Explanation
+
+**[English](#usmsb-theory) | [中文](#usmsb理论详解)**
+
+---
+
+## What is the USMSB Model
+
+USMSB (Universal System Model of Social Behavior) is a theoretical framework designed to **unify the description and derivation of human social behavior**.
+
+### Core Definition
+
+USMSB treats social activity as an **open, adaptive complex system**, with its core being:
+
+> **Agents** achieve **Goals** and create **Value** while facing **Risks** through **Information**-driven **Interaction** and **Transformation** processes within the constraints of specific **Environment** and **Rule**.
+
+### Theoretical Foundations
+
+The USMSB model is built on the following theoretical foundations:
+
+- **Marxist Philosophy**: Human nature is "the sum of all social relations"
+- **Complexity Science**: Focuses on systems composed of many interacting individuals
+- **Social Systems Theory**: Luhmann's social systems theory, emphasizing communication and self-reference
+- **Social Behavior Theory**: Rational behavior theory, planned behavior theory, etc.
+
+### Relationship with Silicon Civilization Platform
+
+USMSB is the **theoretical layer**, and the Silicon Civilization Platform is the **application layer**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Application Layer (Multiple Implementations)│
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
+│  │ Silicon     │ │ Smart City  │ │ Medical     │            │
+│  │ Civilization│ │ System      │ │ Management  │            │
+│  │ Platform    │ │             │ │ System      │            │
+│  └─────────────┘ └─────────────┘ └─────────────┘            │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Apply
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    USMSB SDK (Technical Layer)              │
+│              Programmable Implementation of                  │
+│              Theoretical Framework                          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Implement
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   USMSB Theoretical Model (Theoretical Layer)│
+│              Nine Elements | Six Logics | Nine Interfaces    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Nine Core Elements
+
+The USMSB model consists of nine core elements, which are the basic "atoms" for constructing any social activity system.
+
+### 1. Agent
+
+**Definition**: An individual or organization with the ability to perceive, decide, and act.
+
+**Characteristics**:
+- **Heterogeneity**: Different agents have different goals, capabilities, and preferences
+- **Bounded Rationality**: Decision-making is limited by cognitive ability, information access, and other factors
+- **Adaptability**: Can adjust behavior based on environmental changes and feedback
+
+**Types**:
+| Type | Examples |
+|------|----------|
+| Individual | User, consumer, employee, patient |
+| Organization | Enterprise, government agency, non-profit organization |
+| AI Agent | Intelligent assistant, automated system, robot |
+
+**Data Structure**:
+```python
+@dataclass
+class Agent:
+    id: str
+    name: str
+    type: str  # "human", "ai_agent", "organization"
+    capabilities: List[str]
+    state: Dict[str, Any]
+    goals: List[Goal]
+    resources: List[Resource]
+    rules: List[Rule]
+```
+
+---
+
+### 2. Object
+
+**Definition**: The target of activity, which can be physical entities, information, intangible entities, etc.
+
+**Characteristics**:
+- **Operability**: Can be perceived, processed, transformed, or influenced by agents
+- **Attribute Set**: Has a series of attributes describing its characteristics and state
+
+**Types**:
+| Type | Examples |
+|------|----------|
+| Physical Entity | Product, raw material, equipment |
+| Information Entity | Data, knowledge, document |
+| Intangible Entity | Service, health, relationship |
+
+---
+
+### 3. Goal
+
+**Definition**: The expected state or result that an agent hopes to achieve through activity.
+
+**Characteristics**:
+- **Hierarchy**: There are individual goals, organizational goals, and social goals
+- **Dynamics**: May adjust with environmental changes and learning processes
+- **Measurability**: Some goals can be measured through quantitative indicators
+
+**Hierarchy Example**:
+```
+Social Goal: Improve national health level
+    └── Organizational Goal: Hospital provides high-quality services
+        └── Individual Goal: Doctor cures patient's disease
+```
+
+---
+
+### 4. Resource
+
+**Definition**: All inputs required for activity, including tangible and intangible resources.
+
+**Characteristics**:
+- **Scarcity**: Resources are usually limited and require effective allocation
+- **Transformability**: Can be consumed, transformed, or value-added
+- **Multi-dimensional**: Includes various forms such as material, human, information, and time
+
+**Classification**:
+| Tangible Resources | Intangible Resources |
+|--------------------|----------------------|
+| Capital | Knowledge |
+| Equipment | Information |
+| Location | Technology |
+| Raw Materials | Time |
+| Human Resources | Trust, brand, culture |
+
+---
+
+### 5. Rule
+
+**Definition**: Norms, laws, policies, ethics, standards, customs, etc. that constrain agent behavior and activity processes.
+
+**Characteristics**:
+- **Explicit and Implicit**: Can be explicitly written or conventionally established
+- **Mandatory and Voluntary**: Some have mandatory binding force
+- **Dynamics**: Adjust or evolve with social development
+
+**Classification**:
+| Explicit Rules | Implicit Rules |
+|----------------|----------------|
+| Laws and regulations | Social norms |
+| Industry standards | Cultural customs |
+| Organization systems | Moral ethics |
+| Platform agreements | Industry practices |
+
+---
+
+### 6. Information
+
+**Definition**: Data, knowledge, signals, communication content, etc. generated, transmitted, processed, and utilized in activities.
+
+**Characteristics**:
+- **Asymmetry**: Different agents may have different information
+- **Timeliness**: The value of information may change over time
+- **Multi-modal**: Can exist in various forms such as text, image, sound, data
+
+**Information Flow Example**:
+```
+Market Information → Enterprise Decision → Production Instruction → Product Information → Consumer Feedback
+    ↑                                              ↓
+    └────────────────  Continuous Loop ←─────────────────────┘
+```
+
+---
+
+### 7. Value
+
+**Definition**: The benefits, meanings, or utilities generated by activities, which are the final outputs pursued by agents.
+
+**Characteristics**:
+- **Multi-dimensionality**: Includes economic, social, health, emotional value, etc.
+- **Subjectivity**: Different agents may have different value judgments on the same output
+- **Measurability**: Some value can be measured through quantitative indicators
+
+**Value Types**:
+| Type | Examples |
+|------|----------|
+| Economic Value | Profit, revenue, GDP growth |
+| Social Value | Fairness, stability, cohesion |
+| Health Value | Recovery, well-being, quality of life |
+| Emotional Value | Happiness, belonging, achievement |
+
+---
+
+### 8. Risk
+
+**Definition**: The uncertainties that may occur during activities and their potential negative impacts.
+
+**Characteristics**:
+- **Uncertainty**: The occurrence and consequences of risks are uncertain
+- **Potential Loss**: May lead to resource loss or goal damage once they occur
+- **Manageability**: Can be reduced through identification, assessment, control, and other means
+
+**Risk Types**:
+| Risk Type | Examples |
+|-----------|----------|
+| Market Risk | Demand fluctuation, price fluctuation, intensified competition |
+| Operational Risk | System failure, human error, fraud |
+| Credit Risk | Default, arrears |
+| Technology Risk | Technology obsolescence, security vulnerabilities |
+| Relationship Risk | Misunderstanding, conflict, trust breakdown |
+
+---
+
+### 9. Environment
+
+**Definition**: The external conditions and background in which activities occur.
+
+**Characteristics**:
+- **Dynamics**: Environmental factors continuously change
+- **Complexity**: Composed of multiple interrelated factors
+- **Openness**: There is continuous exchange between the system and the environment
+
+**Environmental Levels**:
+```
+┌────────────────────────────────────────┐
+│           Macro Environment            │
+│  Economic situation, political-legal, │
+│  socio-cultural, technological         │
+├────────────────────────────────────────┤
+│           Meso Environment             │
+│  Industry competition, supply chain,   │
+│  market trends                         │
+├────────────────────────────────────────┤
+│           Micro Environment            │
+│  Family, community, workplace,         │
+│  social circle                         │
+└────────────────────────────────────────┘
+```
+
+---
+
+## Nine Universal Action Interfaces
+
+These actions are the basic behavior patterns universally taken by agents in all social activities, forming the micro-level mechanism of system operation.
+
+### 1. Perception
+
+**Definition**: The process by which agents acquire and understand information.
+
+**Role**: Establishes the connection between agents and the external world, forming the basis for decision-making.
+
+**Implementation**: Observation and monitoring, data collection, market research, sensor acquisition
+
+### 2. Goal & Rule Interpretation
+
+**Definition**: Agents interpret information based on their own goals and existing rules.
+
+**Role**: Determines how agents understand the situation, providing a framework for subsequent decision-making.
+
+**Implementation**: Goal decomposition, rule identification, situation understanding
+
+### 3. Decision-making
+
+**Definition**: Agents choose action plans based on information, goals, rules, and resources.
+
+**Role**: Embodies agent initiative, transforming intentions into action plans.
+
+**Implementation**: Plan generation, multi-objective optimization, risk-return trade-off
+
+### 4. Execution
+
+**Definition**: Agents implement selected action plans.
+
+**Role**: Transforms decisions into specific operations, causing object transformation.
+
+**Implementation**: Code execution, API calls, physical operations, simulation operations
+
+### 5. Interaction
+
+**Definition**: The interaction process between agents, and between agents and objects/environment.
+
+**Role**: Channels for information flow, resource allocation, and relationship establishment.
+
+**Types**: Communication, collaboration, competition, conflict
+
+### 6. Transformation
+
+**Definition**: The process of changing the form, attributes, or value of resources or objects.
+
+**Role**: The core mechanism for achieving value creation and appreciation.
+
+**Examples**: Knowledge → Capability, Raw material → Product, Capital → Capital, Emotion → Trust
+
+### 7. Evaluation
+
+**Definition**: Agents measure activity progress, effects, and outputs.
+
+**Role**: The prerequisite for system self-correction and optimization.
+
+**Evaluation Dimensions**: Goal achievement degree, resource utilization efficiency, value creation amount, risk exposure degree
+
+### 8. Feedback
+
+**Definition**: Returning evaluation results to decision-making and execution环节 for adjustment and optimization.
+
+**Role**: The basis for system adaptation and learning.
+
+**Types**: Positive feedback, negative feedback, delayed feedback
+
+### 9. Risk Management
+
+**Definition**: Identifying, assessing, and responding to potential risks.
+
+**Role**: Reduces negative impacts and improves system robustness.
+
+**Strategies**: Risk avoidance, risk transfer, risk reduction, risk acceptance
+
+### 10. Learning
+
+**Definition**: Agents acquire knowledge from experience, adjust behavior patterns, and improve capabilities.
+
+**Role**: The driving force for system evolution, achieving adaptation and evolution.
+
+**Levels**: Single-loop learning (correcting errors), Double-loop learning (modifying goal rules), Meta-learning (learning how to learn)
+
+---
+
+## Six Core Logics
+
+These logics are the basic laws and cyclic mechanisms that drive all social activity operations, describing macro-level behavior patterns at the system level.
+
+### 1. Goal-Action-Outcome Loop
+
+**Description**: Setting goals, taking actions, producing outcomes, and continuously looping by adjusting goals and actions based on outcomes.
+
+```
+     ┌──────────┐
+     │   Goal   │
+     └────┬─────┘
+          │
+          ▼
+     ┌──────────┐
+     │  Action  │◄──────────┐
+     └────┬─────┘           │
+          │                 │
+          ▼                 │
+     ┌──────────┐           │
+     │  Outcome │           │
+     └────┬─────┘           │
+          │                 │
+          ▼                 │
+     ┌──────────┐           │
+     │  Adjust  │───────────┘
+     └──────────┘
+```
+
+**Key Elements**: Goal setting, action planning, outcome evaluation, feedback adjustment
+
+---
+
+### 2. Resource-Transformation-Value Chain
+
+**Description**: Through inputting scarce resources and undergoing a series of transformation processes, ultimately achieving value creation and appreciation.
+
+```
+  Resource        Transformation         Value
+Resource ─────────────────────────► Value
+   │                         ▲
+   │    ┌─────────────────┐  │
+   └───►│ Transformation  │──┘
+        └─────────────────┘
+              │
+              ▼
+          Appreciation
+```
+
+**Key Elements**: Resource allocation, transformation optimization, value evaluation, efficiency improvement
+
+---
+
+### 3. Information-Decision-Control Loop
+
+**Description**: Information is the basis for decision-making, decisions guide actions, action results generate new information, forming a closed loop.
+
+```
+    ┌───────────────────────────────────────┐
+    │                                       │
+    ▼                                       │
+┌──────────┐      ┌──────────┐      ┌──────────┐
+│Information│─────►│ Decision │─────►│ Control  │
+└──────────┘      └──────────┘      └──────────┘
+    ▲                                       │
+    │                                       │
+    └───────────────────────────────────────┘
+```
+
+**Key Elements**: Information collection, decision analysis, control execution, real-time response
+
+---
+
+### 4. System-Environment Interaction
+
+**Description**: There is continuous input, output, and adaptive interaction between social activity systems and the external environment.
+
+```
+         Environment
+              │
+    ┌─────────┼─────────┐
+    │    Input│         │ Output
+    │   Input │         │ Output
+    ▼         │         ▼
+┌─────────────────────────┐
+│                         │
+│        System           │
+│                         │
+└─────────────────────────┘
+    │         ▲
+    │  Adapt │ Feedback
+    ▼         │
+```
+
+**Key Elements**: Environment awareness, resource acquisition, output delivery, adaptive adjustment
+
+---
+
+### 5. Emergence and Self-organization
+
+**Description**: Macro patterns and behaviors in complex social systems often spontaneously form through interaction between micro-level agents.
+
+```
+  Micro Behavior              Emergence
+  Micro              Emergence
+    │                   │
+    │   ┌───────────┐   │
+    ├──►│Interaction│───┤
+    │   └───────────┘   │
+    │                   │
+    ▼                   ▼
+  Agent Behavior      Macro Pattern
+```
+
+**Key Elements**: Micro behavior, interaction, emergence phenomenon, self-organization mechanism
+
+---
+
+### 6. Adaptation and Evolution
+
+**Description**: Social systems adapt to uncertainty and change through learning and adjustment, continuously evolving.
+
+```
+    ┌─────────────────────────────────────┐
+    │                                     │
+    ▼                                     │
+┌──────────┐      ┌──────────┐      ┌──────────┐
+│ Learning │─────►│Adaptation│─────►│Evolution │
+└──────────┘      └──────────┘      └──────────┘
+    ▲                                     │
+    │                                     │
+    └─────────────────────────────────────┘
+```
+
+**Key Elements**: Experiential learning, strategy adjustment, structural evolution, capability improvement
+
+---
+
+## Model Universality Verification
+
+The USMSB model has been verified in multiple fields, demonstrating its universality:
+
+### Silicon Civilization Platform
+
+| Element | Mapping |
+|---------|---------|
+| Agent | AI agents, human users, organizational entities |
+| Object | Services, demands, transactions |
+| Goal | Service monetization, demand satisfaction |
+| Resource | Computing resources, data, VIBE tokens |
+| Rule | Platform agreements, reputation mechanisms |
+| Information | Agent capabilities, supply and demand information |
+| Value | Service value, reputation score |
+| Risk | Service quality risk, reputation risk |
+| Environment | Decentralized network, market environment |
+
+### Education Field
+
+| Element | Mapping |
+|---------|---------|
+| Agent | Students, teachers, schools |
+| Object | Knowledge, courses, textbooks |
+| Goal | Master knowledge, obtain degree |
+| Resource | Time, teachers, facilities |
+| Rule | Teaching syllabus, examination system |
+| Information | Teaching content, grade feedback |
+| Value | Ability improvement, degree certificate |
+| Risk | Poor learning outcomes |
+| Environment | Family, society, policy |
+
+### Medical Field
+
+| Element | Mapping |
+|---------|---------|
+| Agent | Patients, doctors, hospitals |
+| Object | Disease, health status, medicine |
+| Goal | Recovery, health maintenance |
+| Resource | Medical equipment, medicine, funds |
+| Rule | Diagnosis and treatment standards, medical insurance policy |
+| Information | Medical records, diagnosis reports |
+| Value | Health recovery, life extension |
+| Risk | Misdiagnosis, medical accidents |
+| Environment | Epidemic trends, policy |
+
+---
+
+## USMSB SDK Implementation
+
+The USMSB SDK transforms this theoretical model into actionable programming tools:
+
+### Core Data Structures
+
+```python
+from usmsb_sdk import Agent, Goal, Resource, Rule, Environment
+
+# Create Agent
+agent = Agent(
+    id="agent_001",
+    name="Alice",
+    type="human",
+    capabilities=["learn", "decide"]
+)
+
+# Create Goal
+goal = Goal(
+    id="goal_001",
+    name="Complete Project",
+    priority=1,
+    status="pending"
+)
+
+# Create Environment
+env = Environment(
+    id="env_001",
+    name="Production",
+    type="technological",
+    state={"status": "active"}
+)
+```
+
+### Service Calls
+
+```python
+from usmsb_sdk import USMSBManager
+
+async def main():
+    sdk = USMSBManager()
+    await sdk.initialize()
+
+    # Get behavior prediction service
+    prediction_service = sdk.get_service("behavior_prediction")
+
+    # Predict Agent behavior
+    prediction = await prediction_service.predict_agent_behavior(
+        agent=agent,
+        environment=env
+    )
+
+    await sdk.shutdown()
+```
+
+---
+
+## Related Documents
+
+- [Silicon Civilization Platform Overview](./platform-overview.md) - Application platform built on USMSB
+- [User Guide](./user-guide.md) - Detailed usage instructions for platform and SDK
+- [API Reference](./api-reference.md) - Complete API documentation
+- [Whitepaper](./whitepaper.md) - Project vision and technical architecture
+
+---
+
+**Document Information**
+
+- **Version**: 1.0.0
+- **Author**: USMSB SDK Team
+- **Last Updated**: 2025
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # USMSB理论详解
 
 **Universal System Model of Social Behavior - 社会行为的通用系统模型**
@@ -600,3 +1201,5 @@ async def main():
 - **最后更新**: 2025年
 
 ---
+
+</details>

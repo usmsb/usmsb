@@ -1,3 +1,354 @@
+# Chapter 2: System Architecture Design
+
+**[English](#chapter-2-system-architecture-design) | [中文](#第2章系统架构设计)**
+
+## 2.1 Overall Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              User Layer                                      │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐               │
+│  │  Creator  │  │ Provider  │  │ Investor  │  │  Governor │               │
+│  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘  └─────┬─────┘               │
+└────────┼──────────────┼──────────────┼──────────────┼──────────────────────┘
+         │              │              │              │
+         ▼              ▼              ▼              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Application Layer                               │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                         REST API Gateway                               │  │
+│  │  /pricing  /joint-order  /assets  /credentials  /governance  /...     │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Service Layer                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ Joint Order  │  │AssetFraction│  │  zk Proof    │  │    Dynamic   │    │
+│  │   Service    │  │   Service    │  │   Service    │  │   Pricing    │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │  Reputation  │  │   Matching   │  │  Governance  │  │  Meta Agent │    │
+│  │   Service   │  │    Engine    │  │   Service    │  │              │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Protocol Layer                                  │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                    IAP (Intelligent Activation Protocol)              │  │
+│  │  • Dynamic Value Discovery  • Liquidity Fractionalization            │  │
+│  │  • zk-Credential Pass       • Joint Order                            │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Blockchain Layer                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ JointOrder   │  │ AssetVault   │  │ZKCredential  │  │VIBGovernance│    │
+│  │Joint Order   │  │Asset Fract.  │  │ zk Credential│  │  Governance │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │ VIBToken     │  │ VIBStaking   │  │ VIBIdentity  │  │ VIBTreasury  │    │
+│  │   Token      │  │   Staking    │  │   Identity   │  │   Treasury  │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Network Layer (ISA Nodes)                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐            │  │
+│  │  │ ISA-1   │◄──►│ ISA-2   │◄──►│ ISA-3   │◄──►│ ISA-N   │            │  │
+│  │  │P2P+Agent│    │P2P+Agent│    │P2P+Agent│    │P2P+Agent│            │  │
+│  │  └─────────┘    └─────────┘    └─────────┘    └─────────┘            │  │
+│  │                     P2P Gossip Protocol                                │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## 2.2 Smart Contract Architecture
+
+### Existing Contracts
+
+```
+contracts/
+├── VIBToken.sol      → ERC20 Token (existing)
+├── VIBStaking.sol    → Staking Mechanism (existing)
+├── VIBIdentity.sol   → SBT Identity (existing)
+├── VIBTreasury.sol   → Treasury (existing)
+├── VIBVesting.sol    → Vesting (existing)
+├── VIBTimelock.sol   → Timelock (existing)
+├── VIBGovernance.sol → Governance (existing)
+└── VIBDividend.sol   → Dividend (existing)
+```
+
+### New Contracts
+
+```
+contracts/
+├── JointOrder.sol    → Joint Order Contract (new)
+├── AssetVault.sol    → Asset Fractionalization Contract (new)
+└── ZKCredential.sol  → zk-Credential Pass Contract (new)
+```
+
+### Contract Dependencies
+
+```
+                    ┌─────────────┐
+                    │  VIBToken   │
+                    └──────┬──────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+         ▼                 ▼                 ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ VIBStaking  │    │ VIBTreasury │    │ JointOrder  │
+└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
+       │                  │                  │
+       ▼                  ▼                  ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│VIBGovernance│    │ AssetVault  │    │ZKCredential │
+└──────┬──────┘    └─────────────┘    └─────────────┘
+       │
+       ▼
+┌─────────────┐
+│ VIBIdentity │
+└─────────────┘
+```
+
+## 2.3 On-chain vs Off-chain Division
+
+### Division Principles
+
+| Function | Must Be On-chain | Can Be Off-chain | Explanation |
+|----------|------------------|-------------------|-------------|
+| **Joint Order** | ✅ Escrow<br>✅ Final Settlement | ❌ Demand Aggregation<br>❌ Bidding Evaluation | Escrow must be on-chain for security |
+| **Asset Fractionalization** | ✅ NFT Minting<br>✅ Fraction Ownership<br>✅ Dividend Distribution | ❌ Valuation Calculation<br>❌ Fraction Pricing | Ownership must be transparent on-chain |
+| **zk-Credential Pass** | ✅ Proof Verification<br>✅ Credential Issuance | ❌ Proof Generation<br>❌ Data Aggregation | Verification needs to be public, generation needs privacy |
+
+### On-chain Mode Selection
+
+The system provides two on-chain modes:
+
+```python
+class OnchainMode(Enum):
+    MINIMAL = "minimal"    # Only escrow settlement, complex logic off-chain (Low Gas)
+    FULL = "full"          # Complete logic on-chain (High Security)
+```
+
+**Selection Criteria:**
+- Transaction amount < 100 VIBE → `MINIMAL`
+- Transaction amount >= 100 VIBE → recommend `FULL`
+- Involves high-reputation party → `MINIMAL` acceptable
+- Involves new users → recommend `FULL`
+
+## 2.4 Data Flow Architecture
+
+### Joint Order Data Flow
+
+```
+┌─────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  User   │────►│  Aggregation │────►│  Bidding    │────►│ JointOrder  │
+│ Demand  │     │   Service   │     │  Evaluation │     │   (On-chain)│
+│(Off-chain)│    │ (Off-chain) │     │ (Off-chain) │     └──────┬──────┘
+└─────────┘     └─────────────┘     └─────────────┘            │
+                                                               │
+                   ┌───────────────────────────────────────────┘
+                   ▼
+            ┌─────────────┐     ┌─────────────┐
+            │    Escrow  │────►│  Delivery   │
+            │ (On-chain) │     │ (Off-chain) │
+            └─────────────┘     └──────┬──────┘
+                                       │
+                   ┌───────────────────┘
+                   ▼
+            ┌─────────────┐     ┌─────────────┐
+            │   Confirm  │────►│  Settlement │
+            │ (Off-chain)│     │ (On-chain)  │
+            └─────────────┘     └─────────────┘
+```
+
+### Asset Fractionalization Data Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Creative   │────►│   Dynamic   │────►│   Fraction  │
+│    Asset    │     │   Pricing  │     │  Suggestion │
+│ (Design etc)│     │  (Off-chain)│    │ (Off-chain) │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                   ┌───────────────────────────┘
+                   ▼
+            ┌─────────────┐     ┌─────────────┐
+            │ AssetVault  │────►│  Fraction   │
+            │ (On-chain) │     │  Issuance  │
+            └─────────────┘     └──────┬──────┘
+                                       │
+                   ┌───────────────────┘
+                   ▼
+            ┌─────────────┐     ┌─────────────┐
+            │  Fraction  │────►│   Revenue   │
+            │  Trading   │     │Distribution │
+            │ (On-chain) │     │ (On-chain) │
+            └─────────────┘     └─────────────┘
+```
+
+### zk-Credential Pass Data Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   User      │────►│ zk Proof    │────►│   zk Proof  │
+│ Private Data│     │ Generation  │     │             │
+│(Transaction │     │ (Off-chain) │     │ (Off-chain) │
+│  History)  │     └─────────────┘     └──────┬──────┘
+└─────────────┘                                 │
+                   ┌───────────────────────────┘
+                   ▼
+            ┌─────────────┐     ┌─────────────┐
+            │ZKCredential │────►│    Verify   │
+            │ (On-chain)  │     │   Result    │
+            └─────────────┘     └──────┬──────┘
+                                       │
+                   ┌───────────────────┘
+                   ▼
+            ┌─────────────┐     ┌─────────────┐
+            │   Issue     │────►│   Grant     │
+            │Credential   │     │  Permission │
+            │ (On-chain)  │     │ (On-chain)  │
+            └─────────────┘     └─────────────┘
+```
+
+## 2.5 Security Architecture
+
+### Multi-layer Security Protection
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Security Layer                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Layer 1: Smart Contract Security                                           │
+│  ├── OpenZeppelin Standard Library                                         │
+│  ├── ReentrancyGuard                                                       │
+│  ├── Pausable                                                              │
+│  ├── Ownable                                                               │
+│  └── Timelock                                                              │
+│                                                                             │
+│  Layer 2: Economic Security                                                │
+│  ├── Staking Mechanism (Economic Guarantee)                                │
+│  ├── Reputation System (Reputation Penalty)                                │
+│  ├── Slashing Mechanism (Violation Penalty)                                │
+│  └── Insurance Fund (Risk Buffer)                                         │
+│                                                                             │
+│  Layer 3: Privacy Security                                                 │
+│  ├── zk-SNARK Zero-Knowledge Proof                                         │
+│  ├── Off-chain Data Storage                                               │
+│  └── Minimize On-chain Data Exposure                                       │
+│                                                                             │
+│  Layer 4: Governance Security                                              │
+│  ├── Multi-sig Mechanism                                                  │
+│  ├── Three-tier Governance Weight                                         │
+│  └── Proposal Timelock                                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Gas Fee Strategy
+
+| Scenario | Payment Method | Description |
+|----------|----------------|-------------|
+| Basic Transaction | User pays full | Create order, vote, etc. |
+| Joint Order | Shared proportionally | All participants share |
+| Complex Operation | Platform subsidy | Platform subsidizes partial gas |
+| Governance Operation | Free or subsidized | Encourage governance participation |
+
+## 2.6 Technology Stack
+
+### Smart Contract Layer
+
+| Component | Technology Choice |
+|-----------|-------------------|
+| Development Framework | Hardhat / Foundry |
+| Contract Language | Solidity ^0.8.20 |
+| Standard Library | OpenZeppelin |
+| zk Proof | snarkjs / circom |
+| Testing Framework | Hardhat Test / Foundry Test |
+
+### Off-chain Service Layer
+
+| Component | Technology Choice |
+|-----------|-------------------|
+| Language | Python 3.10+ |
+| Web Framework | FastAPI |
+| Async Runtime | asyncio |
+| Database | SQLite / PostgreSQL |
+| Cache | Redis |
+| Message Queue | asyncio.Queue |
+
+### Node Network Layer
+
+| Component | Technology Choice |
+|-----------|-------------------|
+| P2P Communication | TCP + Custom Protocol |
+| Service Discovery | Gossip Protocol |
+| Identity Verification | ECDSA Signature |
+| State Sync | Merkle Tree |
+
+## 2.7 Deployment Architecture
+
+### Testnet Deployment
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Sepolia Testnet                            │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │  VIBToken   │  │  VIBStaking │  │ VIBIdentity │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │ JointOrder  │  │ AssetVault  │  │ZKCredential │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
+│  │VIBGovernance│  │ VIBTreasury │  │ VIBTimelock │            │
+│  └─────────────┘  └─────────────┘  └─────────────┘            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Node Deployment
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        ISA Node                                  │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │                    Docker Container                        │ │
+│  │                                                           │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │ │
+│  │  │ P2P Node    │  │ Meta Agent  │  │ API Server  │       │ │
+│  │  │ (Python)    │  │ (Python)    │  │ (FastAPI)   │       │ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘       │ │
+│  │                                                           │ │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │ │
+│  │  │ SQLite DB   │  │ Redis Cache │  │ Log Store   │       │ │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘       │ │
+│  │                                                           │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 第2章：系统架构设计
 
 ## 2.1 整体架构
@@ -333,3 +684,5 @@ class OnchainMode(Enum):
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+</details>

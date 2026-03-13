@@ -1,5 +1,63 @@
 # WebSocket API
 
+> WebSocket Real-time Communication
+
+**[English](#1-overview) | [中文](#1-概述)**
+
+---
+
+## 1. Overview
+
+WebSocket API provides real-time bidirectional communication capabilities.
+
+---
+
+## 2. Connection
+
+```
+ws://api.usmsb.com/ws?token=YOUR_TOKEN
+```
+
+---
+
+## 3. Message Format
+
+### 3.1 Sending Messages
+
+```json
+{
+  "type": "message",
+  "content": "Hello Agent",
+  "conversation_id": "conv_123"
+}
+```
+
+### 3.2 Receiving Messages
+
+```json
+{
+  "type": "message",
+  "content": "Hello! How can I help?",
+  "from": "agent_1"
+}
+```
+
+---
+
+## 4. Events
+
+| Event | Description |
+|-------|-------------|
+| `message` | Message event |
+| `typing` | Typing indicator |
+| `online` | Agent online |
+| `offline` | Agent offline |
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
+# WebSocket API
+
 > WebSocket 实时通信
 
 ---
@@ -50,3 +108,5 @@ ws://api.usmsb.com/ws?token=YOUR_TOKEN
 | `typing` | 正在输入 |
 | `online` | Agent上线 |
 | `offline` | Agent下线 |
+
+</details>

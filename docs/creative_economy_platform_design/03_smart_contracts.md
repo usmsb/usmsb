@@ -1,3 +1,598 @@
+# Chapter 3: Smart Contract Design
+
+**[English](#chapter-3-smart-contract-design) | [中文](#第3章智能合约设计)**
+
+## 3.1 Joint Order Contract (JointOrder.sol)
+
+### Design Goals
+
+Implement the complete flow of C-end demand aggregation, reverse bidding, fund escrow, and milestone settlement.
+
+### State Machine Design
+
+```
+┌──────────┐     Escrow Funds      ┌──────────┐     Start Bidding    ┌──────────┐
+│ CREATED  │ ───────────────────► │  FUNDED  │ ──────────────────► │ BIDDING  │
+└──────────┘                       └──────────┘                       └──────────┘
+     ▲                              │                              │
+     │                              │                              │
+     │ Cancel/Refund                │                              │
+     │                              ▼                              ▼
+┌──────────┐              ┌──────────┐     Select Winner      ┌──────────┐
+│ CANCELLED│◄─────────────│ EXPIRED  │◄────────────────────── │AWARDED   │
+└──────────┘              └──────────┘                       └──────────┘
+                                                               │
+                                                               │
+                                    ┌──────────────────────────┘
+                                    ▼
+                              ┌──────────┐     Confirm Delivery ┌──────────┐
+                              │IN_PROGRESS│ ──────────────────► │DELIVERED │
+                              └──────────┘                       └──────────┘
+                                    │                              │
+                                    │                              │
+                                    ▼                              ▼
+                              ┌──────────┐     Dispute Resolution┌──────────┐
+                              │ DISPUTED │◄─────────────────────► │COMPLETED │
+                              └──────────┘                       └──────────┘
+```
+
+### Data Structures
+
+```solidity
+struct OrderPool {
+    bytes32 poolId;                    // Pool ID
+    address creator;                   // Creator
+    string serviceType;                // Service type
+    uint256 totalBudget;               // Total budget
+    uint256 minBudget;                 // Minimum budget
+    uint256 participantCount;          // Participant count
+    uint256 createdAt;                 // Creation timestamp
+    uint256 biddingEndsAt;             // Bidding end time
+    uint256 deliveryDeadline;          // Delivery deadline
+    PoolStatus status;                 // Status
+    address winningProvider;           // Winning provider
+    uint256 winningBid;                // Winning bid price
+}
+
+struct Participant {
+    address user;                      // Participant address
+    uint256 budget;                    // Budget
+    bytes32 demandId;                  // Demand ID
+    string requirements;               // Specific requirements
+    bool hasDeposited;                 // Has deposited
+    bool hasConfirmed;                 // Has confirmed
+    bool hasWithdrawn;                 // Has withdrawn
+}
+
+struct Bid {
+    bytes32 bidId;                     // Bid ID
+    bytes32 poolId;                    // Pool ID
+    address provider;                  // Provider
+    uint256 price;                     // Price
+    uint256 deliveryTime;              // Promised delivery time
+    uint256 reputationScore;           // Reputation score (off-chain signed)
+    uint256 score;                     // Comprehensive score
+    bool isWinner;                     // Is winner
+}
+
+enum PoolStatus {
+    CREATED,       // Created
+    FUNDED,        // Funded
+    BIDDING,       // Bidding
+    AWARDED,       // Awarded
+    IN_PROGRESS,   // In Progress
+    DELIVERED,     // Delivered
+    COMPLETED,     // Completed
+    DISPUTED,      // Disputed
+    CANCELLED,     // Cancelled
+    EXPIRED        // Expired
+}
+```
+
+### Core Functions
+
+```solidity
+// Create demand pool
+function createPool(
+    string memory serviceType,
+    uint256 minBudget,
+    uint256 biddingDuration,
+    uint256 deliveryDeadline
+) external returns (bytes32);
+
+// Join pool
+function joinPool(
+    bytes32 poolId,
+    uint256 budget,
+    string memory requirements
+) external payable;
+
+// Submit bid
+function submitBid(
+    bytes32 poolId,
+    uint256 price,
+    uint256 deliveryTime,
+    bytes memory reputationSignature
+) external;
+
+// Award pool
+function awardPool(
+    bytes32 poolId,
+    bytes32 bidId
+) external;
+
+// Confirm delivery
+function confirmDelivery(
+    bytes32 poolId,
+    uint8 rating
+) external;
+
+// Withdraw earnings
+function withdrawEarnings(bytes32 poolId) external;
+
+// Raise dispute
+function raiseDispute(
+    bytes32 poolId,
+    string memory reason
+) external;
+
+function resolveDispute(
+    bytes32 poolId,
+    bool refundBuyers,
+    string memory resolution
+) external onlyArbitrator;
+```
+
+### Event Definitions
+
+```solidity
+event PoolCreated(bytes32 indexed poolId, address creator, string serviceType);
+event ParticipantJoined(bytes32 indexed poolId, address user, uint256 budget);
+event BidSubmitted(bytes32 indexed poolId, bytes32 bidId, address provider, uint256 price);
+event PoolAwarded(bytes32 indexed poolId, address winner, uint256 winningBid);
+event DeliveryConfirmed(bytes32 indexed poolId, address user, uint8 rating);
+event EarningsWithdrawn(bytes32 indexed poolId, address provider, uint256 amount);
+event DisputeRaised(bytes32 indexed poolId, address raiser, string reason);
+event DisputeResolved(bytes32 indexed poolId, bool refundBuyers, string resolution);
+```
+
+---
+
+## 3.2 Asset Fractionalization Contract (AssetVault.sol)
+
+### Design Goals
+
+Fractionalize creative assets (NFTs) into tradable ERC20 tokens to achieve liquidity and revenue distribution.
+
+### Architecture Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        AssetVault                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Original Asset          Fractionalization        Fraction Token │
+│  ┌─────────┐            ┌─────────┐            ┌─────────┐     │
+│  │ NFT     │ ─────────► │ Vault   │ ─────────► │ ERC20   │     │
+│  │(ERC721) │   Deposit  │         │   Issue   │ Shares  │     │
+│  └─────────┘            └─────────┘            └─────────┘     │
+│       │                       │                      │          │
+│       │                       ▼                      │          │
+│       │               ┌─────────────┐               │          │
+│       │               │ Revenue Pool│◄──────────────┘          │
+│       │               │ DividendPool│   Revenue Distribution    │
+│       │               └─────────────┘                          │
+│       │                       │                                 │
+│       │                       ▼                                 │
+│       │               ┌─────────────┐                          │
+│       └──────────────►│ Holder Share│                          │
+│                       └─────────────┘                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Structures
+
+```solidity
+struct AssetInfo {
+    address nftContract;           // Original NFT contract address
+    uint256 nftTokenId;           // NFT Token ID
+    address owner;                // Original owner
+    uint256 totalShares;          // Total fractions
+    uint256 sharePrice;           // Initial fraction price
+    uint256 sharesSold;           // Shares sold
+    uint256 totalEarnings;       // Total earnings
+    uint256 distributedEarnings;  // Distributed earnings
+    bool isFragmented;           // Is fractionalized
+    bool isTradable;             // Is tradable
+}
+
+struct Shareholder {
+    uint256 shares;              // Shares held
+    uint256 claimedEarnings;    // Claimed earnings
+    uint256 purchaseTime;       // Purchase time
+}
+```
+
+### Core Functions
+
+```solidity
+// Deposit NFT and create fractions
+function depositAndFragment(
+    address nftContract,
+    uint256 tokenId,
+    uint256 totalShares,
+    uint256 sharePrice,
+    string memory metadata
+) external returns (bytes32 assetId);
+
+// Purchase shares
+function purchaseShares(
+    bytes32 assetId,
+    uint256 shareAmount
+) external payable;
+
+// Distribute earnings
+function distributeEarnings(
+    bytes32 assetId,
+    uint256 amount
+) external payable;
+
+// Claim earnings
+function claimEarnings(bytes32 assetId) external;
+
+// Transfer shares
+function transferShares(
+    bytes32 assetId,
+    address to,
+    uint256 amount
+) external;
+
+// Redeem NFT (requires holding all shares)
+function redeemNFT(bytes32 assetId) external;
+
+// Get asset info
+function getAssetInfo(bytes32 assetId) external view returns (AssetInfo memory);
+
+// Get shareholder info
+function getShareholder(
+    bytes32 assetId,
+    address holder
+) external view returns (Shareholder memory);
+
+// Get unclaimed earnings
+function getUnclaimedEarnings(
+    bytes32 assetId,
+    address holder
+) external view returns (uint256);
+```
+
+### Event Definitions
+
+```solidity
+event AssetFragmented(
+    bytes32 indexed assetId,
+    address nftContract,
+    uint256 tokenId,
+    uint256 totalShares
+);
+event SharesPurchased(
+    bytes32 indexed assetId,
+    address buyer,
+    uint256 shareAmount,
+    uint256 price
+);
+event EarningsDistributed(
+    bytes32 indexed assetId,
+    uint256 amount,
+    uint256 perShare
+);
+event EarningsClaimed(
+    bytes32 indexed assetId,
+    address holder,
+    uint256 amount
+);
+event SharesTransferred(
+    bytes32 indexed assetId,
+    address from,
+    address to,
+    uint256 amount
+);
+event NFTRedeemed(
+    bytes32 indexed assetId,
+    address redeemer,
+    uint256 tokenId
+);
+```
+
+---
+
+## 3.3 zk-Credential Pass Contract (ZKCredential.sol)
+
+### Design Goals
+
+Use zero-knowledge proofs to verify user attributes while protecting privacy.
+
+### Architecture Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      ZKCredential                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Off-chain Proof Generation            On-chain Verification   │
+│  ┌─────────────┐                 ┌─────────────┐              │
+│  │ Private Data│                 │             │              │
+│  │ • Transaction│                │  Public      │              │
+│  │   History   │  ──zk-SNARK──►  │  Attributes │              │
+│  │ • Staking   │                 │  • Reputation>0.8            │
+│  │   Record    │     Proof       │  • Staked>1000│              │
+│  │ • Reputation│                │  • No Slash  │              │
+│  │ • Completion │                │              │              │
+│  └─────────────┘                 └─────────────┘              │
+│         │                               │                      │
+│         │                               ▼                      │
+│         │                       ┌─────────────┐               │
+│         │                       │  Credential │               │
+│         │                       │   Issuance  │               │
+│         │                       └─────────────┘               │
+│         │                               │                      │
+│         │                               ▼                      │
+│         │                       ┌─────────────┐               │
+│         └──────────────────────►│ Access      │               │
+│                                 │ Control     │               │
+│                                 └─────────────┘               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Structures
+
+```solidity
+struct Credential {
+    bytes32 credentialId;          // Credential ID
+    address holder;                // Holder
+    CredentialType credType;       // Credential type
+    uint256 validFrom;            // Valid from
+    uint256 validUntil;           // Valid until
+    bytes32 commitment;           // Commitment (privacy protection)
+    bytes32 nullifier;            // Nullifier (replay prevention)
+    bool isRevoked;               // Is revoked
+    bytes metadata;               // Metadata (encrypted)
+}
+
+struct VerificationRecord {
+    bytes32 recordId;              // Record ID
+    bytes32 credentialId;          // Credential ID
+    address verifier;              // Verifier
+    uint256 timestamp;             // Verification timestamp
+    bool isValid;                  // Is valid
+}
+
+enum CredentialType {
+    IDENTITY,          // Identity credential
+    SERVICE_PROVIDER,  // Service provider credential
+    GOVERNANCE,        // Governance credential
+    PREMIUM,           // VIP credential
+    TRUSTED_NODE       // Trusted node credential
+}
+
+struct ProofData {
+    uint256[2] a;         // SNARK proof a
+    uint256[2][2] b;      // SNARK proof b
+    uint256[2] c;         // SNARK proof c
+    uint256[4] publicInputs; // Public inputs
+}
+```
+
+### Core Functions
+
+```solidity
+// Verify proof and issue credential
+function verifyAndIssue(
+    CredentialType credType,
+    uint256 validDuration,
+    bytes32 commitment,
+    ProofData memory proof
+) external returns (bytes32 credentialId);
+
+// Verify credential
+function verifyCredential(
+    bytes32 credentialId,
+    bytes32 nullifier,
+    ProofData memory proof
+) external returns (bool);
+
+// Revoke credential
+function revokeCredential(
+    bytes32 credentialId,
+    string memory reason
+) external onlyIssuer;
+
+// Check credential validity
+function isCredentialValid(bytes32 credentialId) external view returns (bool);
+
+// Get credential info
+function getCredential(
+    bytes32 credentialId
+) external view returns (Credential memory);
+
+// Check if holder has credential type
+function hasCredentialType(
+    address holder,
+    CredentialType credType
+) external view returns (bool);
+
+// Update verification key (admin)
+function updateVerificationKey(
+    CredentialType credType,
+    uint256[2] memory alpha,
+    uint256[2][2] memory beta,
+    uint256[2] memory gamma,
+    uint256[2] memory delta
+) external onlyAdmin;
+```
+
+### Event Definitions
+
+```solidity
+event CredentialIssued(
+    bytes32 indexed credentialId,
+    address indexed holder,
+    CredentialType credType,
+    uint256 validUntil
+);
+event CredentialVerified(
+    bytes32 indexed credentialId,
+    address verifier,
+    bool isValid
+);
+event CredentialRevoked(
+    bytes32 indexed credentialId,
+    string reason
+);
+event VerificationKeyUpdated(CredentialType credType);
+```
+
+### zk-SNARK Circuit Design
+
+```circom
+// credential_proof.circom
+
+template CredentialProof() {
+    // Public inputs
+    signal input reputationThreshold;    // Reputation threshold
+    signal input stakeThreshold;         // Stake threshold
+    signal input commitment;             // Commitment value
+
+    // Private inputs
+    signal input reputation;             // Actual reputation score
+    signal input stake;                  // Actual stake amount
+    signal input noSlash;                // No slash (0 or 1)
+    signal input secret;                 // Random secret
+
+    // Verification signals
+    signal reputationValid;
+    signal stakeValid;
+    signal noSlashValid;
+
+    // Reputation verification: reputation >= reputationThreshold
+    component geq1 = GreaterEqThan(32);
+    geq1.in[0] <== reputation;
+    geq1.in[1] <== reputationThreshold;
+    reputationValid <== geq1.out;
+
+    // Stake verification: stake >= stakeThreshold
+    component geq2 = GreaterEqThan(32);
+    geq2.in[0] <== stake;
+    geq2.in[1] <== stakeThreshold;
+    stakeValid <== geq2.out;
+
+    // No slash verification
+    noSlashValid <== noSlash;
+
+    // Commitment calculation
+    component hash = Poseidon(4);
+    hash.inputs[0] <== reputation;
+    hash.inputs[1] <== stake;
+    hash.inputs[2] <== noSlash;
+    hash.inputs[3] <== secret;
+
+    // Verify commitment
+    commitment === hash.out;
+
+    // All conditions must be satisfied
+    signal output valid;
+    valid <== reputationValid * stakeValid * noSlashValid;
+}
+
+component main = CredentialProof();
+```
+
+---
+
+## 3.4 Contract Interaction Flows
+
+### Joint Order Complete Flow
+
+```
+1. Create Pool
+   User → JointOrder.createPool() → PoolCreated Event
+
+2. Participants Join
+   User A,B,C → JointOrder.joinPool() → ParticipantJoined Event ×3
+   → Each user escrows funds
+
+3. Bidding Phase
+   Provider X,Y,Z → JointOrder.submitBid() → BidSubmitted Event ×3
+   → Reputation signature verification
+
+4. Select Winner
+   Creator → JointOrder.awardPool() → PoolAwarded Event
+   → Funds locked to winner
+
+5. Execute Delivery
+   Winner → (Off-chain delivery) → Submit deliverables
+
+6. Confirm Acceptance
+   User A,B,C → JointOrder.confirmDelivery() → DeliveryConfirmed Event ×3
+   → Update reputation
+
+7. Withdraw Earnings
+   Winner → JointOrder.withdrawEarnings() → EarningsWithdrawn Event
+   → Release funds
+```
+
+### Asset Fractionalization Complete Flow
+
+```
+1. Deposit NFT
+   Creator → AssetVault.depositAndFragment()
+   → NFT transferred to contract → AssetFragmented Event
+
+2. Purchase Shares
+   Investor A,B → AssetVault.purchaseShares() → SharesPurchased Event ×2
+   → Funds deposited to revenue pool
+
+3. Distribute Earnings
+   Creator/Others → AssetVault.distributeEarnings()
+   → EarningsDistributed Event
+
+4. Claim Earnings
+   Investor A → AssetVault.claimEarnings() → EarningsClaimed Event
+
+5. Trade Shares
+   Investor A → AssetVault.transferShares(Investor B)
+   → SharesTransferred Event
+
+6. Redeem NFT (Optional)
+   All-shares holder → AssetVault.redeemNFT() → NFTRedeemed Event
+```
+
+### zk-Credential Pass Complete Flow
+
+```
+1. Off-chain Proof Generation
+   User → (Off-chain) zk proof service → Generate SNARK proof
+
+2. Submit Proof
+   User → ZKCredential.verifyAndIssue()
+   → Verify proof → Issue credential → CredentialIssued Event
+
+3. Use Credential
+   User → ZKCredential.verifyCredential()
+   → Verify credential → Return result → CredentialVerified Event
+
+4. Revoke Credential (Admin)
+   Admin → ZKCredential.revokeCredential()
+   → CredentialRevoked Event
+```
+
+---
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 第3章：智能合约设计
 
 ## 3.1 联合订单合约 (JointOrder.sol)
@@ -459,43 +1054,43 @@ template CredentialProof() {
     signal input reputationThreshold;    // 信誉阈值
     signal input stakeThreshold;         // 质押阈值
     signal input commitment;             // 承诺值
-    
+
     // 私有输入
     signal input reputation;             // 实际信誉分
     signal input stake;                  // 实际质押量
     signal input noSlash;                // 是否无惩罚 (0或1)
     signal input secret;                 // 随机秘密
-    
+
     // 验证条件
     signal reputationValid;
     signal stakeValid;
     signal noSlashValid;
-    
+
     // 信誉分验证: reputation >= reputationThreshold
     component geq1 = GreaterEqThan(32);
     geq1.in[0] <== reputation;
     geq1.in[1] <== reputationThreshold;
     reputationValid <== geq1.out;
-    
+
     // 质押验证: stake >= stakeThreshold
     component geq2 = GreaterEqThan(32);
     geq2.in[0] <== stake;
     geq2.in[1] <== stakeThreshold;
     stakeValid <== geq2.out;
-    
+
     // 无惩罚验证
     noSlashValid <== noSlash;
-    
+
     // 承诺计算
     component hash = Poseidon(4);
     hash.inputs[0] <== reputation;
     hash.inputs[1] <== stake;
     hash.inputs[2] <== noSlash;
     hash.inputs[3] <== secret;
-    
+
     // 验证承诺
     commitment === hash.out;
-    
+
     // 所有条件必须满足
     signal output valid;
     valid <== reputationValid * stakeValid * noSlashValid;
@@ -582,3 +1177,5 @@ component main = CredentialProof();
    管理员 → ZKCredential.revokeCredential()
    → CredentialRevoked事件
 ```
+
+</details>

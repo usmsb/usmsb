@@ -1,3 +1,484 @@
+# VIBE Ecosystem Design Document
+
+**[English](#vibe-ecosystem-design-document) | [中文](#vibe-生态完整设计方案)**
+
+---
+
+## 1. Core Goal
+
+> **"AI Agent Self-Driven Collaboration, Scheduling Humans to Execute Real-World Work"**
+
+---
+
+## 2. Token Economics
+
+### 2.1 Basic Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Token Name | VIBE | Silicon Civilization Platform Token |
+| Symbol | VIBE | - |
+| Total Supply | 1,000,000,000 (1 Billion) | Hard Cap, No Additional Minting |
+| Decimals | 18 | Standard ERC-20 |
+| Initial Circulating | 8% | 80 Million Tokens |
+| Mainnet | Base (Ethereum L2) | - |
+
+### 2.2 Distribution Scheme (Final Version - 2026-02-24)
+
+> **Core Principle: Fully Decentralized, No Manual Trigger, Everything Decided by Code**
+> Reference: VIBE_Full_Automation_Design.md
+
+| Category | Ratio | Amount | Management Contract | Trigger Condition |
+|----------|-------|--------|---------------------|-------------------|
+| Team | 8% | 80M | VIBVesting (4-year lockup) | Time-based auto-release |
+| Early Supporters | 4% | 40M | VIBVesting (2-year lockup) | Time-based auto-release |
+| Community Stable Fund | 6% | 60M | CommunityStableFund | Auto-buyback on price drop |
+| Liquidity Pool | 12% | 120M | LiquidityManager | Time-triggered market making |
+| Community Airdrop | 7% | 70M | AirdropDistributor | User self-claim |
+| Incentive Pool | 63% | 630M | EmissionController | Cycle-based auto-release |
+
+```
+Total: 1 Billion VIBE (No Public Sale)
+
+┌────────────────────────────────────────────────────────────┐
+│ Token Distribution - Fully Decentralized Management       │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  Team 8% (80M)                                            │
+│  ├── Management: VIBVesting (separate contract)           │
+│  ├── Lockup: 4-year linear release                       │
+│  └── Trigger: Time-based auto-release                     │
+│                                                            │
+│  Early Supporters 4% (40M)                               │
+│  ├── Management: VIBVesting (separate from team)         │
+│  ├── Lockup: 2-year linear release                       │
+│  └── Trigger: Time-based auto-release                     │
+│                                                            │
+│  Community Stable Fund 6% (60M)                          │
+│  ├── Management: CommunityStableFund                     │
+│  ├── Function: Auto-buyback & burn on 20% price drop     │
+│  └── Trigger: Oracle condition trigger                    │
+│                                                            │
+│  Liquidity Pool 12% (120M)                               │
+│  ├── Management: LiquidityManager                        │
+│  ├── Function: DEX market making, LP permanently locked  │
+│  └── Trigger: Deploy-time init + auto-compound           │
+│                                                            │
+│  Community Airdrop 7% (70M)                               │
+│  ├── Management: AirdropDistributor                      │
+│  ├── Mechanism: 6 months 100% / 7-12 months 50%         │
+│  └── Trigger: User self-claim (Merkle verification)      │
+│                                                            │
+│  Incentive Pool 63% (630M)                              │
+│  ├── Management: EmissionController                      │
+│  ├── Release: 5-year linear release                      │
+│  └── Trigger: 7-day cycle auto-release                   │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
+```
+
+#### Incentive Pool Internal Distribution (63% = 630M)
+
+| Sub-pool | % of Pool | Amount | Who Can Get | Trigger |
+|----------|-----------|--------|-------------|---------|
+| Staking Rewards | 45% | 283.5M | Stakers | Stake VIBE |
+| Ecosystem Incentive | 30% | 189M | Developers/Builders | DApp usage/code contribution |
+| Governance Rewards | 15% | 94.5M | Governance Participants | Voting/Proposals |
+| Reserve | 10% | 63M | Emergency | Extreme situations |
+
+#### Fully Decentralized Principles
+
+```
+┌─────────────────────────────────────────────────────────┐
+│            Fully Decentralized Ecosystem                │
+├─────────────────────────────────────────────────────────┤
+│  ❌ Does not depend on anyone                           │
+│  ❌ No multi-sig approval required                     │
+│  ❌ No manual trigger needed                           │
+│  ❌ Does not trust anyone                              │
+│                                                         │
+│  ✅ Everything decided by code                         │
+│  ✅ Everything triggered by conditions                 │
+│  ✅ Everything transparent on-chain                   │
+│  ✅ Everything immutable                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+> **Note**: The "Reserved Pool" (Infrastructure Pool 18% / Governance Evolution Pool 10%) has been cancelled in the final design, with related functions merged into the Ecosystem Incentive (30%) and Governance Rewards (15%) sub-pools of the Incentive Pool.
+
+### 2.3 Transaction Fee vs Gas Fee
+
+```
+Important Distinction:
+├── Gas Fee (Network Fee)
+│   ├── Paid to: Base/Ethereum Network
+│   ├── Amount: ~$0.01-0.10 per transaction
+│   └── Cannot be avoided, must be paid for every tx
+│
+└── Transaction Fee (Platform Fee)
+    ├── Paid to: VIBE Platform
+    ├── Amount: 0.8% (per transaction)
+    ├── Distribution:
+    │   ├── 20% → Ecosystem Fund
+    │   ├── 50% → Burn
+    │   └── 30% → Protocol Operations
+    └── Optional Feature
+```
+
+### 2.3 Inflation/Deflation Mechanism
+
+#### Inflation Control
+- Annual Inflation Cap: 2% (hard constraint in contract)
+- Dynamic Range: 1.5% - 3%
+- Circuit Breaker: Pause release when monthly inflation > 0.5%
+
+#### Deflation Mechanism
+| Source | Rate | Description |
+|--------|------|-------------|
+| Transaction Fee | 0.8% | Per transaction |
+| Transaction Burn | 50% | 50% of fee burned |
+| Service Fee Burn | 20% | Platform service fee |
+| Penalty Confiscation | 100% | Violation behavior |
+
+#### Anti-Death Spiral Mechanism
+- Buyback Pool: 5% (buyback when token price drops)
+- Liquidity Margin: 3% (DEX liquidity)
+- Dynamic APY: Auto-increase when token price drops
+
+---
+
+## 3. Funding Design
+
+### 3.1 Final Plan: No Public Sale
+
+```
+Reasons for No Public Sale:
+- Avoid token concentration in large holders
+- Avoid future selling pressure
+- Keep community-oriented
+- Align with Web3 spirit
+```
+
+### 3.2 Launch Capital Sources
+
+```
+Angel Investment (Private):
+- Angel investors not disclosed publicly
+- Team self-funded portion
+- Early supporter investments
+```
+
+### 3.3 Ecosystem Fund Sources
+
+```
+From Protocol Revenue:
+- Transaction Fee 20% → Ecosystem Fund
+- Service Fee Revenue → Ecosystem Fund
+```
+
+---
+
+## 4. Ecosystem Fund Management
+
+### 4.1 Progressive Management
+
+```
+Phase 1 (Early): Team-Led
+├── Multi-sig wallet (3/5)
+├── Team decisions
+└── Transparency reports
+
+Phase 2 (Transition): DAO Oversight
+├── Multi-sig + DAO voting
+├── Major expenditures require DAO approval
+└── Quarterly reports
+
+Phase 3 (Mature): Fully DAO
+├── DAO full control
+├── Proposal voting
+└── Community governance
+```
+
+### 4.2 Ecosystem Fund Sources & Usage
+
+```
+Sources:
+├── Angel investment (not disclosed)
+└── Protocol revenue (20% of tx fees)
+
+Usage:
+├── Developer Incentives (Grants) 40%
+├── Ecosystem Project Investment 25%
+├── Marketing 20%
+├── Community Operations 10%
+└── Legal/Compliance 5%
+```
+
+---
+
+## 5. Governance Design
+
+### 5.1 Three-Layer Governance Structure
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Layer 1: Capital Weight                             │
+│ - Stake amount × Duration coefficient              │
+│ - Single address ≤10%                              │
+│ - Use: Major parameter adjustments, fund usage,    │
+│   strategic direction                              │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ Layer 2: Production Weight                          │
+│ - Contribution points (non-transferable)          │
+│ - Single address ≤15%                              │
+│ - Use: Incentive mechanism adjustments, production │
+│   standards                                         │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│ Layer 3: Community Consensus                        │
+│ - One-person-one-vote after KYC                    │
+│ - 10% of total voting power                        │
+│ - Use: Veto extreme proposals                      │
+└─────────────────────────────────────────────────────┘
+```
+
+### 5.2 Proposal System
+
+| Proposal Type | Threshold | Pass Rate | Time Lock |
+|---------------|-----------|-----------|-----------|
+| General | 500 VIBE | >50% | 14 days |
+| Parameter Adjustment | 5,000 VIBE | >60% | 30 days |
+| Protocol Upgrade | 50,000 VIBE | >75% | 60 days |
+| Emergency | - | >90% | Immediate |
+
+### 5.3 Time Lock
+
+```
+Parameter Change Time Lock:
+├── Staking APY: 14-day delay
+├── Fee: 30-day delay
+├── Burn Ratio: 30-day delay
+└── Dividend Ratio: 30-day delay
+```
+
+---
+
+## 6. Liquidity Design
+
+### 6.1 Initial Liquidity
+
+```
+Initial Liquidity Sources:
+1. Team's own funds (10% tokens)
+2. Market maker arrangements
+3. DEX liquidity mining incentives
+```
+
+### 6.2 Liquidity Pool Strategy
+
+| Phase | Action |
+|-------|--------|
+| Deployment | Establish VIBE/ETH, VIBE/USDC pools |
+| After Launch | Start liquidity mining (LP rewards) |
+| 3 months | Apply for CEX listing |
+| 6 months | Multi-chain deployment (optional) |
+
+### 6.3 Liquidity Lockup
+
+- Lock 50%+ tokens initially
+- Batch release to maintain price stability
+
+---
+
+## 7. AI Agent Collaboration Design
+
+### 7.1 AI Agent Economic Entity
+
+```
+Each AI Agent requires:
+├── Wallet address (AgentWallet contract)
+├── Identity credential (SBT)
+├── Credit score
+└── Fund pool
+```
+
+### 7.2 AI Agent Collaboration Process
+
+```
+1. Task Publishing
+   └── Requester publishes task → Describe goal
+
+2. Task Decomposition
+   └── AI automatically splits into subtasks
+
+3. Agent Discovery
+   └── Match relevant Agents → Negotiate resources
+
+4. Collaborative Execution
+   └── Agent-to-Agent collaboration → Humans execute physical tasks
+
+5. Revenue Distribution
+   └── 70% to final producer
+   └── 20% to collaborative contributor
+   └── 10% to coordinator
+
+6. Tax/Burn
+   └── 0.8% fee
+   └── 50% burned
+```
+
+### 7.3 Human Role
+
+```
+Scenarios where humans are scheduled by AI:
+├── Physical operations (physical tasks AI cannot do)
+├── Identity verification (KYC)
+├── Quality review
+└── Dispute arbitration
+```
+
+---
+
+## 8. AgentFi Design
+
+### 8.1 Currently Achievable (MVP)
+
+| Function | Description |
+|----------|-------------|
+| Agent Wallet | Limit control, whitelist |
+| Agent Registration | Identity SBT |
+| Task Rewards | Staking rewards |
+
+### 8.2 Future Design (Reserved Interfaces)
+
+| Function | Status |
+|----------|--------|
+| Agent Credit | TODO |
+| Agent Investment | TODO |
+| Agent Insurance | TODO |
+| Compute Market | TODO |
+| Data Market | TODO |
+
+---
+
+## 9. Contract Extensibility
+
+### 9.1 Modular Design
+
+```
+┌─────────────────────────────────────────────┐
+│ Core Layer (Immutable)                     │
+│ ├── VIBEToken (Token)                       │
+│ ├── VIBStaking (Staking)                    │
+│ └── VIBVesting (Lockup)                     │
+├─────────────────────────────────────────────┤
+│ Extension Layer (Upgradeable)               │
+│ ├── Governance Module (Governance.sol)      │
+│ ├── Dividend Module (Dividend.sol)          │
+│ ├── Burn Module (Burn.sol)                  │
+│ └── Ecosystem Fund (EcosystemFund.sol)       │
+├─────────────────────────────────────────────┤
+│ Application Layer (Optional)                │
+│ ├── AgentFi                                 │
+│ ├── Compute Market                          │
+│ └── Data Market                             │
+└─────────────────────────────────────────────┘
+```
+
+### 9.2 Upgrade Mechanism
+
+- Early Stage: Upgradeable proxy contracts
+- Mature: Immutable contracts
+
+---
+
+## 10. Implementation Roadmap
+
+### Phase 1: Infrastructure (Now)
+
+- [x] Economic model design
+- [x] Game theory verification
+- [ ] Core contract development
+- [ ] Token deployment (with governance)
+
+### Phase 2: Staking System (Parallel)
+
+- [ ] Staking contract
+- [ ] Lockup contract
+- [ ] Burn mechanism
+
+### Phase 3: Ecosystem (Post-Launch)
+
+- [ ] Ecosystem fund launch
+- [ ] Liquidity pool
+- [ ] CEX listing
+
+### Phase 4: AgentFi (Future)
+
+- [ ] Agent credit
+- [ ] Compute market
+- [ ] Data market
+
+---
+
+## 11. Final Plan Summary
+
+### Token Distribution
+
+| Distribution | Ratio | Purpose |
+|-------------|-------|---------|
+| Team | 8% | 4-year lockup |
+| Early Supporters | 4% | 2-year lockup |
+| Community Stable Fund | 6% | Market support/emergency/incentive |
+| Liquidity Pool | 12% | DEX market making |
+| Community Airdrop | 7% | Attract users |
+| Incentive Pool | 63% | 5-year linear release |
+
+### Funding
+
+- Launch capital: Angel investment (not disclosed)
+- Ecosystem fund: Protocol revenue (20% of tx fees)
+
+### Governance
+
+- Launch together: Proposal + Voting + Time Lock
+
+---
+
+## 12. Pending Discussion Items
+
+### ✅ Decided
+
+| Issue | Decision |
+|-------|----------|
+| Private Sale | None |
+| Ecosystem Fund Source | Protocol revenue + angel investment |
+| Governance | Launch together |
+| Community Stable Fund | Keep 6% |
+
+### To Discuss
+
+1. [ ] Specific contract deployment parameters
+2. [ ] Launch timing
+3. [ ] CEX selection
+4. [ ] Compliance plan
+
+---
+
+## 13. Reference Design Checklist
+
+Complete missing functions see: `docs/VIBE_Design_Checklist.md`
+
+---
+
+*This document is based on expert verification and team discussions, continuously updated*
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # VIBE 生态完整设计方案
 
 > 基于专家论证的完整设计文档
@@ -476,3 +957,5 @@
 ---
 
 *本文档基于专家论证和团队讨论，持续更新*
+
+</details>

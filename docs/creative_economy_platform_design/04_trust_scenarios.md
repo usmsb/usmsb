@@ -1,3 +1,654 @@
+[Chapter 4: Platform Credit Proof Scenario Analysis](#41-overview) | [中文](#41-场景总览)
+
+---
+
+## 4.1 Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    AI Civilization Platform Credit Proof Overview           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐     │
+│  │  User Layer │   │ Service Layer│  │  Network    │   │ Governance  │     │
+│  │             │   │             │  │   Layer     │   │   Layer     │     │
+│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘     │
+│         │                 │                 │                 │            │
+│  ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐     │
+│  │1.ID Register│   │5.Service    │   │9.Node       │   │13.Proposal │     │
+│  │2.Staking    │   │  Transaction│   │  Operation  │   │  Creation  │     │
+│  │3.Wallet     │   │6.Escrow     │   │10.Service   │   │14.Voting   │     │
+│  │  Binding    │   │  Payment    │   │  Discovery  │   │  Weight    │     │
+│  │4.Data       │   │7.Dispute    │   │11.Cross-    │   │15.Exec     │     │
+│  │  Contribution   │  Arbitration│   │  Node       │   │  Authority │     │
+│  │             │   │8.Joint      │   │12.Penalty  │   │16.Fund     │     │
+│  │             │   │  Order      │   │  Mechanism │   │  Allocation│     │
+│  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4.2 User Layer Scenarios (4 scenarios)
+
+### Scenario 1: Identity Registration and Verification
+
+**Problem**: How to prove "I am who I am", "I am qualified"?
+
+**Current Implementation**:
+- VIBIdentity.sol (SBT Identity)
+- isVerified field
+- Four identity types
+
+**What needs to be proven**:
+```
+├── AI_AGENT Identity → Prove Agent capability description is real
+├── HUMAN_PROVIDER Identity → Prove skill certificates are real
+├── NODE_OPERATOR Identity → Prove node specs/location are real
+└── GOVERNANCE Identity → Prove governance history is real
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "identity_type": "HUMAN_PROVIDER",
+  "claims": {
+    "skills": ["UI Design", "Frontend Development"],
+    "certificates": ["AWS Certification", "Adobe Certification"],
+    "experience_years": 5
+  },
+  "proof": "zk-SNARK proof",
+  "verifier": "Platform/Third Party"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 2: Staking Behavior Proof
+
+**Problem**: How to prove "I really staked", "for how long"?
+
+**Current Implementation**:
+- VIBStaking.sol
+- stake field, stakingDuration
+
+**What needs to be proven**:
+```
+├── Staking Amount → Affects voting weight, transaction limits
+├── Staking Duration → Affects capital weight (Layer1 governance)
+└── Staking History → Affects reputation evaluation
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "staker": "0x123...",
+  "total_staked": 10000,
+  "staking_duration_days": 365,
+  "never_slashed": true,
+  "proof": "Merkle proof + Timestamp"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 3: Wallet Binding and Authorization
+
+**Problem**: How to prove "this wallet is mine", "I authorized this operation"?
+
+**Current Implementation**:
+- auth.py: verify_signature()
+- Signature verification mechanism
+
+**What needs to be proven**:
+```
+├── Wallet Ownership → Prevent identity theft
+├── Operation Authorization → Prevent unauthorized operations
+└── Multi-sig Authorization → High-value operations
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "wallet_address": "0x123...",
+  "identity_id": "SBT-001",
+  "binding_timestamp": 1234567890,
+  "signature": "ECDSA signature",
+  "proof": "Zero-knowledge proof of wallet-identity binding"
+}
+```
+
+**ZK Applicability**: Medium
+
+---
+
+### Scenario 4: Data Contribution Proof
+
+**Problem**: How to prove "I contributed high-quality data"?
+
+**Current Implementation**:
+- No direct implementation
+- PPT mentions "crowdsourced dataset"
+
+**What needs to be proven**:
+```
+├── Data Contribution Amount → Earn incentives
+├── Data Quality Score → Affects weight
+├── Data Uniqueness → Extra rewards
+└── Data Source Legitimacy → Prevent cheating
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "contributor_id": "user-001",
+  "data_type": "Creative Asset Valuation Data",
+  "contribution_score": 0.85,
+  "quality_verified": true,
+  "proof": "Data fingerprint + Quality assessment proof"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+## 4.3 Service Layer Scenarios (4 scenarios)
+
+### Scenario 5: Service Transaction Trust
+
+**Problem**: Buyer trusts seller can deliver, seller trusts buyer can pay
+
+**Current Implementation**:
+- transactions.py: Escrow process
+- reputation_service.py: Reputation scoring
+- matching_engine.py: Reputation matching
+
+**What needs to be proven**:
+```
+├── Buyer Payment Ability → Balance proof
+├── Seller Delivery Ability → Historical completion rate
+├── Both Reputation Scores → Risk assessment
+└── Historical Transaction Records → Performance proof
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "party_type": "seller",
+  "reputation_score": 0.85,
+  "completion_rate": 0.92,
+  "total_transactions": 150,
+  "dispute_rate": 0.02,
+  "proof": "ZK proof of historical transaction statistics without exposing specific transactions"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 6: Escrow Payment Trust
+
+**Problem**: Fund safety, milestone-based release, condition triggering
+
+**Current Implementation**:
+- transactions.py: Escrow process
+- State machine: created→escrowed→in_progress→delivered→completed
+
+**What needs to be proven**:
+```
+├── Escrow Fund Existence → On-chain lock proof
+├── Trigger Conditions Met → Milestone proof
+├── Milestone Release Authorization → Multi-party signature
+└── Refund Conditions Met → Cancellation/dispute proof
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "transaction_id": "tx-001",
+  "escrow_amount": 1000,
+  "escrow_status": "locked",
+  "release_conditions": ["milestone_1", "milestone_2"],
+  "proof": "Smart contract state proof"
+}
+```
+
+**ZK Applicability**: Medium (more direct on-chain)
+
+---
+
+### Scenario 7: Dispute Arbitration Trust
+
+**Problem**: Who arbitrates, how to prevent collusion, arbitration fairness
+
+**Current Implementation**:
+- transactions.py: dispute/resolve endpoints
+- Admin permission arbitration
+
+**What needs to be proven**:
+```
+├── Arbitrator Qualification → Random selection + reputation requirement
+├── Arbitration Fairness → No conflict of interest proof
+├── Evidence Authenticity → Deliverable existence proof
+└── Arbitration Execution → On-chain enforcement
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "dispute_id": "dispute-001",
+  "arbitrators": ["arbiter-1", "arbiter-2", "arbiter-3"],
+  "arbitrator_selection": "Random selection + reputation threshold > 0.8",
+  "no_conflict_proof": "ZK proof that arbitrator has no connection with either party",
+  "evidence_hash": "0xabc...",
+  "verdict": "buyer_win",
+  "proof": "Multi-party signature + Evidence chain"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 8: Joint Order Trust
+
+**Problem**: Aggregator trustworthiness, fund safety, fair provider selection
+
+**Current Implementation**:
+- quotes.py: Basic quoting
+- To be implemented: Aggregation logic, reverse bidding
+
+**What needs to be proven**:
+```
+├── Demand Authenticity → Multi-party demand aggregation proof
+├── Fund Pool Security → Escrow proof
+├── Bidding Fairness → All quotes verifiable
+├── Provider Capability → Historical delivery proof
+└── Revenue Distribution → Proportional settlement proof
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "pool_id": "pool-001",
+  "participants": ["user-1", "user-2", "user-3"],
+  "total_budget": 3000,
+  "bids": [
+    {"provider": "p1", "price": 2500, "reputation": 0.85},
+    {"provider": "p2", "price": 2800, "reputation": 0.92}
+  ],
+  "winner": "p1",
+  "selection_proof": "Scoring algorithm verifiable execution"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+## 4.4 Network Layer Scenarios (4 scenarios)
+
+### Scenario 9: Node Operation Trust
+
+**Problem**: Node reliability, service quality, honest behavior
+
+**Current Implementation**:
+- decentralized_node.py: P2PNode
+- NodeIdentity: reputation, stake
+- Heartbeat mechanism, service registration
+
+**What needs to be proven**:
+```
+├── Node Identity Real → SBT binding
+├── Service Capability Real → Capability proof
+├── Online Rate Met → Heartbeat proof
+├── No Malicious Behavior → Clean history proof
+└── Sufficient Staking → Economic collateral
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "node_id": "node-001",
+  "identity_sbt": "SBT-123",
+  "uptime_30d": 0.995,
+  "avg_latency_ms": 50,
+  "stake_amount": 50000,
+  "services_provided": 1000,
+  "no_slash_history": true,
+  "proof": "On-chain reputation + Service statistics proof"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 10: Service Discovery Trust
+
+**Problem**: Service capability real, price reasonable, availability
+
+**Current Implementation**:
+- discovery.py: Service discovery
+- DistributedServiceRegistry
+
+**What needs to be proven**:
+```
+├── Capability Claim Real → Capability verification proof
+├── Price History Stable → No abnormal price fluctuations
+├── Currently Available → Real-time load proof
+└── Historical Reviews Real → Immutable review records
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "service_id": "service-001",
+  "provider_node": "node-001",
+  "claimed_capabilities": ["LLM Inference", "Code Generation"],
+  "verified_capabilities": true,
+  "current_load": 0.3,
+  "price_history_stable": true,
+  "proof": "Capability test passed + Real-time load proof"
+}
+```
+
+**ZK Applicability**: Medium
+
+---
+
+### Scenario 11: Cross-Node Collaboration Trust
+
+**Problem**: Trust between unknown nodes, task distribution reliability
+
+**Current Implementation**:
+- P2P communication
+- Gossip protocol
+
+**What needs to be proven**:
+```
+├── Counterparty Node Trustworthy → Reputation proof
+├── Task Distribution Traceable → Task chain proof
+├── Results Trustworthy → Multi-node verification
+└── Settlement Fair → Settlement proof
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "source_node": "node-001",
+  "target_node": "node-002",
+  "task_id": "task-001",
+  "task_type": "LLM Inference",
+  "both_stake_sufficient": true,
+  "both_reputation_above": 0.7,
+  "proof": "Bidirectional reputation proof + Task signature"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 12: Penalty Mechanism Trust
+
+**Problem**: Penalty fairness, sufficient evidence, appeal channel
+
+**Current Implementation**:
+- VIBGovernance.sol: Governance voting
+- No dedicated penalty contract
+
+**What needs to be proven**:
+```
+├── Violation Facts Confirmed → Evidence chain
+├── Penalty Ratio Reasonable → Transparent rules
+├── Execution Procedure Fair → Appealable
+└── Penalty Executed → On-chain record
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "slash_id": "slash-001",
+  "violator": "node-003",
+  "violation_type": "Service Outage Timeout",
+  "evidence": {
+    "expected_uptime": 0.99,
+    "actual_uptime": 0.85,
+    "affected_users": 50
+  },
+  "penalty_amount": 1000,
+  "appeal_deadline": 1234567890,
+  "proof": "Monitoring data signature + Rule matching proof"
+}
+```
+
+**ZK Applicability**: Medium
+
+---
+
+## 4.5 Governance Layer Scenarios (4 scenarios)
+
+### Scenario 13: Proposal Creation Trust
+
+**Problem**: Who is eligible to propose, proposal content authenticity
+
+**Current Implementation**:
+- VIBGovernance.sol: Proposal threshold
+- governance.py: Proposal API
+
+**What needs to be proven**:
+```
+├── Proposal Permission → Staking/reputation threshold met
+├── Proposal Content Compliant → Follows rules
+├── No Conflict of Interest → Independence proof
+└── Proposal History Clean → No malicious proposal record
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "proposer": "0x123...",
+  "stake_amount": 5000,
+  "reputation_score": 0.75,
+  "proposal_type": "PARAMETER_CHANGE",
+  "no_conflict_of_interest": true,
+  "previous_proposals_success_rate": 0.8,
+  "proof": "Staking proof + Reputation proof"
+}
+```
+
+**ZK Applicability**: High
+
+---
+
+### Scenario 14: Voting Weight Trust
+
+**Problem**: How voting rights are calculated, whether fair
+
+**Current Implementation**:
+- VIBGovernance.sol: Three-layer governance
+  - Layer1: Capital weight (staking × duration)
+  - Layer2: Production weight (contribution points)
+  - Layer3: Community consensus (KYC one-person-one-vote)
+
+**What needs to be proven**:
+```
+├── Staking Real → On-chain verifiable
+├── Contribution Points Real → Contribution proof
+├── KYC Real → Identity verification
+├── No Double Voting → Uniqueness proof
+└── Weight Calculation Correct → Publicly verifiable
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "voter": "0x123...",
+  "layer1_weight": {
+    "stake": 10000,
+    "duration_multiplier": 1.5,
+    "weight": 15000
+  },
+  "layer2_weight": {
+    "contribution_points": 5000,
+    "weight": 5000
+  },
+  "layer3_weight": {
+    "kyc_verified": true,
+    "weight": 1
+  },
+  "proof": "ZK proof of correct weight calculation without exposing specific values"
+}
+```
+
+**ZK Applicability**: Very High
+
+---
+
+### Scenario 15: Execution Authority Trust
+
+**Problem**: Who has authority to execute proposals, whether execution complies
+
+**Current Implementation**:
+- VIBGovernance.sol: Timelock execution
+- VIBTimelock.sol
+
+**What needs to be proven**:
+```
+├── Executor Authority → Multi-sig/governance authorization
+├── Timelock Passed → Waiting period proof
+├── Execution Content Matches Proposal → Consistency proof
+└── Execution Result Correct → State change proof
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "proposal_id": "prop-001",
+  "executor": "timelock-contract",
+  "timelock_expired": true,
+  "execution_data_matches_proposal": true,
+  "post_execution_state": "parameter_updated",
+  "proof": "Timestamp proof + Execution log signature"
+}
+```
+
+**ZK Applicability**: Low (transparent on-chain)
+
+---
+
+### Scenario 16: Fund Allocation Trust
+
+**Problem**: Fund usage transparency, allocation fairness
+
+**Current Implementation**:
+- VIBTreasury.sol: Multi-sig treasury
+- Three fund types
+
+**What needs to be proven**:
+```
+├── Fund Balance Real → On-chain verifiable
+├── Expenditure Proposal Compliant → Passed governance
+├── Multi-sig Real → Signature verification
+├── Recipient Correct → Address matching
+└── Execution Result → Transfer success
+```
+
+**Credit Proof Requirements**:
+```json
+{
+  "treasury_balance": 1000000,
+  "proposal_id": "spend-001",
+  "signatures_required": 3,
+  "signatures_collected": 4,
+  "recipient": "0xabc...",
+  "amount": 10000,
+  "execution_tx": "0xdef...",
+  "proof": "Multi-sig proof + Transfer transaction proof"
+}
+```
+
+**ZK Applicability**: Low (transparent on-chain)
+
+---
+
+## 4.6 Credit Proof Requirements Summary
+
+| Scenario Category | Specific Scenario | Core Proof Content | ZK Applicability | Priority |
+|-------------------|-------------------|---------------------|------------------|----------|
+| **User Layer** | Identity Registration | Ability/Certificate Authenticity | High | P2 |
+| | Staking Behavior | Staking History, No Slash | High | P1 |
+| | Wallet Binding | Ownership Proof | Medium | P3 |
+| | Data Contribution | Data Quality/Source | High | P3 |
+| **Service Layer** | Service Transaction | Performance History, Reputation | High | P0 |
+| | Escrow Payment | Fund Security, Condition Trigger | Medium | P1 |
+| | Dispute Arbitration | Fairness, Evidence Chain | High | P2 |
+| | Joint Order | Aggregation Fairness, Fund Safety | High | P0 |
+| **Network Layer** | Node Operation | Uptime, No Malicious Behavior | High | P1 |
+| | Service Discovery | Capability Real, Available | Medium | P2 |
+| | Cross-Node Collaboration | Bidirectional Trust | High | P2 |
+| | Penalty Mechanism | Evidence Chain, Fairness | Medium | P3 |
+| **Governance Layer** | Proposal Creation | Permission, No Conflict | High | P2 |
+| | Voting Weight | Three-Layer Weight Real | Very High | P0 |
+| | Execution Authority | Timelock, Compliance | Low | P3 |
+| | Fund Allocation | Multi-sig, Usage | Low | P3 |
+
+---
+
+## 4.7 ZK Credential Passport Design Recommendations
+
+### Core Principles
+
+```
+1. Prove attributes, not expose specific values
+2. Prove history, not expose specific transactions
+3. Prove eligibility, not expose reasons
+```
+
+### Passport Types
+
+| Passport Type | Purpose | What Needs to Be Proven |
+|---------------|---------|------------------------|
+| **Basic Passport** | Identity Verification, KYC | Identity Real, No Fraud Record |
+| **Service Passport** | Service Capability Proof | Completion Rate > 90%, Reputation > 0.7, No Major Complaints |
+| **Governance Passport** | Voting Weight Proof | Staking Amount, Contribution Points, KYC Status |
+| **VIP Passport** | Comprehensive High Reputation Proof | Reputation > 0.9, Staking > 10000, Contribution Points > 5000 |
+
+### Implementation Priority
+
+```
+P0 - Implement Immediately
+├── Service Transaction Trust (Required for Every Transaction)
+└── Voting Weight Proof (Governance Core)
+
+P1 - Short-term Implementation
+├── Node Operation Trust (Network Stability Foundation)
+└── Joint Order Trust (New Business Requirement)
+
+P2 - Medium-term Implementation
+├── Identity Registration Verification
+├── Dispute Arbitration Trust
+├── Proposal Creation Trust
+└── Service Discovery Trust
+
+P3 - Long-term Implementation
+├── Data Contribution Proof
+├── Penalty Mechanism Proof
+├── Execution Authority Proof
+└── Fund Allocation Proof
+```
+
+<details>
+<summary><h2>中文翻译</h2></summary>
+
 # 第4章：平台信用证明场景全景分析
 
 ## 4.1 场景总览
@@ -56,7 +707,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -86,7 +737,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -116,7 +767,7 @@
 }
 ```
 
-**zk适用性**：✅ 中
+**zk适用性**：中
 
 ---
 
@@ -147,7 +798,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -182,7 +833,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -213,7 +864,7 @@
 }
 ```
 
-**zk适用性**：⚠️ 中 (链上更直接)
+**zk适用性**：中 (链上更直接)
 
 ---
 
@@ -246,7 +897,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -282,7 +933,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -320,7 +971,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -353,7 +1004,7 @@
 }
 ```
 
-**zk适用性**：✅ 中
+**zk适用性**：中
 
 ---
 
@@ -386,7 +1037,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -423,7 +1074,7 @@
 }
 ```
 
-**zk适用性**：✅ 中
+**zk适用性**：中
 
 ---
 
@@ -458,7 +1109,7 @@
 }
 ```
 
-**zk适用性**：✅ 高
+**zk适用性**：高
 
 ---
 
@@ -502,7 +1153,7 @@
 }
 ```
 
-**zk适用性**：✅ 极高
+**zk适用性**：极高
 
 ---
 
@@ -534,7 +1185,7 @@
 }
 ```
 
-**zk适用性**：⚠️ 低 (链上透明)
+**zk适用性**：低 (链上透明)
 
 ---
 
@@ -569,7 +1220,7 @@
 }
 ```
 
-**zk适用性**：⚠️ 低 (链上透明)
+**zk适用性**：低 (链上透明)
 
 ---
 
@@ -577,22 +1228,22 @@
 
 | 场景分类 | 具体场景 | 核心证明内容 | zk适用性 | 优先级 |
 |----------|----------|--------------|----------|--------|
-| **用户层** | 身份注册 | 能力/证书真实性 | ✅ 高 | P2 |
-| | 质押行为 | 质押历史、无惩罚 | ✅ 高 | P1 |
-| | 钱包绑定 | 所有权证明 | ✅ 中 | P3 |
-| | 数据贡献 | 数据质量/来源 | ✅ 高 | P3 |
-| **服务层** | 服务交易 | 履约历史、信誉 | ✅ 高 | P0 |
-| | 托管支付 | 资金安全、条件触发 | ⚠️ 中 | P1 |
-| | 争议仲裁 | 公正性、证据链 | ✅ 高 | P2 |
-| | 联合订单 | 聚合公正、资金安全 | ✅ 高 | P0 |
-| **网络层** | 节点运营 | 在线率、无恶意 | ✅ 高 | P1 |
-| | 服务发现 | 能力真实、可用 | ✅ 中 | P2 |
-| | 跨节点协作 | 双向信任 | ✅ 高 | P2 |
-| | 惩罚机制 | 证据链、公正 | ✅ 中 | P3 |
-| **治理层** | 提案创建 | 权限、无冲突 | ✅ 高 | P2 |
-| | 投票权重 | 三层权重真实 | ✅ 极高 | P0 |
-| | 执行权限 | 时间锁、合规 | ⚠️ 低 | P3 |
-| | 资金分配 | 多签、用途 | ⚠️ 低 | P3 |
+| **用户层** | 身份注册 | 能力/证书真实性 | 高 | P2 |
+| | 质押行为 | 质押历史、无惩罚 | 高 | P1 |
+| | 钱包绑定 | 所有权证明 | 中 | P3 |
+| | 数据贡献 | 数据质量/来源 | 高 | P3 |
+| **服务层** | 服务交易 | 履约历史、信誉 | 高 | P0 |
+| | 托管支付 | 资金安全、条件触发 | 中 | P1 |
+| | 争议仲裁 | 公正性、证据链 | 高 | P2 |
+| | 联合订单 | 聚合公正、资金安全 | 高 | P0 |
+| **网络层** | 节点运营 | 在线率、无恶意 | 高 | P1 |
+| | 服务发现 | 能力真实、可用 | 中 | P2 |
+| | 跨节点协作 | 双向信任 | 高 | P2 |
+| | 惩罚机制 | 证据链、公正 | 中 | P3 |
+| **治理层** | 提案创建 | 权限、无冲突 | 高 | P2 |
+| | 投票权重 | 三层权重真实 | 极高 | P0 |
+| | 执行权限 | 时间锁、合规 | 低 | P3 |
+| | 资金分配 | 多签、用途 | 低 | P3 |
 
 ---
 
@@ -638,3 +1289,5 @@ P3 - 长期实现
 ├── 执行权限证明
 └── 资金分配证明
 ```
+
+</details>

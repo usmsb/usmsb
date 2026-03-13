@@ -41,6 +41,17 @@
 | `CLEAN_DB_BETWEEN_TESTS=1` | 启用测试间数据库清理 |
 | `DATABASE_PATH` | 自定义数据库路径 |
 
+## 测试文件
+
+| 文件 | 说明 | 测试用例数 |
+|------|------|-----------|
+| `test_business_api_full_coverage.py` | 基础API测试 | 65 |
+| `test_business_logic_coverage.py` | 业务逻辑测试 | 70+ |
+| `test_comprehensive_coverage.py` | 全面补充测试 | 150+ |
+| `test_security_vulnerability.py` | 安全与漏洞测试 | 50+ |
+
+**总计**: 335+ 测试用例
+
 ## 业务闭环覆盖
 
 | 闭环 | 测试模块 | 覆盖API |
