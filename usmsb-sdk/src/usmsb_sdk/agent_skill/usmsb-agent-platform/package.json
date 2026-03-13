@@ -25,12 +25,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/usmsb/usmsb-sdk.git"
+    "url": "https://github.com/usmsb/usmsb.git"
   },
   "bugs": {
-    "url": "https://github.com/usmsb/usmsb-sdk/issues"
+    "url": "https://github.com/usmsb/usmsb/issues"
   },
-  "homepage": "https://github.com/usmsb/usmsb-sdk#readme",
+  "homepage": "https://github.com/usmsb/usmsb#readme",
   "dependencies": {
     "node-fetch": "^2.7.0"
   },

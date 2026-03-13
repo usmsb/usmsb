@@ -16,7 +16,7 @@
 
 ```bash
 # 克隆
-git clone https://github.com/usmsb-sdk/usmsb-sdk.git
+git clone https://github.com/usmsb/usmsb.git
 cd usmsb-sdk
 
 # 安装

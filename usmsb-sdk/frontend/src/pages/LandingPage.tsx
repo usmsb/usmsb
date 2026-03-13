@@ -683,7 +683,7 @@ export default function LandingPage() {
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </Link>
-              <a href="https://github.com/usmsb/sdk" target="_blank" rel="noopener noreferrer">
+              <a href="https://github.com/usmsb/usmsb" target="_blank" rel="noopener noreferrer">
                 <Button
                   variant="outline"
                   size="lg"
@@ -719,7 +719,7 @@ export default function LandingPage() {
                 <a href="https://twitter.com/usmsb_sdk" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-lg bg-white dark:bg-slate-800 hover:bg-secondary-100 dark:hover:bg-slate-700 border border-secondary-200 dark:border-transparent flex items-center justify-center text-secondary-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors" title="Twitter">
                   <Twitter className="w-4 h-4" />
                 </a>
-                <a href="https://github.com/usmsb/sdk" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-lg bg-white dark:bg-slate-800 hover:bg-secondary-100 dark:hover:bg-slate-700 border border-secondary-200 dark:border-transparent flex items-center justify-center text-secondary-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors" title="GitHub">
+                <a href="https://github.com/usmsb/usmsb" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-lg bg-white dark:bg-slate-800 hover:bg-secondary-100 dark:hover:bg-slate-700 border border-secondary-200 dark:border-transparent flex items-center justify-center text-secondary-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors" title="GitHub">
                   <Github className="w-4 h-4" />
                 </a>
                 <a href="https://linkedin.com/company/usmsb" target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-lg bg-white dark:bg-slate-800 hover:bg-secondary-100 dark:hover:bg-slate-700 border border-secondary-200 dark:border-transparent flex items-center justify-center text-secondary-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors" title="LinkedIn">
@@ -751,7 +751,7 @@ export default function LandingPage() {
                   </a>
                 </li>
                 <li>
-                  <a href="https://github.com/usmsb/sdk/releases" target="_blank" rel="noopener noreferrer" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
+                  <a href="https://github.com/usmsb/usmsb/releases" target="_blank" rel="noopener noreferrer" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
                     {t('landing.footer.product.changelog')}
                   </a>
                 </li>
@@ -795,7 +795,7 @@ export default function LandingPage() {
                   </a>
                 </li>
                 <li>
-                  <a href="https://github.com/usmsb" target="_blank" rel="noopener noreferrer" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
+                  <a href="https://github.com/usmsb/usmsb" target="_blank" rel="noopener noreferrer" className="text-sm text-secondary-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-white transition-colors">
                     {t('landing.footer.company.blog')}
                   </a>
                 </li>

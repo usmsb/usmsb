@@ -49,10 +49,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/usmsb/usmsb-sdk"
-Documentation = "https://github.com/usmsb/usmsb-sdk#readme"
-Repository = "https://github.com/usmsb/usmsb-sdk"
-Issues = "https://github.com/usmsb/usmsb-sdk/issues"
+Homepage = "https://github.com/usmsb/usmsb"
+Documentation = "https://github.com/usmsb/usmsb#readme"
+Repository = "https://github.com/usmsb/usmsb"
+Issues = "https://github.com/usmsb/usmsb/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

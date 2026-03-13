@@ -61,7 +61,7 @@ pip install usmsb-sdk
 # or want to contribute to the project
 
 # Clone the repository
-git clone https://github.com/usmsb-sdk/usmsb-sdk.git
+git clone https://github.com/usmsb/usmsb.git
 
 # Navigate to the project directory
 cd usmsb-sdk

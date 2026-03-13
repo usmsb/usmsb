@@ -423,7 +423,7 @@ CONTRACT_INTERFACE = {
 
 - 文档: docs.civilization.world
 - Discord: discord.gg/civilization
-- GitHub: github.com/usmsb-sdk
+- GitHub: github.com/usmsb/usmsb
 - 邮箱: hello@civilization.world
 
 ---

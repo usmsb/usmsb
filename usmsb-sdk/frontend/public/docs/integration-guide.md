@@ -27,7 +27,7 @@
 pip install usmsb-sdk
 
 # Or install from source
-git clone https://github.com/usmsb-sdk/usmsb-sdk.git
+git clone https://github.com/usmsb/usmsb.git
 cd usmsb-sdk
 pip install -e .
 ```

@@ -302,7 +302,7 @@ When referencing USMSB in academic work:
   author = {{USMSB SDK Team}},
   title = {USMSB SDK: Universal System Model of Social Behavior},
   year = {2025},
-  url = {https://github.com/usmsb/sdk}
+  url = {https://github.com/usmsb/usmsb}
 }
 ```
 
@@ -390,7 +390,7 @@ When using USMSB SDK, include the following attribution:
 This software includes USMSB SDK.
 Copyright (c) 2024-2025 [Company Name].
 Licensed under the Apache License, Version 2.0.
-https://github.com/usmsb/sdk
+https://github.com/usmsb/usmsb
 ```
 
 ### 8.2 NOTICE File
@@ -493,7 +493,7 @@ For security vulnerabilities:
 
 For general questions:
 - Email: info@usmsb-sdk.io
-- GitHub Issues: github.com/usmsb/sdk/issues
+- GitHub Issues: github.com/usmsb/usmsb/issues
 - Community: community.usmsb-sdk.io
 
 ---
