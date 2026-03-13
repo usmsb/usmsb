@@ -10,7 +10,7 @@ export function CtaSlide({ isActive, direction }: SlideProps) {
 
   const socialLinks = [
     { icon: <Twitter className="w-5 h-5" />, href: 'https://twitter.com/vibe_ai', label: 'Twitter' },
-    { icon: <Github className="w-5 h-5" />, href: 'https://github.com/vibe-ai', label: 'GitHub' },
+    { icon: <Github className="w-5 h-5" />, href: 'https://github.com/usmsb/usmsb', label: 'GitHub' },
     { icon: <Linkedin className="w-5 h-5" />, href: 'https://linkedin.com/company/vibe-ai', label: 'LinkedIn' },
     { icon: <Mail className="w-5 h-5" />, href: 'mailto:contact@vibe.ai', label: 'Email' },
   ]
