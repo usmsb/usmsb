@@ -1,10 +1,25 @@
 # Example Code
 
-**[English](#1-agent-chat) | [中文](#1-agent-对话)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Agent Chat
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 示例代码
+
+---
+
+## 1. Agent 对话
 
 ```python
 from usmsb_sdk import USMSBClient
@@ -61,10 +76,7 @@ result = await task.execute(data)
 - [Quick Start](./quickstart.md) - Getting started
 - [Python SDK](../06_api/python_sdk.md) - Detailed SDK usage
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# 示例代码
 
 ---
 

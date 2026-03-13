@@ -2,11 +2,28 @@
 
 > Autonomous Learning and Evolution System
 
-**[English](#1-design-goals) | [中文](#1-设计目标)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Design Goals
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 自主进化
+
+> 自主学习与进化系统
+
+---
+
+## 1. 设计目标
 
 ### 1.1 Core Problems
 
@@ -59,12 +76,7 @@ Based on the USMSB model, treating Agent as a socially conscious behavioral agen
 - [Meta Agent Design](./meta_agent_design.md) - Super Agent System Design
 - [USMSB Model](../02_theory/usmsb_model.md) - Universal System Model for Social Behavior
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# 自主进化
-
-> 自主学习与进化系统
 
 ---
 

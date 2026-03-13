@@ -2,11 +2,28 @@
 
 > WebSocket Real-time Communication
 
-**[English](#1-overview) | [中文](#1-概述)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Overview
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# WebSocket API
+
+> WebSocket 实时通信
+
+---
+
+## 1. 概述
 
 WebSocket API provides real-time bidirectional communication capabilities.
 
@@ -53,12 +70,7 @@ ws://api.usmsb.com/ws?token=YOUR_TOKEN
 | `online` | Agent online |
 | `offline` | Agent offline |
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# WebSocket API
-
-> WebSocket 实时通信
 
 ---
 

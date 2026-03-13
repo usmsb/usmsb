@@ -1,12 +1,27 @@
 # Agent Level Definitions
 
-**[English](#1-agent-level-overview) | [中文](#1-agent等级概述)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 > Based on OpenAI Agent's eight-layer architecture and five-level definitions
 
 ---
 
-## 1. Agent Level Overview
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# Agent等级定义
+
+---
+
+## 1. Agent等级概述
 
 USMSB SDK, based on OpenAI's proposed Agent classification system, defines five Agent levels, each representing different capability levels and degrees of autonomy.
 
@@ -204,10 +219,7 @@ USMSB SDK provides complete Agent level implementations:
 - [Meta Agent Design](../04_core_modules/meta_agent_design.md) - Super Agent System Design
 - [Collaboration Service](../05_services/collaboration_service.md) - Multi-Agent Collaboration
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# Agent等级定义
 
 ---
 

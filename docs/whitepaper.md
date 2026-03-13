@@ -1,6 +1,12 @@
 # USMSB SDK Whitepaper
 
-**[English](#usmsb-sdk-whitepaper) | [中文](#usmsb-sdk-白皮书)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 **Universal System Model of Social Behavior - Software Development Kit**
 
@@ -9,7 +15,21 @@ Release Date: 2025
 
 ---
 
-## Important Concept Distinction
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# USMSB SDK 白皮书
+
+**社会行为通用系统模型 - 软件开发工具包**
+
+版本: 1.0.0
+发布日期: 2025
+
+---
+
+## 重要概念区分
 
 Before reading this document, please understand the distinction between these two core concepts:
 
@@ -607,17 +627,7 @@ We believe that USMSB SDK will become an important infrastructure for building a
 
 *For more information, please visit our official website or contact our team.*
 
----
 
-<details>
-<summary><h2>USMSB SDK 白皮书</h2></summary>
-
-# USMSB SDK 白皮书
-
-**通用社会行为系统模型 - 软件开发工具包**
-
-版本: 1.0.0
-发布日期: 2025年
 
 ---
 

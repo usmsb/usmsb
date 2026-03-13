@@ -14,6 +14,11 @@ import {
   GitBranch,
   PlusCircle,
   Target,
+  Bot,
+  Presentation,
+  Dna,
+  FileCode,
+  Home,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import clsx from 'clsx'
@@ -26,25 +31,33 @@ interface MobileDrawerProps {
 export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
   const { t } = useTranslation()
   const { theme } = useAppStore()
+  const isDark = theme === 'dark'
 
   // Logo source based on theme
-  const logoSrc = theme === 'dark' ? '/logo-dark.svg' : '/logo.svg'
+  const logoSrc = isDark ? '/logo-dark.svg' : '/logo.svg'
 
-  const navigation = [
+  const mainNav = [
     { name: t('nav.dashboard'), href: '/app/dashboard', icon: LayoutDashboard },
     { name: t('nav.agents'), href: '/app/agents', icon: Users },
+    { name: t('nav.metaAgent'), href: '/app/chat', icon: Bot },
     { name: t('nav.matching'), href: '/app/matching', icon: Zap },
     { name: t('nav.network'), href: '/app/network', icon: Network },
+  ]
+
+  const toolsNav = [
     { name: t('nav.collaborations'), href: '/app/collaborations', icon: GitBranch },
     { name: t('nav.simulations'), href: '/app/simulations', icon: FlaskConical },
     { name: t('nav.analytics'), href: '/app/analytics', icon: BarChart3 },
     { name: t('nav.marketplace'), href: '/app/marketplace', icon: Store },
     { name: t('nav.governance'), href: '/app/governance', icon: Scale },
+    { name: t('nav.geneCapsule'), href: '/app/gene-capsule/explore', icon: Dna },
+    { name: t('nav.contracts'), href: '/app/contracts', icon: FileCode },
   ]
 
   const quickActions = [
-    { name: t('sidebar.publishService'), href: '/app/publish/service', icon: PlusCircle, color: 'text-green-600 dark:text-green-400', desc: t('sidebar.publishServiceDesc') },
-    { name: t('sidebar.publishDemand'), href: '/app/publish/demand', icon: Target, color: 'text-blue-600 dark:text-blue-400', desc: t('sidebar.publishDemandDesc') },
+    { name: t('sidebar.publishService'), href: '/app/publish/service', icon: PlusCircle, color: 'blue', desc: t('sidebar.publishServiceDesc') },
+    { name: t('sidebar.publishDemand'), href: '/app/publish/demand', icon: Target, color: 'purple', desc: t('sidebar.publishDemandDesc') },
+    { name: t('sidebar.investorPresentation'), href: '/pitch', icon: Presentation, color: 'green', desc: t('sidebar.vibeIntroduction') },
   ]
 
   const handleNavClick = () => {
@@ -65,28 +78,59 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
       {/* Drawer */}
       <div
         className={clsx(
-          'fixed left-0 top-0 h-full w-72 z-50 transform transition-transform duration-300 ease-in-out md:hidden',
-          'bg-white dark:bg-cyber-dark',
+          'fixed left-0 top-0 h-full w-80 max-w-[85vw] z-50 transform transition-transform duration-300 ease-in-out md:hidden',
+          isDark
+            ? 'bg-cyber-card border-r border-neon-blue/20'
+            : 'bg-white border-r border-gray-200',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
+        {/* Neon glow effect - Dark mode */}
+        {isDark && (
+          <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-transparent via-neon-blue/30 to-transparent" />
+        )}
+
         {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-light-border dark:border-secondary-700">
+        <div className={clsx(
+          'h-16 flex items-center justify-between px-4 shrink-0',
+          'border-b',
+          isDark ? 'border-neon-blue/20' : 'border-gray-200'
+        )}>
           <Link
             to="/"
             onClick={onClose}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 group"
           >
             <img
               src={logoSrc}
-              alt="USMSB SDK Logo"
-              className="w-8 h-8"
+              alt="USMSB Logo"
+              className={clsx(
+                'w-8 h-8 transition-all duration-300',
+                'group-hover:scale-110',
+                isDark && 'group-hover:shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+              )}
             />
-            <span className="font-semibold text-light-text-primary dark:text-secondary-100">USMSB SDK</span>
+            <div className="flex flex-col">
+              <span className={clsx(
+                'font-bold text-lg leading-tight',
+                isDark
+                  ? 'font-cyber bg-gradient-to-r from-neon-blue via-neon-purple to-neon-green bg-clip-text text-transparent'
+                  : 'text-gray-900'
+              )}>USMSB</span>
+              <span className={clsx(
+                'text-xs',
+                isDark ? 'text-neon-blue/60' : 'text-gray-500'
+              )}>SDK Platform</span>
+            </div>
           </Link>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-light-bg-tertiary dark:hover:bg-secondary-800 text-light-text-muted dark:text-secondary-400"
+            className={clsx(
+              'p-2 rounded-lg transition-colors',
+              isDark
+                ? 'hover:bg-neon-blue/10 text-neon-blue/70 hover:text-neon-blue'
+                : 'hover:bg-gray-100 text-gray-500'
+            )}
             aria-label="Close menu"
           >
             <X size={20} />
@@ -95,51 +139,166 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
 
         {/* Navigation */}
         <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100%-8rem)]">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              onClick={handleNavClick}
-              className={({ isActive }) =>
-                clsx(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                  isActive
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-400 dark:border dark:border-blue-500/30'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-blue-600/10'
-                )
-              }
-            >
-              <item.icon size={20} />
-              <span className="font-medium">{item.name}</span>
-            </NavLink>
-          ))}
+          {/* Main Navigation Section */}
+          <div className="mb-4">
+            <p className={clsx(
+              'px-3 text-xs font-semibold uppercase tracking-wider mb-2',
+              isDark ? 'text-neon-blue/60 font-cyber' : 'text-gray-500'
+            )}>
+              Main
+            </p>
+            {mainNav.map((item) => (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={handleNavClick}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                  // Base
+                  !isActive && !isDark && 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                  !isActive && isDark && 'text-gray-300 hover:text-neon-blue',
+                  // Active - Light
+                  isActive && !isDark && 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 font-medium border border-blue-200',
+                  // Active - Dark with glow
+                  isActive && isDark && [
+                    'bg-gradient-to-r from-neon-blue/20 to-neon-purple/20',
+                    'text-neon-blue font-cyber',
+                    'border border-neon-blue/40',
+                    'shadow-[0_0_15px_rgba(0,245,255,0.2)]',
+                  ],
+                )}
+              >
+                <item.icon
+                  size={20}
+                  className={clsx(
+                    'shrink-0 transition-all duration-200',
+                    isActive
+                      ? isDark ? 'text-neon-blue' : 'text-blue-600'
+                      : isDark ? 'text-gray-400' : 'text-gray-500'
+                  )}
+                />
+                <span className={clsx(
+                  'font-medium',
+                  isActive && isDark && 'font-cyber'
+                )}>{item.name}</span>
+              </NavLink>
+            ))}
+          </div>
+
+          {/* Tools Navigation Section */}
+          <div className="mb-4">
+            <p className={clsx(
+              'px-3 text-xs font-semibold uppercase tracking-wider mb-2',
+              isDark ? 'text-neon-purple/60 font-cyber' : 'text-gray-500'
+            )}>
+              Tools
+            </p>
+            {toolsNav.map((item) => (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={handleNavClick}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                  // Base
+                  !isActive && !isDark && 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                  !isActive && isDark && 'text-gray-300 hover:text-neon-purple',
+                  // Active - Light
+                  isActive && !isDark && 'bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 font-medium border border-purple-200',
+                  // Active - Dark with purple glow
+                  isActive && isDark && [
+                    'bg-gradient-to-r from-neon-purple/20 to-pink-500/20',
+                    'text-neon-purple font-cyber',
+                    'border border-neon-purple/40',
+                    'shadow-[0_0_15px_rgba(191,0,255,0.2)]',
+                  ],
+                )}
+              >
+                <item.icon
+                  size={20}
+                  className={clsx(
+                    'shrink-0 transition-all duration-200',
+                    isActive
+                      ? isDark ? 'text-neon-purple' : 'text-purple-600'
+                      : isDark ? 'text-gray-400' : 'text-gray-500'
+                  )}
+                />
+                <span className={clsx(
+                  'font-medium',
+                  isActive && isDark && 'font-cyber'
+                )}>{item.name}</span>
+              </NavLink>
+            ))}
+          </div>
 
           {/* Quick Actions */}
-          <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-2 px-3">
-              {t('sidebar.quickActions') || 'Quick Actions'}
+          <div className={clsx(
+            'pt-4 mt-4 border-t',
+            isDark ? 'border-neon-green/20' : 'border-gray-200'
+          )}>
+            <p className={clsx(
+              'px-3 text-xs font-semibold uppercase tracking-wider mb-2',
+              isDark ? 'text-neon-green/60 font-cyber' : 'text-gray-500'
+            )}>
+              {t('sidebar.quickActions')}
             </p>
-            <div className="space-y-1">
+            <div className={clsx(
+              'rounded-xl p-2 space-y-1',
+              isDark
+                ? 'bg-gradient-to-br from-cyber-card to-cyber-dark border border-neon-green/20'
+                : 'bg-gray-50 border border-gray-100'
+            )}>
               {quickActions.map((action) => (
                 <NavLink
                   key={action.name}
                   to={action.href}
                   onClick={handleNavClick}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                      isActive
-                        ? action.color === 'blue'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-600/20 dark:text-blue-400 dark:border dark:border-blue-500/30'
-                          : 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-600/20 dark:text-purple-400 dark:border dark:border-purple-500/30'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
-                    )
-                  }
+                  className={({ isActive }) => clsx(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                    // Base
+                    !isActive && !isDark && 'text-gray-600 hover:bg-white hover:shadow-sm',
+                    !isActive && isDark && 'text-gray-300',
+                    // Active - Light
+                    isActive && !isDark && action.color === 'blue'
+                      ? 'bg-blue-100 text-blue-700'
+                      : action.color === 'purple'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-green-100 text-green-700',
+                    // Active - Dark
+                    isActive && isDark && [
+                      action.color === 'blue' && 'bg-neon-blue/15 text-neon-blue border border-neon-blue/40',
+                      action.color === 'purple' && 'bg-neon-purple/15 text-neon-purple border border-neon-purple/40',
+                      action.color === 'green' && 'bg-neon-green/15 text-neon-green border border-neon-green/40',
+                    ],
+                  )}
                 >
-                  <action.icon size={18} className={action.color} />
+                  <div className={clsx(
+                    'p-1.5 rounded-md',
+                    isDark && action.color === 'blue' && 'bg-neon-blue/20',
+                    isDark && action.color === 'purple' && 'bg-neon-purple/20',
+                    isDark && action.color === 'green' && 'bg-neon-green/20',
+                  )}>
+                    <action.icon
+                      size={16}
+                      className={clsx(
+                        isDark && action.color === 'blue' && 'text-neon-blue',
+                        isDark && action.color === 'purple' && 'text-neon-purple',
+                        isDark && action.color === 'green' && 'text-neon-green',
+                        !isDark && action.color === 'blue' && 'text-blue-600',
+                        !isDark && action.color === 'purple' && 'text-purple-600',
+                        !isDark && action.color === 'green' && 'text-green-600',
+                      )}
+                    />
+                  </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">{action.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-500">{action.desc}</span>
+                    <span className={clsx(
+                      'text-sm font-medium',
+                      isActive && isDark && 'font-cyber'
+                    )}>{action.name}</span>
+                    <span className={clsx(
+                      'text-xs',
+                      isDark ? 'text-gray-500' : 'text-gray-500'
+                    )}>{action.desc}</span>
                   </div>
                 </NavLink>
               ))}
@@ -148,21 +307,44 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
         </nav>
 
         {/* Bottom section */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-cyber-dark">
+        <div className={clsx(
+          'absolute bottom-0 left-0 right-0 p-4 border-t',
+          isDark ? 'border-neon-blue/20 bg-cyber-card/80' : 'border-gray-200 bg-white'
+        )}>
           <NavLink
             to="/app/settings"
             onClick={handleNavClick}
-            className={({ isActive }) =>
-              clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                isActive
-                  ? 'bg-gray-100 text-gray-900 border border-gray-200 dark:bg-blue-600/20 dark:text-blue-400 dark:border dark:border-blue-500/30'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-blue-600/10'
-              )
-            }
+            className={({ isActive }) => clsx(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+              // Base
+              !isActive && !isDark && 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+              !isActive && isDark && 'text-gray-300 hover:text-neon-blue',
+              // Active
+              isActive && !isDark && 'bg-gray-100 text-gray-900 font-medium',
+              isActive && isDark && [
+                'bg-gradient-to-r from-neon-blue/20 to-cyan-500/20',
+                'text-neon-blue font-cyber',
+                'border border-neon-blue/40',
+              ],
+            )}
           >
-            <Settings size={20} />
+            <Settings size={20} className={isDark ? 'text-neon-blue' : ''} />
             <span className="font-medium">{t('nav.settings')}</span>
+          </NavLink>
+
+          {/* Back to Home */}
+          <NavLink
+            to="/"
+            onClick={handleNavClick}
+            className={clsx(
+              'flex items-center gap-3 px-3 py-2.5 mt-2 rounded-lg transition-all duration-200',
+              isDark
+                ? 'text-gray-500 hover:text-neon-green hover:bg-neon-green/5'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            )}
+          >
+            <Home size={18} />
+            <span className="text-sm">Back to Home</span>
           </NavLink>
         </div>
       </div>

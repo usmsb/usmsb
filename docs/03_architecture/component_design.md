@@ -2,11 +2,28 @@
 
 > USMSB SDK Core Component Design
 
-**[English](#1-component-overview) | [中文](#1-组件概览)**
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
+
+**Language / 语言:** <a href="#chinese-translation">English</a> | <a href="#chinese-translation">中文</a>
+
+*Click the link above to jump to the Chinese translation section below.*
+
+</div>
 
 ---
 
-## 1. Component Overview
+<a id="chinese-translation"></a>
+
+<details id="chinese-translation">
+<summary><h2>中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# 组件设计
+
+> USMSB SDK 核心组件设计
+
+---
+
+## 1. 组件概览
 
 ### 1.1 Core Components
 
@@ -141,10 +158,7 @@ reasoning/
 - [Meta Agent Design](../04_core_modules/meta_agent_design.md) - Super Agent System Design
 - [Agent SDK](../04_core_modules/agent_sdk.md) - Agent Development Kit
 
-<details>
-<summary><h2>中文翻译</h2></summary>
 
-# 组件设计
 
 > USMSB SDK 核心组件设计
 
