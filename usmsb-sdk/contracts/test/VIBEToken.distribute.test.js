@@ -75,7 +75,7 @@ describe("VIBEToken DistributeToPools", function () {
     await airdropDistributor.waitForDeployment();
 
     // 部署 EmissionController
-    const EmissionController = await ethers.getContractFactory("EmissionController");
+    const EmissionController = await ethers.getContractFactory("src/EmissionController.sol:EmissionController");
     emissionController = await EmissionController.deploy(
       await vibeToken.getAddress(),
       owner.address,

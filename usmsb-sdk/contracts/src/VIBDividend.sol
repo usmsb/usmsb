@@ -26,6 +26,9 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 紧急提取时间锁 (7天)
     uint256 public constant EMERGENCY_WITHDRAW_DELAY = 7 days;
+
+    /// @notice 最大批量处理数量
+    uint256 public constant MAX_BATCH_SIZE = 100;
     
     /// @notice 待执行的紧急提取
     struct PendingEmergencyWithdraw {
