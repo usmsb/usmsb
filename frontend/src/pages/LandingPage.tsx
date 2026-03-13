@@ -167,7 +167,7 @@ export default function LandingPage() {
     { href: '#usecases', label: t('landing.nav.useCases') },
     { href: '#tech', label: t('landing.nav.tech') },
     { href: '#faq', label: t('landing.nav.faq') },
-    { href: '/pitch', label: 'Pitch', isRoute: true },
+    { href: '/pitch', label: t('landing.nav.pitch'), isRoute: true },
   ]
 
   return (
@@ -468,7 +468,7 @@ export default function LandingPage() {
       <section
         ref={featuresRef}
         id="features"
-        className="relative py-24 md:py-32"
+        className="relative py-24 md:py-32 bg-gradient-to-b from-transparent via-secondary-100/50 dark:via-slate-900/50 to-transparent"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
@@ -488,7 +488,7 @@ export default function LandingPage() {
             {features.map((feature, index) => (
               <div
                 key={feature.key}
-                className="group relative p-6 rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-800/50 dark:to-slate-900/50 border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-primary-500/50 shadow-sm hover:shadow-md dark:shadow-none transition-all duration-300 hover:-translate-y-1"
+                className="group relative p-6 rounded-2xl bg-white dark:bg-slate-900/60 dark:backdrop-blur-sm border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-primary-500/50 shadow-sm hover:shadow-md dark:shadow-none transition-all duration-300 hover:-translate-y-1"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className={clsx('w-14 h-14 rounded-xl flex items-center justify-center mb-4', feature.color)}>
@@ -630,7 +630,7 @@ export default function LandingPage() {
       <section
         ref={useCasesRef}
         id="usecases"
-        className="relative py-24 md:py-32"
+        className="relative py-24 md:py-32 bg-gradient-to-b from-transparent via-secondary-100/50 dark:via-slate-900/50 to-transparent"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
@@ -650,7 +650,7 @@ export default function LandingPage() {
             {useCases.map((useCase, index) => (
               <div
                 key={useCase.key}
-                className="group relative overflow-hidden rounded-2xl bg-white dark:bg-gradient-to-br dark:from-slate-800/50 dark:to-slate-900/50 border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-primary-500/30 shadow-sm hover:shadow-md dark:shadow-none transition-all duration-300"
+                className="group relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900/60 dark:backdrop-blur-sm border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-primary-500/30 shadow-sm hover:shadow-md dark:shadow-none transition-all duration-300"
               >
                 <div className="p-8">
                   <div className="flex items-start gap-4">

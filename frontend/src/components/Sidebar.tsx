@@ -52,7 +52,7 @@ export default function Sidebar() {
   const quickActions = [
     { name: t('sidebar.publishService'), href: '/app/publish/service', icon: PlusCircle, desc: t('sidebar.publishServiceDesc'), color: 'blue' },
     { name: t('sidebar.publishDemand'), href: '/app/publish/demand', icon: Target, desc: t('sidebar.publishDemandDesc'), color: 'purple' },
-    { name: '投资人演示', href: '/pitch', icon: Presentation, desc: 'VIBE 项目介绍', color: 'green' },
+    { name: t('sidebar.investorPresentation'), href: '/pitch', icon: Presentation, desc: t('sidebar.vibeIntroduction'), color: 'green' },
   ]
 
   // Group navigation items

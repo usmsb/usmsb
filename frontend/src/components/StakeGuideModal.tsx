@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { X, Lock, Briefcase, Target, Vote, Shield, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAppStore } from '@/store'
 import clsx from 'clsx'
 
 interface StakeGuideModalProps {
@@ -18,6 +19,8 @@ export function StakeGuideModal({
 }: StakeGuideModalProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { theme } = useAppStore()
+  const isDark = theme === 'dark'
 
   if (!isOpen) return null
 
@@ -29,23 +32,23 @@ export function StakeGuideModal({
   const benefits = [
     {
       icon: Briefcase,
-      title: t('stake.benefit1Title', '发布服务'),
-      desc: t('stake.benefit1Desc', '向市场提供您的专业技能'),
+      title: t('stake.benefit1Title'),
+      desc: t('stake.benefit1Desc'),
     },
     {
       icon: Target,
-      title: t('stake.benefit2Title', '发布需求'),
-      desc: t('stake.benefit2Desc', '发布任务需求找到合适的服务商'),
+      title: t('stake.benefit2Title'),
+      desc: t('stake.benefit2Desc'),
     },
     {
       icon: Shield,
-      title: t('stake.benefit3Title', '注册 Agent'),
-      desc: t('stake.benefit3Desc', '注册您的 AI Agent 参与网络协作'),
+      title: t('stake.benefit3Title'),
+      desc: t('stake.benefit3Desc'),
     },
     {
       icon: Vote,
-      title: t('stake.benefit4Title', '治理投票'),
-      desc: t('stake.benefit4Desc', '参与平台治理决策'),
+      title: t('stake.benefit4Title'),
+      desc: t('stake.benefit4Desc'),
     },
   ]
 
@@ -58,25 +61,68 @@ export function StakeGuideModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-secondary-800 rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+      <div
+        className={clsx(
+          'relative rounded-2xl shadow-xl max-w-md w-full overflow-hidden',
+          // Light mode
+          'bg-white border border-gray-200',
+          // Dark mode - cyberpunk style
+          isDark && 'bg-cyber-card border border-neon-blue/30'
+        )}
+      >
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-8 text-white">
+        <div
+          className={clsx(
+            'relative px-6 py-8',
+            // Light mode
+            'bg-gradient-to-r from-blue-500 to-blue-600',
+            // Dark mode - cyberpunk gradient
+            isDark && 'bg-gradient-to-r from-neon-blue/20 to-neon-purple/20'
+          )}
+        >
+          {/* Cyberpunk border effect */}
+          {isDark && (
+            <div className="absolute inset-0 border border-neon-blue/30 rounded-t-2xl" />
+          )}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            className={clsx(
+              'absolute top-4 right-4 p-1 rounded-full transition-colors',
+              isDark
+                ? 'bg-neon-blue/20 text-neon-blue hover:bg-neon-blue/30'
+                : 'bg-white/20 text-white hover:bg-white/30'
+            )}
           >
             <X size={20} />
           </button>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-              <Lock size={24} />
+            <div
+              className={clsx(
+                'w-12 h-12 rounded-full flex items-center justify-center',
+                isDark ? 'bg-neon-blue/20' : 'bg-white/20'
+              )}
+            >
+              <Lock
+                size={24}
+                className={isDark ? 'text-neon-blue' : 'text-white'}
+              />
             </div>
             <div>
-              <h2 className="text-xl font-bold">
-                {t('stake.required', '需要质押')}
+              <h2
+                className={clsx(
+                  'text-xl font-bold',
+                  isDark ? 'text-neon-blue font-cyber' : 'text-white'
+                )}
+              >
+                {t('stake.required')}
               </h2>
-              <p className="text-white/80 text-sm">
-                {t('stake.toAccess', '访问')} {featureName}
+              <p
+                className={clsx(
+                  'text-sm',
+                  isDark ? 'text-gray-400' : 'text-white/80'
+                )}
+              >
+                {t('stake.toAccess')} {featureName}
               </p>
             </div>
           </div>
@@ -84,31 +130,73 @@ export function StakeGuideModal({
 
         {/* Content */}
         <div className="px-6 py-6">
-          <p className="text-secondary-600 dark:text-secondary-300 mb-4">
-            {t('stake.description', '质押 VIBE 代币以解锁平台全部功能。质押不仅是参与门槛，更是对网络安全的承诺。')}
+          <p
+            className={clsx(
+              'mb-4',
+              isDark ? 'text-gray-300' : 'text-gray-600'
+            )}
+          >
+            {t('stake.description')}
           </p>
 
-          <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4 mb-6">
-            <p className="text-sm text-primary-700 dark:text-primary-300">
-              {t('stake.minimumRequired', '最低质押金额')}:
+          <div
+            className={clsx(
+              'rounded-lg p-4 mb-6',
+              isDark
+                ? 'bg-neon-blue/10 border border-neon-blue/30'
+                : 'bg-blue-50'
+            )}
+          >
+            <p
+              className={clsx(
+                'text-sm',
+                isDark ? 'text-neon-blue' : 'text-blue-700'
+              )}
+            >
+              {t('stake.minimumRequired')}:
               <span className="font-bold ml-2">{requiredStake} VIBE</span>
             </p>
           </div>
 
-          <h3 className="font-semibold text-secondary-900 dark:text-secondary-100 mb-3">
-            {t('stake.benefits', '质押权益')}
+          <h3
+            className={clsx(
+              'font-semibold mb-3',
+              isDark ? 'text-white font-cyber' : 'text-gray-900'
+            )}
+          >
+            {t('stake.benefits')}
           </h3>
           <div className="space-y-3 mb-6">
             {benefits.map((benefit, index) => (
               <div key={index} className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center flex-shrink-0">
-                  <benefit.icon size={16} className="text-primary-600 dark:text-primary-400" />
+                <div
+                  className={clsx(
+                    'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                    isDark
+                      ? 'bg-neon-purple/20'
+                      : 'bg-gray-100'
+                  )}
+                >
+                  <benefit.icon
+                    size={16}
+                    className={isDark ? 'text-neon-purple' : 'text-gray-600'}
+                  />
                 </div>
                 <div>
-                  <p className="font-medium text-secondary-900 dark:text-secondary-100 text-sm">
+                  <p
+                    className={clsx(
+                      'font-medium text-sm',
+                      isDark ? 'text-white' : 'text-gray-900'
+                    )}
+                  >
                     {benefit.title}
                   </p>
-                  <p className="text-xs text-secondary-500 dark:text-secondary-400">
+                  <p
+                    className={clsx(
+                      'text-xs',
+                      isDark ? 'text-gray-400' : 'text-gray-500'
+                    )}
+                  >
                     {benefit.desc}
                   </p>
                 </div>
@@ -122,23 +210,23 @@ export function StakeGuideModal({
               onClick={onClose}
               className={clsx(
                 'flex-1 py-3 px-4 rounded-lg border-2 transition-all',
-                'border-secondary-200 dark:border-secondary-600',
-                'text-secondary-600 dark:text-secondary-300',
-                'hover:bg-secondary-50 dark:hover:bg-secondary-700'
+                isDark
+                  ? 'border-neon-blue/30 text-neon-blue hover:bg-neon-blue/10'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
               )}
             >
-              {t('common.later', '稍后再说')}
+              {t('stake.later')}
             </button>
             <button
               onClick={handleStakeNow}
               className={clsx(
-                'flex-1 py-3 px-4 rounded-lg transition-all',
-                'bg-primary-600 text-white',
-                'hover:bg-primary-700',
-                'flex items-center justify-center gap-2'
+                'flex-1 py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2',
+                isDark
+                  ? 'bg-neon-blue text-black hover:bg-neon-blue/90 font-cyber'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
               )}
             >
-              {t('stake.stakeNow', '立即质押')}
+              {t('stake.stakeNow')}
               <ArrowRight size={18} />
             </button>
           </div>
