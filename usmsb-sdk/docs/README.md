@@ -74,6 +74,6 @@
 
 ## 相关资源
 
-- GitHub仓库: https://github.com/usmsb-sdk
-- 问题反馈: https://github.com/usmsb-sdk/issues
+- GitHub仓库: https://github.com/usmsb/usmsb
+- 问题反馈: https://github.com/usmsb/usmsb/issues
 - 更新日期: 2026-02-26

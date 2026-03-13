@@ -60,7 +60,7 @@ pip install usmsb-sdk
 # 如果你需要最新的开发版本或想为项目做出贡献
 
 # 克隆仓库
-git clone https://github.com/usmsb-sdk/usmsb-sdk.git
+git clone https://github.com/usmsb/usmsb.git
 
 # 进入项目目录
 cd usmsb-sdk

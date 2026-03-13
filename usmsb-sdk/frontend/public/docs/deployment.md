@@ -89,7 +89,7 @@ chmod +x deploy.sh
 
 ```bash
 # Clone repository
-git clone https://github.com/usmsb-sdk/usmsb-platform.git
+git clone https://github.com/usmsb/usmsb.git
 cd usmsb-platform
 
 # Configure environment
@@ -441,7 +441,7 @@ usmsb-cli blockchain status
 
 - Official Docs: docs.usmsb.com
 - API Reference: docs.usmsb.com/api
-- GitHub: github.com/usmsb-sdk
+- GitHub: github.com/usmsb/usmsb
 
 ### 10.2 Contact
 

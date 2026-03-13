@@ -1363,7 +1363,7 @@ The USMSB Platform team does not accept liability for any losses arising from th
 - **Twitter**: @USMSB_Platform
 - **Discord**: discord.gg/usmsb
 - **Email**: contact@usmsb.io
-- **GitHub**: github.com/usmsb-sdk
+- **GitHub**: github.com/usmsb/usmsb
 
 ---
 

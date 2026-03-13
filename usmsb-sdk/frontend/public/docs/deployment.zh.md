@@ -90,7 +90,7 @@ chmod +x install.sh
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/usmsb-sdk/usmsb-sdk.git
+git clone https://github.com/usmsb/usmsb.git
 cd usmsb-sdk
 
 # 2. 配置环境变量

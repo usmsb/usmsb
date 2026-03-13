@@ -11,7 +11,7 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/your-repo/usmsb-sdk.git
+git clone https://github.com/usmsb/usmsb.git
 cd usmsb-sdk
 
 # 2. 安装Python依赖

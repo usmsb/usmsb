@@ -215,7 +215,7 @@ export function HelpPanel({ isOpen, onClose }: HelpPanelProps) {
               {t('help.viewDocs', 'View Docs')}
             </a>
             <a
-              href="https://github.com/usmsb"
+              href="https://github.com/usmsb/usmsb"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-secondary-600 dark:text-secondary-400 hover:underline"

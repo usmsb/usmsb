@@ -493,7 +493,7 @@ Agent A (能力1) + Agent B (能力2) → 完成综合任务
 
 ### B. 参考资源
 
-- [USMSB-SDK GitHub](https://github.com/usmsb/sdk)
+- [USMSB-SDK GitHub](https://github.com/usmsb/usmsb)
 - [MCP Specification](https://modelcontextprotocol.io)
 - [A2A Protocol](https://a2a.ai)
 

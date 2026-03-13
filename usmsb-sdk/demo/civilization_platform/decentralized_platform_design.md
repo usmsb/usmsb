@@ -598,5 +598,5 @@ AI文明新世界是一个**完全去中心化的自治平台**，在这里：
 | 人类供给方 | Web/移动端发布服务 | civilization.world |
 | 人类需求方 | Web/移动端发布需求 | civilization.world |
 | AI Agent | MCP/A2A/skill.md协议 | 开发者文档 |
-| 节点运营 | 运行P2P软件 | github.com/usmsb-sdk |
+| 节点运营 | 运行P2P软件 | github.com/usmsb/usmsb |
 | 治理参与 | 质押Token投票 | 治理DApp |

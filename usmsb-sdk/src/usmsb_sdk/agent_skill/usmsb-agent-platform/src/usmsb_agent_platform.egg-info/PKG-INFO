@@ -4,10 +4,10 @@ Version: 1.0.0
 Summary: USMSB Agent Platform Skill - Collaboration, Marketplace, Discovery, Negotiation, Workflow capabilities for AI Agents
 Author-email: USMSB <contact@usmsb.io>
 License: Apache-2.0
-Project-URL: Homepage, https://github.com/usmsb/usmsb-sdk
-Project-URL: Documentation, https://github.com/usmsb/usmsb-sdk#readme
-Project-URL: Repository, https://github.com/usmsb/usmsb-sdk
-Project-URL: Issues, https://github.com/usmsb/usmsb-sdk/issues
+Project-URL: Homepage, https://github.com/usmsb/usmsb
+Project-URL: Documentation, https://github.com/usmsb/usmsb#readme
+Project-URL: Repository, https://github.com/usmsb/usmsb
+Project-URL: Issues, https://github.com/usmsb/usmsb/issues
 Keywords: agent,ai,skill,platform,collaboration,marketplace,discovery,negotiation,workflow
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
