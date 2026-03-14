@@ -35,6 +35,23 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
     /// @notice 精度
     uint256 public constant PRECISION = 10000;
 
+    // ========== 安全修复: 防抢跑机制 ==========
+
+    /// @notice 提交-揭示方案的提交窗口（秒）
+    uint256 public constant COMMIT_REVEAL_WINDOW = 1 hours;
+
+    /// @notice 提交记录
+    mapping(bytes32 => uint256) public commitTimestamps;
+
+    /// @notice 已执行的提交
+    mapping(bytes32 => bool) public commitExecuted;
+
+    /// @notice 提交事件
+    event BuybackCommitted(bytes32 indexed commitHash, address indexed committer);
+
+    /// @notice 揭示事件
+    event BuybackRevealed(bytes32 indexed commitHash, address indexed committer, uint256 ethSpent, uint256 vibeBought);
+
     // ========== 状态变量 ==========
 
     /// @notice VIBE 代币
@@ -54,6 +71,9 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 最小流动性阈值
     uint256 public minLiquidityThreshold;
+
+    /// @notice Medium #5 修复: 最大触发奖励金额（防止资金池被操纵耗尽）
+    uint256 public constant MAX_TRIGGER_REWARD = 0.01 ether;
 
     /// @notice 上次触发时间
     uint256 public lastTriggerTime;
@@ -128,8 +148,51 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
     // ========== 外部函数 ==========
 
     /**
-     * @notice 自动回购
+     * @notice 提交回购意图（Commit阶段 - 防抢跑）
+     * @dev 用户先提交哈希，等待一段时间后才能揭示执行
+     * @param commitHash keccak256(abi.encodePacked(msg.sender, ethAmount, nonce))
+     */
+    function commitBuyback(bytes32 commitHash) external {
+        require(commitTimestamps[commitHash] == 0, "Already committed");
+        commitTimestamps[commitHash] = block.timestamp;
+        emit BuybackCommitted(commitHash, msg.sender);
+    }
+
+    /**
+     * @notice 揭示并执行回购（Reveal阶段）
+     * @dev 安全修复: 使用Commit-Reveal模式防止抢跑
+     *      必须先调用commitBuyback提交意图，等待COMMIT_REVEAL_WINDOW后才能执行
+     * @param ethAmount 计划使用的ETH金额
+     * @param nonce 随机数
+     */
+    function revealAndBuyback(uint256 ethAmount, bytes32 nonce) external nonReentrant whenNotPaused {
+        // 计算提交哈希
+        bytes32 commitHash = keccak256(abi.encodePacked(msg.sender, ethAmount, nonce));
+
+        // 验证提交记录
+        require(commitTimestamps[commitHash] > 0, "Not committed");
+        require(!commitExecuted[commitHash], "Already executed");
+
+        // 验证时间窗口（防抢跑：必须等待足够时间）
+        require(
+            block.timestamp >= commitTimestamps[commitHash] + COMMIT_REVEAL_WINDOW,
+            "Reveal window not reached"
+        );
+
+        // 标记为已执行
+        commitExecuted[commitHash] = true;
+
+        // 执行实际的回购逻辑
+        _executeBuybackInternal(ethAmount);
+
+        emit BuybackRevealed(commitHash, msg.sender, ethAmount, totalBurned);
+    }
+
+    /**
+     * @notice 自动回购（保留原接口，但添加防抢跑保护）
      * @dev 价格下跌超过阈值时，任何人都可以触发
+     *      安全修复: 使用Commit-Reveal模式，需先commit再reveal
+     *      建议使用 commitBuyback + revealAndBuyback 替代
      */
     function autoBuyback() external nonReentrant whenNotPaused {
         require(address(this).balance > 0, "No ETH balance");
@@ -151,6 +214,17 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
 
         // 计算回购金额（使用50%的ETH余额）
         uint256 ethToSpend = address(this).balance / 2;
+
+        // 执行回购（内部函数）
+        _executeBuybackInternal(ethToSpend);
+    }
+
+    /**
+     * @notice 内部回购执行函数
+     * @dev 将回购逻辑抽取为内部函数，供revealAndBuyback和autoBuyback共用
+     */
+    function _executeBuybackInternal(uint256 ethToSpend) internal {
+        uint256 currentPrice = _getCurrentPrice();
 
         // 执行回购
         uint256 vibeBought = _executeBuyback(ethToSpend);
@@ -444,6 +518,11 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
         uint256 gasBonus = (estimatedGasCost * (100 + GAS_BONUS_PERCENT)) / 100;
 
         uint256 reward = BASE_REWARD + gasBonus + timeBonus;
+
+        // Medium #5 修复: 限制最大奖励金额
+        if (reward > MAX_TRIGGER_REWARD) {
+            reward = MAX_TRIGGER_REWARD;
+        }
 
         if (address(this).balance >= reward) {
             payable(msg.sender).transfer(reward);

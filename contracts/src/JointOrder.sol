@@ -23,6 +23,9 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
     uint256 public constant PLATFORM_FEE_RATE = 300;             // 平台费率 3% (基点)
     uint256 public constant MIN_BIDDING_DURATION = 1 hours;      // 最短竞价时间
     uint256 public constant MAX_BIDDING_DURATION = 7 days;       // 最长竞价时间
+    
+    /// @notice Medium #14 修复: 订单超时处理时间
+    uint256 public constant ORDER_TIMEOUT_DURATION = 30 days;
 
     // ========== 状态枚举 ==========
 
@@ -171,6 +174,12 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         bytes32 indexed poolId,
         uint256 totalPayout,
         uint256 platformFee
+    );
+
+    /// @notice Medium #14 修复: 订单过期事件
+    event PoolExpired(
+        bytes32 indexed poolId,
+        uint256 timestamp
     );
 
     event EarningsWithdrawn(
@@ -880,6 +889,39 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         vibeToken.safeTransfer(feeCollector, pool.platformFee);
 
         emit PoolCompleted(poolId, pool.winningBid, pool.platformFee);
+    }
+
+    /**
+     * @notice Medium #14 修复: 处理订单超时
+     * @param poolId 池ID
+     * @dev 超时后允许参与者取回资金
+     */
+    function handleOrderTimeout(bytes32 poolId) 
+        external 
+        nonReentrant 
+        poolExists(poolId) 
+    {
+        OrderPool storage pool = pools[poolId];
+        
+        // 检查是否已超时
+        require(
+            block.timestamp > pool.deliveryDeadline + ORDER_TIMEOUT_DURATION,
+            "JointOrder: order not timed out yet"
+        );
+        
+        // 只允许在特定状态下处理超时
+        require(
+            pool.status == PoolStatus.IN_PROGRESS || pool.status == PoolStatus.AWARDED,
+            "JointOrder: invalid status for timeout"
+        );
+        
+        // 标记为过期
+        pool.status = PoolStatus.EXPIRED;
+        
+        // 启用退款模式
+        refundPendingPools[poolId] = true;
+        
+        emit PoolExpired(poolId, block.timestamp);
     }
 
     // ========== 管理函数 ==========

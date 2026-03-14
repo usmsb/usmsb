@@ -650,12 +650,20 @@ contract ZKCredential is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard, Pau
     {
         address from = _ownerOf(tokenId);
 
-        if (from != address(0)) {
+        // Medium #15 修复: 加强NFT转移限制
+        // 只允许在撤销状态下转移，否则完全禁止转移
+        if (from != address(0) && to != address(0)) {
             bytes32 credentialId = bytes32(tokenId);
+            Credential storage cred = credentials[credentialId];
+            
+            // 必须处于撤销状态
             require(
-                credentials[credentialId].status == CredentialStatus.REVOKED,
-                "ZKCredential: non-transferable"
+                cred.status == CredentialStatus.REVOKED,
+                "ZKCredential: non-transferable credential"
             );
+            
+            // Medium #15 修复: 确保凭证确实存在且已正确撤销
+            require(cred.credentialId != bytes32(0), "ZKCredential: credential not found");
         }
 
         return super._update(to, tokenId, auth);

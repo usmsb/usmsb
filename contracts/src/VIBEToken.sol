@@ -604,11 +604,16 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      * @notice 质押合约铸造奖励
      * @param to 接收者地址
      * @param amount 奖励数量
+     * @dev Medium #1 修复: 使用更严格的溢出检查
      */
     function mintReward(address to, uint256 amount) external onlyStakingContract {
+        require(to != address(0), "VIBEToken: invalid recipient");
+        require(amount > 0, "VIBEToken: amount must be greater than 0");
+        // 使用更严格的检查，防止任何溢出可能
+        uint256 newTotalSupply = totalSupply() + amount;
         require(
-            totalSupply() + amount <= TOTAL_SUPPLY,
-            "VIBEToken: minting exceeds total supply cap"
+            newTotalSupply <= TOTAL_SUPPLY && newTotalSupply >= totalSupply(),
+            "VIBEToken: minting exceeds total supply cap or would overflow"
         );
         _mint(to, amount);
     }
@@ -683,6 +688,13 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
             uint256 dividendAmount = (taxAmount * DIVIDEND_RATIO) / TAX_PRECISION;
             uint256 ecosystemAmount = (taxAmount * ECOSYSTEM_FUND_RATIO) / TAX_PRECISION;
             uint256 protocolAmount = (taxAmount * PROTOCOL_FUND_RATIO) / TAX_PRECISION;
+
+            // 安全修复: 计算舍入损失，加到销毁金额中
+            // 确保所有税费分配完全，不会在发送者账户中残留
+            uint256 totalDistributed = burnAmount + dividendAmount + ecosystemAmount + protocolAmount;
+            if (totalDistributed < taxAmount) {
+                burnAmount += (taxAmount - totalDistributed);
+            }
 
             // 实际到账金额
             uint256 netAmount = value - taxAmount;

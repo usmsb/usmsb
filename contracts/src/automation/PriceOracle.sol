@@ -327,6 +327,17 @@ contract PriceOracle is Ownable, ReentrancyGuard {
             return lastValidPrice;
         }
 
+        // 安全修复: 计算有效价格源数量
+        uint256 validCount = 0;
+        if (chainlinkValid) validCount++;
+        if (uniswapValid) validCount++;
+        if (sushiswapValid) validCount++;
+
+        // 如果只有1个有效源，不使用它的价格（防止被操控）
+        if (validCount < 2) {
+            return lastValidPrice;
+        }
+
         return _calculateMedian(
             chainlinkValid ? chainlinkPrice : 0,
             uniswapValid ? uniswapPrice : 0,
@@ -536,8 +547,13 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         }
     }
 
+    /// @notice 安全修复: 中位数计算至少需要2个有效价格源
+    /// @dev 防止单一价格源被操控时直接返回该价格
+    error InsufficientValidSources(uint256 validCount, uint256 required);
+
     /**
      * @notice 计算中位数价格，忽略偏差过大的来源
+     * @dev 安全修复: 要求至少2个有效价格源，防止单一源被操控
      */
     function _calculateMedian(
         uint256 price1,
@@ -555,7 +571,14 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         if (valid3) { validPrices[count++] = price3; }
 
         if (count == 0) return 0;
-        if (count == 1) return validPrices[0];
+
+        // 安全修复: 要求至少2个有效价格源才能返回价格
+        // 防止单一价格源被操控时直接返回该价格
+        if (count < 2) {
+            // 不再返回单一价格，而是返回0表示价格不可靠
+            // 调用方应该使用 lastValidPrice 作为回退
+            return 0;
+        }
 
         // 排序
         for (uint256 i = 0; i < count - 1; i++) {
