@@ -9,16 +9,17 @@ import asyncio
 import json
 import logging
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
 
-class ErrorType(str, Enum):
+class ErrorType(StrEnum):
     """错误类型"""
     JSON_FORMAT = "json_format"            # JSON格式错误
     PARAMETER_ERROR = "parameter_error"    # 参数错误
@@ -31,7 +32,7 @@ class ErrorType(str, Enum):
     UNKNOWN_ERROR = "unknown_error"        # 未知错误
 
 
-class SolutionType(str, Enum):
+class SolutionType(StrEnum):
     """解决方案类型"""
     RETRY = "retry"                      # 重试
     FIX_PARAMS = "fix_params"            # 修复参数
@@ -47,8 +48,8 @@ class ErrorRecord:
     error_type: ErrorType = ErrorType.UNKNOWN_ERROR
     error_message: str = ""
     error_traceback: str = ""
-    context: Dict[str, Any] = field(default_factory=dict)
-    tool_name: Optional[str] = None
+    context: dict[str, Any] = field(default_factory=dict)
+    tool_name: str | None = None
     occurrence_count: int = 1
     first_occurred: float = field(default_factory=lambda: datetime.now().timestamp())
     last_occurred: float = field(default_factory=lambda: datetime.now().timestamp())
@@ -59,7 +60,7 @@ class Solution:
     """解决方案"""
     id: str = field(default_factory=lambda: str(uuid4()))
     solution_type: SolutionType = SolutionType.RETRY
-    solution_data: Dict[str, Any] = field(default_factory=dict)
+    solution_data: dict[str, Any] = field(default_factory=dict)
     reasoning: str = ""
     prevent_future: str = ""
     success_rate: float = 0.0
@@ -92,10 +93,10 @@ class ErrorDrivenLearning:
         self.experience_db = experience_db
 
         # 错误记录缓存
-        self._error_cache: Dict[str, ErrorRecord] = {}
+        self._error_cache: dict[str, ErrorRecord] = {}
 
         # 解决方案缓存
-        self._solutions_cache: Dict[str, Solution] = {}
+        self._solutions_cache: dict[str, Solution] = {}
 
         # 错误类型识别器
         self.error_classifiers = {
@@ -116,9 +117,9 @@ class ErrorDrivenLearning:
     async def handle_error(
         self,
         error: Exception,
-        context: Dict[str, Any],
-        tool_registry: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any],
+        tool_registry: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         处理错误的完整流程
 
@@ -137,7 +138,7 @@ class ErrorDrivenLearning:
         error_type = self._classify_error(error, context)
 
         # 更新错误记录
-        error_record = await self._update_error_record(
+        await self._update_error_record(
             error_key, error_type, error_msg, context
         )
 
@@ -176,7 +177,7 @@ class ErrorDrivenLearning:
             "context": context
         }
 
-    def _classify_error(self, error: Exception, context: Dict[str, Any]) -> ErrorType:
+    def _classify_error(self, error: Exception, context: dict[str, Any]) -> ErrorType:
         """识别错误类型"""
         error_msg = str(error)
 
@@ -186,40 +187,40 @@ class ErrorDrivenLearning:
 
         return ErrorType.UNKNOWN_ERROR
 
-    def _is_json_error(self, error_msg: str, context: Dict) -> bool:
+    def _is_json_error(self, error_msg: str, context: dict) -> bool:
         """是否是JSON格式错误"""
         json_indicators = ["json", "expecting", "decode", "invalid json", "JSONDecodeError"]
         return any(ind in error_msg.lower() for ind in json_indicators)
 
-    def _is_parameter_error(self, error_msg: str, context: Dict) -> bool:
+    def _is_parameter_error(self, error_msg: str, context: dict) -> bool:
         """是否是参数错误"""
         param_indicators = ["parameter", "argument", "missing", "required", "TypeError"]
         return any(ind in error_msg.lower() for ind in param_indicators)
 
-    def _is_context_overflow(self, error_msg: str, context: Dict) -> bool:
+    def _is_context_overflow(self, error_msg: str, context: dict) -> bool:
         """是否是上下文超限"""
         context_indicators = ["context", "length", "maximum", "tokens", "too long", "context_length"]
         return any(ind in error_msg.lower() for ind in context_indicators)
 
-    def _is_permission_error(self, error_msg: str, context: Dict) -> bool:
+    def _is_permission_error(self, error_msg: str, context: dict) -> bool:
         """是否是权限错误"""
         perm_indicators = ["permission", "denied", "unauthorized", "forbidden", "access denied"]
         return any(ind in error_msg.lower() for ind in perm_indicators)
 
-    def _is_network_error(self, error_msg: str, context: Dict) -> bool:
+    def _is_network_error(self, error_msg: str, context: dict) -> bool:
         """是否是网络错误"""
         net_indicators = ["connection", "network", "dns", "refused", "ConnectionError"]
         return any(ind in error_msg.lower() for ind in net_indicators)
 
-    def _is_timeout_error(self, error_msg: str, context: Dict) -> bool:
+    def _is_timeout_error(self, error_msg: str, context: dict) -> bool:
         """是否是超时错误"""
         return "timeout" in error_msg.lower()
 
-    def _is_tool_not_found(self, error_msg: str, context: Dict) -> bool:
+    def _is_tool_not_found(self, error_msg: str, context: dict) -> bool:
         """是否是工具未找到"""
         return "not found" in error_msg.lower() or "does not exist" in error_msg.lower()
 
-    def _is_execution_error(self, error_msg: str, context: Dict) -> bool:
+    def _is_execution_error(self, error_msg: str, context: dict) -> bool:
         """是否是执行错误"""
         exec_indicators = ["execution", "failed", "error", "exception"]
         return any(ind in error_msg.lower() for ind in exec_indicators)
@@ -229,7 +230,7 @@ class ErrorDrivenLearning:
         error_key: str,
         error_type: ErrorType,
         error_msg: str,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> ErrorRecord:
         """更新错误记录"""
         if error_key in self._error_cache:
@@ -248,7 +249,7 @@ class ErrorDrivenLearning:
         self._error_cache[error_key] = record
         return record
 
-    def _get_error_key(self, error_msg: str, context: Dict[str, Any]) -> str:
+    def _get_error_key(self, error_msg: str, context: dict[str, Any]) -> str:
         """生成错误唯一键"""
         tool_name = context.get("tool_name", "unknown")
         # 只取错误消息前50个字符作为键
@@ -259,8 +260,8 @@ class ErrorDrivenLearning:
         self,
         error_type: ErrorType,
         error_msg: str,
-        context: Dict[str, Any]
-    ) -> Optional[Solution]:
+        context: dict[str, Any]
+    ) -> Solution | None:
         """检查已知解决方案"""
         # 先检查内存缓存
         error_key = self._get_error_key(error_msg, context)
@@ -287,9 +288,9 @@ class ErrorDrivenLearning:
         self,
         error_type: ErrorType,
         error: Exception,
-        context: Dict[str, Any],
-        tool_registry: Optional[Dict[str, Any]] = None
-    ) -> Optional[Solution]:
+        context: dict[str, Any],
+        tool_registry: dict[str, Any] | None = None
+    ) -> Solution | None:
         """调用LLM获取解决方案"""
         tool_list = list(tool_registry.keys()) if tool_registry else []
 
@@ -346,8 +347,8 @@ class ErrorDrivenLearning:
     async def _apply_solution(
         self,
         solution: Solution,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """应用解决方案"""
         solution.times_used += 1
 
@@ -398,7 +399,7 @@ class ErrorDrivenLearning:
         error_type: ErrorType,
         error_msg: str,
         solution: Solution,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ):
         """记录经验到经验库"""
         # 更新缓存
@@ -436,8 +437,8 @@ class AgentWithSelfHealing:
         self,
         executor: Callable,
         tool_name: str,
-        params: Dict[str, Any],
-        tool_registry: Optional[Dict[str, Any]] = None
+        params: dict[str, Any],
+        tool_registry: dict[str, Any] | None = None
     ) -> Any:
         """
         带自愈的执行
@@ -503,8 +504,8 @@ class AgentWithSelfHealing:
         self,
         tool_name: str,
         primary_executor: Callable,
-        fallback_executors: List[Callable],
-        params: Dict[str, Any]
+        fallback_executors: list[Callable],
+        params: dict[str, Any]
     ) -> Any:
         """使用回退执行器执行"""
         # 尝试主执行器

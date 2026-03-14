@@ -8,12 +8,11 @@ Main platform startup and management functionality.
 import asyncio
 import logging
 import signal
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -36,10 +35,10 @@ class NodeInfo:
     host: str
     port: int
     status: str = "unknown"
-    last_heartbeat: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_heartbeat: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "node_id": self.node_id,
@@ -67,13 +66,13 @@ class PlatformLauncher:
             config_path: Path to the platform configuration file.
         """
         self.config_path = Path(config_path)
-        self.config: Dict[str, Any] = {}
+        self.config: dict[str, Any] = {}
         self.status = PlatformStatus.STOPPED
-        self.nodes: Dict[str, NodeInfo] = {}
+        self.nodes: dict[str, NodeInfo] = {}
         self._shutdown_event = asyncio.Event()
         self._logger = logging.getLogger("usmsb.platform.launcher")
-        self._startup_time: Optional[datetime] = None
-        self._tasks: List[asyncio.Task] = []
+        self._startup_time: datetime | None = None
+        self._tasks: list[asyncio.Task] = []
         self._signal_handlers_installed = False
 
         self._load_config()
@@ -83,7 +82,7 @@ class PlatformLauncher:
         if not self.config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
 
-        with open(self.config_path, "r", encoding="utf-8") as f:
+        with open(self.config_path, encoding="utf-8") as f:
             self.config = yaml.safe_load(f) or {}
 
         self._logger.info(f"Loaded configuration from {self.config_path}")
@@ -217,7 +216,7 @@ class PlatformLauncher:
         self._logger.info("Platform restarted successfully")
         return True
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         Get platform status.
 
@@ -234,7 +233,7 @@ class PlatformLauncher:
             "config_path": str(self.config_path),
         }
 
-    def _get_uptime(self) -> Optional[str]:
+    def _get_uptime(self) -> str | None:
         """Get platform uptime as string."""
         if not self._startup_time:
             return None
@@ -244,7 +243,7 @@ class PlatformLauncher:
         minutes, seconds = divmod(remainder, 60)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-    async def add_node(self, node_config: Dict[str, Any]) -> Optional[str]:
+    async def add_node(self, node_config: dict[str, Any]) -> str | None:
         """
         Add a new node to the platform.
 
@@ -337,7 +336,7 @@ class PlatformLauncher:
         """Start platform services."""
         services = self.config.get("services", {})
 
-        for service_name, service_config in services.items():
+        for service_name, _service_config in services.items():
             self._logger.info(f"Starting service: {service_name}")
             # Simulate service startup
             await asyncio.sleep(0.1)

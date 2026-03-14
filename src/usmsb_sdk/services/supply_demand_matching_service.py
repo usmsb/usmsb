@@ -11,39 +11,35 @@ It serves as the main entry point for supply-demand matching in the platform.
 """
 
 import asyncio
-import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
 from usmsb_sdk.core.elements import Agent, Goal, Resource
-from usmsb_sdk.services.active_matching_service import (
-    ActiveMatchingService,
-    Opportunity,
-    NegotiationSession,
-    NegotiationResult,
-    SearchStrategy,
-    NegotiationStrategy,
-)
 from usmsb_sdk.platform.environment.broadcast_service import (
-    EnvironmentBroadcastService,
+    BroadcastScope,
     BroadcastType,
-    BroadcastMessage,
+    EnvironmentBroadcastService,
 )
 from usmsb_sdk.platform.external.external_agent_adapter import (
     ExternalAgentAdapter,
     ExternalAgentProfile,
     ExternalAgentProtocol,
-    SkillDefinition,
+)
+from usmsb_sdk.services.active_matching_service import (
+    ActiveMatchingService,
+    NegotiationStrategy,
+    SearchStrategy,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class MatchingMode(str, Enum):
+class MatchingMode(StrEnum):
     """Mode for supply-demand matching."""
     PROACTIVE = "proactive"       # Actively search and reach out
     PASSIVE = "passive"           # Wait for incoming requests
@@ -51,7 +47,7 @@ class MatchingMode(str, Enum):
     AUCTION = "auction"           # Auction-based matching
 
 
-class MatchStatus(str, Enum):
+class MatchStatus(StrEnum):
     """Status of a match."""
     SEARCHING = "searching"
     NEGOTIATING = "negotiating"
@@ -67,17 +63,17 @@ class SupplyListing:
     listing_id: str
     agent_id: str
     agent_name: str
-    resource: Dict[str, Any]
-    price_range: Dict[str, float]
+    resource: dict[str, Any]
+    price_range: dict[str, float]
     availability: str = "now"
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     reputation: float = 1.0
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     status: str = "active"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "listing_id": self.listing_id,
             "agent_id": self.agent_id,
@@ -100,17 +96,17 @@ class DemandListing:
     listing_id: str
     agent_id: str
     agent_name: str
-    requirement: Dict[str, Any]
-    budget: Dict[str, float]
-    deadline: Optional[str] = None
-    required_capabilities: List[str] = field(default_factory=list)
+    requirement: dict[str, Any]
+    budget: dict[str, float]
+    deadline: str | None = None
+    required_capabilities: list[str] = field(default_factory=list)
     priority: int = 0
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     status: str = "active"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "listing_id": self.listing_id,
             "agent_id": self.agent_id,
@@ -134,14 +130,14 @@ class Match:
     supply_listing: SupplyListing
     demand_listing: DemandListing
     match_score: float
-    negotiated_terms: Optional[Dict[str, Any]] = None
+    negotiated_terms: dict[str, Any] | None = None
     status: MatchStatus = MatchStatus.SEARCHING
-    negotiation_session_id: Optional[str] = None
+    negotiation_session_id: str | None = None
     created_at: float = field(default_factory=time.time)
-    completed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    completed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "match_id": self.match_id,
             "supply_listing": self.supply_listing.to_dict(),
@@ -168,7 +164,7 @@ class MatchingStats:
     total_negotiations: int = 0
     successful_negotiations: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_supply_listings": self.total_supply_listings,
             "total_demand_listings": self.total_demand_listings,
@@ -218,26 +214,26 @@ class SupplyDemandMatchingService:
         self.external_adapter = external_agent_adapter
 
         # Listings
-        self._supply_listings: Dict[str, SupplyListing] = {}
-        self._demand_listings: Dict[str, DemandListing] = {}
+        self._supply_listings: dict[str, SupplyListing] = {}
+        self._demand_listings: dict[str, DemandListing] = {}
 
         # Matches
-        self._matches: Dict[str, Match] = {}
+        self._matches: dict[str, Match] = {}
 
         # Agent listings index
-        self._agent_supply_listings: Dict[str, List[str]] = {}
-        self._agent_demand_listings: Dict[str, List[str]] = {}
+        self._agent_supply_listings: dict[str, list[str]] = {}
+        self._agent_demand_listings: dict[str, list[str]] = {}
 
         # Statistics
         self._stats = MatchingStats()
 
         # Running searches
-        self._running_searches: Dict[str, asyncio.Task] = {}
+        self._running_searches: dict[str, asyncio.Task] = {}
 
         # Callbacks
-        self.on_match_created: Optional[Callable[[Match], None]] = None
-        self.on_match_completed: Optional[Callable[[Match], None]] = None
-        self.on_listing_added: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.on_match_created: Callable[[Match], None] | None = None
+        self.on_match_completed: Callable[[Match], None] | None = None
+        self.on_listing_added: Callable[[dict[str, Any]], None] | None = None
 
         # Setup broadcast handlers
         self._setup_broadcast_handlers()
@@ -253,10 +249,10 @@ class SupplyDemandMatchingService:
         self,
         agent: Agent,
         resource: Resource,
-        price_range: Optional[Dict[str, float]] = None,
+        price_range: dict[str, float] | None = None,
         availability: str = "now",
-        expires_in: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        expires_in: float | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SupplyListing:
         """
         Publish a supply listing.
@@ -311,11 +307,11 @@ class SupplyDemandMatchingService:
         logger.info(f"Published supply listing {listing_id} from agent {agent.id}")
         return listing
 
-    def get_supply_listing(self, listing_id: str) -> Optional[SupplyListing]:
+    def get_supply_listing(self, listing_id: str) -> SupplyListing | None:
         """Get a supply listing by ID."""
         return self._supply_listings.get(listing_id)
 
-    def get_agent_supply_listings(self, agent_id: str) -> List[SupplyListing]:
+    def get_agent_supply_listings(self, agent_id: str) -> list[SupplyListing]:
         """Get all supply listings for an agent."""
         listing_ids = self._agent_supply_listings.get(agent_id, [])
         return [
@@ -326,11 +322,11 @@ class SupplyDemandMatchingService:
 
     def search_supply_listings(
         self,
-        capabilities: Optional[List[str]] = None,
-        price_max: Optional[float] = None,
-        keywords: Optional[List[str]] = None,
+        capabilities: list[str] | None = None,
+        price_max: float | None = None,
+        keywords: list[str] | None = None,
         limit: int = 20,
-    ) -> List[SupplyListing]:
+    ) -> list[SupplyListing]:
         """Search supply listings."""
         results = []
 
@@ -369,10 +365,10 @@ class SupplyDemandMatchingService:
         self,
         agent: Agent,
         goal: Goal,
-        budget: Optional[Dict[str, float]] = None,
-        deadline: Optional[str] = None,
-        expires_in: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        budget: dict[str, float] | None = None,
+        deadline: str | None = None,
+        expires_in: float | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> DemandListing:
         """
         Publish a demand listing.
@@ -427,11 +423,11 @@ class SupplyDemandMatchingService:
         logger.info(f"Published demand listing {listing_id} from agent {agent.id}")
         return listing
 
-    def get_demand_listing(self, listing_id: str) -> Optional[DemandListing]:
+    def get_demand_listing(self, listing_id: str) -> DemandListing | None:
         """Get a demand listing by ID."""
         return self._demand_listings.get(listing_id)
 
-    def get_agent_demand_listings(self, agent_id: str) -> List[DemandListing]:
+    def get_agent_demand_listings(self, agent_id: str) -> list[DemandListing]:
         """Get all demand listings for an agent."""
         listing_ids = self._agent_demand_listings.get(agent_id, [])
         return [
@@ -442,11 +438,11 @@ class SupplyDemandMatchingService:
 
     def search_demand_listings(
         self,
-        capabilities: Optional[List[str]] = None,
-        budget_min: Optional[float] = None,
-        keywords: Optional[List[str]] = None,
+        capabilities: list[str] | None = None,
+        budget_min: float | None = None,
+        keywords: list[str] | None = None,
         limit: int = 20,
-    ) -> List[DemandListing]:
+    ) -> list[DemandListing]:
         """Search demand listings."""
         results = []
 
@@ -489,7 +485,7 @@ class SupplyDemandMatchingService:
         max_results: int = 10,
         auto_negotiate: bool = False,
         negotiation_strategy: NegotiationStrategy = NegotiationStrategy.BALANCED,
-    ) -> List[Match]:
+    ) -> list[Match]:
         """
         Supplier proactively searches for demands.
 
@@ -504,7 +500,7 @@ class SupplyDemandMatchingService:
         Returns:
             List of potential matches
         """
-        search_id = str(uuid.uuid4())
+        str(uuid.uuid4())
         self._stats.active_searches += 1
 
         try:
@@ -577,7 +573,7 @@ class SupplyDemandMatchingService:
         max_results: int = 10,
         auto_negotiate: bool = False,
         negotiation_strategy: NegotiationStrategy = NegotiationStrategy.BALANCED,
-    ) -> List[Match]:
+    ) -> list[Match]:
         """
         Demander proactively searches for suppliers.
 
@@ -592,7 +588,7 @@ class SupplyDemandMatchingService:
         Returns:
             List of potential matches
         """
-        search_id = str(uuid.uuid4())
+        str(uuid.uuid4())
         self._stats.active_searches += 1
 
         try:
@@ -661,8 +657,8 @@ class SupplyDemandMatchingService:
     async def _start_negotiation(
         self,
         match: Match,
-        supplier_agent: Optional[Agent] = None,
-        demander_agent: Optional[Agent] = None,
+        supplier_agent: Agent | None = None,
+        demander_agent: Agent | None = None,
         negotiation_strategy: NegotiationStrategy = NegotiationStrategy.BALANCED,
     ) -> Match:
         """Start negotiation for a match."""
@@ -713,15 +709,15 @@ class SupplyDemandMatchingService:
 
     # ========== Match Management ==========
 
-    def get_match(self, match_id: str) -> Optional[Match]:
+    def get_match(self, match_id: str) -> Match | None:
         """Get a match by ID."""
         return self._matches.get(match_id)
 
     def get_agent_matches(
         self,
         agent_id: str,
-        status: Optional[MatchStatus] = None,
-    ) -> List[Match]:
+        status: MatchStatus | None = None,
+    ) -> list[Match]:
         """Get all matches involving an agent."""
         matches = []
 
@@ -732,7 +728,7 @@ class SupplyDemandMatchingService:
 
         return matches
 
-    async def complete_match(self, match_id: str, terms: Dict[str, Any]) -> Optional[Match]:
+    async def complete_match(self, match_id: str, terms: dict[str, Any]) -> Match | None:
         """Complete a match with final terms."""
         if match_id not in self._matches:
             return None
@@ -784,8 +780,8 @@ class SupplyDemandMatchingService:
     async def search_external_agents(
         self,
         capability: str,
-        protocol: Optional[ExternalAgentProtocol] = None,
-    ) -> List[ExternalAgentProfile]:
+        protocol: ExternalAgentProtocol | None = None,
+    ) -> list[ExternalAgentProfile]:
         """Search for external agents with a capability."""
         agents = self.external_adapter.find_agents_by_capability(capability)
 
@@ -798,8 +794,8 @@ class SupplyDemandMatchingService:
         self,
         agent_id: str,
         skill_name: str,
-        arguments: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Call a skill on an external agent."""
         response = await self.external_adapter.call_agent(
             agent_id=agent_id,
@@ -811,7 +807,7 @@ class SupplyDemandMatchingService:
 
     # ========== Utility Methods ==========
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get service statistics."""
         return {
             **self._stats.to_dict(),
@@ -835,13 +831,13 @@ class SupplyDemandMatchingService:
         expired_count = 0
 
         # Clean supply listings
-        for listing_id, listing in list(self._supply_listings.items()):
+        for _listing_id, listing in list(self._supply_listings.items()):
             if listing.expires_at and now > listing.expires_at:
                 listing.status = "expired"
                 expired_count += 1
 
         # Clean demand listings
-        for listing_id, listing in list(self._demand_listings.items()):
+        for _listing_id, listing in list(self._demand_listings.items()):
             if listing.expires_at and now > listing.expires_at:
                 listing.status = "expired"
                 expired_count += 1

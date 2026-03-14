@@ -9,14 +9,13 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class DatasetStatus(str, Enum):
+class DatasetStatus(StrEnum):
     """Status of a dataset."""
     UPLOADING = "uploading"
     PROCESSING = "processing"
@@ -26,7 +25,7 @@ class DatasetStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class DatasetType(str, Enum):
+class DatasetType(StrEnum):
     """Types of datasets."""
     TABULAR = "tabular"
     TEXT = "text"
@@ -38,7 +37,7 @@ class DatasetType(str, Enum):
     MULTIMODAL = "multimodal"
 
 
-class AccessLevel(str, Enum):
+class AccessLevel(StrEnum):
     """Access levels for datasets."""
     PUBLIC = "public"
     INTERNAL = "internal"
@@ -78,13 +77,13 @@ class DatasetVersion:
     size_bytes: int
     record_count: int
     path: str
-    quality_metrics: Optional[QualityMetrics] = None
-    schema: Dict[str, Any] = field(default_factory=dict)
+    quality_metrics: QualityMetrics | None = None
+    schema: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=lambda: time.time())
-    created_by: Optional[str] = None
+    created_by: str | None = None
     description: str = ""
     status: DatasetStatus = DatasetStatus.READY
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -94,24 +93,24 @@ class Dataset:
     name: str
     type: DatasetType
     description: str = ""
-    versions: List[DatasetVersion] = field(default_factory=list)
-    latest_version: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
-    owner_id: Optional[str] = None
+    versions: list[DatasetVersion] = field(default_factory=list)
+    latest_version: str | None = None
+    tags: list[str] = field(default_factory=list)
+    owner_id: str | None = None
     access_level: AccessLevel = AccessLevel.INTERNAL
-    license: Optional[str] = None
+    license: str | None = None
     created_at: float = field(default_factory=lambda: time.time())
     updated_at: float = field(default_factory=lambda: time.time())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_version(self, version: str) -> Optional[DatasetVersion]:
+    def get_version(self, version: str) -> DatasetVersion | None:
         """Get a specific version."""
         for v in self.versions:
             if v.version == version:
                 return v
         return None
 
-    def get_latest_version(self) -> Optional[DatasetVersion]:
+    def get_latest_version(self) -> DatasetVersion | None:
         """Get the latest version."""
         if not self.versions:
             return None
@@ -126,8 +125,8 @@ class AccessGrant:
     user_id: str
     access_level: AccessLevel
     granted_at: float = field(default_factory=lambda: time.time())
-    granted_by: Optional[str] = None
-    expires_at: Optional[float] = None
+    granted_by: str | None = None
+    expires_at: float | None = None
 
 
 @dataclass
@@ -136,10 +135,10 @@ class LineageRecord:
     id: str
     dataset_id: str
     version: str
-    source_datasets: List[str]  # List of dataset_id:version
+    source_datasets: list[str]  # List of dataset_id:version
     transformation: str
     created_at: float = field(default_factory=lambda: time.time())
-    created_by: Optional[str] = None
+    created_by: str | None = None
 
 
 class DatasetCatalog:
@@ -154,7 +153,7 @@ class DatasetCatalog:
     - Search and discovery
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         """
         Initialize the Dataset Catalog.
 
@@ -162,21 +161,21 @@ class DatasetCatalog:
             storage_path: Path for dataset storage
         """
         self.storage_path = storage_path or "./datasets"
-        self._datasets: Dict[str, Dataset] = {}
-        self._access_grants: Dict[str, List[AccessGrant]] = {}
-        self._lineage: Dict[str, List[LineageRecord]] = {}
-        self._version_counter: Dict[str, int] = {}
+        self._datasets: dict[str, Dataset] = {}
+        self._access_grants: dict[str, list[AccessGrant]] = {}
+        self._lineage: dict[str, list[LineageRecord]] = {}
+        self._version_counter: dict[str, int] = {}
 
     def register_dataset(
         self,
         name: str,
         dataset_type: DatasetType,
         description: str = "",
-        owner_id: Optional[str] = None,
+        owner_id: str | None = None,
         access_level: AccessLevel = AccessLevel.INTERNAL,
-        license: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        license: str | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Dataset:
         """
         Register a new dataset.
@@ -223,12 +222,12 @@ class DatasetCatalog:
         path: str,
         size_bytes: int,
         record_count: int,
-        checksum: Optional[str] = None,
-        schema: Optional[Dict[str, Any]] = None,
-        quality_metrics: Optional[QualityMetrics] = None,
+        checksum: str | None = None,
+        schema: dict[str, Any] | None = None,
+        quality_metrics: QualityMetrics | None = None,
         description: str = "",
-        created_by: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        created_by: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> DatasetVersion:
         """
         Add a new version to a dataset.
@@ -283,11 +282,11 @@ class DatasetCatalog:
         logger.info(f"Version {version_str} added to dataset {dataset_id}")
         return version
 
-    def get_dataset(self, dataset_id: str) -> Optional[Dataset]:
+    def get_dataset(self, dataset_id: str) -> Dataset | None:
         """Get dataset by ID."""
         return self._datasets.get(dataset_id)
 
-    def get_dataset_by_name(self, name: str) -> Optional[Dataset]:
+    def get_dataset_by_name(self, name: str) -> Dataset | None:
         """Get dataset by name."""
         for dataset in self._datasets.values():
             if dataset.name == name:
@@ -296,12 +295,12 @@ class DatasetCatalog:
 
     def list_datasets(
         self,
-        dataset_type: Optional[DatasetType] = None,
-        tags: Optional[List[str]] = None,
-        owner_id: Optional[str] = None,
-        access_level: Optional[AccessLevel] = None,
-        status: Optional[DatasetStatus] = None,
-    ) -> List[Dataset]:
+        dataset_type: DatasetType | None = None,
+        tags: list[str] | None = None,
+        owner_id: str | None = None,
+        access_level: AccessLevel | None = None,
+        status: DatasetStatus | None = None,
+    ) -> list[Dataset]:
         """
         List datasets with optional filters.
 
@@ -332,7 +331,7 @@ class DatasetCatalog:
         if status:
             datasets = [
                 d for d in datasets
-                if d.get_latest_version()?.status == status
+                if d.get_latest_version() and d.get_latest_version().status == status
             ]
 
         return datasets
@@ -342,8 +341,8 @@ class DatasetCatalog:
         dataset_id: str,
         user_id: str,
         access_level: AccessLevel,
-        granted_by: Optional[str] = None,
-        expires_at: Optional[float] = None,
+        granted_by: str | None = None,
+        expires_at: float | None = None,
     ) -> AccessGrant:
         """
         Grant access to a dataset.
@@ -425,9 +424,9 @@ class DatasetCatalog:
         self,
         dataset_id: str,
         version: str,
-        source_datasets: List[str],
+        source_datasets: list[str],
         transformation: str,
-        created_by: Optional[str] = None,
+        created_by: str | None = None,
     ) -> LineageRecord:
         """
         Record dataset lineage.
@@ -459,16 +458,16 @@ class DatasetCatalog:
 
         return record
 
-    def get_lineage(self, dataset_id: str) -> List[LineageRecord]:
+    def get_lineage(self, dataset_id: str) -> list[LineageRecord]:
         """Get lineage for a dataset."""
         return self._lineage.get(dataset_id, [])
 
-    def get_upstream_datasets(self, dataset_id: str, version: Optional[str] = None) -> List[str]:
+    def get_upstream_datasets(self, dataset_id: str, version: str | None = None) -> list[str]:
         """Get all upstream datasets."""
         upstream = []
         visited = set()
 
-        def collect_upstream(did: str, ver: Optional[str]):
+        def collect_upstream(did: str, ver: str | None):
             if did in visited:
                 return
             visited.add(did)
@@ -488,8 +487,8 @@ class DatasetCatalog:
     def search_datasets(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Dataset]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Dataset]:
         """
         Search datasets by query.
 
@@ -521,7 +520,7 @@ class DatasetCatalog:
 
         return results
 
-    def get_catalog_stats(self) -> Dict[str, Any]:
+    def get_catalog_stats(self) -> dict[str, Any]:
         """Get catalog statistics."""
         total_datasets = len(self._datasets)
         total_versions = sum(len(d.versions) for d in self._datasets.values())

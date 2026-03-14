@@ -18,18 +18,17 @@ import asyncio
 import json
 import logging
 import os
-import re
-import subprocess
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 import shutil
+from dataclasses import dataclass
+from typing import Any
 
 from usmsb_sdk.core.skills.skill_system import (
     Skill,
     SkillCategory,
     SkillMetadata,
-    SkillParameter,
     SkillOutput,
+    SkillParameter,
+    SkillStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,22 +57,20 @@ NPM_PERMISSION_CONFIG = {
 }
 
 # 危险 npm 包列表（已知恶意包）
-NPM_BLOCKED_PACKAGES = set(
-    [
+NPM_BLOCKED_PACKAGES = {
         "flatmap-stream",
         "event-stream@3.3.4",
         "left-pad",
-    ]
-)
+    }
 
 
 class PermissionChecker:
     """权限检查器"""
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] = None):
         self.config = config or NPM_PERMISSION_CONFIG
 
-    def check_path(self, path: str, workspace_root: Optional[str] = None) -> tuple:
+    def check_path(self, path: str, workspace_root: str | None = None) -> tuple:
         """
         检查路径是否在允许范围内
 
@@ -170,27 +167,36 @@ class NpxCommandSkill(Skill):
             "command": SkillParameter(
                 name="command",
                 type="string",
-                description="要执行的命令类型: execute(执行命令), install(安装包), run(运行脚本), dev(启动开发服务器)",
+                description=(
+                    "要执行的命令类型: execute(执行命令), install(安装包), "
+                    "run(运行脚本), dev(启动开发服务器)"
+                ),
                 required=True,
                 enum=["execute", "install", "uninstall", "run", "dev", "init"],
             ),
             "package": SkillParameter(
                 name="package",
                 type="string",
-                description="npm 包名 (用于 install/uninstall)，如 'react', 'typescript@latest', 'create-react-app'",
+                description=(
+                    "npm 包名 (用于 install/uninstall)，如 'react', "
+                    "'typescript@latest', 'create-react-app'"
+                ),
                 required=False,
             ),
             "args": SkillParameter(
                 name="args",
                 type="array",
-                description="命令参数数组，如 ['--save', '--prefix', 'src']",
+                description="命令参数数组, 如 ['--save', '--prefix', 'src']",
                 required=False,
                 default=[],
             ),
             "script": SkillParameter(
                 name="script",
                 type="string",
-                description="package.json 中的脚本名称 (用于 run)，如 'dev', 'build', 'start'",
+                description=(
+                    "package.json 中的脚本名称(用于 run), "
+                    "如 'dev', 'build', 'start'"
+                ),
                 required=False,
             ),
             "working_dir": SkillParameter(
@@ -246,8 +252,8 @@ class NpxCommandSkill(Skill):
         }
 
     async def execute(
-        self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, inputs: dict[str, Any], context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         执行 npm/npx 命令
 
@@ -403,11 +409,11 @@ class NpxCommandSkill(Skill):
 
     async def _install_package(
         self,
-        package: Optional[str],
-        args: List[str],
+        package: str | None,
+        args: list[str],
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
         save_dev: bool,
         global_install: bool,
     ) -> NpmExecutionResult:
@@ -431,11 +437,11 @@ class NpxCommandSkill(Skill):
 
     async def _uninstall_package(
         self,
-        package: Optional[str],
-        args: List[str],
+        package: str | None,
+        args: list[str],
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> NpmExecutionResult:
         """卸载 npm 包"""
         if not package:
@@ -449,11 +455,11 @@ class NpxCommandSkill(Skill):
 
     async def _run_script(
         self,
-        script: Optional[str],
-        args: List[str],
+        script: str | None,
+        args: list[str],
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> NpmExecutionResult:
         """运行 package.json 中的脚本"""
         if not script:
@@ -467,9 +473,9 @@ class NpxCommandSkill(Skill):
     async def _start_dev_server(
         self,
         working_dir: str,
-        args: List[str],
+        args: list[str],
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> NpmExecutionResult:
         """启动开发服务器 (npm run dev)"""
         cmd_parts = ["npm", "run", "dev"]
@@ -479,10 +485,10 @@ class NpxCommandSkill(Skill):
 
     async def _init_project(
         self,
-        package: Optional[str],
+        package: str | None,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> NpmExecutionResult:
         """初始化新项目"""
         cmd_parts = ["npm", "init"]
@@ -495,10 +501,10 @@ class NpxCommandSkill(Skill):
 
     async def _execute_command(
         self,
-        cmd: List[str],
+        cmd: list[str],
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ) -> NpmExecutionResult:
         """执行 shell 命令"""
         if not cmd:
@@ -538,7 +544,7 @@ class NpxCommandSkill(Skill):
                     process.communicate(),
                     timeout=timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 await process.wait()
                 raise TimeoutError(f"Command timed out after {timeout} seconds")
@@ -568,7 +574,7 @@ class NpxCommandSkill(Skill):
                 execution_time=0,
             )
 
-    def _parse_package_info(self, result: NpmExecutionResult) -> Optional[Dict[str, Any]]:
+    def _parse_package_info(self, result: NpmExecutionResult) -> dict[str, Any] | None:
         """解析包信息"""
         if not result.success:
             return None
@@ -576,7 +582,7 @@ class NpxCommandSkill(Skill):
         try:
             package_json_path = os.path.join(result.working_dir, "package.json")
             if os.path.exists(package_json_path):
-                with open(package_json_path, "r") as f:
+                with open(package_json_path) as f:
                     package_data = json.load(f)
                     return {
                         "name": package_data.get("name"),
@@ -608,7 +614,6 @@ class NpxCommandSkill(Skill):
         Returns:
             新的 Skill 实例
         """
-        from usmsb_sdk.core.skills.skill_system import SkillStatus
 
         dynamic_skill = DynamicNpmSkill(
             skill_name=skill_name,
@@ -681,8 +686,8 @@ class DynamicNpmSkill(Skill):
         }
 
     async def execute(
-        self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, inputs: dict[str, Any], context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """执行动态 npm 命令"""
         args = inputs.get("args", [])
         working_dir = inputs.get("working_dir", ".")

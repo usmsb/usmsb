@@ -8,9 +8,9 @@ and potential outcomes based on USMSB model elements.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Environment, Goal, Information
+from usmsb_sdk.core.elements import Agent, Environment, Goal
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
 
 logger = logging.getLogger(__name__)
@@ -19,22 +19,22 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BehaviorPrediction:
     """Result of a behavior prediction."""
-    predicted_actions: List[Dict[str, Any]]
+    predicted_actions: list[dict[str, Any]]
     confidence: float
     reasoning: str
-    alternative_scenarios: List[Dict[str, Any]] = field(default_factory=list)
-    risk_factors: List[str] = field(default_factory=list)
+    alternative_scenarios: list[dict[str, Any]] = field(default_factory=list)
+    risk_factors: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
 @dataclass
 class SystemEvolutionPrediction:
     """Result of a system evolution prediction."""
-    predicted_state: Dict[str, Any]
-    timeline: List[Dict[str, Any]]
-    key_drivers: List[str]
+    predicted_state: dict[str, Any]
+    timeline: list[dict[str, Any]]
+    key_drivers: list[str]
     confidence: float
-    assumptions: List[str]
+    assumptions: list[str]
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -68,8 +68,8 @@ class BehaviorPredictionService:
         self,
         agent: Agent,
         environment: Environment,
-        goal: Optional[Goal] = None,
-        context: Optional[Dict[str, Any]] = None,
+        goal: Goal | None = None,
+        context: dict[str, Any] | None = None,
     ) -> BehaviorPrediction:
         """
         Predict an agent's behavior.
@@ -116,10 +116,10 @@ class BehaviorPredictionService:
 
     async def predict_system_evolution(
         self,
-        agents: List[Agent],
+        agents: list[Agent],
         environment: Environment,
         time_horizon: int = 10,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> SystemEvolutionPrediction:
         """
         Predict how a multi-agent system will evolve.
@@ -157,9 +157,9 @@ class BehaviorPredictionService:
 
     async def analyze_behavior_patterns(
         self,
-        historical_data: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        historical_data: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Analyze patterns in historical behavior data.
 
@@ -200,8 +200,8 @@ Provide your analysis in JSON format with keys: patterns (list), trends (list), 
         agent1: Agent,
         agent2: Agent,
         interaction_type: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Predict the outcome of an interaction between two agents.
 
@@ -298,7 +298,7 @@ Respond in JSON format with keys: predicted_actions (list), confidence (float), 
 
     def _build_evolution_prediction_prompt(
         self,
-        agents: List[Agent],
+        agents: list[Agent],
         environment: Environment,
         time_horizon: int,
     ) -> str:
@@ -345,7 +345,7 @@ Respond in JSON format with keys: predicted_state (object), timeline (list of {t
             for r in rules[:5]  # Limit to 5 rules
         ])
 
-    def _format_historical_data(self, data: List[Dict]) -> str:
+    def _format_historical_data(self, data: list[dict]) -> str:
         """Format historical data for prompt."""
         import json
         return json.dumps(data, indent=2, default=str)[:2000]  # Limit length
@@ -378,7 +378,7 @@ Respond in JSON format with keys: predicted_state (object), timeline (list of {t
             assumptions=parsed.get("assumptions", []),
         )
 
-    async def _parse_json_response(self, response: str) -> Dict[str, Any]:
+    async def _parse_json_response(self, response: str) -> dict[str, Any]:
         """Parse JSON from LLM response."""
         import json
         try:

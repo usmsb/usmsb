@@ -7,28 +7,27 @@ AGI Core - 知识库与记忆系统核心模块
 - agi_core/      - 记忆系统和知识图谱（本地实现）
 """
 
-from .memory import AGIMemorySystem, MemoryLayer, MemoryItem, MemoryConfig
-from .knowledge_graph import DynamicKnowledgeGraph, KnowledgeNode, KnowledgeEdge, RelationType
-from .integration import AGICoreSystem, AGICoreConfig
-
 from usmsb_sdk.platform.external.meta_agent.evolution_v2 import (
-    SelfEvolutionEngine,
-    create_evolution_engine,
     EvolutionPhase,
     KnowledgeState,
+    SelfEvolutionEngine,
+    create_evolution_engine,
 )
-
 from usmsb_sdk.reasoning import (
-    IReasoningEngine,
-    ReasoningResult,
-    ReasoningType,
-    ReasoningChainManager,
+    AbductiveEngine,
+    AnalogicalEngine,
+    CausalEngine,
     DeductiveEngine,
     InductiveEngine,
-    AbductiveEngine,
-    CausalEngine,
-    AnalogicalEngine,
+    IReasoningEngine,
+    ReasoningChainManager,
+    ReasoningResult,
+    ReasoningType,
 )
+
+from .integration import AGICoreConfig, AGICoreSystem
+from .knowledge_graph import DynamicKnowledgeGraph, KnowledgeEdge, KnowledgeNode, RelationType
+from .memory import AGIMemorySystem, MemoryConfig, MemoryItem, MemoryLayer
 
 __all__ = [
     "AGICoreSystem",

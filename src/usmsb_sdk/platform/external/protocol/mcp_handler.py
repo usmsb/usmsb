@@ -15,21 +15,16 @@ added in future updates.
 """
 
 import asyncio
-import json
 import logging
-import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, AsyncIterator, Callable
+from typing import Any
 
 # Import from base_handler to avoid circular import
 from usmsb_sdk.platform.external.protocol.base_handler import (
     BaseProtocolHandler,
-    ProtocolConfig,
-    ProtocolMessage,
-    ProtocolResponse,
     ExternalAgentStatus,
-    ExternalAgentResponse,
+    ProtocolConfig,
     SkillDefinition,
 )
 
@@ -42,7 +37,7 @@ class MCPServerInfo:
     name: str
     version: str
     protocol_version: str
-    capabilities: Dict[str, Any] = field(default_factory=dict)
+    capabilities: dict[str, Any] = field(default_factory=dict)
     instructions: str = ""
 
 
@@ -51,7 +46,7 @@ class MCPTool:
     """MCP Tool definition."""
     name: str
     description: str
-    input_schema: Dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any] = field(default_factory=dict)
 
     def to_skill_definition(self) -> SkillDefinition:
         """Convert MCP tool to SkillDefinition."""
@@ -71,7 +66,7 @@ class MCPResource:
     name: str
     description: str = ""
     mime_type: str = "text/plain"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -79,14 +74,14 @@ class MCPPrompt:
     """MCP Prompt definition."""
     name: str
     description: str
-    arguments: List[Dict[str, Any]] = field(default_factory=list)
+    arguments: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class MCPToolCall:
     """MCP tool call request."""
     name: str
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     call_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
@@ -94,7 +89,7 @@ class MCPToolCall:
 class MCPToolResult:
     """MCP tool call result."""
     call_id: str
-    content: List[Dict[str, Any]] = field(default_factory=list)
+    content: list[dict[str, Any]] = field(default_factory=list)
     is_error: bool = False
 
 
@@ -102,13 +97,13 @@ class MCPToolResult:
 class MCPMessage:
     """MCP protocol message."""
     jsonrpc: str = "2.0"
-    id: Optional[str] = None
-    method: Optional[str] = None
-    params: Dict[str, Any] = field(default_factory=dict)
-    result: Optional[Any] = None
-    error: Optional[Dict[str, Any]] = None
+    id: str | None = None
+    method: str | None = None
+    params: dict[str, Any] = field(default_factory=dict)
+    result: Any | None = None
+    error: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = {"jsonrpc": self.jsonrpc}
         if self.id is not None:
             data["id"] = self.id
@@ -144,7 +139,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
 
     def __init__(
         self,
-        config: Optional[ProtocolConfig] = None,
+        config: ProtocolConfig | None = None,
         client_name: str = "usmsb-sdk",
         client_version: str = "1.0.0",
     ):
@@ -159,11 +154,11 @@ class MCPProtocolHandler(BaseProtocolHandler):
         super().__init__(config)
         self._client_name = client_name
         self._client_version = client_version
-        self._server_info: Optional[MCPServerInfo] = None
-        self._tools: List[MCPTool] = []
-        self._resources: List[MCPResource] = []
-        self._prompts: List[MCPPrompt] = []
-        self._session_id: Optional[str] = None
+        self._server_info: MCPServerInfo | None = None
+        self._tools: list[MCPTool] = []
+        self._resources: list[MCPResource] = []
+        self._prompts: list[MCPPrompt] = []
+        self._session_id: str | None = None
         self._initialized = False
 
         logger.info(f"MCPProtocolHandler initialized: {client_name} v{client_version}")
@@ -211,7 +206,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -263,7 +258,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
 
         return result
 
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Discover skills (MCP tools) from the server.
 
@@ -377,9 +372,9 @@ class MCPProtocolHandler(BaseProtocolHandler):
     async def _send_request(
         self,
         method: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         timeout: float = 60.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Send an MCP request.
 
@@ -393,7 +388,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
         """
         request_id = str(uuid.uuid4())
 
-        message = MCPMessage(
+        MCPMessage(
             id=request_id,
             method=method,
             params=params,
@@ -460,7 +455,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
     async def _send_notification(
         self,
         method: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
     ) -> None:
         """
         Send an MCP notification.
@@ -469,7 +464,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
             method: Notification method name.
             params: Notification parameters.
         """
-        message = MCPMessage(
+        MCPMessage(
             method=method,
             params=params,
         )
@@ -481,7 +476,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
 
     # ========== Resource Methods ==========
 
-    async def list_resources(self) -> List[MCPResource]:
+    async def list_resources(self) -> list[MCPResource]:
         """
         List available MCP resources.
 
@@ -541,7 +536,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
 
     # ========== Prompt Methods ==========
 
-    async def list_prompts(self) -> List[MCPPrompt]:
+    async def list_prompts(self) -> list[MCPPrompt]:
         """
         List available MCP prompts.
 
@@ -577,7 +572,7 @@ class MCPProtocolHandler(BaseProtocolHandler):
     async def get_prompt(
         self,
         name: str,
-        arguments: Optional[Dict[str, Any]] = None,
+        arguments: dict[str, Any] | None = None,
     ) -> Any:
         """
         Get an MCP prompt.
@@ -604,19 +599,19 @@ class MCPProtocolHandler(BaseProtocolHandler):
 
     # ========== Utility Methods ==========
 
-    def get_server_info(self) -> Optional[MCPServerInfo]:
+    def get_server_info(self) -> MCPServerInfo | None:
         """Get MCP server information."""
         return self._server_info
 
-    def get_tools(self) -> List[MCPTool]:
+    def get_tools(self) -> list[MCPTool]:
         """Get list of available tools."""
         return self._tools
 
-    def get_resources(self) -> List[MCPResource]:
+    def get_resources(self) -> list[MCPResource]:
         """Get list of available resources."""
         return self._resources
 
-    def get_prompts(self) -> List[MCPPrompt]:
+    def get_prompts(self) -> list[MCPPrompt]:
         """Get list of available prompts."""
         return self._prompts
 

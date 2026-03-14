@@ -17,10 +17,10 @@ Key Features:
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 from usmsb_sdk.core.elements import Agent
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
@@ -28,7 +28,7 @@ from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
 logger = logging.getLogger(__name__)
 
 
-class LearningType(str, Enum):
+class LearningType(StrEnum):
     """Type of learning."""
     MATCH_PATTERN = "match_pattern"
     NEGOTIATION_STRATEGY = "negotiation_strategy"
@@ -37,7 +37,7 @@ class LearningType(str, Enum):
     PARTNER_PREFERENCE = "partner_preference"
 
 
-class InsightCategory(str, Enum):
+class InsightCategory(StrEnum):
     """Category of learning insight."""
     SUCCESS_PATTERNS = "success_patterns"
     FAILURE_REASONS = "failure_reasons"
@@ -54,11 +54,11 @@ class LearningInsight:
     title: str
     description: str
     confidence: float  # 0-1
-    evidence: List[Dict[str, Any]] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "insight_id": self.insight_id,
             "category": self.category.value,
@@ -75,16 +75,16 @@ class LearningInsight:
 class OptimizedStrategy:
     """An optimized matching strategy."""
     strategy_id: str
-    preferred_partner_types: List[str] = field(default_factory=list)
-    optimal_price_range: Dict[str, float] = field(default_factory=dict)  # min, max
+    preferred_partner_types: list[str] = field(default_factory=list)
+    optimal_price_range: dict[str, float] = field(default_factory=dict)  # min, max
     recommended_negotiation_strategy: str = "balanced"
     best_contact_timing: str = "anytime"
-    capability_highlighting: List[str] = field(default_factory=list)
-    target_capabilities: List[str] = field(default_factory=list)
+    capability_highlighting: list[str] = field(default_factory=list)
+    target_capabilities: list[str] = field(default_factory=list)
     min_reputation_threshold: float = 0.5
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "strategy_id": self.strategy_id,
             "preferred_partner_types": self.preferred_partner_types,
@@ -104,13 +104,13 @@ class MarketInsight:
     insight_id: str
     demand_level: str  # high, medium, low
     supply_level: str
-    price_trends: Dict[str, Any] = field(default_factory=dict)
-    opportunity_areas: List[str] = field(default_factory=list)
-    competitive_analysis: Dict[str, Any] = field(default_factory=dict)
-    recommendations: List[str] = field(default_factory=list)
+    price_trends: dict[str, Any] = field(default_factory=dict)
+    opportunity_areas: list[str] = field(default_factory=list)
+    competitive_analysis: dict[str, Any] = field(default_factory=dict)
+    recommendations: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "insight_id": self.insight_id,
             "demand_level": self.demand_level,
@@ -134,7 +134,7 @@ class ProactiveLearningService:
     def __init__(
         self,
         llm_adapter: ILLMAdapter,
-        history_store: Optional[Any] = None,  # Optional persistence
+        history_store: Any | None = None,  # Optional persistence
     ):
         """
         Initialize the Proactive Learning Service.
@@ -147,17 +147,17 @@ class ProactiveLearningService:
         self.history_store = history_store
 
         # Learning cache per agent
-        self._agent_insights: Dict[str, List[LearningInsight]] = {}
-        self._agent_strategies: Dict[str, OptimizedStrategy] = {}
-        self._market_insights: Dict[str, MarketInsight] = {}
+        self._agent_insights: dict[str, list[LearningInsight]] = {}
+        self._agent_strategies: dict[str, OptimizedStrategy] = {}
+        self._market_insights: dict[str, MarketInsight] = {}
 
         # Callbacks
-        self.on_insight_generated: Optional[Callable[[str, LearningInsight], None]] = None
+        self.on_insight_generated: Callable[[str, LearningInsight], None] | None = None
 
     async def learn_from_match_history(
         self,
         agent: Agent,
-    ) -> List[LearningInsight]:
+    ) -> list[LearningInsight]:
         """
         Learn from agent's match history.
 
@@ -238,7 +238,7 @@ class ProactiveLearningService:
             logger.error(f"Learning analysis error: {e}")
             return []
 
-    def _prepare_history_summary(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _prepare_history_summary(self, history: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Prepare match history for analysis."""
         summary = []
         for match in history[-50:]:  # Analyze last 50 matches
@@ -324,7 +324,7 @@ class ProactiveLearningService:
     async def analyze_negotiation_patterns(
         self,
         agent: Agent,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Analyze negotiation patterns from history.
 
@@ -376,7 +376,7 @@ class ProactiveLearningService:
         self,
         success_rate: float,
         avg_rounds: float,
-    ) -> List[str]:
+    ) -> list[str]:
         """Generate recommendations based on negotiation analysis."""
         recommendations = []
 
@@ -462,8 +462,8 @@ class ProactiveLearningService:
 
     async def _collect_market_data(
         self,
-        capabilities: List[str],
-    ) -> Dict[str, Any]:
+        capabilities: list[str],
+    ) -> dict[str, Any]:
         """Collect market data for analysis."""
         # This would normally query the registry and match history
         # For now, return placeholder data
@@ -478,8 +478,8 @@ class ProactiveLearningService:
     def get_insights(
         self,
         agent_id: str,
-        category: Optional[InsightCategory] = None,
-    ) -> List[LearningInsight]:
+        category: InsightCategory | None = None,
+    ) -> list[LearningInsight]:
         """Get stored insights for an agent."""
         insights = self._agent_insights.get(agent_id, [])
 
@@ -491,14 +491,14 @@ class ProactiveLearningService:
     def get_strategy(
         self,
         agent_id: str,
-    ) -> Optional[OptimizedStrategy]:
+    ) -> OptimizedStrategy | None:
         """Get optimized strategy for an agent."""
         return self._agent_strategies.get(agent_id)
 
     def get_market_insight(
         self,
         agent_id: str,
-    ) -> Optional[MarketInsight]:
+    ) -> MarketInsight | None:
         """Get market insight for an agent."""
         return self._market_insights.get(agent_id)
 
@@ -516,7 +516,7 @@ class ProactiveLearningService:
     async def continuous_learning(
         self,
         agent: Agent,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Perform continuous learning cycle.
 
@@ -546,7 +546,7 @@ class ProactiveLearningService:
         results["strategy_optimized"] = True
 
         # Market analysis
-        market_insight = await self.proactive_market_analysis(agent)
+        await self.proactive_market_analysis(agent)
         results["market_analyzed"] = True
 
         return results

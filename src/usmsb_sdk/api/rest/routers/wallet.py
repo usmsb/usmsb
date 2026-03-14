@@ -8,15 +8,13 @@ Provides wallet operations:
 Authentication: Supports both Bearer token and API Key authentication.
 """
 
-import time
-from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 
-from usmsb_sdk.api.database import get_db, get_agent_wallet
-from usmsb_sdk.api.rest.unified_auth import get_current_user_unified, ErrorCode
+from usmsb_sdk.api.database import get_agent_wallet, get_db
 from usmsb_sdk.api.rest.api_key_manager import get_stake_tier, get_tier_benefits
+from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 
 router = APIRouter(prefix="/wallet", tags=["Wallet"])
 
@@ -42,18 +40,18 @@ class TransactionRecord(BaseModel):
     transaction_type: str
     amount: float
     status: str
-    counterparty_id: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
+    counterparty_id: str | None = None
+    title: str | None = None
+    description: str | None = None
     created_at: float
-    completed_at: Optional[float] = None
+    completed_at: float | None = None
 
 
 class TransactionHistoryResponse(BaseModel):
     """Transaction history response."""
     success: bool = True
     agent_id: str
-    transactions: List[TransactionRecord]
+    transactions: list[TransactionRecord]
     total_count: int
     page: int
     page_size: int
@@ -85,10 +83,10 @@ def get_pending_rewards(agent_id: str) -> float:
 
 def get_wallet_transactions(
     agent_id: str,
-    tx_type: Optional[str] = None,
+    tx_type: str | None = None,
     limit: int = 50,
     offset: int = 0
-) -> List[dict]:
+) -> list[dict]:
     """Get wallet transactions for agent."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -115,7 +113,7 @@ def get_wallet_transactions(
         return [dict(row) for row in cursor.fetchall()]
 
 
-def count_wallet_transactions(agent_id: str, tx_type: Optional[str] = None) -> int:
+def count_wallet_transactions(agent_id: str, tx_type: str | None = None) -> int:
     """Count wallet transactions for agent."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -200,7 +198,7 @@ async def get_balance(
 
 @router.get("/transactions", response_model=TransactionHistoryResponse)
 async def get_transactions(
-    type: Optional[str] = Query(None, description="Filter by transaction type"),
+    type: str | None = Query(None, description="Filter by transaction type"),
     limit: int = Query(50, ge=1, le=200, description="Number of transactions per page"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     user: dict = Depends(get_current_user_unified)

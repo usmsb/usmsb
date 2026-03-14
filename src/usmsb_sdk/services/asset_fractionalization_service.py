@@ -5,19 +5,18 @@ Implements NFT fragmentation into tradeable ERC20 shares.
 """
 
 import asyncio
-import hashlib
-import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class AssetStatus(str, Enum):
+class AssetStatus(StrEnum):
     """Asset status enumeration."""
 
     CREATED = "created"
@@ -42,9 +41,9 @@ class AssetInfo:
     distributed_earnings: float
     created_at: float
     status: AssetStatus
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "assetId": self.asset_id,
             "nftContract": self.nft_contract,
@@ -71,7 +70,7 @@ class Shareholder:
     claimed_earnings: float
     purchase_time: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "assetId": self.asset_id,
             "address": self.address,
@@ -96,22 +95,22 @@ class AssetFractionalizationService:
     def __init__(
         self,
         web3_provider=None,
-        contract_address: Optional[str] = None,
+        contract_address: str | None = None,
         pricing_service=None,
     ):
         self.web3 = web3_provider
         self.contract_address = contract_address
         self.pricing = pricing_service
 
-        self._assets: Dict[str, AssetInfo] = {}
-        self._shareholders: Dict[str, Dict[str, Shareholder]] = {}
-        self._user_assets: Dict[str, List[str]] = {}
+        self._assets: dict[str, AssetInfo] = {}
+        self._shareholders: dict[str, dict[str, Shareholder]] = {}
+        self._user_assets: dict[str, list[str]] = {}
 
         self._running = False
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
 
-        self.on_asset_fragmented: Optional[Callable[[AssetInfo], None]] = None
-        self.on_shares_purchased: Optional[Callable[[str, str, int], None]] = None
+        self.on_asset_fragmented: Callable[[AssetInfo], None] | None = None
+        self.on_shares_purchased: Callable[[str, str, int], None] | None = None
 
     async def start(self) -> None:
         self._running = True
@@ -130,7 +129,7 @@ class AssetFractionalizationService:
         owner: str,
         total_shares: int,
         share_price: float,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AssetInfo:
         """Deposit NFT and create fragmented asset."""
         asset_id = f"asset-{uuid.uuid4().hex[:8]}"
@@ -275,18 +274,18 @@ class AssetFractionalizationService:
 
         return unclaimed
 
-    def get_asset(self, asset_id: str) -> Optional[AssetInfo]:
+    def get_asset(self, asset_id: str) -> AssetInfo | None:
         return self._assets.get(asset_id)
 
-    def get_shareholder(self, asset_id: str, address: str) -> Optional[Shareholder]:
+    def get_shareholder(self, asset_id: str, address: str) -> Shareholder | None:
         return self._shareholders.get(asset_id, {}).get(address)
 
-    def get_user_assets(self, user: str) -> List[AssetInfo]:
+    def get_user_assets(self, user: str) -> list[AssetInfo]:
         asset_ids = self._user_assets.get(user, [])
         return [self._assets[aid] for aid in asset_ids if aid in self._assets]
 
 
-_asset_fractionalization_service: Optional[AssetFractionalizationService] = None
+_asset_fractionalization_service: AssetFractionalizationService | None = None
 
 
 async def get_asset_fractionalization_service() -> AssetFractionalizationService:

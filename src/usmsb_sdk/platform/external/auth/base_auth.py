@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class Permission(Enum):
@@ -113,12 +113,12 @@ class AuthContext:
         metadata: Additional metadata
     """
     wallet_address: str
-    agent_id: Optional[str] = None
-    signature: Optional[str] = None
-    message: Optional[str] = None
-    nonce: Optional[str] = None
+    agent_id: str | None = None
+    signature: str | None = None
+    message: str | None = None
+    nonce: str | None = None
     timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -133,8 +133,8 @@ class BaseAuthResult:
         timestamp: When the result was generated
     """
     success: bool
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
+    error_code: str | None = None
+    error_message: str | None = None
     timestamp: datetime = field(default_factory=datetime.now)
 
 
@@ -150,11 +150,11 @@ class WalletAuthResult(BaseAuthResult):
         permissions: Granted permission level
         expires_at: When the authentication expires
     """
-    wallet_address: Optional[str] = None
+    wallet_address: str | None = None
     is_verified: bool = False
-    did: Optional[str] = None
+    did: str | None = None
     permissions: Permission = Permission.NONE
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 @dataclass
@@ -171,13 +171,13 @@ class StakeVerificationResult(BaseAuthResult):
         max_agents: Maximum agents allowed for this tier
         locked_until: When locked stake becomes available (if any)
     """
-    wallet_address: Optional[str] = None
+    wallet_address: str | None = None
     stake_amount: float = 0.0
     stake_tier: StakeTier = StakeTier.NONE
     can_register: bool = False
     active_agents: int = 0
     max_agents: int = 0
-    locked_until: Optional[datetime] = None
+    locked_until: datetime | None = None
 
 
 @dataclass
@@ -193,12 +193,12 @@ class FullAuthResult(BaseAuthResult):
         permissions: Combined permission set
         valid_until: When the full authentication expires
     """
-    wallet_auth: Optional[WalletAuthResult] = None
-    stake_verification: Optional[StakeVerificationResult] = None
-    agent_id: Optional[str] = None
-    session_token: Optional[str] = None
-    permissions: List[Permission] = field(default_factory=list)
-    valid_until: Optional[datetime] = None
+    wallet_auth: WalletAuthResult | None = None
+    stake_verification: StakeVerificationResult | None = None
+    agent_id: str | None = None
+    session_token: str | None = None
+    permissions: list[Permission] = field(default_factory=list)
+    valid_until: datetime | None = None
 
 
 class IAuthProvider(ABC):

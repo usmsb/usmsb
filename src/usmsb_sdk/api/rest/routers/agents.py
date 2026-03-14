@@ -8,40 +8,43 @@ Authentication:
 - Protected endpoints (require X-API-Key + X-Agent-ID): update, delete, stake, wallet operations
 """
 
-import json
 import time
 import uuid
-import asyncio
-import httpx
-from datetime import datetime
-from typing import List, Optional, Dict, Any, Union
+from typing import Any, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from usmsb_sdk.api.cache import cache_manager, generate_cache_key
+from usmsb_sdk.api.database import (
+    create_agent as db_create_agent,
+)
+from usmsb_sdk.api.database import (
+    create_agent_wallet as db_create_agent_wallet,
+)
+from usmsb_sdk.api.database import (
+    delete_agent as db_delete_agent,
+)
 from usmsb_sdk.api.database import (
     get_agent as db_get_agent,
-    get_all_agents as db_get_all_agents,
-    create_agent as db_create_agent,
+)
+from usmsb_sdk.api.database import (
+    get_agent_wallet,
+    has_wallet_binding,
+    update_agent_binding_status,
     update_agent_heartbeat,
     update_agent_stake,
-    update_agent_balance,
-    delete_agent as db_delete_agent,
-    has_wallet_binding,
-    get_agent_wallet,
-    create_agent_wallet as db_create_agent_wallet,
-    update_agent_binding_status,
 )
-from usmsb_sdk.api.cache import cache_manager, generate_cache_key
+from usmsb_sdk.api.database import (
+    get_all_agents as db_get_all_agents,
+)
 from usmsb_sdk.api.rest.schemas.agent import (
     AgentCreate,
-    AgentResponse,
-    AgentUpdate,
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
-    AgentListFilter,
-    AgentStatus,
-    AgentProtocol,
+    AgentResponse,
+    AgentUpdate,
 )
 from usmsb_sdk.api.rest.schemas.environment import GoalCreate
 from usmsb_sdk.api.rest.services.utils import safe_json_loads
@@ -49,9 +52,7 @@ from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
     get_optional_user_unified,
     verify_agent_access,
-    ErrorCode,
 )
-from usmsb_sdk.api.rest.api_key_manager import get_stake_tier, get_tier_benefits
 
 router = APIRouter(prefix="/agents", tags=["Agents"])
 
@@ -146,11 +147,11 @@ async def create_agent(agent_create: AgentCreate):
     )
 
 
-@router.get("", response_model=List[AgentResponse])
+@router.get("", response_model=list[AgentResponse])
 async def list_agents(
-    type: Optional[str] = Query(None, description="Filter by agent type"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    protocol: Optional[str] = Query(None, description="Filter by protocol"),
+    type: str | None = Query(None, description="Filter by agent type"),
+    status: str | None = Query(None, description="Filter by status"),
+    protocol: str | None = Query(None, description="Filter by protocol"),
     limit: int = Query(100, ge=1, le=1000),
 ):
     """List all agents with optional filtering.
@@ -180,7 +181,7 @@ async def list_agents(
     return result
 
 
-@router.get("/discover", response_model=List[AgentResponse])
+@router.get("/discover", response_model=list[AgentResponse])
 async def discover_agents(
     online: bool = Query(False, description="Filter for online agents"),
     limit: int = Query(100, ge=1, le=1000),
@@ -218,7 +219,7 @@ async def get_agent_endpoint(agent_id: str):
 async def update_agent(
     agent_id: str,
     agent_update: AgentUpdate,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Update agent configuration.
 
@@ -254,7 +255,7 @@ async def update_agent(
         update_data['metadata'] = agent_update.metadata
 
     # Update in database
-    updated = db_create_agent(update_data)  # Uses INSERT OR REPLACE
+    db_create_agent(update_data)  # Uses INSERT OR REPLACE
 
     # 失效agents缓存
     cache_manager.agents.invalidate_prefix("agents:")
@@ -275,16 +276,16 @@ class AgentPingResponse(BaseModel):
     agent_id: str
     reachable: bool
     endpoint: str
-    latency_ms: Optional[int] = None
-    error: Optional[str] = None
-    agent_status: Optional[str] = None
-    last_heartbeat: Optional[float] = None
+    latency_ms: int | None = None
+    error: str | None = None
+    agent_status: str | None = None
+    last_heartbeat: float | None = None
 
 
 async def _check_agent_connectivity(
     endpoint: str,
     timeout: float = 5.0
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Check if an agent is reachable via its endpoint.
 
@@ -340,7 +341,7 @@ async def _check_agent_connectivity(
             "latency_ms": latency,
             "error": "Connection timeout - agent may be offline"
         }
-    except httpx.ConnectError as e:
+    except httpx.ConnectError:
         latency = int((time.time() - start_time) * 1000)
         return {
             "reachable": False,
@@ -359,7 +360,7 @@ async def _check_agent_connectivity(
 @router.get("/{agent_id}/ping", response_model=AgentPingResponse)
 async def ping_agent(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_optional_user_unified)
+    user: dict[str, Any] = Depends(get_optional_user_unified)
 ):
     """Ping an agent to check if it's reachable.
 
@@ -407,7 +408,7 @@ async def ping_agent(
 async def agent_heartbeat(
     agent_id: str,
     request: AgentHeartbeatRequest = None,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Update agent heartbeat.
 
@@ -478,7 +479,7 @@ async def agent_heartbeat(
 @router.delete("/{agent_id}")
 async def delete_agent_endpoint(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Delete/unregister an agent.
 
@@ -505,7 +506,7 @@ async def delete_agent_endpoint(
 async def add_goal_to_agent(
     agent_id: str,
     goal_create: GoalCreate,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Add a goal to an agent.
 
@@ -528,7 +529,7 @@ async def add_goal_to_agent(
 @router.get("/{agent_id}/transactions")
 async def get_agent_transactions(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Get transactions for an agent.
 
@@ -548,7 +549,7 @@ async def get_agent_transactions(
 async def add_agent_stake(
     agent_id: str,
     amount: float = Query(..., ge=0),
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Add stake to an agent.
 
@@ -610,7 +611,7 @@ class WalletResponse(BaseModel):
 @router.get("/{agent_id}/wallet", response_model=Optional[WalletResponse])
 async def get_agent_wallet_endpoint(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Get agent's wallet information.
 
@@ -650,7 +651,7 @@ async def get_agent_wallet_endpoint(
 async def create_or_bind_wallet(
     agent_id: str,
     request: WalletBindRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Create or bind a wallet for an agent.
 
@@ -726,7 +727,7 @@ async def create_or_bind_wallet(
 @router.delete("/{agent_id}/wallet")
 async def unbind_agent_wallet(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Unbind/delete an agent's wallet.
 
@@ -769,8 +770,8 @@ class AgentInvokeRequest(BaseModel):
 class AgentInvokeResponse(BaseModel):
     """Response from agent invocation."""
     success: bool
-    result: Optional[dict] = None
-    error: Optional[str] = None
+    result: dict | None = None
+    error: str | None = None
     agent_id: str
 
 
@@ -778,7 +779,7 @@ class AgentInvokeResponse(BaseModel):
 async def invoke_agent(
     agent_id: str,
     request: AgentInvokeRequest = None,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Invoke an agent method.
 
@@ -829,7 +830,7 @@ async def invoke_agent(
                         "params": request.params if request else {"message": "test"}
                     }
                 )
-                latency_ms = int((time.time() - start_time) * 1000)
+                int((time.time() - start_time) * 1000)
 
                 if response.status_code == 200:
                     return AgentInvokeResponse(

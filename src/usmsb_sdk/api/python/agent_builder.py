@@ -4,7 +4,7 @@ Agent Builder
 Fluent API for creating and configuring Agent instances.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from usmsb_sdk.core.elements import Agent, AgentType, Goal, Resource, Rule
 
@@ -30,15 +30,15 @@ class AgentBuilder:
 
     def __init__(self):
         """Initialize the builder with default values."""
-        self._id: Optional[str] = None
+        self._id: str | None = None
         self._name: str = "Agent"
         self._type: AgentType = AgentType.AI_AGENT
-        self._capabilities: List[str] = []
-        self._state: Dict[str, Any] = {}
-        self._goals: List[Goal] = []
-        self._resources: List[Resource] = []
-        self._rules: List[Rule] = []
-        self._metadata: Dict[str, Any] = {}
+        self._capabilities: list[str] = []
+        self._state: dict[str, Any] = {}
+        self._goals: list[Goal] = []
+        self._resources: list[Resource] = []
+        self._rules: list[Rule] = []
+        self._metadata: dict[str, Any] = {}
 
     def with_id(self, agent_id: str) -> "AgentBuilder":
         """
@@ -81,7 +81,7 @@ class AgentBuilder:
         self._type = agent_type
         return self
 
-    def with_capabilities(self, capabilities: List[str]) -> "AgentBuilder":
+    def with_capabilities(self, capabilities: list[str]) -> "AgentBuilder":
         """
         Set the agent capabilities.
 
@@ -108,7 +108,7 @@ class AgentBuilder:
             self._capabilities.append(capability)
         return self
 
-    def with_state(self, state: Dict[str, Any]) -> "AgentBuilder":
+    def with_state(self, state: dict[str, Any]) -> "AgentBuilder":
         """
         Set the agent state.
 
@@ -191,7 +191,7 @@ class AgentBuilder:
         name: str,
         quantity: float,
         resource_type: str = "tangible",
-        unit: Optional[str] = None,
+        unit: str | None = None,
     ) -> "AgentBuilder":
         """
         Add a resource by specifying its attributes.
@@ -264,7 +264,7 @@ class AgentBuilder:
         self._rules.append(rule)
         return self
 
-    def with_metadata(self, metadata: Dict[str, Any]) -> "AgentBuilder":
+    def with_metadata(self, metadata: dict[str, Any]) -> "AgentBuilder":
         """
         Set the agent metadata.
 

@@ -6,14 +6,18 @@ Authentication:
 - GET endpoints are public for discovery
 """
 
-from typing import List, Dict, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from usmsb_sdk.api.database import (
     create_environment as db_create_environment,
-    get_environment as db_get_environment,
+)
+from usmsb_sdk.api.database import (
     get_all_environments as db_get_all_environments,
+)
+from usmsb_sdk.api.database import (
+    get_environment as db_get_environment,
 )
 from usmsb_sdk.api.rest.schemas.environment import EnvironmentCreate
 from usmsb_sdk.api.rest.services.utils import safe_json_loads
@@ -26,7 +30,7 @@ router = APIRouter(prefix="/environments", tags=["Environments"])
 @router.post("", status_code=201)
 async def create_environment_endpoint(
     env_create: EnvironmentCreate,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Create a new environment.

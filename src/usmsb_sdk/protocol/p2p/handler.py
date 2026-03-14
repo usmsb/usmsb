@@ -7,20 +7,19 @@ enabling decentralized communication between agents.
 
 import asyncio
 import hashlib
-import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 
 from usmsb_sdk.protocol.base import (
     BaseProtocolHandler,
-    ProtocolConfig,
     ExternalAgentStatus,
+    ProtocolConfig,
     SkillDefinition,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +31,15 @@ class P2PNodeInfo:
     address: str
     port: int
     name: str = ""
-    public_key: Optional[str] = None
-    capabilities: List[str] = field(default_factory=list)
-    skills: List[str] = field(default_factory=list)
+    public_key: str | None = None
+    capabilities: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)
     status: str = "unknown"
     last_seen: float = 0.0
     reputation: float = 1.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "address": self.address,
@@ -62,13 +61,13 @@ class P2PMessage:
     message_id: str
     message_type: str
     sender_id: str
-    receiver_id: Optional[str]  # None for broadcast
-    payload: Dict[str, Any]
+    receiver_id: str | None  # None for broadcast
+    payload: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
     ttl: int = 5  # Hop limit for broadcast
-    signature: Optional[str] = None
+    signature: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "message_type": self.message_type,
@@ -86,12 +85,12 @@ class P2PSkillRequest:
     """P2P skill execution request."""
     request_id: str
     skill_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     timeout: float = 60.0
     priority: int = 0
     broadcast: bool = False  # Whether to broadcast to multiple nodes
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "skill_name": self.skill_name,
@@ -109,10 +108,10 @@ class P2PSkillResponse:
     node_id: str
     success: bool
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "node_id": self.node_id,
@@ -164,8 +163,8 @@ class P2PHandler(BaseProtocolHandler):
 
     def __init__(
         self,
-        config: Optional[ProtocolConfig] = None,
-        node_id: Optional[str] = None,
+        config: ProtocolConfig | None = None,
+        node_id: str | None = None,
         node_name: str = "",
         port: int = 0,
     ):
@@ -182,10 +181,10 @@ class P2PHandler(BaseProtocolHandler):
         self._node_id = node_id or self._generate_node_id()
         self._node_name = node_name or f"Node-{self._node_id[:8]}"
         self._port = port
-        self._peers: Dict[str, P2PNodeInfo] = {}
-        self._dht: Dict[str, P2PDHTEntry] = {}
-        self._seen_messages: Set[str] = set()  # For deduplication
-        self._p2p_message_handlers: Dict[str, Callable] = {}
+        self._peers: dict[str, P2PNodeInfo] = {}
+        self._dht: dict[str, P2PDHTEntry] = {}
+        self._seen_messages: set[str] = set()  # For deduplication
+        self._p2p_message_handlers: dict[str, Callable] = {}
 
         # Register default message handlers
         self._register_default_handlers()
@@ -263,7 +262,7 @@ class P2PHandler(BaseProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -314,14 +313,14 @@ class P2PHandler(BaseProtocolHandler):
         else:
             raise Exception(response.error or "Skill execution failed")
 
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Discover skills from P2P network.
 
         Returns:
             List of discovered skills.
         """
-        skills: Dict[str, SkillDefinition] = {}
+        skills: dict[str, SkillDefinition] = {}
 
         # Collect skills from all peers
         for peer in self._peers.values():
@@ -378,7 +377,7 @@ class P2PHandler(BaseProtocolHandler):
         self,
         peer_id: str,
         message_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
     ) -> None:
         """
         Send a message to a specific peer.
@@ -393,7 +392,7 @@ class P2PHandler(BaseProtocolHandler):
 
         peer = self._peers[peer_id]
 
-        message = P2PMessage(
+        P2PMessage(
             message_id=str(uuid.uuid4()),
             message_type=message_type,
             sender_id=self._node_id,
@@ -412,8 +411,8 @@ class P2PHandler(BaseProtocolHandler):
     async def _broadcast(
         self,
         message_type: str,
-        payload: Dict[str, Any],
-        exclude_peers: Optional[Set[str]] = None,
+        payload: dict[str, Any],
+        exclude_peers: set[str] | None = None,
     ) -> None:
         """
         Broadcast a message to all peers.
@@ -425,7 +424,7 @@ class P2PHandler(BaseProtocolHandler):
         """
         exclude = exclude_peers or set()
 
-        message = P2PMessage(
+        P2PMessage(
             message_id=str(uuid.uuid4()),
             message_type=message_type,
             sender_id=self._node_id,
@@ -481,7 +480,7 @@ class P2PHandler(BaseProtocolHandler):
         self,
         message: P2PMessage,
         sender: P2PNodeInfo,
-    ) -> Optional[P2PMessage]:
+    ) -> P2PMessage | None:
         """Handle ping message."""
         # Respond with pong
         return P2PMessage(
@@ -496,7 +495,7 @@ class P2PHandler(BaseProtocolHandler):
         self,
         message: P2PMessage,
         sender: P2PNodeInfo,
-    ) -> Optional[P2PMessage]:
+    ) -> P2PMessage | None:
         """Handle peer discovery request."""
         peer_list = [
             {
@@ -521,7 +520,7 @@ class P2PHandler(BaseProtocolHandler):
         self,
         message: P2PMessage,
         sender: P2PNodeInfo,
-    ) -> Optional[P2PMessage]:
+    ) -> P2PMessage | None:
         """Handle incoming skill request."""
         # In real implementation, execute the skill locally
         payload = message.payload
@@ -546,7 +545,7 @@ class P2PHandler(BaseProtocolHandler):
         self,
         message: P2PMessage,
         sender: P2PNodeInfo,
-    ) -> Optional[P2PMessage]:
+    ) -> P2PMessage | None:
         """Handle DHT lookup request."""
         key = message.payload.get("key")
 
@@ -598,7 +597,7 @@ class P2PHandler(BaseProtocolHandler):
 
         return True
 
-    async def dht_lookup(self, key: str, timeout: float = 10.0) -> Optional[Any]:
+    async def dht_lookup(self, key: str, timeout: float = 10.0) -> Any | None:
         """
         Look up a value in the DHT.
 
@@ -629,11 +628,11 @@ class P2PHandler(BaseProtocolHandler):
 
     # ========== Utility Methods ==========
 
-    def get_peers(self) -> List[P2PNodeInfo]:
+    def get_peers(self) -> list[P2PNodeInfo]:
         """Get list of known peers."""
         return list(self._peers.values())
 
-    def get_peer(self, peer_id: str) -> Optional[P2PNodeInfo]:
+    def get_peer(self, peer_id: str) -> P2PNodeInfo | None:
         """Get a specific peer by ID."""
         return self._peers.get(peer_id)
 
@@ -641,7 +640,7 @@ class P2PHandler(BaseProtocolHandler):
         """Get local node ID."""
         return self._node_id
 
-    def get_network_stats(self) -> Dict[str, Any]:
+    def get_network_stats(self) -> dict[str, Any]:
         """Get P2P network statistics."""
         return {
             "node_id": self._node_id,
@@ -651,8 +650,8 @@ class P2PHandler(BaseProtocolHandler):
                 1 for p in self._peers.values() if p.status == "online"
             ),
             "dht_entries": len(self._dht),
-            "skills_available": len(set(
+            "skills_available": len({
                 skill for peer in self._peers.values()
                 for skill in peer.skills
-            )),
+            }),
         }

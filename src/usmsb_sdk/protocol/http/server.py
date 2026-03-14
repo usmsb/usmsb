@@ -5,12 +5,11 @@ This module provides the HTTP server implementation for REST API endpoints.
 """
 
 import asyncio
-import json
 import logging
 import time
-import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +20,13 @@ class HTTPServerConfig:
     host: str = "0.0.0.0"
     port: int = 8080
     debug: bool = False
-    cors_origins: List[str] = field(default_factory=lambda: ["*"])
+    cors_origins: list[str] = field(default_factory=lambda: ["*"])
     max_request_size: int = 10 * 1024 * 1024  # 10MB
     request_timeout: float = 60.0
     keep_alive: bool = True
     workers: int = 1
-    ssl_cert: Optional[str] = None
-    ssl_key: Optional[str] = None
+    ssl_cert: str | None = None
+    ssl_key: str | None = None
 
 
 @dataclass
@@ -36,8 +35,8 @@ class HTTPRoute:
     path: str
     method: str
     handler: Callable
-    name: Optional[str] = None
-    middleware: List[Callable] = field(default_factory=list)
+    name: str | None = None
+    middleware: list[Callable] = field(default_factory=list)
 
 
 class HTTPRouter:
@@ -58,15 +57,15 @@ class HTTPRouter:
             prefix: URL prefix for all routes in this router.
         """
         self._prefix = prefix.rstrip("/")
-        self._routes: Dict[str, HTTPRoute] = {}
-        self._middleware: List[Callable] = []
+        self._routes: dict[str, HTTPRoute] = {}
+        self._middleware: list[Callable] = []
 
     def add_route(
         self,
         path: str,
         method: str,
         handler: Callable,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> HTTPRoute:
         """
         Add a route.
@@ -96,28 +95,28 @@ class HTTPRouter:
 
         return route
 
-    def get(self, path: str, name: Optional[str] = None):
+    def get(self, path: str, name: str | None = None):
         """Decorator for GET routes."""
         def decorator(handler: Callable) -> Callable:
             self.add_route(path, "GET", handler, name)
             return handler
         return decorator
 
-    def post(self, path: str, name: Optional[str] = None):
+    def post(self, path: str, name: str | None = None):
         """Decorator for POST routes."""
         def decorator(handler: Callable) -> Callable:
             self.add_route(path, "POST", handler, name)
             return handler
         return decorator
 
-    def put(self, path: str, name: Optional[str] = None):
+    def put(self, path: str, name: str | None = None):
         """Decorator for PUT routes."""
         def decorator(handler: Callable) -> Callable:
             self.add_route(path, "PUT", handler, name)
             return handler
         return decorator
 
-    def delete(self, path: str, name: Optional[str] = None):
+    def delete(self, path: str, name: str | None = None):
         """Decorator for DELETE routes."""
         def decorator(handler: Callable) -> Callable:
             self.add_route(path, "DELETE", handler, name)
@@ -129,7 +128,7 @@ class HTTPRouter:
         self._middleware.append(middleware_func)
         return middleware_func
 
-    def get_routes(self) -> Dict[str, HTTPRoute]:
+    def get_routes(self) -> dict[str, HTTPRoute]:
         """Get all routes."""
         return self._routes.copy()
 
@@ -143,7 +142,7 @@ class HTTPRouter:
         """
         additional_prefix = f"{self._prefix}{prefix}"
 
-        for route_key, route in router.get_routes().items():
+        for _route_key, route in router.get_routes().items():
             # Remove original prefix and add new one
             original_path = route.path
             if router._prefix and original_path.startswith(router._prefix):
@@ -181,7 +180,7 @@ class HTTPServer:
 
     def __init__(
         self,
-        config: Optional[HTTPServerConfig] = None,
+        config: HTTPServerConfig | None = None,
         host: str = "0.0.0.0",
         port: int = 8080,
     ):
@@ -195,10 +194,10 @@ class HTTPServer:
         """
         self._config = config or HTTPServerConfig(host=host, port=port)
         self._router = HTTPRouter()
-        self._server: Optional[Any] = None
+        self._server: Any | None = None
         self._running = False
-        self._startup_handlers: List[Callable] = []
-        self._shutdown_handlers: List[Callable] = []
+        self._startup_handlers: list[Callable] = []
+        self._shutdown_handlers: list[Callable] = []
 
         logger.info(f"HTTPServer initialized on {self._config.host}:{self._config.port}")
 
@@ -214,24 +213,24 @@ class HTTPServer:
 
     # ========== Route Registration ==========
 
-    def route(self, path: str, method: str, name: Optional[str] = None):
+    def route(self, path: str, method: str, name: str | None = None):
         """Decorator for adding routes."""
         return self._router.get.__wrapped__.__get__(self._router, type(self._router))
         # Simpler: use get, post, put, delete directly
 
-    def get(self, path: str, name: Optional[str] = None):
+    def get(self, path: str, name: str | None = None):
         """Decorator for GET routes."""
         return self._router.get(path, name)
 
-    def post(self, path: str, name: Optional[str] = None):
+    def post(self, path: str, name: str | None = None):
         """Decorator for POST routes."""
         return self._router.post(path, name)
 
-    def put(self, path: str, name: Optional[str] = None):
+    def put(self, path: str, name: str | None = None):
         """Decorator for PUT routes."""
         return self._router.put(path, name)
 
-    def delete(self, path: str, name: Optional[str] = None):
+    def delete(self, path: str, name: str | None = None):
         """Decorator for DELETE routes."""
         return self._router.delete(path, name)
 
@@ -335,9 +334,9 @@ class HTTPServer:
         self,
         method: str,
         path: str,
-        headers: Dict[str, str],
-        body: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str],
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Handle an incoming HTTP request.
 
@@ -401,11 +400,11 @@ class HTTPServer:
 
     # ========== Utility Methods ==========
 
-    def get_routes(self) -> Dict[str, HTTPRoute]:
+    def get_routes(self) -> dict[str, HTTPRoute]:
         """Get all registered routes."""
         return self._router.get_routes()
 
-    def get_server_info(self) -> Dict[str, Any]:
+    def get_server_info(self) -> dict[str, Any]:
         """Get server information."""
         return {
             "host": self._config.host,

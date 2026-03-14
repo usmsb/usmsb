@@ -19,16 +19,15 @@
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class TriggerType(str, Enum):
+class TriggerType(StrEnum):
     """触发条件类型"""
     IDLE = "idle"                    # 空闲触发
     TASK_COMPLETE = "task_complete"  # 任务完成触发
@@ -38,7 +37,7 @@ class TriggerType(str, Enum):
     NEW_KNOWLEDGE = "new_knowledge"  # 新知识触发
 
 
-class GuardianTask(str, Enum):
+class GuardianTask(StrEnum):
     """守护任务类型"""
     REVIEW_SUMMARY = "review_summary"       # 复盘总结
     ERROR_REVIEW = "error_review"           # 错误复盘
@@ -98,7 +97,7 @@ class GuardianDaemon:
         knowledge_base,
         memory_manager,
         evolution_engine,
-        config: Optional[GuardianConfig] = None
+        config: GuardianConfig | None = None
     ):
         """
         初始化守护进程
@@ -118,7 +117,7 @@ class GuardianDaemon:
 
         # 状态
         self._running = False
-        self._guardian_task: Optional[asyncio.Task] = None
+        self._guardian_task: asyncio.Task | None = None
 
         # 统计
         self.stats = GuardianStats()
@@ -130,8 +129,8 @@ class GuardianDaemon:
         self._idle_since = 0.0
 
         # 能力评估
-        self._capabilities: Dict[str, float] = {}
-        self._evolution_goals: List[str] = []
+        self._capabilities: dict[str, float] = {}
+        self._evolution_goals: list[str] = []
 
     async def start(self):
         """启动守护进程"""
@@ -219,7 +218,7 @@ class GuardianDaemon:
     async def _check_hourly_trigger(self):
         """检查小时触发"""
         # 简化的周期检查
-        current_hour = datetime.now().hour
+        datetime.now().hour
         # 可以添加更复杂的周期逻辑
         pass
 
@@ -255,7 +254,7 @@ class GuardianDaemon:
                     )
                     self.stats.tasks_completed += 1
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.warning(f"Guardian task timeout: {task.value}")
                 except Exception as e:
                     logger.error(f"Guardian task failed: {task.value}, error: {e}")
@@ -266,7 +265,7 @@ class GuardianDaemon:
         except Exception as e:
             logger.error(f"Guardian tasks execution failed: {e}")
 
-    def _select_tasks(self, trigger_type: TriggerType) -> List[GuardianTask]:
+    def _select_tasks(self, trigger_type: TriggerType) -> list[GuardianTask]:
         """根据触发类型选择任务"""
         if trigger_type == TriggerType.IDLE:
             # 空闲时进行全面复盘
@@ -418,7 +417,7 @@ class GuardianDaemon:
 
             if "```json" in response:
                 response = response.split("```json")[1].split("```")[0]
-            data = json.loads(response.strip())
+            json.loads(response.strip())
 
             self.stats.errors_learned_from += len(error_records)
             logger.info(f"Error review completed: {len(error_records)} errors analyzed")
@@ -668,7 +667,7 @@ class GuardianDaemon:
 
         logger.info(f"Knowledge update completed: {len(pending_knowledge)} items")
 
-    async def _validate_knowledge(self, knowledge: Dict) -> bool:
+    async def _validate_knowledge(self, knowledge: dict) -> bool:
         """验证知识"""
         prompt = f"""请验证以下知识的准确性。
 
@@ -726,7 +725,7 @@ class GuardianDaemon:
         except Exception as e:
             logger.error(f"Self-optimization failed: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取守护进程统计"""
         return {
             "running": self._running,

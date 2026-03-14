@@ -1,19 +1,19 @@
 """USMSB Platform Human Module."""
 
 from usmsb_sdk.platform.human.adapter import (
+    AssignedTask,
     HumanAgentAdapter,
     HumanAgentProfile,
     HumanAgentStatus,
     Skill,
-    AssignedTask,
     TaskStatus,
 )
 from usmsb_sdk.platform.human.talent_matching import (
-    TalentMatchingService,
     MatchingConfig,
     MatchingCriteria,
     MatchingResult,
     MatchingStrategy,
+    TalentMatchingService,
 )
 
 __all__ = [

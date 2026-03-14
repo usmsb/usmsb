@@ -25,80 +25,84 @@ warnings.warn(
 )
 
 # Re-export from new location for backward compatibility
-from usmsb_sdk.protocol.base import (
-    BaseProtocolHandler,
-    ProtocolConfig,
-    ProtocolMessage,
-    ProtocolResponse,
-    ConnectionInfo,
-)
-
 from usmsb_sdk.protocol.a2a.client import (
-    A2AClient as A2AProtocolHandler,
+    A2AAgentInfo,
     A2AEnvelope,
     A2ASkillRequest,
     A2ASkillResponse,
-    A2AAgentInfo,
 )
-
-from usmsb_sdk.protocol.http.client import (
-    HTTPClient as HTTPProtocolHandler,
-    HTTPEndpointConfig,
-    HTTPAuthConfig,
-    HTTPRequest,
-    HTTPResponse,
-    HTTPSkillEndpoint,
+from usmsb_sdk.protocol.a2a.client import (
+    A2AClient as A2AProtocolHandler,
 )
-
-from usmsb_sdk.protocol.mcp.handler import (
-    MCPHandler as MCPProtocolHandler,
-    MCPServerInfo,
+from usmsb_sdk.protocol.base import (
+    BaseProtocolHandler,
+    ConnectionInfo,
+    ProtocolConfig,
+    ProtocolMessage,
+    ProtocolResponse,
 )
-
-from usmsb_sdk.protocol.mcp.types import (
-    MCPTool,
-    MCPResource,
-    MCPPrompt,
-    MCPToolCall,
-    MCPToolResult,
-    MCPMessage,
-)
-
-from usmsb_sdk.protocol.p2p.handler import (
-    P2PHandler as P2PProtocolHandler,
-    P2PNodeInfo,
-    P2PMessage,
-    P2PSkillRequest,
-    P2PSkillResponse,
-    P2PDHTEntry,
-)
-
-from usmsb_sdk.protocol.websocket.client import (
-    WebSocketClient as WebSocketProtocolHandler,
-    WebSocketConfig,
-    WebSocketMessage,
-    WebSocketEvent,
-    WebSocketSubscription,
-)
-
 from usmsb_sdk.protocol.grpc.handler import (
-    gRPCHandler as gRPCProtocolHandler,
+    GRPC_AVAILABLE,
+    ConnectionEndpoint,
+    ConnectionPool,
+    LoadBalancingStrategy,
+    ProtoMessageBuilder,
+    call_grpc_method,
+    create_grpc_handler,
     gRPCConfig,
+    gRPCError,
+    gRPCErrorCode,
     gRPCMethod,
     gRPCRequest,
     gRPCResponse,
     gRPCServiceDefinition,
-    gRPCError,
-    gRPCErrorCode,
-    LoadBalancingStrategy,
-    ConnectionPool,
-    ConnectionEndpoint,
-    ProtoMessageBuilder,
-    GRPC_AVAILABLE,
-    create_grpc_handler,
-    call_grpc_method,
 )
-
+from usmsb_sdk.protocol.grpc.handler import (
+    gRPCHandler as gRPCProtocolHandler,
+)
+from usmsb_sdk.protocol.http.client import (
+    HTTPAuthConfig,
+    HTTPEndpointConfig,
+    HTTPRequest,
+    HTTPResponse,
+    HTTPSkillEndpoint,
+)
+from usmsb_sdk.protocol.http.client import (
+    HTTPClient as HTTPProtocolHandler,
+)
+from usmsb_sdk.protocol.mcp.handler import (
+    MCPHandler as MCPProtocolHandler,
+)
+from usmsb_sdk.protocol.mcp.handler import (
+    MCPServerInfo,
+)
+from usmsb_sdk.protocol.mcp.types import (
+    MCPMessage,
+    MCPPrompt,
+    MCPResource,
+    MCPTool,
+    MCPToolCall,
+    MCPToolResult,
+)
+from usmsb_sdk.protocol.p2p.handler import (
+    P2PDHTEntry,
+    P2PMessage,
+    P2PNodeInfo,
+    P2PSkillRequest,
+    P2PSkillResponse,
+)
+from usmsb_sdk.protocol.p2p.handler import (
+    P2PHandler as P2PProtocolHandler,
+)
+from usmsb_sdk.protocol.websocket.client import (
+    WebSocketClient as WebSocketProtocolHandler,
+)
+from usmsb_sdk.protocol.websocket.client import (
+    WebSocketConfig,
+    WebSocketEvent,
+    WebSocketMessage,
+    WebSocketSubscription,
+)
 
 __all__ = [
     # Base handler
@@ -170,7 +174,7 @@ __all__ = [
 # Protocol handler factory (backward compatibility)
 def create_protocol_handler(
     protocol: str,
-    config: Optional[ProtocolConfig] = None,
+    config: ProtocolConfig | None = None,
     **kwargs,
 ) -> BaseProtocolHandler:
     """

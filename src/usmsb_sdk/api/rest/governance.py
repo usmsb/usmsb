@@ -4,26 +4,30 @@ Governance API endpoints for AI Civilization Platform
 Provides proposal management, voting, and governance statistics.
 """
 import os
-from fastapi import APIRouter, HTTPException, Depends, Header
-from pydantic import BaseModel, Field
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 import time
-import uuid
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.database import (
     create_proposal as db_create_proposal,
+)
+from usmsb_sdk.api.database import (
     get_proposals as db_get_proposals,
-    vote_proposal as db_vote_proposal,
-    get_user_by_address,
+)
+from usmsb_sdk.api.database import (
     get_session_by_token,
-    get_db,
+    get_user_by_address,
+)
+from usmsb_sdk.api.database import (
+    vote_proposal as db_vote_proposal,
 )
 
 router = APIRouter(prefix="/governance", tags=["Governance"])
 
 
-async def get_current_admin(authorization: Optional[str] = Header(None)) -> dict:
+async def get_current_admin(authorization: str | None = Header(None)) -> dict:
     """Dependency to get current admin user - requires admin privileges."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -64,8 +68,8 @@ class ProposalCreate(BaseModel):
     description: str = Field(..., min_length=10)
     proposal_type: str = "community_initiative"
     proposer_id: str
-    changes: Dict[str, Any] = {}
-    tags: List[str] = []
+    changes: dict[str, Any] = {}
+    tags: list[str] = []
 
 
 class ProposalResponse(BaseModel):
@@ -79,7 +83,7 @@ class ProposalResponse(BaseModel):
     votes_for: int
     votes_against: int
     quorum: float
-    deadline: Optional[str]
+    deadline: str | None
     created_at: float
 
 
@@ -87,7 +91,7 @@ class VoteRequest(BaseModel):
     """Vote request."""
     voter_id: str
     support: bool  # True = for, False = against
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class GovernanceStats(BaseModel):
@@ -98,7 +102,7 @@ class GovernanceStats(BaseModel):
     participation_rate: float
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+async def get_current_user(authorization: str | None = Header(None)) -> dict:
     """Dependency to get current user from access token."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -121,7 +125,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
 
 @router.get("/proposals")
 async def list_proposals(
-    status: Optional[str] = None,
+    status: str | None = None,
     limit: int = 50
 ):
     """List all proposals."""
@@ -129,7 +133,7 @@ async def list_proposals(
 
     # Filter by status if provided
     if status:
-        proposals = [p for e in proposals if p.get('status') == status]
+        proposals = [p for p in proposals if p.get('status') == status]
 
     # Sort by created_at descending
     proposals.sort(key=lambda x: x.get('created_at', 0) or 0, reverse=True)
@@ -248,7 +252,7 @@ async def get_my_votes(user: dict = Depends(get_current_user)):
 
 
 @router.get("/voting-power")
-async def get_voting_power(authorization: Optional[str] = Header(None)):
+async def get_voting_power(authorization: str | None = Header(None)):
     """
     Get voting power for the current user.
 

@@ -2,7 +2,7 @@
 Matching-related Pydantic schemas.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -12,7 +12,7 @@ class NegotiationRequest(BaseModel):
 
     initiator_id: str
     counterpart_id: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
 
 
 class ProposalRequest(BaseModel):
@@ -28,7 +28,7 @@ class NetworkExploreRequest(BaseModel):
     """Schema for network exploration."""
 
     agent_id: str
-    target_capabilities: Optional[List[str]] = None
+    target_capabilities: list[str] | None = None
     exploration_depth: int = 2
 
 
@@ -43,8 +43,8 @@ class MatchRequest(BaseModel):
     """Schema for match request."""
 
     demand_id: str
-    supplier_ids: List[str]
-    criteria: Dict[str, Any] = {}
+    supplier_ids: list[str]
+    criteria: dict[str, Any] = {}
 
 
 class MatchResponse(BaseModel):

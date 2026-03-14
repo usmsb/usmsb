@@ -2,7 +2,7 @@
 Prompts module for Meta Agent
 """
 
-from .system_prompt import SYSTEM_PROMPT, PERSONALITY, CAPABILITIES
+from .system_prompt import CAPABILITIES, PERSONALITY, SYSTEM_PROMPT
 from .tool_prompts import TOOL_DESCRIPTIONS, get_tool_prompt
 
 __all__ = [

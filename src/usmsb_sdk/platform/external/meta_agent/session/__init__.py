@@ -26,7 +26,7 @@ Usage:
 """
 
 from .session_manager import SessionManager
-from .user_session import SessionConfig, UserSession, UserProfile
+from .user_session import SessionConfig, UserProfile, UserSession
 
 __all__ = [
     "SessionManager",

@@ -10,17 +10,21 @@ Stake Requirements:
 import json
 import logging
 import uuid
-from typing import List, Optional, Dict, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from usmsb_sdk.api.database import (
-    get_agent as db_get_agent,
     create_workflow as db_create_workflow,
+)
+from usmsb_sdk.api.database import (
+    get_agent as db_get_agent,
+)
+from usmsb_sdk.api.database import (
     get_workflows as db_get_workflows,
 )
 from usmsb_sdk.api.rest.schemas.workflow import WorkflowCreate
-from usmsb_sdk.api.rest.services.utils import safe_json_loads, create_agent_from_db_data
+from usmsb_sdk.api.rest.services.utils import create_agent_from_db_data, safe_json_loads
 from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
     require_stake_unified,
@@ -42,7 +46,7 @@ def set_workflow_service(service):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_workflow(
     workflow_create: WorkflowCreate,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Create a new workflow.
 
@@ -127,7 +131,7 @@ async def create_workflow(
 @router.post("/{workflow_id}/execute")
 async def execute_workflow(
     workflow_id: str,
-    user: Dict[str, Any] = Depends(require_stake_unified(100))
+    user: dict[str, Any] = Depends(require_stake_unified(100))
 ):
     """Execute a workflow.
 
@@ -175,7 +179,7 @@ async def execute_workflow(
 
 
 @router.get("")
-async def list_workflows(user: Dict[str, Any] = Depends(get_current_user_unified)):
+async def list_workflows(user: dict[str, Any] = Depends(get_current_user_unified)):
     """List all workflows for the authenticated agent.
 
     Requires:

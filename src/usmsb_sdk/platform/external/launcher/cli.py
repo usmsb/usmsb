@@ -10,19 +10,16 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
 
 import yaml
 
 from .config_wizard import ConfigWizard
 from .health_checker import HealthChecker, HealthStatus
-from .platform_launcher import PlatformLauncher, PlatformStatus
-from .status_monitor import StatusMonitor
+from .platform_launcher import PlatformLauncher
 
 
-def setup_logging(level: str = "INFO", log_file: Optional[str] = None) -> None:
+def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
     """Setup logging configuration."""
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -94,7 +91,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     # Restart command
-    restart_parser = subparsers.add_parser("restart", help="Restart the platform")
+    subparsers.add_parser("restart", help="Restart the platform")
 
     # Status command
     status_parser = subparsers.add_parser("status", help="Show platform status")
@@ -216,7 +213,7 @@ async def cmd_start(args: argparse.Namespace) -> int:
             logger.error("Failed to start platform")
             return 1
 
-        print(f"Platform started successfully")
+        print("Platform started successfully")
         print(f"Status: {launcher.get_status()['status']}")
         print(f"Nodes: {launcher.get_status()['node_count']}")
 
@@ -240,7 +237,7 @@ async def cmd_start(args: argparse.Namespace) -> int:
 async def cmd_stop(args: argparse.Namespace) -> int:
     """Handle stop command."""
     setup_logging(args.log_level, args.log_file)
-    logger = logging.getLogger("usmsb.cli")
+    logging.getLogger("usmsb.cli")
 
     # In a real implementation, this would connect to a running platform
     # For now, we'll just show a message
@@ -332,7 +329,7 @@ async def cmd_config(args: argparse.Namespace) -> int:
             return 1
 
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
 
             wizard = ConfigWizard()
@@ -350,7 +347,7 @@ async def cmd_config(args: argparse.Namespace) -> int:
             print(f"Configuration file not found: {args.config}")
             return 1
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             print(f.read())
 
     elif args.action == "template":
@@ -364,13 +361,13 @@ async def cmd_config(args: argparse.Namespace) -> int:
 async def cmd_health(args: argparse.Namespace) -> int:
     """Handle health command."""
     setup_logging(args.log_level, args.log_file)
-    logger = logging.getLogger("usmsb.cli")
+    logging.getLogger("usmsb.cli")
 
     config_path = Path(args.config)
     config = {}
 
     if config_path.exists():
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
 
     checker = HealthChecker(config)
@@ -418,7 +415,7 @@ async def cmd_health(args: argparse.Namespace) -> int:
         icon = status_icons.get(report.overall_status, "[?]")
         print(f"\nOverall Status: {icon} {report.overall_status.value.upper()}")
 
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(f"  Total checks: {report.summary['total']}")
         print(f"  Healthy: {report.summary['healthy']}")
         print(f"  Degraded: {report.summary['degraded']}")
@@ -455,11 +452,11 @@ async def cmd_logs(args: argparse.Namespace) -> int:
     try:
         if args.follow:
             import tailer
-            for line in tailer.follow(open(log_path, "r", encoding="utf-8")):
+            for line in tailer.follow(open(log_path, encoding="utf-8")):
                 if _filter_log_line(line, args.level, args.component):
                     print(line, end="")
         else:
-            with open(log_path, "r", encoding="utf-8") as f:
+            with open(log_path, encoding="utf-8") as f:
                 lines = f.readlines()[-args.lines:]
                 for line in lines:
                     if _filter_log_line(line, args.level, args.component):
@@ -469,7 +466,7 @@ async def cmd_logs(args: argparse.Namespace) -> int:
 
     except ImportError:
         # tailer not available, read last N lines
-        with open(log_path, "r", encoding="utf-8") as f:
+        with open(log_path, encoding="utf-8") as f:
             lines = f.readlines()[-args.lines:]
             for line in lines:
                 if _filter_log_line(line, args.level, args.component):
@@ -479,7 +476,7 @@ async def cmd_logs(args: argparse.Namespace) -> int:
         return 0
 
 
-def _filter_log_line(line: str, level: Optional[str], component: Optional[str]) -> bool:
+def _filter_log_line(line: str, level: str | None, component: str | None) -> bool:
     """Filter log line by level and component."""
     if level and level not in line:
         return False
@@ -491,7 +488,7 @@ def _filter_log_line(line: str, level: Optional[str], component: Optional[str]) 
 async def cmd_node(args: argparse.Namespace) -> int:
     """Handle node command."""
     setup_logging(args.log_level, args.log_level)
-    logger = logging.getLogger("usmsb.cli")
+    logging.getLogger("usmsb.cli")
 
     if args.action == "list":
         config_path = Path(args.config)
@@ -499,7 +496,7 @@ async def cmd_node(args: argparse.Namespace) -> int:
             print("No configuration found")
             return 1
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
 
         nodes = config.get("nodes", [])
@@ -522,7 +519,7 @@ async def cmd_node(args: argparse.Namespace) -> int:
             print(f"Configuration file not found: {args.config}")
             return 1
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
 
         if "nodes" not in config:
@@ -553,7 +550,7 @@ async def cmd_node(args: argparse.Namespace) -> int:
             print(f"Configuration file not found: {args.config}")
             return 1
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
 
         nodes = config.get("nodes", [])

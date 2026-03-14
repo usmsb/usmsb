@@ -511,7 +511,7 @@ def get_tool_prompt(tools: list) -> str:
     prompt_parts = ["## 可用工具\n"]
 
     for tool_name in tools:
-        for category, info in TOOL_DESCRIPTIONS.items():
+        for _category, info in TOOL_DESCRIPTIONS.items():
             if tool_name in info.get("tools", {}):
                 tool_info = info["tools"][tool_name]
                 prompt_parts.append(f"### {tool_name}")
@@ -530,7 +530,7 @@ def get_all_tools_prompt() -> str:
     """生成所有工具的完整说明"""
     prompt_parts = ["## 工具库\n"]
 
-    for category, info in TOOL_DESCRIPTIONS.items():
+    for _category, info in TOOL_DESCRIPTIONS.items():
         prompt_parts.append(f"\n### {info['category']}\n")
         for tool_name, tool_info in info.get("tools", {}).items():
             prompt_parts.append(f"- **{tool_name}**: {tool_info['description']}")

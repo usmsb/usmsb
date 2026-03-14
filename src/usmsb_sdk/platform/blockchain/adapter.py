@@ -11,16 +11,16 @@ import json
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class BlockchainNetwork(str, Enum):
+class BlockchainNetwork(StrEnum):
     """Supported blockchain networks."""
     ETHEREUM_MAINNET = "ethereum_mainnet"
     ETHEREUM_GOERLI = "ethereum_goerli"
@@ -31,7 +31,7 @@ class BlockchainNetwork(str, Enum):
     CUSTOM = "custom"
 
 
-class TransactionStatus(str, Enum):
+class TransactionStatus(StrEnum):
     """Transaction status."""
     PENDING = "pending"
     SUBMITTED = "submitted"
@@ -47,7 +47,7 @@ class WalletInfo:
     balance: Decimal
     network: BlockchainNetwork
     created_at: float = field(default_factory=lambda: time.time())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -57,16 +57,16 @@ class Transaction:
     from_address: str
     to_address: str
     value: Decimal
-    data: Optional[str] = None
-    gas_price: Optional[Decimal] = None
-    gas_limit: Optional[int] = None
-    nonce: Optional[int] = None
+    data: str | None = None
+    gas_price: Decimal | None = None
+    gas_limit: int | None = None
+    nonce: int | None = None
     status: TransactionStatus = TransactionStatus.PENDING
-    tx_hash: Optional[str] = None
-    block_number: Optional[int] = None
+    tx_hash: str | None = None
+    block_number: int | None = None
     created_at: float = field(default_factory=lambda: time.time())
-    confirmed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    confirmed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -74,11 +74,11 @@ class SmartContract:
     """Smart contract definition."""
     address: str
     name: str
-    abi: List[Dict[str, Any]]
-    bytecode: Optional[str] = None
+    abi: list[dict[str, Any]]
+    bytecode: str | None = None
     network: BlockchainNetwork = BlockchainNetwork.ETHEREUM_MAINNET
-    deployed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    deployed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class IBlockchainAdapter(ABC):
@@ -90,7 +90,7 @@ class IBlockchainAdapter(ABC):
     """
 
     @abstractmethod
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """
         Initialize blockchain connection.
 
@@ -113,7 +113,7 @@ class IBlockchainAdapter(ABC):
         pass
 
     @abstractmethod
-    async def create_wallet(self, password: Optional[str] = None) -> WalletInfo:
+    async def create_wallet(self, password: str | None = None) -> WalletInfo:
         """
         Create a new wallet.
 
@@ -126,7 +126,7 @@ class IBlockchainAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_wallet(self, address: str) -> Optional[WalletInfo]:
+    async def get_wallet(self, address: str) -> WalletInfo | None:
         """
         Get wallet by address.
 
@@ -157,8 +157,8 @@ class IBlockchainAdapter(ABC):
         from_address: str,
         to_address: str,
         value: Decimal,
-        private_key: Optional[str] = None,
-        data: Optional[str] = None,
+        private_key: str | None = None,
+        data: str | None = None,
     ) -> Transaction:
         """
         Transfer tokens between addresses.
@@ -176,7 +176,7 @@ class IBlockchainAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_transaction(self, tx_hash: str) -> Optional[Transaction]:
+    async def get_transaction(self, tx_hash: str) -> Transaction | None:
         """
         Get transaction by hash.
 
@@ -212,9 +212,9 @@ class IBlockchainAdapter(ABC):
     async def deploy_contract(
         self,
         bytecode: str,
-        abi: List[Dict[str, Any]],
-        constructor_args: Optional[List[Any]] = None,
-        from_address: Optional[str] = None,
+        abi: list[dict[str, Any]],
+        constructor_args: list[Any] | None = None,
+        from_address: str | None = None,
     ) -> SmartContract:
         """
         Deploy a smart contract.
@@ -235,8 +235,8 @@ class IBlockchainAdapter(ABC):
         self,
         contract_address: str,
         method: str,
-        args: Optional[List[Any]] = None,
-        from_address: Optional[str] = None,
+        args: list[Any] | None = None,
+        from_address: str | None = None,
     ) -> Any:
         """
         Call a contract method (read-only).
@@ -257,9 +257,9 @@ class IBlockchainAdapter(ABC):
         self,
         contract_address: str,
         method: str,
-        args: Optional[List[Any]] = None,
+        args: list[Any] | None = None,
         from_address: str = None,
-        private_key: Optional[str] = None,
+        private_key: str | None = None,
         value: Decimal = Decimal("0"),
     ) -> Transaction:
         """
@@ -288,7 +288,7 @@ class IBlockchainAdapter(ABC):
         self,
         contract_address: str,
         event_name: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """
         Subscribe to contract events.
@@ -334,18 +334,18 @@ class EthereumAdapter(IBlockchainAdapter):
         """
         self.network = network
         self._web3 = None
-        self._wallets: Dict[str, Dict[str, Any]] = {}
-        self._subscriptions: Dict[str, Any] = {}
-        self._contracts: Dict[str, SmartContract] = {}
+        self._wallets: dict[str, dict[str, Any]] = {}
+        self._subscriptions: dict[str, Any] = {}
+        self._contracts: dict[str, SmartContract] = {}
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize Ethereum connection."""
         try:
             # Try to import web3
             try:
-                from web3 import Web3, AsyncHTTPProvider
-                from web3.eth import AsyncEth
                 from eth_account import Account
+                from web3 import AsyncHTTPProvider, Web3
+                from web3.eth import AsyncEth
 
                 # Enable Mnemonic features
                 Account.enable_unaudited_hdwallet_features()
@@ -389,7 +389,7 @@ class EthereumAdapter(IBlockchainAdapter):
             return True  # Mock mode
         return await self._web3.is_connected()
 
-    async def create_wallet(self, password: Optional[str] = None) -> WalletInfo:
+    async def create_wallet(self, password: str | None = None) -> WalletInfo:
         """Create a new Ethereum wallet."""
         if self._web3 is None:
             # Mock wallet creation
@@ -417,7 +417,7 @@ class EthereumAdapter(IBlockchainAdapter):
             network=self.network,
         )
 
-    async def get_wallet(self, address: str) -> Optional[WalletInfo]:
+    async def get_wallet(self, address: str) -> WalletInfo | None:
         """Get wallet by address."""
         if address not in self._wallets:
             return None
@@ -443,8 +443,8 @@ class EthereumAdapter(IBlockchainAdapter):
         from_address: str,
         to_address: str,
         value: Decimal,
-        private_key: Optional[str] = None,
-        data: Optional[str] = None,
+        private_key: str | None = None,
+        data: str | None = None,
     ) -> Transaction:
         """Transfer ETH between addresses."""
         tx_id = hashlib.sha256(f"{from_address}{to_address}{value}{time.time()}".encode()).hexdigest()[:16]
@@ -506,7 +506,7 @@ class EthereumAdapter(IBlockchainAdapter):
 
         return transaction
 
-    async def get_transaction(self, tx_hash: str) -> Optional[Transaction]:
+    async def get_transaction(self, tx_hash: str) -> Transaction | None:
         """Get transaction by hash."""
         if self._web3 is None:
             return None
@@ -551,9 +551,9 @@ class EthereumAdapter(IBlockchainAdapter):
     async def deploy_contract(
         self,
         bytecode: str,
-        abi: List[Dict[str, Any]],
-        constructor_args: Optional[List[Any]] = None,
-        from_address: Optional[str] = None,
+        abi: list[dict[str, Any]],
+        constructor_args: list[Any] | None = None,
+        from_address: str | None = None,
     ) -> SmartContract:
         """Deploy a smart contract."""
         contract_id = hashlib.sha256(f"{bytecode}{time.time()}".encode()).hexdigest()[:16]
@@ -577,8 +577,8 @@ class EthereumAdapter(IBlockchainAdapter):
         self,
         contract_address: str,
         method: str,
-        args: Optional[List[Any]] = None,
-        from_address: Optional[str] = None,
+        args: list[Any] | None = None,
+        from_address: str | None = None,
     ) -> Any:
         """Call a contract method (read-only)."""
         # Mock implementation
@@ -588,9 +588,9 @@ class EthereumAdapter(IBlockchainAdapter):
         self,
         contract_address: str,
         method: str,
-        args: Optional[List[Any]] = None,
+        args: list[Any] | None = None,
         from_address: str = None,
-        private_key: Optional[str] = None,
+        private_key: str | None = None,
         value: Decimal = Decimal("0"),
     ) -> Transaction:
         """Execute a contract method (state-changing)."""
@@ -617,7 +617,7 @@ class EthereumAdapter(IBlockchainAdapter):
         self,
         contract_address: str,
         event_name: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """Subscribe to contract events."""
         import uuid
@@ -648,14 +648,14 @@ class MockBlockchainAdapter(IBlockchainAdapter):
 
     def __init__(self):
         """Initialize mock adapter."""
-        self._wallets: Dict[str, Dict[str, Any]] = {}
-        self._transactions: Dict[str, Transaction] = {}
-        self._contracts: Dict[str, SmartContract] = {}
-        self._subscriptions: Dict[str, Any] = {}
-        self._balances: Dict[str, Decimal] = {}
+        self._wallets: dict[str, dict[str, Any]] = {}
+        self._transactions: dict[str, Transaction] = {}
+        self._contracts: dict[str, SmartContract] = {}
+        self._subscriptions: dict[str, Any] = {}
+        self._balances: dict[str, Decimal] = {}
         self._block_number = 1000000
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize mock adapter."""
         logger.info("Mock blockchain adapter initialized")
         return True
@@ -669,7 +669,7 @@ class MockBlockchainAdapter(IBlockchainAdapter):
         """Always connected in mock mode."""
         return True
 
-    async def create_wallet(self, password: Optional[str] = None) -> WalletInfo:
+    async def create_wallet(self, password: str | None = None) -> WalletInfo:
         """Create a mock wallet with initial balance."""
         import secrets
         address = "0x" + secrets.token_hex(20)
@@ -688,7 +688,7 @@ class MockBlockchainAdapter(IBlockchainAdapter):
             network=BlockchainNetwork.CUSTOM,
         )
 
-    async def get_wallet(self, address: str) -> Optional[WalletInfo]:
+    async def get_wallet(self, address: str) -> WalletInfo | None:
         """Get mock wallet."""
         if address not in self._wallets:
             return None
@@ -708,8 +708,8 @@ class MockBlockchainAdapter(IBlockchainAdapter):
         from_address: str,
         to_address: str,
         value: Decimal,
-        private_key: Optional[str] = None,
-        data: Optional[str] = None,
+        private_key: str | None = None,
+        data: str | None = None,
     ) -> Transaction:
         """Mock transfer."""
         tx_id = hashlib.sha256(f"{from_address}{to_address}{value}{time.time()}".encode()).hexdigest()[:16]
@@ -747,7 +747,7 @@ class MockBlockchainAdapter(IBlockchainAdapter):
 
         return transaction
 
-    async def get_transaction(self, tx_hash: str) -> Optional[Transaction]:
+    async def get_transaction(self, tx_hash: str) -> Transaction | None:
         """Get mock transaction."""
         return self._transactions.get(tx_hash)
 
@@ -766,9 +766,9 @@ class MockBlockchainAdapter(IBlockchainAdapter):
     async def deploy_contract(
         self,
         bytecode: str,
-        abi: List[Dict[str, Any]],
-        constructor_args: Optional[List[Any]] = None,
-        from_address: Optional[str] = None,
+        abi: list[dict[str, Any]],
+        constructor_args: list[Any] | None = None,
+        from_address: str | None = None,
     ) -> SmartContract:
         """Deploy mock contract."""
         import secrets
@@ -790,8 +790,8 @@ class MockBlockchainAdapter(IBlockchainAdapter):
         self,
         contract_address: str,
         method: str,
-        args: Optional[List[Any]] = None,
-        from_address: Optional[str] = None,
+        args: list[Any] | None = None,
+        from_address: str | None = None,
     ) -> Any:
         """Mock contract call."""
         return {"result": "mock_result", "method": method, "args": args}
@@ -800,9 +800,9 @@ class MockBlockchainAdapter(IBlockchainAdapter):
         self,
         contract_address: str,
         method: str,
-        args: Optional[List[Any]] = None,
+        args: list[Any] | None = None,
         from_address: str = None,
-        private_key: Optional[str] = None,
+        private_key: str | None = None,
         value: Decimal = Decimal("0"),
     ) -> Transaction:
         """Mock contract execution."""
@@ -833,7 +833,7 @@ class MockBlockchainAdapter(IBlockchainAdapter):
         self,
         contract_address: str,
         event_name: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """Subscribe to mock events."""
         import uuid

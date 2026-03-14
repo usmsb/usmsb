@@ -8,18 +8,16 @@ with the event bus and metrics systems.
 import json
 import logging
 import sys
-import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
-
 # Context variables for request tracing
-correlation_id_var: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
-request_id_var: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
-agent_id_var: ContextVar[Optional[str]] = ContextVar("agent_id", default=None)
+correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+agent_id_var: ContextVar[str | None] = ContextVar("agent_id", default=None)
 
 
 @dataclass
@@ -28,7 +26,7 @@ class LogContext:
     service_name: str = "usmsb-sdk"
     version: str = "0.1.0"
     environment: str = "development"
-    extra_fields: Dict[str, Any] = field(default_factory=dict)
+    extra_fields: dict[str, Any] = field(default_factory=dict)
 
 
 class StructuredFormatter(logging.Formatter):
@@ -38,7 +36,7 @@ class StructuredFormatter(logging.Formatter):
 
     def __init__(
         self,
-        context: Optional[LogContext] = None,
+        context: LogContext | None = None,
         include_extra: bool = True,
     ):
         """
@@ -124,7 +122,7 @@ class StructuredLogger:
     def __init__(
         self,
         name: str,
-        context: Optional[LogContext] = None,
+        context: LogContext | None = None,
     ):
         """
         Initialize the structured logger.
@@ -185,7 +183,7 @@ class BoundLogger:
     def __init__(
         self,
         parent: StructuredLogger,
-        bound_context: Dict[str, Any],
+        bound_context: dict[str, Any],
     ):
         """
         Initialize bound logger.
@@ -236,8 +234,8 @@ class BoundLogger:
 def configure_logging(
     level: str = "INFO",
     json_output: bool = True,
-    context: Optional[LogContext] = None,
-    log_file: Optional[str] = None,
+    context: LogContext | None = None,
+    log_file: str | None = None,
 ) -> None:
     """
     Configure structured logging for the SDK.
@@ -277,7 +275,7 @@ def configure_logging(
 
 def get_logger(
     name: str,
-    context: Optional[LogContext] = None,
+    context: LogContext | None = None,
 ) -> StructuredLogger:
     """
     Get a structured logger.
@@ -292,7 +290,7 @@ def get_logger(
     return StructuredLogger(name, context)
 
 
-def set_correlation_id(correlation_id: Optional[str] = None) -> str:
+def set_correlation_id(correlation_id: str | None = None) -> str:
     """
     Set the correlation ID for the current context.
 
@@ -307,12 +305,12 @@ def set_correlation_id(correlation_id: Optional[str] = None) -> str:
     return cid
 
 
-def get_correlation_id() -> Optional[str]:
+def get_correlation_id() -> str | None:
     """Get the current correlation ID."""
     return correlation_id_var.get()
 
 
-def set_request_id(request_id: Optional[str] = None) -> str:
+def set_request_id(request_id: str | None = None) -> str:
     """
     Set the request ID for the current context.
 
@@ -327,7 +325,7 @@ def set_request_id(request_id: Optional[str] = None) -> str:
     return rid
 
 
-def get_request_id() -> Optional[str]:
+def get_request_id() -> str | None:
     """Get the current request ID."""
     return request_id_var.get()
 
@@ -337,7 +335,7 @@ def set_agent_id(agent_id: str) -> None:
     agent_id_var.set(agent_id)
 
 
-def get_agent_id() -> Optional[str]:
+def get_agent_id() -> str | None:
     """Get the current agent ID."""
     return agent_id_var.get()
 
@@ -349,9 +347,9 @@ class LoggingContext:
 
     def __init__(
         self,
-        correlation_id: Optional[str] = None,
-        request_id: Optional[str] = None,
-        agent_id: Optional[str] = None,
+        correlation_id: str | None = None,
+        request_id: str | None = None,
+        agent_id: str | None = None,
     ):
         """
         Initialize logging context.
@@ -364,9 +362,9 @@ class LoggingContext:
         self._correlation_id = correlation_id
         self._request_id = request_id
         self._agent_id = agent_id
-        self._old_correlation_id: Optional[str] = None
-        self._old_request_id: Optional[str] = None
-        self._old_agent_id: Optional[str] = None
+        self._old_correlation_id: str | None = None
+        self._old_request_id: str | None = None
+        self._old_agent_id: str | None = None
 
     def __enter__(self) -> "LoggingContext":
         """Enter the context."""

@@ -8,7 +8,6 @@
 - 查询质押信息
 """
 
-from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -62,7 +61,7 @@ async def get_blockchain_status():
         # 获取代币信息
         token_name = client.token.name()
         token_symbol = client.token.symbol()
-        decimals = client.token.decimals()
+        client.token.decimals()
 
         return BlockchainStatusResponse(
             connected=connection["connected"],

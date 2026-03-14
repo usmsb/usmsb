@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, Generic, TypeVar
 
 
 class StorageType(Enum):
@@ -48,12 +48,12 @@ class DataLocation:
     """Represents the location of data in the storage system."""
     storage_type: StorageType
     key: str
-    path: Optional[str] = None
-    cid: Optional[str] = None  # IPFS Content ID
-    version: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    path: str | None = None
+    cid: str | None = None  # IPFS Content ID
+    version: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "storage_type": self.storage_type.value,
@@ -65,7 +65,7 @@ class DataLocation:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DataLocation":
+    def from_dict(cls, data: dict[str, Any]) -> "DataLocation":
         """Create from dictionary."""
         return cls(
             storage_type=StorageType(data["storage_type"]),
@@ -81,13 +81,13 @@ class DataLocation:
 class StorageResult:
     """Result of a storage operation."""
     success: bool
-    data: Optional[Any] = None
-    location: Optional[DataLocation] = None
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: Any | None = None
+    location: DataLocation | None = None
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -131,7 +131,7 @@ class StorageInterface(ABC, Generic[T]):
         self,
         key: str,
         data: T,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         overwrite: bool = False,
     ) -> StorageResult:
         """
@@ -190,10 +190,10 @@ class StorageInterface(ABC, Generic[T]):
     @abstractmethod
     async def list_keys(
         self,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         List all keys in storage.
 
@@ -208,7 +208,7 @@ class StorageInterface(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    async def get_metadata(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, key: str) -> dict[str, Any] | None:
         """
         Get metadata for a key without retrieving the full data.
 
@@ -224,7 +224,7 @@ class StorageInterface(ABC, Generic[T]):
     async def update_metadata(
         self,
         key: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         merge: bool = True,
     ) -> StorageResult:
         """
@@ -256,10 +256,10 @@ class StorageInterface(ABC, Generic[T]):
 
     async def batch_store(
         self,
-        items: Dict[str, T],
-        metadata: Optional[Dict[str, Dict[str, Any]]] = None,
+        items: dict[str, T],
+        metadata: dict[str, dict[str, Any]] | None = None,
         overwrite: bool = False,
-    ) -> Dict[str, StorageResult]:
+    ) -> dict[str, StorageResult]:
         """
         Store multiple items in a batch.
 
@@ -282,7 +282,7 @@ class StorageInterface(ABC, Generic[T]):
             )
         return results
 
-    async def batch_retrieve(self, keys: List[str]) -> Dict[str, StorageResult]:
+    async def batch_retrieve(self, keys: list[str]) -> dict[str, StorageResult]:
         """
         Retrieve multiple items in a batch.
 
@@ -297,7 +297,7 @@ class StorageInterface(ABC, Generic[T]):
             results[key] = await self.retrieve(key)
         return results
 
-    async def batch_delete(self, keys: List[str]) -> Dict[str, StorageResult]:
+    async def batch_delete(self, keys: list[str]) -> dict[str, StorageResult]:
         """
         Delete multiple items in a batch.
 
@@ -324,7 +324,7 @@ class StorageInterface(ABC, Generic[T]):
             error="Clear operation not implemented for this storage type",
         )
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """
         Get storage statistics.
 
@@ -347,7 +347,7 @@ class AsyncStorageInterface(StorageInterface[T]):
         key: str,
         data: T,
         ttl_seconds: int,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> StorageResult:
         """
         Store data with a time-to-live.

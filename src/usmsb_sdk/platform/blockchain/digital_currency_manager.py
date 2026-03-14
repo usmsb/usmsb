@@ -5,28 +5,24 @@ Manages the platform's internal digital currency including
 issuance, transfers, staking, and exchange operations.
 """
 
-import asyncio
 import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Resource, ResourceType
 from usmsb_sdk.platform.blockchain.adapter import (
     IBlockchainAdapter,
     MockBlockchainAdapter,
-    Transaction,
     TransactionStatus,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class CurrencyType(str, Enum):
+class CurrencyType(StrEnum):
     """Types of digital currency."""
     NATIVE = "native"  # Platform native token
     STAKED = "staked"  # Staked tokens
@@ -34,7 +30,7 @@ class CurrencyType(str, Enum):
     GOVERNANCE = "governance"  # Governance tokens
 
 
-class TransactionType(str, Enum):
+class TransactionType(StrEnum):
     """Types of currency transactions."""
     MINT = "mint"
     BURN = "burn"
@@ -93,15 +89,15 @@ class CurrencyTransaction:
     """Currency transaction record."""
     id: str
     type: TransactionType
-    from_address: Optional[str]
-    to_address: Optional[str]
+    from_address: str | None
+    to_address: str | None
     amount: Decimal
     currency_type: CurrencyType
     status: TransactionStatus
-    blockchain_tx_hash: Optional[str] = None
+    blockchain_tx_hash: str | None = None
     created_at: float = field(default_factory=lambda: time.time())
-    completed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    completed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class DigitalCurrencyManager:
@@ -118,8 +114,8 @@ class DigitalCurrencyManager:
 
     def __init__(
         self,
-        blockchain_adapter: Optional[IBlockchainAdapter] = None,
-        config: Optional[CurrencyConfig] = None,
+        blockchain_adapter: IBlockchainAdapter | None = None,
+        config: CurrencyConfig | None = None,
     ):
         """
         Initialize the Digital Currency Manager.
@@ -132,14 +128,14 @@ class DigitalCurrencyManager:
         self.config = config or CurrencyConfig()
 
         # State
-        self._balances: Dict[str, CurrencyBalance] = {}
-        self._stakes: Dict[str, StakeInfo] = {}
-        self._transactions: Dict[str, CurrencyTransaction] = {}
+        self._balances: dict[str, CurrencyBalance] = {}
+        self._stakes: dict[str, StakeInfo] = {}
+        self._transactions: dict[str, CurrencyTransaction] = {}
         self._circulating_supply = self.config.initial_circulating_supply
         self._total_minted = self.config.initial_circulating_supply
 
         # Platform treasury wallet
-        self._treasury_address: Optional[str] = None
+        self._treasury_address: str | None = None
 
     async def initialize(self) -> bool:
         """
@@ -480,7 +476,7 @@ class DigitalCurrencyManager:
         self._transactions[tx_id] = transaction
         return transaction
 
-    async def get_stakes(self, address: str) -> List[StakeInfo]:
+    async def get_stakes(self, address: str) -> list[StakeInfo]:
         """
         Get all stakes for an address.
 
@@ -495,7 +491,7 @@ class DigitalCurrencyManager:
             if stake.address == address and stake.status == "active"
         ]
 
-    async def get_transaction(self, tx_id: str) -> Optional[CurrencyTransaction]:
+    async def get_transaction(self, tx_id: str) -> CurrencyTransaction | None:
         """Get transaction by ID."""
         return self._transactions.get(tx_id)
 
@@ -503,7 +499,7 @@ class DigitalCurrencyManager:
         self,
         address: str,
         limit: int = 100,
-    ) -> List[CurrencyTransaction]:
+    ) -> list[CurrencyTransaction]:
         """
         Get transaction history for an address.
 
@@ -520,7 +516,7 @@ class DigitalCurrencyManager:
         ]
         return sorted(transactions, key=lambda x: x.created_at, reverse=True)[:limit]
 
-    def get_supply_stats(self) -> Dict[str, Any]:
+    def get_supply_stats(self) -> dict[str, Any]:
         """Get currency supply statistics."""
         total_staked = sum(
             stake.amount for stake in self._stakes.values()

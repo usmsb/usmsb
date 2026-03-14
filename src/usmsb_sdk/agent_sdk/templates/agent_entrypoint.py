@@ -16,7 +16,6 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -24,16 +23,15 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
 
 from usmsb_sdk.agent_sdk import (
-    BaseAgent,
     AgentConfig,
-    SkillDefinition,
-    SkillParameter,
+    BaseAgent,
     CapabilityDefinition,
     Message,
     MessageType,
     Session,
+    SkillDefinition,
+    SkillParameter,
 )
-
 
 # Configure logging
 logging.basicConfig(
@@ -65,7 +63,7 @@ class DockerAgent(BaseAgent):
         # Perform any custom initialization here
         # e.g., load ML models, connect to databases, etc.
 
-    async def handle_message(self, message: Message, session: Optional[Session] = None) -> Optional[Message]:
+    async def handle_message(self, message: Message, session: Session | None = None) -> Message | None:
         """Handle incoming messages."""
         logger.info(f"Received message from {message.sender_id}: {message.type.value}")
 
@@ -91,7 +89,7 @@ class DockerAgent(BaseAgent):
 
         # Execute the skill based on its name
         # Override this method or register skill handlers for custom behavior
-        skill = self._skills[skill_name]
+        self._skills[skill_name]
 
         # Default skill implementations (override in subclass)
         if skill_name == "ping":
@@ -167,8 +165,6 @@ def load_config_from_env() -> AgentConfig:
     from usmsb_sdk.agent_sdk.agent_config import (
         NetworkConfig,
         SecurityConfig,
-        ProtocolConfig,
-        ProtocolType,
     )
 
     config = AgentConfig(
@@ -216,7 +212,7 @@ def load_config_from_file(config_path: str) -> AgentConfig:
     """Load agent configuration from a YAML file."""
     logger.info(f"Loading configuration from: {config_path}")
 
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         data = yaml.safe_load(f)
 
     # Parse agent section

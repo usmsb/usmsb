@@ -6,15 +6,15 @@ Supports discrete event simulation, Monte Carlo simulation, and
 agent-based modeling.
 """
 
-import asyncio
 import logging
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Environment, Goal, Resource, Risk
+from usmsb_sdk.core.elements import Agent, Environment
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
 
 logger = logging.getLogger(__name__)
@@ -55,8 +55,8 @@ class SimulationEvent:
     event_type: EventType
     timestamp: float
     source: str
-    target: Optional[str]
-    data: Dict[str, Any]
+    target: str | None
+    data: dict[str, Any]
     priority: int = 0
 
     def __lt__(self, other):
@@ -71,9 +71,9 @@ class SimulationStep:
     """A single step in the simulation."""
     step_number: int
     timestamp: float
-    events: List[SimulationEvent]
-    state_snapshot: Dict[str, Any]
-    metrics: Dict[str, float]
+    events: list[SimulationEvent]
+    state_snapshot: dict[str, Any]
+    metrics: dict[str, float]
 
 
 @dataclass
@@ -82,12 +82,12 @@ class SimulationConfig:
     simulation_type: SimulationType
     max_steps: int = 1000
     time_limit: float = 3600.0  # seconds
-    seed: Optional[int] = None
+    seed: int | None = None
     snapshot_interval: int = 10
     parallel_agents: bool = True
     event_queue_size: int = 10000
     enable_logging: bool = True
-    stop_conditions: List[Dict[str, Any]] = field(default_factory=list)
+    stop_conditions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -95,14 +95,14 @@ class SimulationResult:
     """Result of a simulation run."""
     simulation_id: str
     status: SimulationStatus
-    steps: List[SimulationStep]
-    final_state: Dict[str, Any]
-    metrics: Dict[str, float]
-    events: List[SimulationEvent]
+    steps: list[SimulationStep]
+    final_state: dict[str, Any]
+    metrics: dict[str, float]
+    events: list[SimulationEvent]
     duration: float
-    agent_stats: Dict[str, Dict[str, Any]]
-    resource_stats: Dict[str, Dict[str, Any]]
-    emergent_patterns: List[Dict[str, Any]]
+    agent_stats: dict[str, dict[str, Any]]
+    resource_stats: dict[str, dict[str, Any]]
+    emergent_patterns: list[dict[str, Any]]
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -110,23 +110,23 @@ class SimulationResult:
 class AgentState:
     """State of an agent in simulation."""
     agent_id: str
-    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
-    resources: Dict[str, float] = field(default_factory=dict)
-    goals: List[str] = field(default_factory=list)
-    active_goal: Optional[str] = None
+    position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    resources: dict[str, float] = field(default_factory=dict)
+    goals: list[str] = field(default_factory=list)
+    active_goal: str | None = None
     health: float = 1.0
     energy: float = 1.0
     status: str = "idle"
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class EnvironmentState:
     """State of the simulation environment."""
-    resources: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    conditions: Dict[str, float] = field(default_factory=dict)
-    spatial_grid: Optional[Dict[Tuple[int, int, int], Any]] = None
+    resources: dict[str, dict[str, Any]] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
+    conditions: dict[str, float] = field(default_factory=dict)
+    spatial_grid: dict[tuple[int, int, int], Any] | None = None
 
 
 class SystemSimulationService:
@@ -143,8 +143,8 @@ class SystemSimulationService:
 
     def __init__(
         self,
-        llm_adapter: Optional[ILLMAdapter] = None,
-        default_config: Optional[SimulationConfig] = None,
+        llm_adapter: ILLMAdapter | None = None,
+        default_config: SimulationConfig | None = None,
     ):
         """
         Initialize the Simulation Service.
@@ -157,14 +157,14 @@ class SystemSimulationService:
         self.default_config = default_config or SimulationConfig(
             simulation_type=SimulationType.AGENT_BASED
         )
-        self._active_simulations: Dict[str, Dict[str, Any]] = {}
-        self._event_handlers: Dict[EventType, List[Callable]] = {}
+        self._active_simulations: dict[str, dict[str, Any]] = {}
+        self._event_handlers: dict[EventType, list[Callable]] = {}
 
     async def create_simulation(
         self,
-        agents: List[Agent],
+        agents: list[Agent],
         environment: Environment,
-        config: Optional[SimulationConfig] = None,
+        config: SimulationConfig | None = None,
     ) -> str:
         """
         Create a new simulation.
@@ -225,7 +225,7 @@ class SystemSimulationService:
     async def run_simulation(
         self,
         simulation_id: str,
-        steps: Optional[int] = None,
+        steps: int | None = None,
     ) -> SimulationResult:
         """
         Run a simulation.
@@ -301,11 +301,11 @@ class SystemSimulationService:
 
     async def run_monte_carlo(
         self,
-        agents: List[Agent],
+        agents: list[Agent],
         environment: Environment,
         num_runs: int = 100,
-        config: Optional[SimulationConfig] = None,
-    ) -> Dict[str, Any]:
+        config: SimulationConfig | None = None,
+    ) -> dict[str, Any]:
         """
         Run Monte Carlo simulation.
 
@@ -321,7 +321,7 @@ class SystemSimulationService:
         config = config or SimulationConfig(simulation_type=SimulationType.MONTE_CARLO)
 
         results = []
-        for run in range(num_runs):
+        for _run in range(num_runs):
             # Vary seed for each run
             config.seed = random.randint(1, 1000000)
 
@@ -347,7 +347,7 @@ class SystemSimulationService:
         self,
         simulation_id: str,
         num_steps: int = 1,
-    ) -> List[SimulationStep]:
+    ) -> list[SimulationStep]:
         """
         Execute a specific number of steps.
 
@@ -408,9 +408,9 @@ class SystemSimulationService:
 
     async def _agent_based_step(
         self,
-        sim: Dict[str, Any],
+        sim: dict[str, Any],
         step_num: int,
-    ) -> List[SimulationEvent]:
+    ) -> list[SimulationEvent]:
         """Execute agent-based simulation step."""
         events = []
         agents = sim["agents"]
@@ -451,9 +451,9 @@ class SystemSimulationService:
 
     async def _discrete_event_step(
         self,
-        sim: Dict[str, Any],
+        sim: dict[str, Any],
         step_num: int,
-    ) -> List[SimulationEvent]:
+    ) -> list[SimulationEvent]:
         """Execute discrete event simulation step."""
         events = []
         event_queue = sim["event_queue"]
@@ -476,9 +476,9 @@ class SystemSimulationService:
 
     async def _hybrid_step(
         self,
-        sim: Dict[str, Any],
+        sim: dict[str, Any],
         step_num: int,
-    ) -> List[SimulationEvent]:
+    ) -> list[SimulationEvent]:
         """Execute hybrid simulation step."""
         # Combine agent-based and discrete event
         events = await self._agent_based_step(sim, step_num)
@@ -489,16 +489,15 @@ class SystemSimulationService:
         self,
         agent: Agent,
         state: AgentState,
-        sim: Dict[str, Any],
+        sim: dict[str, Any],
         step_num: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Determine what action an agent takes."""
         # Use LLM for intelligent decision if available
         if self.llm:
             return await self._llm_determine_action(agent, state, sim, step_num)
 
         # Default behavior based on goals and state
-        action_types = ["move", "gather", "interact", "rest", "produce", "consume"]
 
         # Weight by agent state
         weights = {
@@ -531,9 +530,9 @@ class SystemSimulationService:
         self,
         agent: Agent,
         state: AgentState,
-        sim: Dict[str, Any],
+        sim: dict[str, Any],
         step_num: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Use LLM to determine agent action."""
         prompt = f"""Determine the next action for an agent in a simulation.
 
@@ -574,8 +573,8 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
         self,
         agent: Agent,
         state: AgentState,
-        action: Dict[str, Any],
-        sim: Dict[str, Any],
+        action: dict[str, Any],
+        sim: dict[str, Any],
     ) -> None:
         """Apply the effects of an action to agent state."""
         action_type = action.get("type", "rest")
@@ -624,10 +623,10 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
     async def _process_interaction(
         self,
         agent: Agent,
-        action: Dict[str, Any],
-        sim: Dict[str, Any],
+        action: dict[str, Any],
+        sim: dict[str, Any],
         step_num: int,
-    ) -> List[SimulationEvent]:
+    ) -> list[SimulationEvent]:
         """Process interaction between agents."""
         events = []
         target_id = action.get("target")
@@ -667,8 +666,8 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
     async def _process_event(
         self,
         event: SimulationEvent,
-        sim: Dict[str, Any],
-    ) -> List[SimulationEvent]:
+        sim: dict[str, Any],
+    ) -> list[SimulationEvent]:
         """Process a discrete event and generate follow-up events."""
         follow_ups = []
 
@@ -681,7 +680,7 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
         return follow_ups
 
-    async def _check_stop_conditions(self, sim: Dict[str, Any]) -> bool:
+    async def _check_stop_conditions(self, sim: dict[str, Any]) -> bool:
         """Check if stop conditions are met."""
         config = sim["config"]
 
@@ -690,7 +689,7 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
             if cond_type == "goal_achieved":
                 # Check if any agent achieved their goal
-                for agent_id, state in sim["agent_states"].items():
+                for _agent_id, state in sim["agent_states"].items():
                     if condition.get("goal_id") in state.goals:
                         return True
 
@@ -718,8 +717,8 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
     async def _detect_emergent_patterns(
         self,
-        sim: Dict[str, Any],
-    ) -> List[Dict[str, Any]]:
+        sim: dict[str, Any],
+    ) -> list[dict[str, Any]]:
         """Detect emergent patterns in simulation."""
         patterns = []
 
@@ -760,12 +759,12 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
         return patterns
 
-    async def _take_snapshot(self, sim: Dict[str, Any]) -> None:
+    async def _take_snapshot(self, sim: dict[str, Any]) -> None:
         """Take a snapshot of simulation state."""
         # Snapshots are stored in step results
         pass
 
-    def _get_state_snapshot(self, sim: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_state_snapshot(self, sim: dict[str, Any]) -> dict[str, Any]:
         """Get a snapshot of the current state."""
         return {
             "step": sim["current_step"],
@@ -785,7 +784,7 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
             },
         }
 
-    def _calculate_metrics(self, sim: Dict[str, Any]) -> Dict[str, float]:
+    def _calculate_metrics(self, sim: dict[str, Any]) -> dict[str, float]:
         """Calculate simulation metrics."""
         agent_states = list(sim["agent_states"].values())
 
@@ -804,9 +803,9 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
     def _calculate_step_metrics(
         self,
-        sim: Dict[str, Any],
-        events: List[SimulationEvent],
-    ) -> Dict[str, float]:
+        sim: dict[str, Any],
+        events: list[SimulationEvent],
+    ) -> dict[str, float]:
         """Calculate metrics for a single step."""
         return {
             "events_count": len(events),
@@ -814,7 +813,7 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
             "interaction_events": sum(1 for e in events if e.event_type == EventType.AGENT_INTERACTION),
         }
 
-    def _compile_agent_stats(self, sim: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    def _compile_agent_stats(self, sim: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Compile statistics for each agent."""
         return {
             aid: {
@@ -826,14 +825,14 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
             for aid, state in sim["agent_states"].items()
         }
 
-    def _compile_resource_stats(self, sim: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    def _compile_resource_stats(self, sim: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Compile resource statistics."""
         return sim["env_state"].resources.copy()
 
     def _aggregate_monte_carlo_results(
         self,
-        results: List[SimulationResult],
-    ) -> Dict[str, float]:
+        results: list[SimulationResult],
+    ) -> dict[str, float]:
         """Aggregate Monte Carlo results."""
         if not results:
             return {}
@@ -856,9 +855,9 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
     def _calculate_confidence_intervals(
         self,
-        results: List[SimulationResult],
+        results: list[SimulationResult],
         confidence: float = 0.95,
-    ) -> Dict[str, Tuple[float, float]]:
+    ) -> dict[str, tuple[float, float]]:
         """Calculate confidence intervals for metrics."""
         import math
 
@@ -885,16 +884,16 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
 
     def _calculate_distribution_stats(
         self,
-        results: List[SimulationResult],
-    ) -> Dict[str, Dict[str, float]]:
+        results: list[SimulationResult],
+    ) -> dict[str, dict[str, float]]:
         """Calculate distribution statistics."""
         # Percentiles, skewness, kurtosis would go here
         return {}
 
     def _identify_outliers(
         self,
-        results: List[SimulationResult],
-    ) -> List[Dict[str, Any]]:
+        results: list[SimulationResult],
+    ) -> list[dict[str, Any]]:
         """Identify outlier simulations."""
         outliers = []
 
@@ -930,7 +929,7 @@ Provide response in JSON format: {{"type": "action_type", "target": "target_id_o
             self._event_handlers[event_type] = []
         self._event_handlers[event_type].append(handler)
 
-    def get_simulation_status(self, simulation_id: str) -> Optional[SimulationStatus]:
+    def get_simulation_status(self, simulation_id: str) -> SimulationStatus | None:
         """Get the status of a simulation."""
         if simulation_id in self._active_simulations:
             return self._active_simulations[simulation_id]["status"]

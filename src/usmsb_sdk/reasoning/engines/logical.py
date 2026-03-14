@@ -4,19 +4,19 @@ Logical Reasoning Engines
 逻辑推理引擎：演绎、归纳、溯因推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
 import re
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
+    ReasoningType,
     UncertaintyMeasure,
     UncertaintyType,
 )
@@ -30,9 +30,9 @@ class LogicalRule:
 
     rule_id: str
     rule_type: str
-    premises: List[str]
+    premises: list[str]
     conclusion: str
-    conditions: List[str] = field(default_factory=list)
+    conditions: list[str] = field(default_factory=list)
     priority: int = 0
     confidence: float = 1.0
 
@@ -52,12 +52,12 @@ class DeductiveEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._rules: Dict[str, LogicalRule] = {}
-        self._facts: Set[str] = set()
+        self._rules: dict[str, LogicalRule] = {}
+        self._facts: set[str] = set()
         self._initialize_default_rules()
 
     @property
@@ -86,7 +86,7 @@ class DeductiveEngine(BaseReasoningEngine):
         formula = re.sub(r"\s+", " ", formula)
         return formula
 
-    def _match_pattern(self, pattern: str, formula: str) -> Optional[Dict[str, str]]:
+    def _match_pattern(self, pattern: str, formula: str) -> dict[str, str] | None:
         pattern = self._normalize_formula(pattern)
         formula = self._normalize_formula(formula)
 
@@ -111,7 +111,7 @@ class DeductiveEngine(BaseReasoningEngine):
 
         return None
 
-    def _apply_modus_ponens(self, premises: List[str]) -> Tuple[Optional[str], ConfidenceScore]:
+    def _apply_modus_ponens(self, premises: list[str]) -> tuple[str | None, ConfidenceScore]:
         for i, p1 in enumerate(premises):
             for j, p2 in enumerate(premises):
                 if i == j:
@@ -133,7 +133,7 @@ class DeductiveEngine(BaseReasoningEngine):
 
         return None, ConfidenceScore(value=0.0)
 
-    def _apply_modus_tollens(self, premises: List[str]) -> Tuple[Optional[str], ConfidenceScore]:
+    def _apply_modus_tollens(self, premises: list[str]) -> tuple[str | None, ConfidenceScore]:
         for i, p1 in enumerate(premises):
             for j, p2 in enumerate(premises):
                 if i == j:
@@ -152,12 +152,12 @@ class DeductiveEngine(BaseReasoningEngine):
         return None, ConfidenceScore(value=0.0)
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
         normalized_premises = [self._normalize_formula(str(p)) for p in premises]
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
         derived_facts = set(normalized_premises)
         all_derived = []
 
@@ -224,7 +224,7 @@ class DeductiveEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         for step in reasoning_result.reasoning_chain:
@@ -240,7 +240,7 @@ class DeductiveEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         normalized_premises = [self._normalize_formula(str(p)) for p in premises]
         normalized_conclusion = self._normalize_formula(str(conclusion))
 
@@ -268,23 +268,23 @@ class InductiveEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._observations: List[Dict[str, Any]] = []
-        self._hypotheses: Dict[str, Dict[str, Any]] = {}
+        self._observations: list[dict[str, Any]] = []
+        self._hypotheses: dict[str, dict[str, Any]] = {}
 
     @property
     def engine_type(self) -> ReasoningType:
         return ReasoningType.INDUCTIVE
 
-    def add_observation(self, observation: Dict[str, Any]) -> None:
+    def add_observation(self, observation: dict[str, Any]) -> None:
         self._observations.append(observation)
 
     def _calculate_support(
-        self, hypothesis: str, observations: List[Dict[str, Any]]
-    ) -> Tuple[int, int, float]:
+        self, hypothesis: str, observations: list[dict[str, Any]]
+    ) -> tuple[int, int, float]:
         supporting = 0
         total = len(observations)
 
@@ -296,7 +296,7 @@ class InductiveEngine(BaseReasoningEngine):
         return supporting, total, ratio
 
     def _observation_supports_hypothesis(
-        self, observation: Dict[str, Any], hypothesis: str
+        self, observation: dict[str, Any], hypothesis: str
     ) -> bool:
         obs_str = str(observation.get("content", observation))
         hyp_parts = hypothesis.lower().split()
@@ -304,13 +304,13 @@ class InductiveEngine(BaseReasoningEngine):
         match_count = sum(1 for part in hyp_parts if part in obs_str.lower())
         return match_count >= len(hyp_parts) * 0.5
 
-    def _generate_hypothesis(self, observations: List[Dict[str, Any]]) -> List[str]:
+    def _generate_hypothesis(self, observations: list[dict[str, Any]]) -> list[str]:
         hypotheses = []
 
         if not observations:
             return hypotheses
 
-        feature_counts: Dict[str, int] = defaultdict(int)
+        feature_counts: dict[str, int] = defaultdict(int)
 
         for obs in observations:
             content = str(obs.get("content", obs))
@@ -327,7 +327,7 @@ class InductiveEngine(BaseReasoningEngine):
         return hypotheses
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
@@ -340,7 +340,7 @@ class InductiveEngine(BaseReasoningEngine):
 
         self._observations.extend(observations)
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         hypotheses = self._generate_hypothesis(observations)
 
@@ -412,7 +412,7 @@ class InductiveEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         if reasoning_result.confidence.value < 0.5:
@@ -425,7 +425,7 @@ class InductiveEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         observations = [{"content": str(p)} for p in premises]
         hypothesis = str(conclusion)
 
@@ -451,11 +451,11 @@ class AbductiveEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._explanation_templates: Dict[str, Dict[str, Any]] = {}
+        self._explanation_templates: dict[str, dict[str, Any]] = {}
 
     @property
     def engine_type(self) -> ReasoningType:
@@ -464,8 +464,8 @@ class AbductiveEngine(BaseReasoningEngine):
     def add_explanation_template(
         self,
         effect: str,
-        possible_causes: List[str],
-        prior_probabilities: Optional[Dict[str, float]] = None,
+        possible_causes: list[str],
+        prior_probabilities: dict[str, float] | None = None,
     ) -> None:
         self._explanation_templates[effect] = {
             "possible_causes": possible_causes,
@@ -474,8 +474,8 @@ class AbductiveEngine(BaseReasoningEngine):
         }
 
     def _generate_hypotheses(
-        self, observation: str, context: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, observation: str, context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         hypotheses = []
 
         if observation in self._explanation_templates:
@@ -508,8 +508,8 @@ class AbductiveEngine(BaseReasoningEngine):
         return hypotheses
 
     def _evaluate_hypothesis(
-        self, hypothesis: Dict[str, Any], observation: str, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, hypothesis: dict[str, Any], observation: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         cause = hypothesis["cause"]
         prior = hypothesis["prior_probability"]
 
@@ -538,7 +538,7 @@ class AbductiveEngine(BaseReasoningEngine):
         }
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
@@ -551,7 +551,7 @@ class AbductiveEngine(BaseReasoningEngine):
 
         observation = str(premises[0])
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         hypotheses = self._generate_hypotheses(observation, context)
 
@@ -592,7 +592,7 @@ class AbductiveEngine(BaseReasoningEngine):
                 value=best_explanation["overall_score"],
                 parameters={"method": "bayesian_abduction"},
             ),
-            alternatives=[e for e in evaluated[1:4]],
+            alternatives=list(evaluated[1:4]),
             explanations=[
                 f"对观察 '{observation}' 的最佳解释推理",
                 f"最佳解释: {best_explanation['cause']}",
@@ -605,7 +605,7 @@ class AbductiveEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         if reasoning_result.confidence.value < 0.3:
@@ -616,14 +616,14 @@ class AbductiveEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         if not premises:
             return ConfidenceScore(value=0.0)
 
         observation = str(premises[0])
         conclusion_str = str(conclusion)
 
-        hypotheses = self._generate_hypotheses(obsation, {})
+        hypotheses = self._generate_hypotheses(observation, {})
 
         for hyp in hypotheses:
             if hyp["cause"] == conclusion_str:

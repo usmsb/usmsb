@@ -5,7 +5,7 @@ SQLAlchemy models for persistent storage of USMSB SDK entities.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -17,7 +17,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
@@ -36,16 +35,16 @@ class AgentModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)  # AgentType enum value
     state: Mapped[str] = mapped_column(String(50), default="idle")  # AgentState enum value
-    capabilities: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    attributes: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    metadata: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    capabilities: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    goals: Mapped[List["GoalModel"]] = relationship("GoalModel", back_populates="agent", cascade="all, delete-orphan")
-    resources: Mapped[List["AgentResourceModel"]] = relationship("AgentResourceModel", back_populates="agent", cascade="all, delete-orphan")
-    rules: Mapped[List["AgentRuleModel"]] = relationship("AgentRuleModel", back_populates="agent", cascade="all, delete-orphan")
+    goals: Mapped[list["GoalModel"]] = relationship("GoalModel", back_populates="agent", cascade="all, delete-orphan")
+    resources: Mapped[list["AgentResourceModel"]] = relationship("AgentResourceModel", back_populates="agent", cascade="all, delete-orphan")
+    rules: Mapped[list["AgentRuleModel"]] = relationship("AgentRuleModel", back_populates="agent", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<AgentModel(id={self.id}, name={self.name}, type={self.type})>"
@@ -62,15 +61,15 @@ class GoalModel(Base):
     priority: Mapped[float] = mapped_column(Float, default=0.5)
     status: Mapped[str] = mapped_column(String(50), default="pending")  # GoalStatus enum value
     progress: Mapped[float] = mapped_column(Float, default=0.0)
-    target_metrics: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    parent_goal_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("goals.id"), nullable=True)
+    target_metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    parent_goal_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("goals.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     agent: Mapped["AgentModel"] = relationship("AgentModel", back_populates="goals")
-    sub_goals: Mapped[List["GoalModel"]] = relationship("GoalModel", remote_side=[id], backref="parent_goal")
+    sub_goals: Mapped[list["GoalModel"]] = relationship("GoalModel", remote_side=[id], backref="parent_goal")
 
     def __repr__(self) -> str:
         return f"<GoalModel(id={self.id}, name={self.name}, status={self.status})>"
@@ -84,10 +83,10 @@ class ResourceModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)  # ResourceType enum value
     quantity: Mapped[float] = mapped_column(Float, default=0.0)
-    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    max_quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    attributes: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    environment_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    max_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    environment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -104,9 +103,9 @@ class AgentResourceModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     quantity: Mapped[float] = mapped_column(Float, default=0.0)
-    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    max_quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    attributes: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    max_quantity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -125,11 +124,11 @@ class RuleModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     rule_type: Mapped[str] = mapped_column(String(50), default="constraint")  # constraint, permission, obligation
-    conditions: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    actions: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    conditions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    actions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     priority: Mapped[float] = mapped_column(Float, default=0.5)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    environment_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
+    environment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -146,8 +145,8 @@ class AgentRuleModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     rule_type: Mapped[str] = mapped_column(String(50), default="constraint")
-    conditions: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    actions: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    conditions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    actions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     priority: Mapped[float] = mapped_column(Float, default=0.5)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -172,8 +171,8 @@ class RiskModel(Base):
     risk_level: Mapped[str] = mapped_column(String(50), default="medium")  # low, medium, high, critical
     mitigation_strategy: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="identified")  # identified, mitigating, resolved, accepted
-    agent_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
-    environment_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
+    agent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
+    environment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -189,12 +188,12 @@ class InformationModel(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=True)
     info_type: Mapped[str] = mapped_column(String(50), default="general")  # fact, opinion, instruction, etc.
-    source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(255), nullable=True)
     credibility: Mapped[float] = mapped_column(Float, default=0.5)
     relevance: Mapped[float] = mapped_column(Float, default=0.5)
-    tags: Mapped[List[str]] = mapped_column(JSON, default=list)
-    metadata: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    agent_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    agent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -210,16 +209,16 @@ class EnvironmentModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[str] = mapped_column(String(50), default="general")  # EnvironmentType enum value
     state: Mapped[str] = mapped_column(String(50), default="active")  # EnvironmentState enum value
-    constraints: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    attributes: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    parent_environment_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
+    constraints: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    parent_environment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    resources: Mapped[List["ResourceModel"]] = relationship("ResourceModel", back_populates="environment")
-    rules: Mapped[List["RuleModel"]] = relationship("RuleModel", back_populates="environment")
-    risks: Mapped[List["RiskModel"]] = relationship("RiskModel", back_populates="environment")
+    resources: Mapped[list["ResourceModel"]] = relationship("ResourceModel", back_populates="environment")
+    rules: Mapped[list["RuleModel"]] = relationship("RuleModel", back_populates="environment")
+    risks: Mapped[list["RiskModel"]] = relationship("RiskModel", back_populates="environment")
 
     def __repr__(self) -> str:
         return f"<EnvironmentModel(id={self.id}, name={self.name}, type={self.type})>"
@@ -233,13 +232,13 @@ class WorkflowModel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="pending")  # WorkflowStatus enum value
-    steps: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list)
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     current_step: Mapped[int] = mapped_column(Integer, default=0)
     agent_id: Mapped[str] = mapped_column(String(36), ForeignKey("agents.id"), nullable=False)
-    result: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
-    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -254,12 +253,12 @@ class SimulationResultModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     simulation_id: Mapped[str] = mapped_column(String(36), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="pending")
-    config: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    final_state: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    metrics: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    agent_stats: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    resource_stats: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    emergent_patterns: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list)
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    final_state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    agent_stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    resource_stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    emergent_patterns: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     duration: Mapped[float] = mapped_column(Float, default=0.0)
     steps_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -275,11 +274,11 @@ class EventLogModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     event_type: Mapped[str] = mapped_column(String(100), nullable=False)
     source: Mapped[str] = mapped_column(String(255), nullable=False)
-    target: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    target: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    agent_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
-    environment_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
+    agent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
+    environment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
 
     def __repr__(self) -> str:
         return f"<EventLogModel(id={self.id}, type={self.event_type})>"
@@ -292,10 +291,10 @@ class MetricsModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     metric_name: Mapped[str] = mapped_column(String(255), nullable=False)
     metric_value: Mapped[float] = mapped_column(Float, nullable=False)
-    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    tags: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
-    agent_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
-    environment_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    tags: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
+    agent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("agents.id"), nullable=True)
+    environment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("environments.id"), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     def __repr__(self) -> str:

@@ -13,14 +13,17 @@ Authentication: All endpoints require X-API-Key + X-Agent-ID headers.
 
 import time
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from usmsb_sdk.api.database import get_db, get_agent_wallet, update_agent_stake
-from usmsb_sdk.api.rest.unified_auth import get_current_user_unified, require_stake_unified, ErrorCode
+from usmsb_sdk.api.database import get_agent_wallet, get_db, update_agent_stake
 from usmsb_sdk.api.rest.api_key_manager import get_stake_tier, get_tier_benefits
+from usmsb_sdk.api.rest.unified_auth import (
+    ErrorCode,
+    get_current_user_unified,
+    require_stake_unified,
+)
 
 router = APIRouter(prefix="/staking", tags=["Staking"])
 
@@ -51,7 +54,7 @@ class StakingInfoResponse(BaseModel):
     stake_status: str
     stake_tier: str
     locked_stake: float
-    unlock_available_at: Optional[float] = None
+    unlock_available_at: float | None = None
     pending_rewards: float
     apy: float
     tier_benefits: dict
@@ -63,7 +66,7 @@ class RewardsResponse(BaseModel):
     agent_id: str
     pending_rewards: float
     total_claimed: float
-    last_claim_at: Optional[float] = None
+    last_claim_at: float | None = None
     apy: float
 
 
@@ -92,7 +95,7 @@ def calculate_apy(staked_amount: float) -> float:
     return BASE_APY + (max(0, tier_level - 1) * APY_BONUS_PER_TIER)
 
 
-def calculate_pending_rewards(agent_id: str, staked_amount: float, last_claim_at: Optional[float]) -> float:
+def calculate_pending_rewards(agent_id: str, staked_amount: float, last_claim_at: float | None) -> float:
     """Calculate pending rewards based on time elapsed since last claim."""
     if staked_amount <= 0:
         return 0.0

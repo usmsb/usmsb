@@ -16,20 +16,19 @@ Core Formula:
 """
 
 import asyncio
-import json
 import logging
 import math
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class PricingStrategy(str, Enum):
+class PricingStrategy(StrEnum):
     """Pricing strategy modes."""
 
     CONSERVATIVE = "conservative"  # Lower prices, faster deals
@@ -39,7 +38,7 @@ class PricingStrategy(str, Enum):
     AUCTION = "auction"  # Competitive bidding
 
 
-class ServiceCategory(str, Enum):
+class ServiceCategory(StrEnum):
     """Service categories for scarcity calculation."""
 
     GENERAL = "general"  # Common services
@@ -81,7 +80,7 @@ class PricingFactor:
     confidence: float  # How confident we are in this factor
     reasoning: str  # Human-readable explanation
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "value": round(self.value, 4),
@@ -97,14 +96,14 @@ class PricingResult:
 
     base_price: float
     final_price: float
-    price_range: Dict[str, float]  # min, max, recommended
-    factors: List[PricingFactor]
-    market_conditions: Dict[str, Any]
+    price_range: dict[str, float]  # min, max, recommended
+    factors: list[PricingFactor]
+    market_conditions: dict[str, Any]
     confidence: float
     strategy_used: PricingStrategy
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "basePrice": round(self.base_price, 4),
             "finalPrice": round(self.final_price, 4),
@@ -126,7 +125,7 @@ class PriceHistory:
     """Historical price data for analysis."""
 
     service_type: str
-    prices: List[Dict[str, Any]]  # [{price, volume, timestamp}, ...]
+    prices: list[dict[str, Any]]  # [{price, volume, timestamp}, ...]
     avg_price: float
     price_volatility: float
     trend_direction: float  # -1 to 1 (falling to rising)
@@ -210,14 +209,14 @@ class DynamicPricingService:
         self.matching = matching_service
         self.db = db_connection
 
-        self._market_snapshots: Dict[str, MarketSnapshot] = {}
-        self._price_history: Dict[str, PriceHistory] = {}
-        self._service_stats: Dict[str, Dict[str, Any]] = defaultdict(dict)
+        self._market_snapshots: dict[str, MarketSnapshot] = {}
+        self._price_history: dict[str, PriceHistory] = {}
+        self._service_stats: dict[str, dict[str, Any]] = defaultdict(dict)
 
         self._running = False
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
 
-        self.on_price_updated: Optional[Callable[[str, float], None]] = None
+        self.on_price_updated: Callable[[str, float], None] | None = None
 
     async def start(self) -> None:
         """Start background analysis tasks."""
@@ -265,10 +264,10 @@ class DynamicPricingService:
 
     async def _analyze_market_conditions(self) -> None:
         """Analyze current market conditions for all service types."""
-        for service_type, history in list(self._price_history.items()):
+        for service_type, _history in list(self._price_history.items()):
             await self._update_market_snapshot(service_type)
 
-    async def _update_market_snapshot(self, service_type: str) -> Optional[MarketSnapshot]:
+    async def _update_market_snapshot(self, service_type: str) -> MarketSnapshot | None:
         """Update market snapshot for a service type."""
         history = self._price_history.get(service_type)
         if not history or not history.prices:
@@ -354,12 +353,12 @@ class DynamicPricingService:
         base_price: float,
         service_type: str,
         supplier_id: str,
-        demander_id: Optional[str] = None,
+        demander_id: str | None = None,
         supplier_reputation: float = 0.5,
         demander_urgency: float = 0.0,
         service_category: ServiceCategory = ServiceCategory.GENERAL,
         strategy: PricingStrategy = PricingStrategy.DYNAMIC,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> PricingResult:
         """
         Calculate intelligent price based on multiple factors.
@@ -378,7 +377,7 @@ class DynamicPricingService:
         Returns:
             PricingResult with final price and all factor breakdowns
         """
-        factors: List[PricingFactor] = []
+        factors: list[PricingFactor] = []
         context = context or {}
 
         factor_1 = await self._calculate_supply_demand_factor(service_type, context)
@@ -460,7 +459,7 @@ class DynamicPricingService:
     async def _calculate_supply_demand_factor(
         self,
         service_type: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> PricingFactor:
         """
         Calculate supply-demand factor.
@@ -512,7 +511,7 @@ class DynamicPricingService:
     def _calculate_quality_factor(
         self,
         reputation: float,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> PricingFactor:
         """
         Calculate quality factor based on reputation.
@@ -546,7 +545,7 @@ class DynamicPricingService:
     async def _calculate_momentum_factor(
         self,
         service_type: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> PricingFactor:
         """
         Calculate market momentum factor.
@@ -589,7 +588,7 @@ class DynamicPricingService:
     def _calculate_urgency_factor(
         self,
         urgency: float,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> PricingFactor:
         """
         Calculate urgency factor.
@@ -629,7 +628,7 @@ class DynamicPricingService:
         self,
         service_type: str,
         category: ServiceCategory,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> PricingFactor:
         """
         Calculate scarcity factor.
@@ -687,7 +686,7 @@ class DynamicPricingService:
         service_type: str,
         reputation: float,
         strategy: PricingStrategy,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> PricingFactor:
         """
         Calculate competitive positioning factor.
@@ -743,7 +742,7 @@ class DynamicPricingService:
 
     # ==================== Utility Methods ====================
 
-    def _get_market_conditions_summary(self, service_type: str) -> Dict[str, Any]:
+    def _get_market_conditions_summary(self, service_type: str) -> dict[str, Any]:
         """Get summary of current market conditions."""
         snapshot = self._market_snapshots.get(service_type)
         history = self._price_history.get(service_type)
@@ -762,7 +761,7 @@ class DynamicPricingService:
         self,
         service_type: str,
         target_position: str = "market",  # "budget", "market", "premium"
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get price recommendation for a service type."""
         history = self._price_history.get(service_type)
 
@@ -790,7 +789,7 @@ class DynamicPricingService:
                 "positioning": "Market-aligned pricing",
             }
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get pricing service statistics."""
         return {
             "trackedServiceTypes": len(self._price_history),
@@ -803,7 +802,7 @@ class DynamicPricingService:
         self,
         service_type: str,
         days: int = 7,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get price history for a service type."""
         history = self._price_history.get(service_type)
 
@@ -814,7 +813,7 @@ class DynamicPricingService:
         return [p for p in history.prices if p["timestamp"] > cutoff]
 
 
-_dynamic_pricing_service: Optional[DynamicPricingService] = None
+_dynamic_pricing_service: DynamicPricingService | None = None
 
 
 async def get_dynamic_pricing_service() -> DynamicPricingService:

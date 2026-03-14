@@ -4,13 +4,10 @@
 评估和监控系统能力，识别弱点
 """
 
-import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Any
 
 from .models import (
     Capability,
@@ -28,8 +25,8 @@ class AssessmentContext:
 
     task_type: str
     difficulty: float
-    time_limit: Optional[float] = None
-    resource_constraints: Dict[str, Any] = field(default_factory=dict)
+    time_limit: float | None = None
+    resource_constraints: dict[str, Any] = field(default_factory=dict)
     previous_attempts: int = 0
 
 
@@ -42,8 +39,8 @@ class WeaknessAnalysis:
     current_level: float
     target_level: float
     gap: float
-    root_causes: List[str]
-    improvement_suggestions: List[str]
+    root_causes: list[str]
+    improvement_suggestions: list[str]
     priority: float
 
 
@@ -63,12 +60,12 @@ class CapabilityAssessor:
         self.llm = llm_manager
         self.knowledge = knowledge_base
 
-        self._capabilities: Dict[str, Capability] = {}
-        self._performance_metrics: Dict[str, PerformanceMetric] = {}
-        self._assessment_history: List[Dict[str, Any]] = []
-        self._weakness_cache: Dict[str, WeaknessAnalysis] = {}
+        self._capabilities: dict[str, Capability] = {}
+        self._performance_metrics: dict[str, PerformanceMetric] = {}
+        self._assessment_history: list[dict[str, Any]] = []
+        self._weakness_cache: dict[str, WeaknessAnalysis] = {}
 
-        self._capability_graph: Dict[str, List[str]] = {}
+        self._capability_graph: dict[str, list[str]] = {}
 
         self._initialized = False
 
@@ -152,8 +149,8 @@ class CapabilityAssessor:
     async def assess_capability(
         self,
         capability_id: str,
-        context: Optional[AssessmentContext] = None,
-    ) -> Dict[str, Any]:
+        context: AssessmentContext | None = None,
+    ) -> dict[str, Any]:
         """
         评估单项能力
 
@@ -215,7 +212,7 @@ class CapabilityAssessor:
 
         return recent_avg - older_avg
 
-    async def _check_prerequisites(self, capability: Capability) -> Dict[str, bool]:
+    async def _check_prerequisites(self, capability: Capability) -> dict[str, bool]:
         """检查前置能力是否满足"""
         results = {}
         for prereq_id in capability.prerequisite_ids:
@@ -226,7 +223,7 @@ class CapabilityAssessor:
                 results[prereq_id] = False
         return results
 
-    def _get_derived_capabilities(self, capability_id: str) -> List[Dict[str, Any]]:
+    def _get_derived_capabilities(self, capability_id: str) -> list[dict[str, Any]]:
         """获取派生能力"""
         derived = []
         for cap_id, prereqs in self._capability_graph.items():
@@ -242,7 +239,7 @@ class CapabilityAssessor:
                     )
         return derived
 
-    def _identify_strengths(self, capability: Capability) -> List[str]:
+    def _identify_strengths(self, capability: Capability) -> list[str]:
         """识别能力优势"""
         strengths = []
 
@@ -257,7 +254,7 @@ class CapabilityAssessor:
 
         return strengths
 
-    def _identify_weaknesses(self, capability: Capability) -> List[str]:
+    def _identify_weaknesses(self, capability: Capability) -> list[str]:
         """识别能力弱点"""
         weaknesses = []
 
@@ -283,8 +280,8 @@ class CapabilityAssessor:
     def _generate_recommendations(
         self,
         capability: Capability,
-        context: Optional[AssessmentContext],
-    ) -> List[str]:
+        context: AssessmentContext | None,
+    ) -> list[str]:
         """生成改进建议"""
         recommendations = []
 
@@ -307,7 +304,7 @@ class CapabilityAssessor:
 
         return recommendations
 
-    async def assess_all_capabilities(self) -> Dict[str, Any]:
+    async def assess_all_capabilities(self) -> dict[str, Any]:
         """
         评估所有能力
 
@@ -339,7 +336,7 @@ class CapabilityAssessor:
             "improvement_priorities": self._get_improvement_priorities(),
         }
 
-    def _get_top_capabilities(self, n: int, ascending: bool) -> List[Dict[str, Any]]:
+    def _get_top_capabilities(self, n: int, ascending: bool) -> list[dict[str, Any]]:
         """获取顶部能力"""
         sorted_caps = sorted(
             self._capabilities.values(),
@@ -356,7 +353,7 @@ class CapabilityAssessor:
             for c in sorted_caps[:n]
         ]
 
-    def _get_improvement_priorities(self) -> List[Dict[str, Any]]:
+    def _get_improvement_priorities(self) -> list[dict[str, Any]]:
         """获取改进优先级"""
         priorities = []
 
@@ -390,7 +387,7 @@ class CapabilityAssessor:
         capability_id: str,
         success: bool,
         performance_score: float,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ):
         """
         记录能力表现
@@ -436,7 +433,7 @@ class CapabilityAssessor:
                 if all_prereqs_met and performance > 0.7:
                     dependent.score = min(1.0, dependent.score + 0.02)
 
-    async def identify_weaknesses(self) -> List[WeaknessAnalysis]:
+    async def identify_weaknesses(self) -> list[WeaknessAnalysis]:
         """
         识别能力弱点
 
@@ -469,7 +466,7 @@ class CapabilityAssessor:
 
         return sorted(weaknesses, key=lambda w: w.priority, reverse=True)
 
-    async def _analyze_root_causes(self, capability: Capability) -> List[str]:
+    async def _analyze_root_causes(self, capability: Capability) -> list[str]:
         """分析弱点根本原因"""
         causes = []
 
@@ -517,8 +514,8 @@ class CapabilityAssessor:
     async def _generate_improvement_suggestions(
         self,
         capability: Capability,
-        root_causes: List[str],
-    ) -> List[str]:
+        root_causes: list[str],
+    ) -> list[str]:
         """生成改进建议"""
         suggestions = []
 
@@ -586,7 +583,7 @@ class CapabilityAssessor:
         if metric_name in self._performance_metrics:
             self._performance_metrics[metric_name].update(value)
 
-    async def get_performance_summary(self) -> Dict[str, Any]:
+    async def get_performance_summary(self) -> dict[str, Any]:
         """获取性能摘要"""
         return {
             "metrics": {
@@ -611,11 +608,11 @@ class CapabilityAssessor:
         if not self._initialized:
             await self.initialize()
 
-    def get_capability(self, capability_id: str) -> Optional[Capability]:
+    def get_capability(self, capability_id: str) -> Capability | None:
         """获取能力"""
         return self._capabilities.get(capability_id)
 
-    def get_all_capabilities(self) -> Dict[str, Capability]:
+    def get_all_capabilities(self) -> dict[str, Capability]:
         """获取所有能力"""
         return self._capabilities.copy()
 

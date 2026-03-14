@@ -5,7 +5,8 @@ Tools Registry - 工具注册表
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from ..session.user_session import UserSession
@@ -28,10 +29,10 @@ class Tool:
         name: str,
         description: str,
         handler: Callable,
-        required_permissions: Optional[List[str]] = None,
+        required_permissions: list[str] | None = None,
         security_level: str = "low",  # low, medium, high
         requires_session: bool = False,
-        parameters: Optional[Dict[str, Any]] = None,
+        parameters: dict[str, Any] | None = None,
     ):
         self.name = name
         self.description = description
@@ -61,7 +62,7 @@ class Tool:
             # 统一传递 params 字典格式
             return await self.handler(params=kwargs)
 
-    def to_function_schema(self, provider: str = "anthropic") -> Dict[str, Any]:
+    def to_function_schema(self, provider: str = "anthropic") -> dict[str, Any]:
         """转换为 Function Calling 的 JSON Schema 格式
 
         Args:
@@ -96,7 +97,7 @@ class Tool:
                 },
             }
 
-    def _get_parameters(self) -> Dict[str, Any]:
+    def _get_parameters(self) -> dict[str, Any]:
         """
         获取工具参数的 properties 字典
 
@@ -205,7 +206,7 @@ class Tool:
         # 这是 MiniMax API 要求的：每个工具至少需要一个参数
         return {"input": {"type": "string", "description": f"{self.name}的输入参数"}}
 
-    def _get_required_parameters(self) -> List[str]:
+    def _get_required_parameters(self) -> list[str]:
         """获取必需的参数列表"""
         if self.parameters and "required" in self.parameters:
             return self.parameters.get("required", [])
@@ -233,22 +234,22 @@ class ToolRegistry:
     """
 
     def __init__(self):
-        self.tools: Dict[str, Tool] = {}
+        self.tools: dict[str, Tool] = {}
 
     def register(self, tool: Tool):
         """注册工具"""
         self.tools[tool.name] = tool
         logger.info(f"Registered tool: {tool.name} (requires_session={tool.requires_session})")
 
-    def get_tool(self, name: str) -> Optional[Tool]:
+    def get_tool(self, name: str) -> Tool | None:
         """获取工具"""
         return self.tools.get(name)
 
-    def list_tools(self) -> List[Dict[str, str]]:
+    def list_tools(self) -> list[dict[str, str]]:
         """列出所有工具"""
         return [{"name": t.name, "description": t.description} for t in self.tools.values()]
 
-    def get_tools_schema(self, provider: str = "anthropic") -> List[Dict[str, Any]]:
+    def get_tools_schema(self, provider: str = "anthropic") -> list[dict[str, Any]]:
         """获取所有工具的 Function Calling Schema
 
         Args:
@@ -278,6 +279,6 @@ class ToolRegistry:
 
         return await tool.execute(session=session, **kwargs)
 
-    def get_tools_requiring_session(self) -> List[str]:
+    def get_tools_requiring_session(self) -> list[str]:
         """获取所有需要 UserSession 的工具名称"""
         return [name for name, tool in self.tools.items() if tool.requires_session]

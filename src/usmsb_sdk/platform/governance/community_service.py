@@ -5,18 +5,17 @@ Service for managing community interactions including forums,
 social features, and reputation systems.
 """
 
-import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ContentType(str, Enum):
+class ContentType(StrEnum):
     """Types of community content."""
     POST = "post"
     COMMENT = "comment"
@@ -26,7 +25,7 @@ class ContentType(str, Enum):
     ANSWER = "answer"
 
 
-class ReactionType(str, Enum):
+class ReactionType(StrEnum):
     """Types of reactions."""
     LIKE = "like"
     HELPFUL = "helpful"
@@ -40,7 +39,7 @@ class Reputation:
     agent_id: str
     score: float = 0.0
     level: int = 1
-    badges: List[str] = field(default_factory=list)
+    badges: list[str] = field(default_factory=list)
     contributions: int = 0
     helpful_votes: int = 0
     created_at: float = field(default_factory=lambda: time.time())
@@ -58,17 +57,17 @@ class Content:
     id: str
     author_id: str
     type: ContentType
-    title: Optional[str] = None
+    title: str | None = None
     body: str = ""
-    parent_id: Optional[str] = None  # For comments/replies
-    tags: List[str] = field(default_factory=list)
-    reactions: Dict[ReactionType, List[str]] = field(default_factory=dict)  # type -> voter_ids
+    parent_id: str | None = None  # For comments/replies
+    tags: list[str] = field(default_factory=list)
+    reactions: dict[ReactionType, list[str]] = field(default_factory=dict)  # type -> voter_ids
     view_count: int = 0
     is_pinned: bool = False
     is_locked: bool = False
     created_at: float = field(default_factory=lambda: time.time())
     updated_at: float = field(default_factory=lambda: time.time())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get_reaction_count(self, reaction_type: ReactionType) -> int:
         """Get count of a specific reaction."""
@@ -95,7 +94,7 @@ class Notification:
     type: str
     title: str
     body: str
-    content_id: Optional[str] = None
+    content_id: str | None = None
     is_read: bool = False
     created_at: float = field(default_factory=lambda: time.time())
 
@@ -115,28 +114,28 @@ class CommunityInteractionService:
     def __init__(self):
         """Initialize the Community Interaction Service."""
         # Storage
-        self._contents: Dict[str, Content] = {}
-        self._reputations: Dict[str, Reputation] = {}
-        self._follows: Dict[str, List[Follow]] = {}  # follower_id -> follows
-        self._notifications: Dict[str, List[Notification]] = {}  # recipient_id -> notifications
+        self._contents: dict[str, Content] = {}
+        self._reputations: dict[str, Reputation] = {}
+        self._follows: dict[str, list[Follow]] = {}  # follower_id -> follows
+        self._notifications: dict[str, list[Notification]] = {}  # recipient_id -> notifications
 
         # Indexes
-        self._contents_by_author: Dict[str, List[str]] = {}
-        self._contents_by_tag: Dict[str, List[str]] = {}
+        self._contents_by_author: dict[str, list[str]] = {}
+        self._contents_by_tag: dict[str, list[str]] = {}
 
         # Callbacks
-        self.on_content_created: Optional[Callable[[Content], None]] = None
-        self.on_reaction: Optional[Callable[[str, str, ReactionType], None]] = None
+        self.on_content_created: Callable[[Content], None] | None = None
+        self.on_reaction: Callable[[str, str, ReactionType], None] | None = None
 
     def create_content(
         self,
         author_id: str,
         type: ContentType,
         body: str,
-        title: Optional[str] = None,
-        parent_id: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        title: str | None = None,
+        parent_id: str | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Content:
         """
         Create community content.
@@ -190,7 +189,7 @@ class CommunityInteractionService:
         logger.info(f"Content created: {content.id} by {author_id}")
         return content
 
-    def get_content(self, content_id: str) -> Optional[Content]:
+    def get_content(self, content_id: str) -> Content | None:
         """Get content by ID."""
         content = self._contents.get(content_id)
         if content:
@@ -201,9 +200,9 @@ class CommunityInteractionService:
         self,
         content_id: str,
         author_id: str,
-        body: Optional[str] = None,
-        title: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        body: str | None = None,
+        title: str | None = None,
+        tags: list[str] | None = None,
     ) -> bool:
         """Update content."""
         content = self._contents.get(content_id)
@@ -297,20 +296,20 @@ class CommunityInteractionService:
 
         return True
 
-    def get_replies(self, content_id: str) -> List[Content]:
+    def get_replies(self, content_id: str) -> list[Content]:
         """Get replies to content."""
         return [
             c for c in self._contents.values()
             if c.parent_id == content_id
         ]
 
-    def get_discussion_thread(self, content_id: str) -> Dict[str, Any]:
+    def get_discussion_thread(self, content_id: str) -> dict[str, Any]:
         """Get full discussion thread."""
         content = self._contents.get(content_id)
         if not content:
             return {}
 
-        def build_thread(c: Content) -> Dict[str, Any]:
+        def build_thread(c: Content) -> dict[str, Any]:
             replies = self.get_replies(c.id)
             return {
                 "content": c,
@@ -321,12 +320,12 @@ class CommunityInteractionService:
 
     def list_content(
         self,
-        type: Optional[ContentType] = None,
-        author_id: Optional[str] = None,
-        tag: Optional[str] = None,
+        type: ContentType | None = None,
+        author_id: str | None = None,
+        tag: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Content]:
+    ) -> list[Content]:
         """List content with filters."""
         if tag and tag in self._contents_by_tag:
             content_ids = self._contents_by_tag[tag]
@@ -401,7 +400,7 @@ class CommunityInteractionService:
         logger.info(f"Badge '{badge}' awarded to {agent_id}")
         return True
 
-    def get_leaderboard(self, limit: int = 10) -> List[Reputation]:
+    def get_leaderboard(self, limit: int = 10) -> list[Reputation]:
         """Get reputation leaderboard."""
         reputations = list(self._reputations.values())
         reputations.sort(key=lambda x: x.score, reverse=True)
@@ -445,7 +444,7 @@ class CommunityInteractionService:
 
         return False
 
-    def get_followers(self, agent_id: str) -> List[str]:
+    def get_followers(self, agent_id: str) -> list[str]:
         """Get list of followers."""
         followers = []
         for follower_id, follows in self._follows.items():
@@ -453,7 +452,7 @@ class CommunityInteractionService:
                 followers.append(follower_id)
         return followers
 
-    def get_following(self, agent_id: str) -> List[str]:
+    def get_following(self, agent_id: str) -> list[str]:
         """Get list of agents being followed."""
         if agent_id not in self._follows:
             return []
@@ -480,7 +479,7 @@ class CommunityInteractionService:
         type: str,
         title: str,
         body: str,
-        content_id: Optional[str] = None,
+        content_id: str | None = None,
     ) -> Notification:
         """Add a notification."""
         import uuid
@@ -505,7 +504,7 @@ class CommunityInteractionService:
         recipient_id: str,
         unread_only: bool = False,
         limit: int = 50,
-    ) -> List[Notification]:
+    ) -> list[Notification]:
         """Get notifications for a user."""
         notifications = self._notifications.get(recipient_id, [])
 
@@ -534,7 +533,7 @@ class CommunityInteractionService:
                 count += 1
         return count
 
-    def get_community_stats(self) -> Dict[str, Any]:
+    def get_community_stats(self) -> dict[str, Any]:
         """Get community statistics."""
         total_content = len(self._contents)
         total_users = len(self._reputations)

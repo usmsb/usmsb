@@ -10,13 +10,12 @@ Version: 1.0.0
 
 import asyncio
 import logging
-import os
 import shutil
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +103,9 @@ class FileInfo:
     size: int
     is_dir: bool
     modified_at: float
-    created_at: Optional[float] = None
+    created_at: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "name": self.name,
@@ -167,7 +166,7 @@ class UserWorkspace:
     def __init__(
         self,
         wallet_address: str,
-        config: Optional[WorkspaceConfig] = None,
+        config: WorkspaceConfig | None = None,
     ):
         """
         初始化用户工作空间
@@ -195,9 +194,9 @@ class UserWorkspace:
         }
 
         # 配额统计缓存
-        self._storage_used_cache: Optional[int] = None
-        self._file_count_cache: Optional[int] = None
-        self._cache_timestamp: Optional[float] = None
+        self._storage_used_cache: int | None = None
+        self._file_count_cache: int | None = None
+        self._cache_timestamp: float | None = None
         self._cache_ttl = 60  # 缓存60秒
 
         # 写锁（用于并发控制）
@@ -224,7 +223,7 @@ class UserWorkspace:
             self.workspace_root.mkdir(parents=True, exist_ok=True)
 
             # 创建子目录
-            for dir_type, dir_path in self._subdirs.items():
+            for _dir_type, dir_path in self._subdirs.items():
                 dir_path.mkdir(parents=True, exist_ok=True)
                 logger.debug(f"Created directory: {dir_path}")
 
@@ -241,7 +240,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise WorkspaceError(error_msg) from e
 
-    def resolve_path(self, relative_path: str, subdir: Optional[DirectoryType] = None) -> Path:
+    def resolve_path(self, relative_path: str, subdir: DirectoryType | None = None) -> Path:
         """
         解析相对路径为绝对路径（限制在工作空间内）
 
@@ -384,8 +383,8 @@ class UserWorkspace:
     async def write_file(
         self,
         relative_path: str,
-        content: Union[str, bytes],
-        subdir: Optional[DirectoryType] = None,
+        content: str | bytes,
+        subdir: DirectoryType | None = None,
         overwrite: bool = True,
     ) -> Path:
         """
@@ -456,9 +455,9 @@ class UserWorkspace:
     async def read_file(
         self,
         relative_path: str,
-        subdir: Optional[DirectoryType] = None,
+        subdir: DirectoryType | None = None,
         as_text: bool = False,
-    ) -> Union[bytes, str]:
+    ) -> bytes | str:
         """
         读取文件
 
@@ -504,10 +503,10 @@ class UserWorkspace:
     async def list_files(
         self,
         directory: str = "",
-        subdir: Optional[DirectoryType] = None,
+        subdir: DirectoryType | None = None,
         pattern: str = "*",
         recursive: bool = False,
-    ) -> List[FileInfo]:
+    ) -> list[FileInfo]:
         """
         列出文件
 
@@ -562,7 +561,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def delete_file(self, relative_path: str, subdir: Optional[DirectoryType] = None) -> bool:
+    async def delete_file(self, relative_path: str, subdir: DirectoryType | None = None) -> bool:
         """
         删除文件或目录
 
@@ -603,7 +602,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def exists(self, relative_path: str, subdir: Optional[DirectoryType] = None) -> bool:
+    async def exists(self, relative_path: str, subdir: DirectoryType | None = None) -> bool:
         """
         检查文件是否存在
 
@@ -625,7 +624,7 @@ class UserWorkspace:
             return False
 
     async def create_directory(
-        self, relative_path: str, subdir: Optional[DirectoryType] = None
+        self, relative_path: str, subdir: DirectoryType | None = None
     ) -> Path:
         """
         创建目录
@@ -656,8 +655,8 @@ class UserWorkspace:
             raise FileOperationError(error_msg) from e
 
     async def get_file_info(
-        self, relative_path: str, subdir: Optional[DirectoryType] = None
-    ) -> Optional[FileInfo]:
+        self, relative_path: str, subdir: DirectoryType | None = None
+    ) -> FileInfo | None:
         """
         获取文件信息
 
@@ -685,8 +684,8 @@ class UserWorkspace:
         self,
         src_path: str,
         dst_path: str,
-        src_subdir: Optional[DirectoryType] = None,
-        dst_subdir: Optional[DirectoryType] = None,
+        src_subdir: DirectoryType | None = None,
+        dst_subdir: DirectoryType | None = None,
     ) -> Path:
         """
         移动文件
@@ -727,8 +726,8 @@ class UserWorkspace:
         self,
         src_path: str,
         dst_path: str,
-        src_subdir: Optional[DirectoryType] = None,
-        dst_subdir: Optional[DirectoryType] = None,
+        src_subdir: DirectoryType | None = None,
+        dst_subdir: DirectoryType | None = None,
     ) -> Path:
         """
         复制文件
@@ -773,7 +772,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def cleanup_temp(self, max_age_seconds: Optional[int] = None) -> int:
+    async def cleanup_temp(self, max_age_seconds: int | None = None) -> int:
         """
         清理临时文件
 
@@ -897,7 +896,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def get_quota_info(self) -> Dict[str, Any]:
+    async def get_quota_info(self) -> dict[str, Any]:
         """
         获取配额使用情况
 
@@ -935,7 +934,7 @@ class UserWorkspace:
         }
 
     async def clear_subdir(
-        self, subdir: DirectoryType, max_age_seconds: Optional[int] = None
+        self, subdir: DirectoryType, max_age_seconds: int | None = None
     ) -> int:
         """
         清空指定子目录
@@ -986,7 +985,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """
         获取工作空间统计信息
 
@@ -1020,7 +1019,7 @@ class UserWorkspace:
             "max_storage_mb": self.config.max_storage_mb,
         }
 
-    def get_path(self, relative_path: str, subdir: Optional[DirectoryType] = None) -> str:
+    def get_path(self, relative_path: str, subdir: DirectoryType | None = None) -> str:
         """
         获取文件/目录的绝对路径（字符串形式）
 
@@ -1039,7 +1038,7 @@ class UserWorkspace:
         """
         return str(self.resolve_path(relative_path, subdir))
 
-    def is_within_workspace(self, path: Union[str, Path]) -> bool:
+    def is_within_workspace(self, path: str | Path) -> bool:
         """
         检查给定路径是否在工作空间内
 
@@ -1063,7 +1062,7 @@ class UserWorkspace:
 
 async def create_workspace(
     wallet_address: str,
-    workspace_root: Optional[str] = None,
+    workspace_root: str | None = None,
     **kwargs,
 ) -> UserWorkspace:
     """

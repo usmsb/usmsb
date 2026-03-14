@@ -14,12 +14,12 @@ import logging
 import os
 import sqlite3
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .models import (
+    PermissionType,
     UserPermission,
     UserRole,
-    PermissionType,
     get_role_permissions,
     get_tool_required_permissions,
 )
@@ -50,7 +50,7 @@ class PermissionManager:
 
     def __init__(self, db_path: str = "meta_agent.db"):
         self.db_path = db_path
-        self._user_cache: Dict[str, UserPermission] = {}
+        self._user_cache: dict[str, UserPermission] = {}
         self._initialized = False
 
     async def init(self):
@@ -161,7 +161,7 @@ class PermissionManager:
         logger.info(f"Registered user {wallet_address} with role {role.value}")
         return user
 
-    async def get_user(self, wallet_address: str) -> Optional[UserPermission]:
+    async def get_user(self, wallet_address: str) -> UserPermission | None:
         """获取用户权限信息"""
         # 检查缓存
         if wallet_address in self._user_cache:
@@ -185,9 +185,9 @@ class PermissionManager:
         self,
         wallet_address: str,
         new_role: UserRole,
-        changed_by: Optional[str] = None,
-        reason: Optional[str] = None,
-    ) -> Optional[UserPermission]:
+        changed_by: str | None = None,
+        reason: str | None = None,
+    ) -> UserPermission | None:
         """
         更新用户角色
 
@@ -221,7 +221,7 @@ class PermissionManager:
         logger.info(f"Updated role for {wallet_address}: {old_role.value} -> {new_role.value}")
         return user
 
-    def invalidate_cache(self, wallet_address: Optional[str] = None):
+    def invalidate_cache(self, wallet_address: str | None = None):
         """清除用户缓存
 
         Args:
@@ -237,7 +237,7 @@ class PermissionManager:
 
     async def update_stake(
         self, wallet_address: str, stake_amount: float
-    ) -> Optional[UserPermission]:
+    ) -> UserPermission | None:
         """更新用户质押量"""
         user = await self.get_user(wallet_address)
         if not user:
@@ -250,7 +250,7 @@ class PermissionManager:
         logger.info(f"Updated stake for {wallet_address}: {stake_amount}")
         return user
 
-    async def update_balance(self, wallet_address: str, balance: float) -> Optional[UserPermission]:
+    async def update_balance(self, wallet_address: str, balance: float) -> UserPermission | None:
         """更新用户代币余额"""
         user = await self.get_user(wallet_address)
         if not user:
@@ -288,7 +288,7 @@ class PermissionManager:
         self,
         wallet_address: str,
         tool_name: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         检查用户是否可以访问某工具
 
@@ -336,12 +336,12 @@ class PermissionManager:
         user = await self.get_user(wallet_address)
         return user.voting_power if user else 0.0
 
-    async def get_users_by_role(self, role: UserRole) -> List[UserPermission]:
+    async def get_users_by_role(self, role: UserRole) -> list[UserPermission]:
         """获取指定角色的所有用户"""
         loop = _get_event_loop()
         return await loop.run_in_executor(None, self._query_users_by_role, role)
 
-    def _query_users_by_role(self, role: UserRole) -> List[UserPermission]:
+    def _query_users_by_role(self, role: UserRole) -> list[UserPermission]:
         """查询指定角色的用户"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -355,12 +355,12 @@ class PermissionManager:
 
         return [self._row_to_user(row) for row in rows]
 
-    async def get_all_users(self, limit: int = 100) -> List[UserPermission]:
+    async def get_all_users(self, limit: int = 100) -> list[UserPermission]:
         """获取所有用户"""
         loop = _get_event_loop()
         return await loop.run_in_executor(None, self._query_all_users, limit)
 
-    def _query_all_users(self, limit: int) -> List[UserPermission]:
+    def _query_all_users(self, limit: int) -> list[UserPermission]:
         """查询所有用户"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -374,7 +374,7 @@ class PermissionManager:
 
         return [self._row_to_user(row) for row in rows]
 
-    async def _load_user(self, wallet_address: str) -> Optional[UserPermission]:
+    async def _load_user(self, wallet_address: str) -> UserPermission | None:
         """加载用户"""
         try:
             loop = asyncio.get_running_loop()
@@ -383,7 +383,7 @@ class PermissionManager:
             asyncio.set_event_loop(loop)
         return await loop.run_in_executor(None, self._query_user, wallet_address)
 
-    def _query_user(self, wallet_address: str) -> Optional[UserPermission]:
+    def _query_user(self, wallet_address: str) -> UserPermission | None:
         """查询用户"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -436,8 +436,8 @@ class PermissionManager:
 
         cursor.execute(
             """
-            INSERT OR REPLACE INTO user_permissions 
-            (id, wallet_address, role, permissions, stake_amount, token_balance, 
+            INSERT OR REPLACE INTO user_permissions
+            (id, wallet_address, role, permissions, stake_amount, token_balance,
              voting_power, created_at, updated_at, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -463,8 +463,8 @@ class PermissionManager:
         wallet_address: str,
         old_role: UserRole,
         new_role: UserRole,
-        changed_by: Optional[str],
-        reason: Optional[str],
+        changed_by: str | None,
+        reason: str | None,
     ):
         """记录角色变更历史"""
         loop = _get_event_loop()
@@ -483,8 +483,8 @@ class PermissionManager:
         wallet_address: str,
         old_role: UserRole,
         new_role: UserRole,
-        changed_by: Optional[str],
-        reason: Optional[str],
+        changed_by: str | None,
+        reason: str | None,
     ):
         """插入角色变更记录"""
         import uuid
@@ -494,7 +494,7 @@ class PermissionManager:
 
         cursor.execute(
             """
-            INSERT INTO role_history 
+            INSERT INTO role_history
             (id, wallet_address, old_role, new_role, changed_by, reason, changed_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
@@ -512,7 +512,7 @@ class PermissionManager:
         conn.commit()
         conn.close()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取权限统计"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

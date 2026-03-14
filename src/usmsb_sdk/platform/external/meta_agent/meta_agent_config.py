@@ -2,9 +2,8 @@
 Meta Agent 配置
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 import os
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -12,9 +11,9 @@ class LLMConfig:
     """LLM 配置"""
 
     provider: str = "minimax"  # minimax, openai, claude, local
-    api_key: Optional[str] = None
-    api_url: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: str | None = None
+    api_url: str | None = None
+    base_url: str | None = None
     model: str = "MiniMax-M2.5"
     temperature: float = 0.7
     max_tokens: int = 4000
@@ -24,9 +23,9 @@ class LLMConfig:
 class WalletConfig:
     """钱包配置"""
 
-    private_key: Optional[str] = None
+    private_key: str | None = None
     encrypted: bool = True
-    supported_chains: List[str] = field(default_factory=lambda: ["ethereum", "polygon", "bsc"])
+    supported_chains: list[str] = field(default_factory=lambda: ["ethereum", "polygon", "bsc"])
 
 
 @dataclass
@@ -59,13 +58,13 @@ class MetaAgentConfig:
 
     # 平台配置
     platform_url: str = "http://localhost:8000"
-    platform_api_key: Optional[str] = None
+    platform_api_key: str | None = None
 
     # 权限配置
     default_role: str = "USER"
 
     # 知识库配置
-    vector_db_url: Optional[str] = None
+    vector_db_url: str | None = None
 
     # IPFS 配置
     ipfs_gateway: str = "https://ipfs.io"

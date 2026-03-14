@@ -5,10 +5,10 @@
 """
 
 from .recognizer import (
-    IntentRecognizer,
     Intent,
-    IntentType,
+    IntentRecognizer,
     IntentResult,
+    IntentType,
 )
 
 __all__ = [

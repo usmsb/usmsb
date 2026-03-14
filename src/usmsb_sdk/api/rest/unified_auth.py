@@ -8,20 +8,20 @@ Supports both authentication methods:
 This allows human users and AI agents to access the same endpoints.
 """
 
-import time
 import json
-from typing import Optional, Dict, Any
+import time
+from typing import Any
+
 from fastapi import Header, HTTPException
 
 from ..database import (
+    get_agent_wallet,
     get_db,
     get_session_by_token,
     get_user_by_address,
-    get_agent_wallet,
-    get_api_key_by_hash,
     update_api_key_last_used,
 )
-from .api_key_manager import verify_api_key, get_stake_tier, get_tier_benefits
+from .api_key_manager import get_stake_tier, get_tier_benefits, verify_api_key
 
 
 class ErrorCode:
@@ -40,8 +40,8 @@ class ErrorCode:
 
 
 async def get_user_by_bearer_token(
-    authorization: Optional[str] = Header(None)
-) -> Optional[Dict[str, Any]]:
+    authorization: str | None = Header(None)
+) -> dict[str, Any] | None:
     """
     Authenticate user by Bearer token (SIWE wallet auth).
 
@@ -96,9 +96,9 @@ async def get_user_by_bearer_token(
 
 
 async def get_agent_by_api_key_headers(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID")
-) -> Optional[Dict[str, Any]]:
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_agent_id: str | None = Header(None, alias="X-Agent-ID")
+) -> dict[str, Any] | None:
     """
     Authenticate agent by API Key headers.
 
@@ -199,10 +199,10 @@ async def get_agent_by_api_key_headers(
 
 
 async def get_current_user_unified(
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID")
-) -> Dict[str, Any]:
+    authorization: str | None = Header(None),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_agent_id: str | None = Header(None, alias="X-Agent-ID")
+) -> dict[str, Any]:
     """
     Unified authentication dependency.
 
@@ -235,10 +235,10 @@ async def get_current_user_unified(
 
 
 async def get_optional_user_unified(
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID")
-) -> Optional[Dict[str, Any]]:
+    authorization: str | None = Header(None),
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_agent_id: str | None = Header(None, alias="X-Agent-ID")
+) -> dict[str, Any] | None:
     """
     Optional unified authentication - returns None if no credentials provided.
 
@@ -262,7 +262,7 @@ def require_stake_unified(min_stake: int = 100):
     """
     Dependency factory to require minimum stake (works with both auth types).
     """
-    async def stake_checker(user: Dict = Depends(get_current_user_unified)) -> Dict:
+    async def stake_checker(user: dict = Depends(get_current_user_unified)) -> dict:
         if user['staked_amount'] < min_stake:
             raise HTTPException(
                 status_code=403,
@@ -279,7 +279,7 @@ def require_stake_unified(min_stake: int = 100):
     return stake_checker
 
 
-def verify_agent_access(user: Dict[str, Any], target_agent_id: str) -> None:
+def verify_agent_access(user: dict[str, Any], target_agent_id: str) -> None:
     """
     Verify that the authenticated user has access to the target agent.
 

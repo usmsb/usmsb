@@ -7,20 +7,18 @@ Enables agents to learn from:
 - Market trends
 - Peer behavior
 """
-import asyncio
-import json
 import logging
-import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
 import statistics
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class InsightType(str, Enum):
+class InsightType(StrEnum):
     """Types of learning insights."""
     PRICING = "pricing"               # Pricing strategy
     SKILL_GAP = "skill_gap"           # Missing skills
@@ -32,7 +30,7 @@ class InsightType(str, Enum):
     RECOMMENDATION = "recommendation"   # Action recommendations
 
 
-class InsightPriority(str, Enum):
+class InsightPriority(StrEnum):
     """Priority levels for insights."""
     LOW = "low"
     MEDIUM = "medium"
@@ -49,15 +47,15 @@ class LearningInsight:
     priority: InsightPriority
     title: str
     description: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     confidence: float  # 0-1
     actionable: bool
-    suggested_actions: List[str]
+    suggested_actions: list[str]
     created_at: float
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     applied: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "insightId": self.insight_id,
             "agentId": self.agent_id,
@@ -84,7 +82,7 @@ class TransactionAnalysis:
 
     # Outcome
     success: bool
-    rating: Optional[int]
+    rating: int | None
     amount: float
     duration: float  # seconds
 
@@ -101,7 +99,7 @@ class TransactionAnalysis:
     match_score: float
     capability_match: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "transactionId": self.transaction_id,
             "agentId": self.agent_id,
@@ -130,7 +128,7 @@ class StrategyRecommendation:
     expected_improvement: str
     confidence: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category,
             "currentValue": self.current_value,
@@ -165,20 +163,20 @@ class LearningService:
         self.llm = llm_adapter
 
         # Storage
-        self._insights: Dict[str, List[LearningInsight]] = {}
-        self._transaction_history: Dict[str, List[TransactionAnalysis]] = {}
+        self._insights: dict[str, list[LearningInsight]] = {}
+        self._transaction_history: dict[str, list[TransactionAnalysis]] = {}
 
         # Callbacks
-        self.on_insight_created: Optional[Callable[[LearningInsight], None]] = None
+        self.on_insight_created: Callable[[LearningInsight], None] | None = None
 
     # ==================== Transaction Learning ====================
 
     async def learn_from_transaction(
         self,
-        transaction_data: Dict[str, Any],
+        transaction_data: dict[str, Any],
         agent_id: str,
         role: str,
-    ) -> List[LearningInsight]:
+    ) -> list[LearningInsight]:
         """
         Learn from a completed transaction.
 
@@ -224,7 +222,7 @@ class LearningService:
 
     def _create_transaction_analysis(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         agent_id: str,
         role: str,
     ) -> TransactionAnalysis:
@@ -252,7 +250,7 @@ class LearningService:
         self,
         agent_id: str,
         analysis: TransactionAnalysis,
-    ) -> Optional[LearningInsight]:
+    ) -> LearningInsight | None:
         """Analyze pricing strategy."""
         history = self._transaction_history.get(agent_id, [])
         if len(history) < self.MIN_TRANSACTIONS_FOR_ANALYSIS:
@@ -317,13 +315,12 @@ class LearningService:
         self,
         agent_id: str,
         analysis: TransactionAnalysis,
-    ) -> Optional[LearningInsight]:
+    ) -> LearningInsight | None:
         """Analyze performance patterns."""
         history = self._transaction_history.get(agent_id, [])
         if len(history) < self.MIN_TRANSACTIONS_FOR_ANALYSIS:
             return None
 
-        insights = []
 
         # Analyze ratings
         ratings = [t.rating for t in history if t.rating is not None]
@@ -384,8 +381,8 @@ class LearningService:
     async def analyze_market_trends(
         self,
         agent_id: str,
-        skills: List[str],
-    ) -> List[LearningInsight]:
+        skills: list[str],
+    ) -> list[LearningInsight]:
         """
         Analyze market trends relevant to an agent.
 
@@ -434,7 +431,7 @@ class LearningService:
     async def get_strategy_recommendations(
         self,
         agent_id: str,
-    ) -> List[StrategyRecommendation]:
+    ) -> list[StrategyRecommendation]:
         """
         Get strategy recommendations for an agent.
 
@@ -485,7 +482,7 @@ class LearningService:
         agent_id: str,
         insight_type: InsightType = None,
         include_expired: bool = False,
-    ) -> List[LearningInsight]:
+    ) -> list[LearningInsight]:
         """Get insights for an agent."""
         insights = self._insights.get(agent_id, [])
         now = time.time()
@@ -533,7 +530,7 @@ class LearningService:
 
     # ==================== Statistics ====================
 
-    def get_learning_stats(self, agent_id: str) -> Dict[str, Any]:
+    def get_learning_stats(self, agent_id: str) -> dict[str, Any]:
         """Get learning statistics for an agent."""
         history = self._transaction_history.get(agent_id, [])
         insights = self._insights.get(agent_id, [])
@@ -554,7 +551,7 @@ class LearningService:
 
 
 # Global instance
-_learning_service: Optional[LearningService] = None
+_learning_service: LearningService | None = None
 
 
 def get_learning_service() -> LearningService:

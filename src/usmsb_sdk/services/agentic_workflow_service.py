@@ -7,18 +7,19 @@ task decomposition, planning, tool execution, and multi-agent coordination.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Environment, Goal, GoalStatus
+from usmsb_sdk.core.elements import Agent
 from usmsb_sdk.intelligence_adapters.base import IAgenticFrameworkAdapter, ILLMAdapter
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowStatus(str, Enum):
+class WorkflowStatus(StrEnum):
     """Status of a workflow."""
     PENDING = "pending"
     RUNNING = "running"
@@ -34,13 +35,13 @@ class WorkflowStep:
     id: str
     name: str
     description: str
-    action: Dict[str, Any]
-    dependencies: List[str] = field(default_factory=list)
+    action: dict[str, Any]
+    dependencies: list[str] = field(default_factory=list)
     status: WorkflowStatus = WorkflowStatus.PENDING
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    result: Any | None = None
+    error: str | None = None
+    started_at: float | None = None
+    completed_at: float | None = None
 
 
 @dataclass
@@ -49,12 +50,12 @@ class Workflow:
     id: str
     name: str
     description: str
-    steps: List[WorkflowStep]
+    steps: list[WorkflowStep]
     status: WorkflowStatus = WorkflowStatus.PENDING
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    started_at: float | None = None
+    completed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -62,12 +63,12 @@ class WorkflowResult:
     """Result of workflow execution."""
     workflow_id: str
     status: WorkflowStatus
-    step_results: Dict[str, Any]
+    step_results: dict[str, Any]
     total_steps: int
     completed_steps: int
     failed_steps: int
     execution_time: float
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class AgenticWorkflowService:
@@ -85,7 +86,7 @@ class AgenticWorkflowService:
     def __init__(
         self,
         llm_adapter: ILLMAdapter,
-        agentic_adapter: Optional[IAgenticFrameworkAdapter] = None,
+        agentic_adapter: IAgenticFrameworkAdapter | None = None,
         max_concurrent_steps: int = 5,
     ):
         """
@@ -100,20 +101,20 @@ class AgenticWorkflowService:
         self.agentic_adapter = agentic_adapter
         self.max_concurrent_steps = max_concurrent_steps
 
-        self._workflows: Dict[str, Workflow] = {}
-        self._tools: Dict[str, Dict[str, Any]] = {}
+        self._workflows: dict[str, Workflow] = {}
+        self._tools: dict[str, dict[str, Any]] = {}
         self._step_semaphore = asyncio.Semaphore(max_concurrent_steps)
 
         # Callbacks
-        self.on_step_start: Optional[Callable[[WorkflowStep], None]] = None
-        self.on_step_complete: Optional[Callable[[WorkflowStep], None]] = None
-        self.on_step_error: Optional[Callable[[WorkflowStep, Exception], None]] = None
+        self.on_step_start: Callable[[WorkflowStep], None] | None = None
+        self.on_step_complete: Callable[[WorkflowStep], None] | None = None
+        self.on_step_error: Callable[[WorkflowStep, Exception], None] | None = None
 
     def register_tool(
         self,
         name: str,
         description: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         handler: Callable,
     ) -> None:
         """
@@ -141,8 +142,8 @@ class AgenticWorkflowService:
         self,
         task_description: str,
         agent: Agent,
-        available_tools: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        available_tools: list[str] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> Workflow:
         """
         Create a workflow from a task description.
@@ -196,7 +197,7 @@ class AgenticWorkflowService:
         self,
         workflow_id: str,
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> WorkflowResult:
         """
         Execute a workflow.
@@ -236,7 +237,7 @@ class AgenticWorkflowService:
                     # Check for circular dependencies or all steps done
                     remaining = [s for s in workflow.steps if s.id not in executed_steps]
                     if remaining:
-                        raise RuntimeError(f"Cannot progress: remaining steps have unmet dependencies")
+                        raise RuntimeError("Cannot progress: remaining steps have unmet dependencies")
                     break
 
                 # Execute ready steps (with concurrency limit)
@@ -247,7 +248,7 @@ class AgenticWorkflowService:
 
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                for step, result in zip(ready_steps[:len(tasks)], results):
+                for step, result in zip(ready_steps[:len(tasks)], results, strict=False):
                     if isinstance(result, Exception):
                         step.status = WorkflowStatus.FAILED
                         step.error = str(result)
@@ -293,7 +294,7 @@ class AgenticWorkflowService:
         self,
         step: WorkflowStep,
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> Any:
         """Execute a single workflow step."""
         async with self._step_semaphore:
@@ -322,8 +323,8 @@ class AgenticWorkflowService:
 
     async def _execute_tool_call(
         self,
-        action: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
+        action: dict[str, Any],
+        context: dict[str, Any] | None = None,
     ) -> Any:
         """Execute a tool call action."""
         tool_name = action.get("tool") or action.get("name")
@@ -342,8 +343,8 @@ class AgenticWorkflowService:
 
     async def _execute_llm_reasoning(
         self,
-        action: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
+        action: dict[str, Any],
+        context: dict[str, Any] | None = None,
     ) -> Any:
         """Execute an LLM reasoning action."""
         prompt = action.get("prompt", "")
@@ -351,9 +352,9 @@ class AgenticWorkflowService:
 
     async def _execute_agent_action(
         self,
-        action: Dict[str, Any],
+        action: dict[str, Any],
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> Any:
         """Execute an agent-specific action."""
         # This would integrate with the agent's execution service
@@ -365,9 +366,9 @@ class AgenticWorkflowService:
         self,
         task_description: str,
         agent: Agent,
-        available_tools: Optional[List[str]],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        available_tools: list[str] | None,
+        context: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Plan workflow steps using LLM."""
         tools_info = "\n".join([
             f"- {name}: {info['description']}"
@@ -408,9 +409,9 @@ Respond with a JSON array of steps."""
     async def coordinate_agents(
         self,
         task: str,
-        agents: List[Agent],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        agents: list[Agent],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Coordinate multiple agents for a task.
 
@@ -452,7 +453,7 @@ Respond in JSON format."""
         except:
             return {"plan": response}
 
-    def get_workflow(self, workflow_id: str) -> Optional[Workflow]:
+    def get_workflow(self, workflow_id: str) -> Workflow | None:
         """Get a workflow by ID."""
         return self._workflows.get(workflow_id)
 
@@ -463,7 +464,7 @@ Respond in JSON format."""
             return True
         return False
 
-    def list_workflows(self, status: Optional[WorkflowStatus] = None) -> List[Workflow]:
+    def list_workflows(self, status: WorkflowStatus | None = None) -> list[Workflow]:
         """List workflows, optionally filtered by status."""
         workflows = list(self._workflows.values())
         if status:

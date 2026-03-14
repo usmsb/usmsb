@@ -9,21 +9,20 @@ Implements the registration system for agents, including:
 - Failover and retry logic
 """
 
+import asyncio
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
-from urllib.parse import urlparse
-import asyncio
+from typing import Any
+
 import aiohttp
-import json
-import logging
-import random
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
-    ProtocolType,
     ProtocolConfig,
+    ProtocolType,
 )
 
 
@@ -47,7 +46,7 @@ class PlatformNode:
     latency: float = float('inf')
     load: float = 0.0
     priority: int = 0
-    last_check: Optional[datetime] = None
+    last_check: datetime | None = None
     is_available: bool = False
 
     def calculate_score(self) -> float:
@@ -57,7 +56,7 @@ class PlatformNode:
         # Weight: latency (50%), load (30%), priority (20%)
         return (self.latency * 0.5) + (self.load * 0.3) + ((100 - self.priority) * 0.002)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "endpoint": self.endpoint,
@@ -76,18 +75,18 @@ class RegistrationInfo:
     registration_id: str
     agent_id: str
     node_id: str
-    protocols: List[ProtocolType]
+    protocols: list[ProtocolType]
     registered_at: datetime
-    expires_at: Optional[datetime] = None
-    token: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    expires_at: datetime | None = None
+    token: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
         if self.expires_at:
             return datetime.now() > self.expires_at
         return False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "registration_id": self.registration_id,
             "agent_id": self.agent_id,
@@ -116,7 +115,7 @@ class RegistrationManager:
         self,
         agent_id: str,
         agent_config: AgentConfig,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.agent_id = agent_id
         self.config = agent_config
@@ -124,22 +123,22 @@ class RegistrationManager:
 
         # State
         self._status = RegistrationStatus.NOT_REGISTERED
-        self._registration_info: Optional[RegistrationInfo] = None
-        self._registered_protocols: Set[ProtocolType] = set()
+        self._registration_info: RegistrationInfo | None = None
+        self._registered_protocols: set[ProtocolType] = set()
 
         # Platform nodes
-        self._platform_nodes: Dict[str, PlatformNode] = {}
-        self._primary_node: Optional[PlatformNode] = None
-        self._backup_nodes: List[PlatformNode] = []
+        self._platform_nodes: dict[str, PlatformNode] = {}
+        self._primary_node: PlatformNode | None = None
+        self._backup_nodes: list[PlatformNode] = []
 
         # Session management
-        self._http_session: Optional[aiohttp.ClientSession] = None
+        self._http_session: aiohttp.ClientSession | None = None
         self._lock = asyncio.Lock()
 
         # Callbacks
-        self._on_registration_hooks: List[Callable] = []
-        self._on_unregistration_hooks: List[Callable] = []
-        self._on_failure_hooks: List[Callable] = []
+        self._on_registration_hooks: list[Callable] = []
+        self._on_unregistration_hooks: list[Callable] = []
+        self._on_failure_hooks: list[Callable] = []
 
         # Retry configuration
         self._max_retries = 3
@@ -151,16 +150,16 @@ class RegistrationManager:
         return self._status
 
     @property
-    def registration_info(self) -> Optional[RegistrationInfo]:
+    def registration_info(self) -> RegistrationInfo | None:
         return self._registration_info
 
     @property
-    def registered_protocols(self) -> List[ProtocolType]:
+    def registered_protocols(self) -> list[ProtocolType]:
         return list(self._registered_protocols)
 
     # ==================== Node Discovery ====================
 
-    async def discover_nodes(self) -> List[PlatformNode]:
+    async def discover_nodes(self) -> list[PlatformNode]:
         """
         Discover available platform nodes.
 
@@ -194,7 +193,7 @@ class RegistrationManager:
         nodes.sort(key=lambda n: n.calculate_score())
         return nodes
 
-    async def _probe_node(self, endpoint: str) -> Optional[PlatformNode]:
+    async def _probe_node(self, endpoint: str) -> PlatformNode | None:
         """Probe a platform node for health and latency"""
         start_time = datetime.now()
 
@@ -220,14 +219,14 @@ class RegistrationManager:
                         last_check=datetime.now(),
                         is_available=True,
                     )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.logger.warning(f"Timeout probing {endpoint}")
         except Exception as e:
             self.logger.warning(f"Error probing {endpoint}: {e}")
 
         return None
 
-    async def _probe_p2p_node(self, address: str) -> Optional[PlatformNode]:
+    async def _probe_p2p_node(self, address: str) -> PlatformNode | None:
         """Probe a P2P bootstrap node"""
         # P2P node probing would be implemented based on P2P protocol
         # For now, return a basic node info
@@ -242,7 +241,7 @@ class RegistrationManager:
             is_available=True,
         )
 
-    async def select_best_node(self) -> Optional[PlatformNode]:
+    async def select_best_node(self) -> PlatformNode | None:
         """Select the best available platform node"""
         nodes = await self.discover_nodes()
 
@@ -260,7 +259,7 @@ class RegistrationManager:
 
     # ==================== Registration ====================
 
-    async def register(self, protocols: Optional[List[ProtocolType]] = None, endpoint_override: Optional[str] = None) -> bool:
+    async def register(self, protocols: list[ProtocolType] | None = None, endpoint_override: str | None = None) -> bool:
         """
         Register agent with the platform.
 
@@ -313,7 +312,7 @@ class RegistrationManager:
             await self._notify_failure_hooks("Registration failed after all retries")
             return False
 
-    async def _do_register(self, protocols: List[ProtocolType]) -> bool:
+    async def _do_register(self, protocols: list[ProtocolType]) -> bool:
         """Execute the registration with the platform"""
         node = self._primary_node
         if not node:
@@ -357,7 +356,7 @@ class RegistrationManager:
             self.logger.error(f"Unsupported protocol: {node.protocol}")
             return False
 
-    async def _register_http(self, node: PlatformNode, payload: Dict) -> bool:
+    async def _register_http(self, node: PlatformNode, payload: dict) -> bool:
         """Register via HTTP protocol"""
         try:
             if not self._http_session:
@@ -396,7 +395,7 @@ class RegistrationManager:
             self.logger.error(f"HTTP registration error: {e}")
             return False
 
-    async def _register_a2a(self, node: PlatformNode, payload: Dict) -> bool:
+    async def _register_a2a(self, node: PlatformNode, payload: dict) -> bool:
         """Register via A2A protocol"""
         # A2A protocol registration implementation
         # This would involve A2A-specific message exchange
@@ -406,7 +405,7 @@ class RegistrationManager:
         payload["protocol"] = "a2a"
         return await self._register_http(node, payload)
 
-    async def _register_mcp(self, node: PlatformNode, payload: Dict) -> bool:
+    async def _register_mcp(self, node: PlatformNode, payload: dict) -> bool:
         """Register via MCP (Model Context Protocol)"""
         # MCP protocol registration implementation
         self.logger.info(f"Registering via MCP protocol with node {node.node_id}")
@@ -421,7 +420,7 @@ class RegistrationManager:
 
         return await self._register_http(node, {"mcp": mcp_payload})
 
-    async def _register_p2p(self, node: PlatformNode, payload: Dict) -> bool:
+    async def _register_p2p(self, node: PlatformNode, payload: dict) -> bool:
         """Register via P2P protocol"""
         # P2P protocol registration implementation
         self.logger.info(f"Registering via P2P protocol with node {node.node_id}")
@@ -564,7 +563,7 @@ class RegistrationManager:
 
     # ==================== Protocol-Specific Registration ====================
 
-    async def register_protocol(self, protocol: ProtocolType, config: Optional[ProtocolConfig] = None) -> bool:
+    async def register_protocol(self, protocol: ProtocolType, config: ProtocolConfig | None = None) -> bool:
         """Register for a specific protocol"""
         if self._status != RegistrationStatus.REGISTERED:
             # Full registration first

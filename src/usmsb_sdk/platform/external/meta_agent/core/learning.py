@@ -3,7 +3,7 @@
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,10 @@ class LearningService:
         """记录经验"""
         logger.info(f"Recording experience: {input} -> {success}")
 
-    async def extract_knowledge(self, experience: Dict) -> Dict:
+    async def extract_knowledge(self, experience: dict) -> dict:
         """提取知识"""
         return {}
 
-    async def update_model(self, knowledge: Dict):
+    async def update_model(self, knowledge: dict):
         """更新模型"""
         pass

@@ -14,14 +14,11 @@ Skills:
     - get_routes: Get configured routing information
 """
 
-from collections import defaultdict
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
 import asyncio
-import logging
 import random
-import time
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
@@ -33,7 +30,6 @@ from usmsb_sdk.agent_sdk.communication import Message, MessageType, Session
 from usmsb_sdk.platform.external.system_agents.base_system_agent import (
     BaseSystemAgent,
     SystemAgentConfig,
-    SystemAgentPermission,
 )
 
 
@@ -61,7 +57,7 @@ class QueuedRequest:
         self,
         request_id: str,
         message: Message,
-        target_agents: List[str],
+        target_agents: list[str],
         priority: int = 0,
     ):
         self.request_id = request_id
@@ -69,11 +65,11 @@ class QueuedRequest:
         self.target_agents = target_agents
         self.priority = priority
         self.created_at = datetime.now()
-        self.started_at: Optional[datetime] = None
-        self.completed_at: Optional[datetime] = None
+        self.started_at: datetime | None = None
+        self.completed_at: datetime | None = None
         self.status = "pending"
-        self.result: Optional[Any] = None
-        self.error: Optional[str] = None
+        self.result: Any | None = None
+        self.error: str | None = None
 
     @property
     def wait_time(self) -> float:
@@ -83,13 +79,13 @@ class QueuedRequest:
         return (datetime.now() - self.created_at).total_seconds()
 
     @property
-    def processing_time(self) -> Optional[float]:
+    def processing_time(self) -> float | None:
         """Get processing time (seconds)"""
         if self.started_at and self.completed_at:
             return (self.completed_at - self.started_at).total_seconds()
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "request_id": self.request_id,
@@ -123,7 +119,7 @@ class RouteTarget:
         self.successful_requests = 0
         self.failed_requests = 0
         self.total_response_time = 0.0
-        self.last_request_time: Optional[datetime] = None
+        self.last_request_time: datetime | None = None
         self.status = RouteStatus.ACTIVE
 
     @property
@@ -147,7 +143,7 @@ class RouteTarget:
             return 0.0
         return self.total_response_time / self.successful_requests
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "agent_id": self.agent_id,
@@ -172,7 +168,7 @@ class Route:
         route_id: str,
         name: str,
         pattern: str,
-        targets: List[RouteTarget],
+        targets: list[RouteTarget],
         strategy: LoadBalanceStrategy = LoadBalanceStrategy.ROUND_ROBIN,
         enabled: bool = True,
     ):
@@ -188,7 +184,7 @@ class Route:
         # Round-robin index
         self._rr_index = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "route_id": self.route_id,
@@ -240,19 +236,19 @@ class RouterAgent(BaseSystemAgent):
     def __init__(
         self,
         config: AgentConfig,
-        system_config: Optional[SystemAgentConfig] = None,
+        system_config: SystemAgentConfig | None = None,
     ):
         """Initialize the router agent"""
         super().__init__(config, system_config)
 
         # Routes configuration
-        self._routes: Dict[str, Route] = {}
+        self._routes: dict[str, Route] = {}
         self._default_strategy = LoadBalanceStrategy.LEAST_CONNECTIONS
 
         # Request queue
-        self._request_queue: List[QueuedRequest] = []
-        self._active_requests: Dict[str, QueuedRequest] = {}
-        self._completed_requests: List[QueuedRequest] = []
+        self._request_queue: list[QueuedRequest] = []
+        self._active_requests: dict[str, QueuedRequest] = {}
+        self._completed_requests: list[QueuedRequest] = []
         self._request_counter = 0
         self._max_queue_size = 1000
         self._max_concurrent_requests = 100
@@ -456,8 +452,8 @@ class RouterAgent(BaseSystemAgent):
     async def handle_message(
         self,
         message: Message,
-        session: Optional[Session] = None
-    ) -> Optional[Message]:
+        session: Session | None = None
+    ) -> Message | None:
         """Handle incoming messages"""
         await self.audit_operation("message_received", {
             "message_type": message.type.value if hasattr(message.type, 'value') else str(message.type),
@@ -482,7 +478,7 @@ class RouterAgent(BaseSystemAgent):
 
         return None
 
-    async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_skill(self, skill_name: str, params: dict[str, Any]) -> Any:
         """Execute router skills"""
         await self.audit_operation("skill_execution", {
             "skill": skill_name,
@@ -509,7 +505,7 @@ class RouterAgent(BaseSystemAgent):
 
     # ==================== Skill Implementations ====================
 
-    async def _skill_route(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_route(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute route skill"""
         message_type = params.get("message_type")
         content = params.get("content")
@@ -538,7 +534,7 @@ class RouterAgent(BaseSystemAgent):
 
         return await self._route_message(message_type, content, options)
 
-    async def _skill_balance(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_balance(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute balance skill"""
         route_id = params.get("route_id")
         agent_id = params.get("agent_id")
@@ -585,7 +581,7 @@ class RouterAgent(BaseSystemAgent):
 
         return result
 
-    async def _skill_queue_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_queue_status(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute queue_status skill"""
         include_pending = params.get("include_pending", True)
         include_active = params.get("include_active", True)
@@ -620,7 +616,7 @@ class RouterAgent(BaseSystemAgent):
 
         return result
 
-    async def _skill_get_routes(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _skill_get_routes(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """Execute get_routes skill"""
         route_id = params.get("route_id")
         pattern = params.get("pattern")
@@ -657,8 +653,8 @@ class RouterAgent(BaseSystemAgent):
         self,
         message_type: str,
         content: Any,
-        options: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        options: dict[str, Any]
+    ) -> dict[str, Any]:
         """Route a message to appropriate targets"""
         self._stats["total_routed"] += 1
 
@@ -805,7 +801,7 @@ class RouterAgent(BaseSystemAgent):
                 if len(self._completed_requests) > 100:
                     self._completed_requests = self._completed_requests[-100:]
 
-    def _find_matching_route(self, pattern: str) -> Optional[Route]:
+    def _find_matching_route(self, pattern: str) -> Route | None:
         """Find a route matching the pattern"""
         for route in self._routes.values():
             if not route.enabled:
@@ -823,7 +819,7 @@ class RouterAgent(BaseSystemAgent):
 
         return self._routes.get("default")
 
-    async def _discover_targets(self, message_type: str) -> List[str]:
+    async def _discover_targets(self, message_type: str) -> list[str]:
         """Discover target agents for a message type"""
         if self._discovery_manager:
             try:
@@ -836,10 +832,10 @@ class RouterAgent(BaseSystemAgent):
 
     async def _select_target(
         self,
-        targets: List[str],
+        targets: list[str],
         strategy: LoadBalanceStrategy,
-        route: Optional[Route]
-    ) -> Optional[str]:
+        route: Route | None
+    ) -> str | None:
         """Select a target using the specified strategy"""
         if not targets:
             return None
@@ -867,7 +863,7 @@ class RouterAgent(BaseSystemAgent):
                     total = sum(weights)
                     r = random.uniform(0, total)
                     cumulative = 0
-                    for target, weight in zip(valid_targets, weights):
+                    for target, weight in zip(valid_targets, weights, strict=False):
                         cumulative += weight
                         if r <= cumulative:
                             return target
@@ -906,7 +902,7 @@ class RouterAgent(BaseSystemAgent):
         self,
         message_type: str,
         content: Any,
-        target_agents: List[str],
+        target_agents: list[str],
         priority: int,
     ) -> QueuedRequest:
         """Queue a request for later processing"""
@@ -1007,9 +1003,9 @@ class RouterAgent(BaseSystemAgent):
         route_id: str,
         name: str,
         pattern: str,
-        target_agents: List[str],
+        target_agents: list[str],
         strategy: LoadBalanceStrategy = LoadBalanceStrategy.ROUND_ROBIN,
-        weights: Optional[Dict[str, int]] = None,
+        weights: dict[str, int] | None = None,
     ) -> Route:
         """Add or update a route"""
         targets = []
@@ -1041,7 +1037,7 @@ class RouterAgent(BaseSystemAgent):
         self,
         agent_id: str,
         status: RouteStatus,
-        route_id: Optional[str] = None
+        route_id: str | None = None
     ) -> None:
         """Update the status of a route target"""
         routes_to_update = [self._routes[route_id]] if route_id else list(self._routes.values())

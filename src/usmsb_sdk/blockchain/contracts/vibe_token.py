@@ -8,12 +8,11 @@ VIBE代币客户端模块
 - 税费明细查询
 """
 
-from typing import Dict, Optional, Any
-from web3 import Web3
 from decimal import Decimal
+from typing import Any
 
 from ..config import BlockchainConfig
-from .base import BaseContractClient, TransactionError, ContractError
+from .base import BaseContractClient, ContractError
 
 
 class VIBETokenClient(BaseContractClient):
@@ -31,10 +30,10 @@ class VIBETokenClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Any] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Any] = None,
+        web3_client: Any | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: Any | None = None,
     ):
         """
         初始化VIBE代币客户端
@@ -109,7 +108,7 @@ class VIBETokenClient(BaseContractClient):
         amount: int,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         授权消费
@@ -182,7 +181,7 @@ class VIBETokenClient(BaseContractClient):
         )
         return int(allowance_value)
 
-    def get_tax_breakdown(self, amount: int) -> Dict[str, Any]:
+    def get_tax_breakdown(self, amount: int) -> dict[str, Any]:
         """
         计算交易税明细
 
@@ -246,7 +245,7 @@ class VIBETokenClient(BaseContractClient):
         amount: int,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         转账（有交易税）
@@ -297,7 +296,7 @@ class VIBETokenClient(BaseContractClient):
         amount: int,
         sender_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         代理转账（从授权额度中转账）

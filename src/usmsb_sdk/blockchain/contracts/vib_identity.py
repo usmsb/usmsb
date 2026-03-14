@@ -9,11 +9,10 @@ VIBIdentity身份认证客户端模块
 """
 
 from enum import IntEnum
-from typing import Dict, Any, Optional, Tuple
-from web3 import Web3
+from typing import Any
 
 from ..config import BlockchainConfig
-from .base import BaseContractClient, TransactionError, ContractError
+from .base import BaseContractClient, ContractError
 
 
 class IdentityType(IntEnum):
@@ -62,10 +61,10 @@ class VIBIdentityClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Any] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Any] = None,
+        web3_client: Any | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: Any | None = None,
     ):
         """
         初始化VIBIdentity客户端
@@ -97,8 +96,8 @@ class VIBIdentityClient(BaseContractClient):
         metadata: str,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
-    ) -> Tuple[int, str]:
+        gas: int | None = None,
+    ) -> tuple[int, str]:
         """
         为Agent注册身份（由创建者调用）
 
@@ -152,8 +151,8 @@ class VIBIdentityClient(BaseContractClient):
         metadata: str,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
-    ) -> Tuple[int, str]:
+        gas: int | None = None,
+    ) -> tuple[int, str]:
         """
         注册AI Agent身份（自注册）
 
@@ -204,8 +203,8 @@ class VIBIdentityClient(BaseContractClient):
         metadata: str,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
-    ) -> Tuple[int, str]:
+        gas: int | None = None,
+    ) -> tuple[int, str]:
         """
         注册人类服务者身份
 
@@ -241,8 +240,8 @@ class VIBIdentityClient(BaseContractClient):
         metadata: str,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
-    ) -> Tuple[int, str]:
+        gas: int | None = None,
+    ) -> tuple[int, str]:
         """
         注册节点运营商身份
 
@@ -278,8 +277,8 @@ class VIBIdentityClient(BaseContractClient):
         metadata: str,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
-    ) -> Tuple[int, str]:
+        gas: int | None = None,
+    ) -> tuple[int, str]:
         """
         注册治理参与者身份
 
@@ -383,7 +382,7 @@ class VIBIdentityClient(BaseContractClient):
         )
         return bool(is_reg)
 
-    async def get_identity_info(self, token_id: int) -> Dict[str, Any]:
+    async def get_identity_info(self, token_id: int) -> dict[str, Any]:
         """
         获取身份信息
 
@@ -584,7 +583,7 @@ class VIBIdentityClient(BaseContractClient):
         metadata: str,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         更新身份元数据
@@ -629,7 +628,7 @@ class VIBIdentityClient(BaseContractClient):
         verified: bool,
         admin_address: str,
         admin_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         验证身份（仅管理员）

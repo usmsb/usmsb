@@ -4,17 +4,17 @@
 提供网页抓取、浏览器控制等能力
 """
 
-import asyncio
 import json
 import logging
-import re
-from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, urljoin
+from typing import Any
+from urllib.parse import urlparse
+
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
 
-def get_web_tools() -> List:
+def get_web_tools() -> list:
     """获取网页工具列表"""
     return [
         {
@@ -45,7 +45,7 @@ def get_web_tools() -> List:
     ]
 
 
-async def fetch_url(params: dict) -> Dict[str, Any]:
+async def fetch_url(params: dict) -> dict[str, Any]:
     """
     获取网页内容
 
@@ -98,14 +98,14 @@ async def fetch_url(params: dict) -> Dict[str, Any]:
                     "content_length": len(text),
                 }
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"status": "error", "message": f"请求超时 ({timeout}秒)"}
     except Exception as e:
         logger.error(f"Fetch URL failed: {e}")
         return {"status": "error", "message": str(e)}
 
 
-async def parse_html(params: dict) -> Dict[str, Any]:
+async def parse_html(params: dict) -> dict[str, Any]:
     """
     解析 HTML 内容
 
@@ -156,7 +156,7 @@ async def parse_html(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def search_web(params: dict) -> Dict[str, Any]:
+async def search_web(params: dict) -> dict[str, Any]:
     """
     搜索网页
 
@@ -183,7 +183,7 @@ async def search_web(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def _search_duckduckgo(query: str, num_results: int) -> Dict[str, Any]:
+async def _search_duckduckgo(query: str, num_results: int) -> dict[str, Any]:
     """使用 DuckDuckGo 搜索"""
     try:
         from duckduckgo_search import DDGS
@@ -219,7 +219,7 @@ async def _search_duckduckgo(query: str, num_results: int) -> Dict[str, Any]:
         return await _search_bing(query, num_results)
 
 
-async def _search_fallback(query: str, num_results: int) -> Dict[str, Any]:
+async def _search_fallback(query: str, num_results: int) -> dict[str, Any]:
     """备用搜索方法：使用 Bing"""
     return await _search_bing(query, num_results)
 
@@ -302,7 +302,7 @@ async def _search_fallback(query: str, num_results: int) -> Dict[str, Any]:
     }
 
 
-async def _search_google(query: str, num_results: int) -> Dict[str, Any]:
+async def _search_google(query: str, num_results: int) -> dict[str, Any]:
     """使用 Google 搜索（需要安装 google-search）"""
     try:
         from googlesearch import search as google_search
@@ -329,7 +329,7 @@ async def _search_google(query: str, num_results: int) -> Dict[str, Any]:
         return {"status": "error", "message": "需要安装 google-search"}
 
 
-async def _search_bing(query: str, num_results: int) -> Dict[str, Any]:
+async def _search_bing(query: str, num_results: int) -> dict[str, Any]:
     """使用 Bing 搜索（通过抓取网页）"""
     import aiohttp
 
@@ -407,7 +407,7 @@ async def _search_bing(query: str, num_results: int) -> Dict[str, Any]:
         return await _search_fallback(query, num_results)
 
 
-async def download_file(params: dict) -> Dict[str, Any]:
+async def download_file(params: dict) -> dict[str, Any]:
     """
     下载远程文件
 
@@ -458,7 +458,7 @@ async def download_file(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def get_headers(params: dict) -> Dict[str, Any]:
+async def get_headers(params: dict) -> dict[str, Any]:
     """
     获取网页响应头
 
@@ -507,7 +507,7 @@ class WebTool:
             "description": self.description,
         }
 
-    def to_function_schema(self, provider: str = "anthropic") -> Dict[str, Any]:
+    def to_function_schema(self, provider: str = "anthropic") -> dict[str, Any]:
         """转换为 Function Calling 的 JSON Schema 格式"""
         # MiniMax uses Anthropic-compatible format
         if provider in ("anthropic", "minimax"):
@@ -537,7 +537,7 @@ class WebTool:
                 },
             }
 
-    def _get_parameters(self) -> Dict[str, Any]:
+    def _get_parameters(self) -> dict[str, Any]:
         """获取工具参数定义"""
         params_map = {
             "fetch_url": {
@@ -567,7 +567,7 @@ class WebTool:
         }
         return params_map.get(self.name, {})
 
-    def _get_required_parameters(self) -> List[str]:
+    def _get_required_parameters(self) -> list[str]:
         """获取必需的参数列表"""
         required_map = {
             "fetch_url": ["url"],

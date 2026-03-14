@@ -8,7 +8,7 @@ Chat 配置类
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -102,11 +102,11 @@ class ChatConfig:
 
     # ========== 关键词配置（降级时使用） ==========
     # 简单问候关键词
-    simple_keywords: List[str] = field(default_factory=lambda: [
+    simple_keywords: list[str] = field(default_factory=lambda: [
         "你好", "hi", "hello", "嗨", "您好", "hey"
     ])
     # 工具相关关键词
-    tool_keywords: List[str] = field(default_factory=lambda: [
+    tool_keywords: list[str] = field(default_factory=lambda: [
         "搜索", "查找", "执行", "运行", "计算", "获取", "查询", "列出", "读取", "写", "创建",
         "search", "find", "execute", "run", "query", "create", "get", "list", "read", "write"
     ])
@@ -124,13 +124,13 @@ class ChatConfig:
         )
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "ChatConfig":
+    def from_dict(cls, config_dict: dict[str, Any]) -> "ChatConfig":
         """从字典加载配置"""
         return cls(
             **{k: v for k, v in config_dict.items() if hasattr(cls, k)}
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "max_history_tokens": self.max_history_tokens,

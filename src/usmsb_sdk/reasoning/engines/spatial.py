@@ -4,20 +4,18 @@ Spatial Reasoning Engine
 空间推理引擎：位置、方向、距离推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 import logging
 import math
+from dataclasses import dataclass
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
-    UncertaintyMeasure,
-    UncertaintyType,
+    ReasoningType,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,9 +26,9 @@ class SpatialEntity:
     """空间实体"""
 
     entity_id: str
-    position: Tuple[float, float, float]
-    size: Optional[Tuple[float, float, float]] = None
-    orientation: Optional[Tuple[float, float, float]] = None
+    position: tuple[float, float, float]
+    size: tuple[float, float, float] | None = None
+    orientation: tuple[float, float, float] | None = None
     entity_type: str = "object"
 
 
@@ -60,12 +58,12 @@ class SpatialEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._entities: Dict[str, SpatialEntity] = {}
-        self._relations: List[SpatialRelation] = []
+        self._entities: dict[str, SpatialEntity] = {}
+        self._relations: list[SpatialRelation] = []
 
     @property
     def engine_type(self) -> ReasoningType:
@@ -75,13 +73,13 @@ class SpatialEngine(BaseReasoningEngine):
         self._entities[entity.entity_id] = entity
 
     def _calculate_distance(
-        self, pos1: Tuple[float, float, float], pos2: Tuple[float, float, float]
+        self, pos1: tuple[float, float, float], pos2: tuple[float, float, float]
     ) -> float:
-        return math.sqrt(sum((a - b) ** 2 for a, b in zip(pos1, pos2)))
+        return math.sqrt(sum((a - b) ** 2 for a, b in zip(pos1, pos2, strict=False)))
 
     def _calculate_direction(
-        self, from_pos: Tuple[float, float, float], to_pos: Tuple[float, float, float]
-    ) -> Tuple[str, float]:
+        self, from_pos: tuple[float, float, float], to_pos: tuple[float, float, float]
+    ) -> tuple[str, float]:
         dx = to_pos[0] - from_pos[0]
         dy = to_pos[1] - from_pos[1]
 
@@ -108,7 +106,7 @@ class SpatialEngine(BaseReasoningEngine):
 
     def _check_containment(
         self, container: SpatialEntity, contained: SpatialEntity
-    ) -> Tuple[bool, float]:
+    ) -> tuple[bool, float]:
         if not container.size or not contained.size:
             return False, 0.0
 
@@ -117,13 +115,13 @@ class SpatialEngine(BaseReasoningEngine):
         o_pos = contained.position
         o_size = contained.size
 
-        c_min = tuple(p - s / 2 for p, s in zip(c_pos, c_size))
-        c_max = tuple(p + s / 2 for p, s in zip(c_pos, c_size))
-        o_min = tuple(p - s / 2 for p, s in zip(o_pos, o_size))
-        o_max = tuple(p + s / 2 for p, s in zip(o_pos, o_size))
+        c_min = tuple(p - s / 2 for p, s in zip(c_pos, c_size, strict=False))
+        c_max = tuple(p + s / 2 for p, s in zip(c_pos, c_size, strict=False))
+        o_min = tuple(p - s / 2 for p, s in zip(o_pos, o_size, strict=False))
+        o_max = tuple(p + s / 2 for p, s in zip(o_pos, o_size, strict=False))
 
         contained_flag = all(
-            om >= cm and ox <= cx for om, cm, ox, cx in zip(o_min, c_min, o_max, c_max)
+            om >= cm and ox <= cx for om, cm, ox, cx in zip(o_min, c_min, o_max, c_max, strict=False)
         )
 
         if contained_flag:
@@ -135,7 +133,7 @@ class SpatialEngine(BaseReasoningEngine):
 
         return contained_flag, confidence
 
-    def _check_overlap(self, entity1: SpatialEntity, entity2: SpatialEntity) -> Tuple[bool, float]:
+    def _check_overlap(self, entity1: SpatialEntity, entity2: SpatialEntity) -> tuple[bool, float]:
         if not entity1.size or not entity2.size:
             dist = self._calculate_distance(entity1.position, entity2.position)
             overlap = dist < 0.5
@@ -144,10 +142,10 @@ class SpatialEngine(BaseReasoningEngine):
         pos1, size1 = entity1.position, entity1.size
         pos2, size2 = entity2.position, entity2.size
 
-        min1 = tuple(p - s / 2 for p, s in zip(pos1, size1))
-        max1 = tuple(p + s / 2 for p, s in zip(pos1, size1))
-        min2 = tuple(p - s / 2 for p, s in zip(pos2, size2))
-        max2 = tuple(p + s / 2 for p, s in zip(pos2, size2))
+        min1 = tuple(p - s / 2 for p, s in zip(pos1, size1, strict=False))
+        max1 = tuple(p + s / 2 for p, s in zip(pos1, size1, strict=False))
+        min2 = tuple(p - s / 2 for p, s in zip(pos2, size2, strict=False))
+        max2 = tuple(p + s / 2 for p, s in zip(pos2, size2, strict=False))
 
         overlap_dist = [max(0, min(max1[i], max2[i]) - max(min1[i], min2[i])) for i in range(3)]
         overlap_volume = overlap_dist[0] * overlap_dist[1] * overlap_dist[2]
@@ -162,7 +160,7 @@ class SpatialEngine(BaseReasoningEngine):
 
     def _get_topological_relation(
         self, entity1: SpatialEntity, entity2: SpatialEntity
-    ) -> Tuple[str, float]:
+    ) -> tuple[str, float]:
         is_contained, conf_contained = self._check_containment(entity2, entity1)
         if is_contained:
             return "包含", conf_contained
@@ -187,11 +185,11 @@ class SpatialEngine(BaseReasoningEngine):
         return "分离", 1.0
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         if not premises:
             return self._create_result(
@@ -228,7 +226,7 @@ class SpatialEngine(BaseReasoningEngine):
                         conclusion=f"{e1_id} 和 {e2_id} 之间的距离是 {dist:.2f} 单位",
                         confidence=ConfidenceScore(value=1.0),
                         reasoning_chain=reasoning_chain,
-                        explanations=[f"欧几里得距离计算", f"距离: {dist:.2f}"],
+                        explanations=["欧几里得距离计算", f"距离: {dist:.2f}"],
                     )
                 else:
                     result = self._create_result(
@@ -318,7 +316,7 @@ class SpatialEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         for step in reasoning_result.reasoning_chain:
@@ -328,10 +326,10 @@ class SpatialEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         return ConfidenceScore(value=1.0)
 
-    def get_nearby_entities(self, entity_id: str, radius: float) -> List[Dict[str, Any]]:
+    def get_nearby_entities(self, entity_id: str, radius: float) -> list[dict[str, Any]]:
         if entity_id not in self._entities:
             return []
 

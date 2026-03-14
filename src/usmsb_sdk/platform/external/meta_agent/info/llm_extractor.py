@@ -1,8 +1,7 @@
 import json
 import logging
-from typing import Optional
 
-from .types import RetrievalIntent, CandidateMessage, ExtractedInfo
+from .types import CandidateMessage, ExtractedInfo, RetrievalIntent
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ class LLMExtractor:
 
     async def extract(
         self, candidate: CandidateMessage, intent: RetrievalIntent
-    ) -> Optional[ExtractedInfo]:
+    ) -> ExtractedInfo | None:
         prompt = f"""从给定消息中提取用户需要的信息。
 
 用户想要找: {intent.description}
@@ -68,7 +67,7 @@ class LLMExtractor:
             logger.warning(f"LLM extraction failed: {e}")
             return None
 
-    def _parse_json(self, response: str) -> Optional[dict]:
+    def _parse_json(self, response: str) -> dict | None:
         try:
             if "```json" in response:
                 response = response.split("```json")[1].split("```")[0]

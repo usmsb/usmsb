@@ -4,16 +4,14 @@ Workflow Module
 Manages agent workflows and task execution.
 """
 
-import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +42,13 @@ class WorkflowStep:
     name: str
     description: str
     tool: str
-    parameters: Dict[str, Any]
-    dependencies: List[str]
+    parameters: dict[str, Any]
+    dependencies: list[str]
     status: str = "pending"
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    result: Any | None = None
+    error: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     @property
     def is_complete(self) -> bool:
@@ -66,7 +64,7 @@ class WorkflowStep:
         return self.status == "pending"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowStep":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowStep":
         return cls(
             step_id=data.get("step_id", data.get("id", "")),
             name=data.get("name", ""),
@@ -81,7 +79,7 @@ class WorkflowStep:
             completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "step_id": self.step_id,
             "name": self.name,
@@ -101,16 +99,16 @@ class Workflow:
     workflow_id: str
     name: str
     task_description: str
-    steps: List[WorkflowStep]
+    steps: list[WorkflowStep]
     status: str
     current_step: int
     agent_id: str
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    result: Any | None = None
+    error: str | None = None
 
     @property
     def total_steps(self) -> int:
@@ -148,7 +146,7 @@ class Workflow:
         return 0.0
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Workflow":
+    def from_dict(cls, data: dict[str, Any]) -> "Workflow":
         # Parse steps
         steps = []
         steps_data = data.get("steps", [])
@@ -194,11 +192,11 @@ class WorkflowResult:
     completed_steps: int
     failed_steps: int
     execution_time: float
-    step_results: Dict[str, Any]
+    step_results: dict[str, Any]
     final_result: Any
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowResult":
+    def from_dict(cls, data: dict[str, Any]) -> "WorkflowResult":
         return cls(
             workflow_id=data.get("workflow_id", ""),
             status=data.get("status", "pending"),
@@ -226,22 +224,22 @@ class WorkflowManager:
         self,
         platform_client: PlatformClient,
         agent_id: str,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
         self.agent_id = agent_id
         self.logger = logger or logging.getLogger(__name__)
 
         # Workflow cache
-        self._workflows: Dict[str, Workflow] = {}
+        self._workflows: dict[str, Workflow] = {}
 
     # ==================== Workflow Creation ====================
 
     async def create(
         self,
         task_description: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> Optional[Workflow]:
+        available_tools: list[str] | None = None,
+    ) -> Workflow | None:
         """
         Create a new workflow.
 
@@ -266,13 +264,13 @@ class WorkflowManager:
         self.logger.error(f"Failed to create workflow: {response.error}")
         return None
 
-    async def get(self, workflow_id: str) -> Optional[Workflow]:
+    async def get(self, workflow_id: str) -> Workflow | None:
         """Get a workflow by ID"""
         if workflow_id in self._workflows:
             return self._workflows[workflow_id]
         return None
 
-    async def list_all(self) -> List[Workflow]:
+    async def list_all(self) -> list[Workflow]:
         """List all workflows"""
         response = await self._platform.list_workflows()
 
@@ -288,7 +286,7 @@ class WorkflowManager:
 
     # ==================== Execution ====================
 
-    async def execute(self, workflow_id: str) -> Optional[WorkflowResult]:
+    async def execute(self, workflow_id: str) -> WorkflowResult | None:
         """
         Execute a workflow.
 
@@ -329,7 +327,7 @@ class WorkflowManager:
 
     # ==================== Status ====================
 
-    async def get_status(self, workflow_id: str) -> Dict[str, Any]:
+    async def get_status(self, workflow_id: str) -> dict[str, Any]:
         """Get workflow status"""
         workflow = await self.get(workflow_id)
         if workflow:
@@ -345,7 +343,7 @@ class WorkflowManager:
             }
         return {"error": "Workflow not found"}
 
-    async def get_current_step(self, workflow_id: str) -> Optional[WorkflowStep]:
+    async def get_current_step(self, workflow_id: str) -> WorkflowStep | None:
         """Get the current step being executed"""
         workflow = await self.get(workflow_id)
         if workflow and 0 <= workflow.current_step < len(workflow.steps):
@@ -387,8 +385,8 @@ class WorkflowManager:
     async def run(
         self,
         task_description: str,
-        tools: Optional[List[str]] = None,
-    ) -> Optional[WorkflowResult]:
+        tools: list[str] | None = None,
+    ) -> WorkflowResult | None:
         """
         Convenience method to create and run a workflow.
 

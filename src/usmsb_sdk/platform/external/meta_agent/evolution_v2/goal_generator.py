@@ -4,17 +4,15 @@
 自主生成学习目标
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any
 
 from .models import (
-    LearningGoal,
     GoalPriority,
+    LearningGoal,
     LearningType,
 )
 
@@ -30,8 +28,8 @@ class GoalTemplate:
     priority: GoalPriority
     learning_type: LearningType
     estimated_duration: float
-    prerequisites: List[str] = field(default_factory=list)
-    success_criteria: Dict[str, Any] = field(default_factory=dict)
+    prerequisites: list[str] = field(default_factory=list)
+    success_criteria: dict[str, Any] = field(default_factory=dict)
 
 
 class GoalGenerator:
@@ -51,11 +49,11 @@ class GoalGenerator:
         self.capability_assessor = capability_assessor
         self.curiosity_engine = curiosity_engine
 
-        self._active_goals: Dict[str, LearningGoal] = {}
-        self._completed_goals: List[LearningGoal] = []
-        self._goal_templates: List[GoalTemplate] = []
+        self._active_goals: dict[str, LearningGoal] = {}
+        self._completed_goals: list[LearningGoal] = []
+        self._goal_templates: list[GoalTemplate] = []
 
-        self._goal_graph: Dict[str, List[str]] = {}
+        self._goal_graph: dict[str, list[str]] = {}
         self._generation_count: int = 0
 
         self._initialized = False
@@ -118,8 +116,8 @@ class GoalGenerator:
     async def generate_goals(
         self,
         count: int = 3,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[LearningGoal]:
+        context: dict[str, Any] | None = None,
+    ) -> list[LearningGoal]:
         """
         生成学习目标
 
@@ -151,7 +149,7 @@ class GoalGenerator:
 
         return goals[:count]
 
-    async def _generate_weakness_goals(self, count: int) -> List[LearningGoal]:
+    async def _generate_weakness_goals(self, count: int) -> list[LearningGoal]:
         """基于弱点生成目标"""
         goals = []
 
@@ -184,7 +182,7 @@ class GoalGenerator:
 
         return goals
 
-    async def _generate_exploration_goals(self, count: int) -> List[LearningGoal]:
+    async def _generate_exploration_goals(self, count: int) -> list[LearningGoal]:
         """基于探索生成目标"""
         goals = []
 
@@ -199,7 +197,7 @@ class GoalGenerator:
 
         return goals
 
-    async def _generate_improvement_goals(self, count: int) -> List[LearningGoal]:
+    async def _generate_improvement_goals(self, count: int) -> list[LearningGoal]:
         """生成一般改进目标"""
         goals = []
 
@@ -225,7 +223,7 @@ class GoalGenerator:
 
         return goals
 
-    async def prioritize_goals(self) -> List[LearningGoal]:
+    async def prioritize_goals(self) -> list[LearningGoal]:
         """
         对目标进行优先级排序
 
@@ -268,7 +266,7 @@ class GoalGenerator:
         self,
         goal: LearningGoal,
         max_sub_goals: int = 5,
-    ) -> List[LearningGoal]:
+    ) -> list[LearningGoal]:
         """
         分解目标
 
@@ -291,7 +289,7 @@ class GoalGenerator:
         else:
             sub_goals = self._decompose_default(goal, max_sub_goals)
 
-        for i, sub in enumerate(sub_goals):
+        for _i, sub in enumerate(sub_goals):
             sub.priority = goal.priority
             sub.deadline = goal.deadline
             goal.sub_goals.append(sub.id)
@@ -303,7 +301,7 @@ class GoalGenerator:
         self,
         goal: LearningGoal,
         max_count: int,
-    ) -> List[LearningGoal]:
+    ) -> list[LearningGoal]:
         """使用LLM分解目标"""
         prompt = f"""将以下学习目标分解为{max_count}个子目标：
 
@@ -337,7 +335,7 @@ class GoalGenerator:
         self,
         goal: LearningGoal,
         max_count: int,
-    ) -> List[LearningGoal]:
+    ) -> list[LearningGoal]:
         """默认分解策略"""
         phases = ["理解概念", "学习原理", "实践应用", "总结反思", "巩固提升"]
 
@@ -354,7 +352,7 @@ class GoalGenerator:
     async def check_goal_dependencies(
         self,
         goal: LearningGoal,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         检查目标依赖
 
@@ -384,7 +382,7 @@ class GoalGenerator:
 
         return result
 
-    async def schedule_goals(self) -> List[Dict[str, Any]]:
+    async def schedule_goals(self) -> list[dict[str, Any]]:
         """
         调度目标执行
 
@@ -398,7 +396,7 @@ class GoalGenerator:
         schedule = []
         current_time = datetime.now().timestamp()
 
-        for i, goal in enumerate(prioritized):
+        for _i, goal in enumerate(prioritized):
             dep_check = await self.check_goal_dependencies(goal)
 
             start_time = current_time
@@ -434,15 +432,15 @@ class GoalGenerator:
             if success:
                 self._completed_goals.append(goal)
 
-    def get_active_goals(self) -> List[LearningGoal]:
+    def get_active_goals(self) -> list[LearningGoal]:
         """获取活跃目标"""
         return list(self._active_goals.values())
 
-    def get_goal(self, goal_id: str) -> Optional[LearningGoal]:
+    def get_goal(self, goal_id: str) -> LearningGoal | None:
         """获取特定目标"""
         return self._active_goals.get(goal_id)
 
-    def get_goal_stats(self) -> Dict[str, Any]:
+    def get_goal_stats(self) -> dict[str, Any]:
         """获取目标统计"""
         return {
             "active_goals": len(self._active_goals),

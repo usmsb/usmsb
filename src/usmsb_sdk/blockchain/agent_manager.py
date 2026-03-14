@@ -5,18 +5,18 @@ Agent管理器模块
 """
 
 import json
-from typing import Dict, Optional, Tuple, List
+
 from eth_account import Account
 
 from .config import BlockchainConfig
-from .web3_client import Web3Client
-from .contracts.vibe_token import VIBETokenClient
-from .contracts.agent_wallet import AgentWalletFactory, AgentWalletClient
-from .contracts.agent_registry import AgentRegistryClient
-from .contracts.vib_identity import VIBIdentityClient, IdentityType
-from .contracts.vib_staking import VIBStakingClient
 from .contracts.abi_loader import load_abi_and_bytecode
+from .contracts.agent_registry import AgentRegistryClient
+from .contracts.agent_wallet import AgentWalletClient, AgentWalletFactory
+from .contracts.vib_identity import VIBIdentityClient
+from .contracts.vib_staking import VIBStakingClient
+from .contracts.vibe_token import VIBETokenClient
 from .key_management import AgentKeyManager
+from .web3_client import Web3Client
 
 
 class AgentCreationError(Exception):
@@ -40,8 +40,8 @@ class AgentManager:
 
     def __init__(
         self,
-        config: Optional[BlockchainConfig] = None,
-        key_manager: Optional[AgentKeyManager] = None,
+        config: BlockchainConfig | None = None,
+        key_manager: AgentKeyManager | None = None,
     ):
         """
         初始化Agent管理器
@@ -55,11 +55,11 @@ class AgentManager:
         self.key_manager = key_manager
 
         # 延迟初始化合约客户端
-        self._token_client: Optional[VIBETokenClient] = None
-        self._registry_client: Optional[AgentRegistryClient] = None
-        self._identity_client: Optional[VIBIdentityClient] = None
-        self._staking_client: Optional[VIBStakingClient] = None
-        self._wallet_factory: Optional[AgentWalletFactory] = None
+        self._token_client: VIBETokenClient | None = None
+        self._registry_client: AgentRegistryClient | None = None
+        self._identity_client: VIBIdentityClient | None = None
+        self._staking_client: VIBStakingClient | None = None
+        self._wallet_factory: AgentWalletFactory | None = None
 
     @property
     def token_client(self) -> VIBETokenClient:
@@ -123,7 +123,7 @@ class AgentManager:
             )
         return self._wallet_factory
 
-    async def check_can_create_agent(self, owner_address: str) -> Dict[str, any]:
+    async def check_can_create_agent(self, owner_address: str) -> dict[str, any]:
         """
         检查Owner是否可以创建新Agent
 
@@ -164,7 +164,7 @@ class AgentManager:
             "reason": reason,
         }
 
-    async def generate_agent_keypair(self) -> Tuple[str, str]:
+    async def generate_agent_keypair(self) -> tuple[str, str]:
         """
         生成Agent密钥对
 
@@ -182,7 +182,7 @@ class AgentManager:
     async def generate_agent_keypair_encrypted(
         self,
         encryption_key: str = None,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         生成Agent密钥对（加密）
 
@@ -208,7 +208,7 @@ class AgentManager:
         agent_address: str = None,
         agent_private_key: str = None,
         encryption_key: str = None,
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """
         完整的Agent创建流程
 
@@ -316,7 +316,7 @@ class AgentManager:
             except Exception as e:
                 # 身份注册失败不影响Agent创建
                 import warnings
-                warnings.warn(f"Failed to register identity: {e}")
+                warnings.warn(f"Failed to register identity: {e}", stacklevel=2)
 
         # 6. 初始充值（可选）
         if initial_deposit > 0:
@@ -330,7 +330,7 @@ class AgentManager:
                 )
 
                 # 然后充值
-                deposit_tx_hash = await AgentWalletClient(
+                await AgentWalletClient(
                     web3_client=self.web3_client,
                     config=self.config,
                     contract_address=wallet_address,
@@ -356,7 +356,7 @@ class AgentManager:
         self,
         agent_address: str,
         wallet_address: str,
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """
         获取Agent完整状态
 
@@ -424,7 +424,7 @@ class AgentManager:
             "is_registered_identity": is_registered_identity,
         }
 
-    async def list_owner_agents(self, owner_address: str) -> List[Dict[str, str]]:
+    async def list_owner_agents(self, owner_address: str) -> list[dict[str, str]]:
         """
         列出Owner的所有Agent
 
@@ -491,7 +491,6 @@ class AgentManager:
 
 # 导入asyncio用于gather操作
 import asyncio
-
 
 __all__ = [
     "AgentManager",

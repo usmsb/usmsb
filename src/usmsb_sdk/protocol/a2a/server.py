@@ -5,20 +5,17 @@ This module provides the A2A server implementation for agent-to-agent communicat
 """
 
 import asyncio
-import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 from usmsb_sdk.protocol.a2a.client import (
-    A2AEnvelope,
-    A2ASkillRequest,
-    A2ASkillResponse,
     A2AAgentInfo,
+    A2AEnvelope,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +25,7 @@ class A2AServerConfig:
     """A2A server configuration."""
     host: str = "0.0.0.0"
     port: int = 9000
-    agent_id: Optional[str] = None
+    agent_id: str | None = None
     agent_name: str = "A2A Agent"
     agent_version: str = "1.0.0"
     max_connections: int = 100
@@ -48,7 +45,7 @@ class A2AServer:
 
     def __init__(
         self,
-        config: Optional[A2AServerConfig] = None,
+        config: A2AServerConfig | None = None,
         host: str = "0.0.0.0",
         port: int = 9000,
     ):
@@ -62,11 +59,11 @@ class A2AServer:
         """
         self._config = config or A2AServerConfig(host=host, port=port)
         self._agent_id = self._config.agent_id or f"agent-{uuid.uuid4().hex[:8]}"
-        self._server: Optional[Any] = None
+        self._server: Any | None = None
         self._running = False
-        self._connections: Dict[str, Any] = {}
-        self._skills: Dict[str, Callable] = {}
-        self._message_handlers: Dict[str, Callable] = {}
+        self._connections: dict[str, Any] = {}
+        self._skills: dict[str, Callable] = {}
+        self._message_handlers: dict[str, Callable] = {}
 
         # Register default handlers
         self._register_default_handlers()
@@ -169,7 +166,7 @@ class A2AServer:
         name: str,
         handler: Callable,
         description: str = "",
-        input_schema: Optional[Dict[str, Any]] = None,
+        input_schema: dict[str, Any] | None = None,
     ) -> None:
         """
         Register a skill.
@@ -305,8 +302,8 @@ class A2AServer:
     async def handle_message(
         self,
         connection_id: str,
-        message: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        message: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """
         Handle an incoming message.
 
@@ -348,7 +345,7 @@ class A2AServer:
             endpoint=f"{self._config.host}:{self._config.port}",
         )
 
-    def get_server_info(self) -> Dict[str, Any]:
+    def get_server_info(self) -> dict[str, Any]:
         """Get server information."""
         return {
             "host": self._config.host,

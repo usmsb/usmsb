@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,8 @@ class DecisionService:
         self.llm = llm_manager
 
     async def decide(
-        self, agent_id: str, goal: Any, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, agent_id: str, goal: Any, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         为 Agent 做出决策
 
@@ -40,10 +40,10 @@ class DecisionService:
             return await self._decide_from_dict(goal, context)
         return await self._decide_from_text(str(goal), context)
 
-    async def _decide_from_dict(self, goal: Dict, context: Optional[Dict]) -> Dict[str, Any]:
+    async def _decide_from_dict(self, goal: dict, context: dict | None) -> dict[str, Any]:
         """从字典目标决策"""
         intent = goal.get("intent", "unknown")
-        original = goal.get("original", "")
+        goal.get("original", "")
 
         # 根据意图选择行动
         if intent in ["command", "命令", "执行"]:
@@ -55,7 +55,7 @@ class DecisionService:
         else:
             return await self._plan_general(goal, context)
 
-    async def _decide_from_text(self, goal_text: str, context: Optional[Dict]) -> Dict[str, Any]:
+    async def _decide_from_text(self, goal_text: str, context: dict | None) -> dict[str, Any]:
         """从文本目标决策"""
         prompt = f"""分析用户请求，制定执行计划。
 
@@ -75,15 +75,15 @@ class DecisionService:
             "plan": llm_result,
         }
 
-    async def _plan_command(self, goal: Dict, context: Optional[Dict]) -> Dict[str, Any]:
+    async def _plan_command(self, goal: dict, context: dict | None) -> dict[str, Any]:
         """规划命令执行"""
         return {"actions": [{"tool": "execute_command", "params": goal}], "plan": "execute"}
 
-    async def _plan_query(self, goal: Dict, context: Optional[Dict]) -> Dict[str, Any]:
+    async def _plan_query(self, goal: dict, context: dict | None) -> dict[str, Any]:
         """规划查询"""
         return {"actions": [{"tool": "query_data", "params": goal}], "plan": "query"}
 
-    async def _plan_answer(self, goal: Dict, context: Optional[Dict]) -> Dict[str, Any]:
+    async def _plan_answer(self, goal: dict, context: dict | None) -> dict[str, Any]:
         """规划问答"""
         original = goal.get("original", "你好")
 
@@ -97,7 +97,7 @@ class DecisionService:
             "plan": "answer",
         }
 
-    async def _plan_general(self, goal: Dict, context: Optional[Dict]) -> Dict[str, Any]:
+    async def _plan_general(self, goal: dict, context: dict | None) -> dict[str, Any]:
         """通用规划"""
         original = goal.get("original", "")
 
@@ -114,19 +114,19 @@ class DecisionService:
     async def plan_actions(
         self,
         goal: Any,
-        constraints: Optional[Dict[str, Any]] = None,
-        available_actions: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        constraints: dict[str, Any] | None = None,
+        available_actions: list[str] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """规划行动序列"""
         return {"actions": [], "plan": []}
 
     async def select_strategy(
         self,
-        situation: Dict[str, Any],
-        strategies: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        situation: dict[str, Any],
+        strategies: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """选择最优策略"""
         if not strategies:
             return {"selected": None, "reason": "no strategies"}

@@ -15,29 +15,26 @@ Key Features:
 4. Trust Management: Maintain trust scores for relationship decisions
 """
 
-import asyncio
-import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent
 from usmsb_sdk.core.communication.agent_communication import (
     AgentAddress,
     AgentCommunicationManager,
-    Message,
-    MessageType,
 )
+from usmsb_sdk.core.elements import Agent
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
 from usmsb_sdk.node.decentralized_node import DistributedServiceRegistry
 
 logger = logging.getLogger(__name__)
 
 
-class ExplorationStrategy(str, Enum):
+class ExplorationStrategy(StrEnum):
     """Strategy for network exploration."""
     BFS = "breadth_first"      # Explore broadly
     DFS = "depth_first"        # Explore deeply
@@ -45,7 +42,7 @@ class ExplorationStrategy(str, Enum):
     TARGETED = "targeted"      # Target specific capabilities
 
 
-class TrustLevel(str, Enum):
+class TrustLevel(StrEnum):
     """Trust level for agent relationships."""
     UNKNOWN = "unknown"
     LOW = "low"
@@ -59,14 +56,14 @@ class AgentCapabilityInfo:
     """Information about an agent's capabilities."""
     agent_id: str
     agent_name: str
-    capabilities: List[str]
-    skills: List[str]
+    capabilities: list[str]
+    skills: list[str]
     reputation: float
     status: str
     last_seen: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "agent_name": self.agent_name,
@@ -79,7 +76,7 @@ class AgentCapabilityInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentCapabilityInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentCapabilityInfo":
         return cls(
             agent_id=data.get("agent_id", ""),
             agent_name=data.get("agent_name", "Unknown"),
@@ -103,7 +100,7 @@ class AgentRecommendation:
     reason: str
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "recommended_agent_id": self.recommended_agent_id,
             "recommended_agent_name": self.recommended_agent_name,
@@ -123,12 +120,12 @@ class ContactRequest:
     requester_name: str
     target_id: str
     contact_reason: str
-    proposal: Optional[Dict[str, Any]] = None
+    proposal: dict[str, Any] | None = None
     status: str = "pending"
     created_at: float = field(default_factory=time.time)
-    response_message: Optional[str] = None
+    response_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "requester_id": self.requester_id,
@@ -148,9 +145,9 @@ class ContactResult:
     target_agent_id: str
     accepted: bool
     response_message: str
-    suggested_action: Optional[str] = None
+    suggested_action: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target_agent_id": self.target_agent_id,
             "accepted": self.accepted,
@@ -163,13 +160,13 @@ class ContactResult:
 class ExplorationRecord:
     """Record of a network exploration."""
     explorer_id: str
-    discovered_agents: List[str]
+    discovered_agents: list[str]
     exploration_depth: int
     strategy: str
     started_at: float
-    completed_at: Optional[float] = None
+    completed_at: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "explorer_id": self.explorer_id,
             "discovered_agents": self.discovered_agents,
@@ -189,10 +186,10 @@ class AgentRelationship:
     trust_score: float
     interaction_count: int
     last_interaction: float
-    shared_capabilities: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    shared_capabilities: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "related_agent_id": self.related_agent_id,
@@ -217,7 +214,7 @@ class AgentNetworkExplorer:
         self,
         communication_manager: AgentCommunicationManager,
         registry: DistributedServiceRegistry,
-        llm_adapter: Optional[ILLMAdapter] = None,
+        llm_adapter: ILLMAdapter | None = None,
     ):
         """
         Initialize the Agent Network Explorer.
@@ -232,35 +229,35 @@ class AgentNetworkExplorer:
         self.llm = llm_adapter
 
         # Network graph: agent_id -> set of known agent_ids
-        self._network_graph: Dict[str, Set[str]] = {}
+        self._network_graph: dict[str, set[str]] = {}
 
         # Agent capabilities cache
-        self._agent_capabilities: Dict[str, AgentCapabilityInfo] = {}
+        self._agent_capabilities: dict[str, AgentCapabilityInfo] = {}
 
         # Trust scores: agent_id -> {related_agent_id -> trust_score}
-        self._trust_scores: Dict[str, Dict[str, float]] = {}
+        self._trust_scores: dict[str, dict[str, float]] = {}
 
         # Relationships: agent_id -> list of relationships
-        self._relationships: Dict[str, List[AgentRelationship]] = {}
+        self._relationships: dict[str, list[AgentRelationship]] = {}
 
         # Exploration history
-        self._exploration_history: List[ExplorationRecord] = []
+        self._exploration_history: list[ExplorationRecord] = []
 
         # Contact requests
-        self._contact_requests: Dict[str, ContactRequest] = {}
+        self._contact_requests: dict[str, ContactRequest] = {}
 
         # Callbacks
-        self.on_agent_discovered: Optional[Callable[[AgentCapabilityInfo], None]] = None
-        self.on_relationship_established: Optional[Callable[[AgentRelationship], None]] = None
+        self.on_agent_discovered: Callable[[AgentCapabilityInfo], None] | None = None
+        self.on_relationship_established: Callable[[AgentRelationship], None] | None = None
 
     async def explore_network(
         self,
         agent: Agent,
         exploration_depth: int = 2,
         max_agents_per_hop: int = 5,
-        target_capabilities: Optional[List[str]] = None,
+        target_capabilities: list[str] | None = None,
         strategy: ExplorationStrategy = ExplorationStrategy.BFS,
-    ) -> List[AgentCapabilityInfo]:
+    ) -> list[AgentCapabilityInfo]:
         """
         Proactively explore the network to discover new agents.
 
@@ -274,9 +271,9 @@ class AgentNetworkExplorer:
         Returns:
             List of discovered agent capabilities
         """
-        discovered_agents: List[AgentCapabilityInfo] = []
-        visited: Set[str] = {agent.id}
-        current_hop: List[str] = [agent.id]
+        discovered_agents: list[AgentCapabilityInfo] = []
+        visited: set[str] = {agent.id}
+        current_hop: list[str] = [agent.id]
 
         exploration_record = ExplorationRecord(
             explorer_id=agent.id,
@@ -287,8 +284,8 @@ class AgentNetworkExplorer:
         )
 
         try:
-            for depth in range(exploration_depth):
-                next_hop: List[str] = []
+            for _depth in range(exploration_depth):
+                next_hop: list[str] = []
 
                 for current_agent_id in current_hop:
                     # Get known agents from network graph or registry
@@ -345,7 +342,7 @@ class AgentNetworkExplorer:
             logger.error(f"Network exploration error: {e}")
             return discovered_agents
 
-    async def _get_known_agents(self, agent_id: str) -> List[str]:
+    async def _get_known_agents(self, agent_id: str) -> list[str]:
         """Get agents known by a specific agent."""
         # From local network graph
         if agent_id in self._network_graph:
@@ -361,7 +358,7 @@ class AgentNetworkExplorer:
         except Exception:
             return []
 
-    async def _get_agent_capabilities(self, agent_id: str) -> Optional[AgentCapabilityInfo]:
+    async def _get_agent_capabilities(self, agent_id: str) -> AgentCapabilityInfo | None:
         """Get capabilities of an agent."""
         # Check cache first
         if agent_id in self._agent_capabilities:
@@ -415,15 +412,15 @@ class AgentNetworkExplorer:
 
     def _calculate_capability_match(
         self,
-        agent_capabilities: List[str],
-        target_capabilities: List[str],
+        agent_capabilities: list[str],
+        target_capabilities: list[str],
     ) -> float:
         """Calculate how well agent capabilities match targets."""
         if not target_capabilities:
             return 1.0
 
-        agent_caps_set = set(c.lower() for c in agent_capabilities)
-        target_caps_set = set(c.lower() for c in target_capabilities)
+        agent_caps_set = {c.lower() for c in agent_capabilities}
+        target_caps_set = {c.lower() for c in target_capabilities}
 
         matches = len(agent_caps_set & target_caps_set)
         return matches / len(target_caps_set) if target_caps_set else 0.0
@@ -433,7 +430,7 @@ class AgentNetworkExplorer:
         agent: Agent,
         target_capability: str,
         max_recommendations: int = 5,
-    ) -> List[AgentRecommendation]:
+    ) -> list[AgentRecommendation]:
         """
         Request recommendations from known agents.
 
@@ -445,7 +442,7 @@ class AgentNetworkExplorer:
         Returns:
             List of agent recommendations
         """
-        recommendations: List[AgentRecommendation] = []
+        recommendations: list[AgentRecommendation] = []
 
         # Get known agents from network
         known_agents = self._network_graph.get(agent.id, set())
@@ -499,7 +496,7 @@ class AgentNetworkExplorer:
         agent: Agent,
         target_agent_id: str,
         contact_reason: str,
-        proposal: Optional[Dict[str, Any]] = None,
+        proposal: dict[str, Any] | None = None,
     ) -> ContactResult:
         """
         Initiate contact with another agent.
@@ -615,7 +612,7 @@ class AgentNetworkExplorer:
         agent: Agent,
         interest_type: str,  # "seeking" or "offering"
         capability: str,
-        details: Dict[str, Any],
+        details: dict[str, Any],
     ) -> int:
         """
         Broadcast interest to the network.
@@ -652,7 +649,7 @@ class AgentNetworkExplorer:
         self,
         agent_id: str,
         depth: int = 1,
-    ) -> List[AgentCapabilityInfo]:
+    ) -> list[AgentCapabilityInfo]:
         """
         Get an agent's network (agents they know).
 
@@ -663,12 +660,12 @@ class AgentNetworkExplorer:
         Returns:
             List of agents in the network
         """
-        network: List[AgentCapabilityInfo] = []
-        visited: Set[str] = {agent_id}
-        current: List[str] = list(self._network_graph.get(agent_id, set()))
+        network: list[AgentCapabilityInfo] = []
+        visited: set[str] = {agent_id}
+        current: list[str] = list(self._network_graph.get(agent_id, set()))
 
         for _ in range(depth):
-            next_level: List[str] = []
+            next_level: list[str] = []
             for agent_id in current:
                 if agent_id in visited:
                     continue
@@ -687,7 +684,7 @@ class AgentNetworkExplorer:
         self,
         agent_id: str,
         min_trust: float = 0.7,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Get agents trusted by a specific agent.
 
@@ -738,7 +735,7 @@ class AgentNetworkExplorer:
                         rel.trust_level = TrustLevel.LOW
                     break
 
-    def get_exploration_stats(self, agent_id: str) -> Dict[str, Any]:
+    def get_exploration_stats(self, agent_id: str) -> dict[str, Any]:
         """Get exploration statistics for an agent."""
         agent_explorations = [
             e for e in self._exploration_history
@@ -754,7 +751,7 @@ class AgentNetworkExplorer:
             "trusted_agents": len(self.get_trusted_agents(agent_id)),
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize explorer state."""
         return {
             "network_graph": {

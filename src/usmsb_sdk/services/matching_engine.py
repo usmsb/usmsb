@@ -7,12 +7,11 @@ Provides real matching algorithms for the REST API.
 Integrates with DynamicPricingService for intelligent price suggestions.
 """
 
-import json
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from usmsb_sdk.services.dynamic_pricing_service import DynamicPricingService
@@ -30,10 +29,10 @@ class MatchScore:
     reputation_match: float
     time_match: float
     semantic_match: float = 0.0
-    suggested_price_range: Dict[str, float] = field(default_factory=dict)
+    suggested_price_range: dict[str, float] = field(default_factory=dict)
     reasoning: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "overall": round(self.overall, 3),
             "capability_match": round(self.capability_match, 3),
@@ -57,7 +56,7 @@ class MatchResult:
     status: str = "pending"
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "match_id": self.match_id,
             "demand_id": self.demand_id,
@@ -99,7 +98,7 @@ class MatchingEngine:
         """
         self.llm = llm_adapter
         self.pricing_service = pricing_service
-        self._match_history: List[Dict[str, Any]] = []
+        self._match_history: list[dict[str, Any]] = []
 
     def set_pricing_service(self, service: "DynamicPricingService") -> None:
         """Set the dynamic pricing service."""
@@ -107,8 +106,8 @@ class MatchingEngine:
 
     def calculate_capability_match(
         self,
-        required_skills: List[str],
-        offered_capabilities: List[str],
+        required_skills: list[str],
+        offered_capabilities: list[str],
     ) -> float:
         """
         Calculate capability match score.
@@ -134,8 +133,8 @@ class MatchingEngine:
             return 0.0
 
         # Normalize to lowercase for comparison
-        required = set(s.lower().strip() for s in required_skills)
-        offered = set(c.lower().strip() for c in offered_capabilities)
+        required = {s.lower().strip() for s in required_skills}
+        offered = {c.lower().strip() for c in offered_capabilities}
 
         # Direct overlap
         intersection = required & offered
@@ -156,7 +155,7 @@ class MatchingEngine:
 
     def calculate_price_match(
         self,
-        budget_range: Dict[str, float],
+        budget_range: dict[str, float],
         price: float,
         price_type: str = "hourly",
     ) -> float:
@@ -229,9 +228,9 @@ class MatchingEngine:
 
     def calculate_time_match(
         self,
-        deadline: Optional[str],
+        deadline: str | None,
         availability: str,
-        estimated_duration: Optional[str] = None,
+        estimated_duration: str | None = None,
     ) -> float:
         """
         Calculate time match score.
@@ -254,7 +253,7 @@ class MatchingEngine:
         deadline_score = 1.0
         if deadline:
             try:
-                from datetime import datetime, timedelta
+                from datetime import datetime
 
                 # Try to parse deadline
                 if deadline.endswith("Z"):
@@ -391,10 +390,10 @@ Respond with only a number between 0 and 1.
 
     def suggest_price_range(
         self,
-        budget_range: Dict[str, float],
+        budget_range: dict[str, float],
         provider_price: float,
-        market_data: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, float]:
+        market_data: dict[str, float] | None = None,
+    ) -> dict[str, float]:
         """
         Suggest a fair price range for negotiation.
 
@@ -406,11 +405,10 @@ Respond with only a number between 0 and 1.
 
         # Start with provider's price as baseline
         if market_data:
-            avg_price = market_data.get("average", provider_price)
+            market_data.get("average", provider_price)
             min_price = market_data.get("min", provider_price * 0.8)
             max_price = market_data.get("max", provider_price * 1.2)
         else:
-            avg_price = provider_price
             min_price = provider_price * 0.8
             max_price = provider_price * 1.2
 
@@ -438,8 +436,8 @@ Respond with only a number between 0 and 1.
         supplier_id: str,
         supplier_reputation: float = 0.5,
         demander_urgency: float = 0.0,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Calculate intelligent price using dynamic pricing service.
 
@@ -484,8 +482,8 @@ Respond with only a number between 0 and 1.
         price_match: float,
         reputation_match: float,
         time_match: float,
-        demand: Dict[str, Any],
-        supply: Dict[str, Any],
+        demand: dict[str, Any],
+        supply: dict[str, Any],
     ) -> str:
         """
         Generate human-readable reasoning for the match.
@@ -527,11 +525,11 @@ Respond with only a number between 0 and 1.
 
     async def match_demand_to_supplies(
         self,
-        demand: Dict[str, Any],
-        supplies: List[Dict[str, Any]],
+        demand: dict[str, Any],
+        supplies: list[dict[str, Any]],
         min_score: float = 0.3,
         max_results: int = 10,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """
         Match a demand to multiple supplies.
 
@@ -612,11 +610,11 @@ Respond with only a number between 0 and 1.
 
     async def match_supply_to_demands(
         self,
-        supply: Dict[str, Any],
-        demands: List[Dict[str, Any]],
+        supply: dict[str, Any],
+        demands: list[dict[str, Any]],
         min_score: float = 0.3,
         max_results: int = 10,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """
         Match a supply to multiple demands.
 

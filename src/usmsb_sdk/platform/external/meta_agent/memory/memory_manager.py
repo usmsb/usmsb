@@ -12,11 +12,11 @@
 import asyncio
 import json
 import logging
-import sqlite3
 import os
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ class ConversationSummary:
     id: str
     conversation_id: str
     summary: str
-    key_topics: List[str] = field(default_factory=list)
-    decisions: List[str] = field(default_factory=list)
+    key_topics: list[str] = field(default_factory=list)
+    decisions: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     message_count: int = 0
 
@@ -50,9 +50,9 @@ class UserProfile:
     """用户画像"""
 
     user_id: str
-    preferences: Dict[str, Any] = field(default_factory=dict)
-    commitments: List[str] = field(default_factory=list)
-    knowledge: Dict[str, Any] = field(default_factory=dict)
+    preferences: dict[str, Any] = field(default_factory=dict)
+    commitments: list[str] = field(default_factory=list)
+    knowledge: dict[str, Any] = field(default_factory=dict)
     last_updated: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -69,7 +69,7 @@ class MemoryManager:
     def __init__(
         self,
         db_path: str = "memory.db",
-        config: Optional[MemoryConfig] = None,
+        config: MemoryConfig | None = None,
         llm_manager=None,
     ):
         self.db_path = db_path
@@ -143,7 +143,7 @@ class MemoryManager:
         self,
         conversation_id: str,
         user_id: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
     ):
         """
         处理对话，提取和管理记忆
@@ -170,7 +170,7 @@ class MemoryManager:
     async def _generate_summary(
         self,
         conversation_id: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         user_id: str,
     ):
         """生成对话摘要"""
@@ -239,7 +239,7 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"Failed to generate summary: {e}")
 
-    def _format_messages(self, messages: List[Dict[str, str]]) -> str:
+    def _format_messages(self, messages: list[dict[str, str]]) -> str:
         """格式化消息列表"""
         lines = []
         for msg in messages:
@@ -252,8 +252,8 @@ class MemoryManager:
         self,
         conversation_id: str,
         summary: str,
-        key_topics: List[str],
-        decisions: List[str],
+        key_topics: list[str],
+        decisions: list[str],
         message_count: int,
     ):
         """保存摘要"""
@@ -278,8 +278,8 @@ class MemoryManager:
         summary_id: str,
         conversation_id: str,
         summary: str,
-        key_topics: List[str],
-        decisions: List[str],
+        key_topics: list[str],
+        decisions: list[str],
         message_count: int,
     ):
         """插入摘要"""
@@ -289,12 +289,12 @@ class MemoryManager:
         # 清理旧摘要（保留最近的 N 个）
         cursor.execute(
             """
-            DELETE FROM conversation_summaries 
-            WHERE conversation_id = ? 
+            DELETE FROM conversation_summaries
+            WHERE conversation_id = ?
             AND id NOT IN (
-                SELECT id FROM conversation_summaries 
-                WHERE conversation_id = ? 
-                ORDER BY created_at DESC 
+                SELECT id FROM conversation_summaries
+                WHERE conversation_id = ?
+                ORDER BY created_at DESC
                 LIMIT ?
             )
         """,
@@ -324,7 +324,7 @@ class MemoryManager:
     async def _extract_important_info(
         self,
         user_id: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
     ):
         """从对话中提取重要信息（用户偏好、承诺等）"""
         # 只处理用户消息
@@ -367,7 +367,7 @@ class MemoryManager:
         except Exception as e:
             logger.error(f"Failed to extract preferences: {e}")
 
-    async def _update_user_profile(self, user_id: str, data: Dict[str, Any]):
+    async def _update_user_profile(self, user_id: str, data: dict[str, Any]):
         """更新用户画像"""
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
@@ -377,7 +377,7 @@ class MemoryManager:
             data,
         )
 
-    def _merge_profile(self, user_id: str, data: Dict[str, Any]):
+    def _merge_profile(self, user_id: str, data: dict[str, Any]):
         """合并用户画像"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -406,7 +406,7 @@ class MemoryManager:
 
             cursor.execute(
                 """
-                UPDATE user_profiles 
+                UPDATE user_profiles
                 SET preferences = ?, commitments = ?, knowledge = ?, last_updated = ?
                 WHERE user_id = ?
             """,
@@ -441,8 +441,8 @@ class MemoryManager:
     async def get_context(
         self,
         user_id: str,
-        conversation_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        conversation_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         获取完整上下文记忆
 
@@ -486,7 +486,7 @@ class MemoryManager:
 
         return context
 
-    def _get_summaries(self, conversation_id: str) -> List[Dict]:
+    def _get_summaries(self, conversation_id: str) -> list[dict]:
         """获取对话摘要"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -516,7 +516,7 @@ class MemoryManager:
             for row in rows
         ]
 
-    def _get_user_profile(self, user_id: str) -> Optional[Dict]:
+    def _get_user_profile(self, user_id: str) -> dict | None:
         """获取用户画像"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -543,7 +543,7 @@ class MemoryManager:
             "last_updated": row[3],
         }
 
-    def _get_important_memories(self, user_id: str) -> List[Dict]:
+    def _get_important_memories(self, user_id: str) -> list[dict]:
         """获取重要记忆"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -572,7 +572,7 @@ class MemoryManager:
             for row in rows
         ]
 
-    def build_context_prompt(self, context: Dict[str, Any]) -> str:
+    def build_context_prompt(self, context: dict[str, Any]) -> str:
         """根据上下文构建提示词"""
         parts = []
 
@@ -615,7 +615,7 @@ class MemoryManager:
 
     # ==================== 智能召回所需方法 ====================
 
-    async def search(self, query: str, limit: int = 20) -> List[Dict]:
+    async def search(self, query: str, limit: int = 20) -> list[dict]:
         """
         通用搜索 - 用于智能召回
 
@@ -630,7 +630,7 @@ class MemoryManager:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._search_memory, query, limit)
 
-    def _search_memory(self, query: str, limit: int) -> List[Dict]:
+    def _search_memory(self, query: str, limit: int) -> list[dict]:
         """内部搜索方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -662,17 +662,17 @@ class MemoryManager:
             for row in rows
         ]
 
-    async def search_by_keyword(self, keyword: str) -> List[Dict]:
+    async def search_by_keyword(self, keyword: str) -> list[dict]:
         """按关键词搜索"""
         return await self.search(keyword, limit=20)
 
-    async def search_by_task_type(self, task_type: str) -> List[Dict]:
+    async def search_by_task_type(self, task_type: str) -> list[dict]:
         """按任务类型搜索"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._search_by_task_type, task_type)
 
-    def _search_by_task_type(self, task_type: str) -> List[Dict]:
+    def _search_by_task_type(self, task_type: str) -> list[dict]:
         """按任务类型搜索 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -704,13 +704,13 @@ class MemoryManager:
             for row in rows
         ]
 
-    async def search_by_time(self, time_range: str) -> List[Dict]:
+    async def search_by_time(self, time_range: str) -> list[dict]:
         """按时间范围搜索"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._search_by_time, time_range)
 
-    def _search_by_time(self, time_range: str) -> List[Dict]:
+    def _search_by_time(self, time_range: str) -> list[dict]:
         """按时间范围搜索 - 内部方法"""
         import time
 
@@ -756,17 +756,17 @@ class MemoryManager:
             for row in rows
         ]
 
-    async def search_by_entity(self, entity: str) -> List[Dict]:
+    async def search_by_entity(self, entity: str) -> list[dict]:
         """按实体搜索"""
         return await self.search(entity, limit=20)
 
-    async def search_by_success(self, success: bool) -> List[Dict]:
+    async def search_by_success(self, success: bool) -> list[dict]:
         """按成功/失败标记搜索"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._search_by_success, success)
 
-    def _search_by_success(self, success: bool) -> List[Dict]:
+    def _search_by_success(self, success: bool) -> list[dict]:
         """按成功/失败搜索 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -803,13 +803,13 @@ class MemoryManager:
 
     # ==================== 守护进程所需方法 ====================
 
-    async def get_recent_conversations(self, limit: int = 20) -> List[Dict]:
+    async def get_recent_conversations(self, limit: int = 20) -> list[dict]:
         """获取最近的对话"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_recent_conversations, limit)
 
-    def _get_recent_conversations(self, limit: int) -> List[Dict]:
+    def _get_recent_conversations(self, limit: int) -> list[dict]:
         """获取最近的对话 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -838,14 +838,14 @@ class MemoryManager:
             for row in rows
         ]
 
-    async def get_recent_errors(self, limit: int = 10) -> List[Dict]:
+    async def get_recent_errors(self, limit: int = 10) -> list[dict]:
         """获取最近的错误记录"""
         # 从重要记忆中获取错误相关的内容
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_recent_errors, limit)
 
-    def _get_recent_errors(self, limit: int) -> List[Dict]:
+    def _get_recent_errors(self, limit: int) -> list[dict]:
         """获取最近的错误 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -876,13 +876,13 @@ class MemoryManager:
             for row in rows
         ]
 
-    async def get_successful_conversations(self, limit: int = 10) -> List[Dict]:
+    async def get_successful_conversations(self, limit: int = 10) -> list[dict]:
         """获取成功的对话"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_successful_conversations, limit)
 
-    def _get_successful_conversations(self, limit: int) -> List[Dict]:
+    def _get_successful_conversations(self, limit: int) -> list[dict]:
         """获取成功的对话 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -911,13 +911,13 @@ class MemoryManager:
             for row in rows
         ]
 
-    async def get_pending_knowledge(self) -> List[Dict]:
+    async def get_pending_knowledge(self) -> list[dict]:
         """获取待验证的知识"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_pending_knowledge)
 
-    def _get_pending_knowledge(self) -> List[Dict]:
+    def _get_pending_knowledge(self) -> list[dict]:
         """获取待验证的知识 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -972,14 +972,14 @@ class MemoryManager:
         conn.commit()
         conn.close()
 
-    async def get_execution_logs(self, limit: int = 50) -> List[Dict]:
+    async def get_execution_logs(self, limit: int = 50) -> list[dict]:
         """获取执行日志"""
         # 从重要记忆中获取执行相关的记录
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_execution_logs, limit)
 
-    def _get_execution_logs(self, limit: int) -> List[Dict]:
+    def _get_execution_logs(self, limit: int) -> list[dict]:
         """获取执行日志 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -1016,7 +1016,7 @@ class MemoryManager:
         content: str,
         memory_type: str,
         importance: float = 0.5,
-        context: Optional[Dict] = None,
+        context: dict | None = None,
     ):
         """添加重要记忆"""
         await self.init()
@@ -1031,7 +1031,7 @@ class MemoryManager:
         content: str,
         memory_type: str,
         importance: float,
-        context: Optional[Dict],
+        context: dict | None,
     ):
         """添加重要记忆 - 内部方法"""
         import uuid
@@ -1096,7 +1096,7 @@ class MemoryManager:
                     },
                 )
 
-    async def _detect_important_entity(self, content: str, user_id: str) -> Optional[Dict]:
+    async def _detect_important_entity(self, content: str, user_id: str) -> dict | None:
         """使用 LLM 检测内容中的重要实体"""
         prompt = f"""分析以下内容，检测是否包含重要实体信息。
 
@@ -1137,7 +1137,7 @@ class MemoryManager:
 
         return None
 
-    def _check_entity_exists(self, user_id: str, content: str) -> Optional[Dict]:
+    def _check_entity_exists(self, user_id: str, content: str) -> dict | None:
         """检查重要实体是否已存在"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

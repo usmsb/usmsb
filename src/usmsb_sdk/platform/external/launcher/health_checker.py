@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class HealthStatus(Enum):
@@ -30,11 +30,11 @@ class HealthCheckResult:
     name: str
     status: HealthStatus
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     duration_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -51,15 +51,15 @@ class HealthReport:
     """Complete health report."""
     platform_name: str
     overall_status: HealthStatus
-    checks: List[HealthCheckResult]
+    checks: list[HealthCheckResult]
     generated_at: datetime = field(default_factory=datetime.now)
-    summary: Dict[str, int] = field(default_factory=dict)
+    summary: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self):
         """Calculate summary after initialization."""
         self.summary = self._calculate_summary()
 
-    def _calculate_summary(self) -> Dict[str, int]:
+    def _calculate_summary(self) -> dict[str, int]:
         """Calculate summary statistics."""
         return {
             "total": len(self.checks),
@@ -69,7 +69,7 @@ class HealthReport:
             "unknown": sum(1 for c in self.checks if c.status == HealthStatus.UNKNOWN),
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "platform_name": self.platform_name,
@@ -87,7 +87,7 @@ class HealthChecker:
     Performs health checks on nodes, storage, and network connectivity.
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """
         Initialize health checker.
 
@@ -96,7 +96,7 @@ class HealthChecker:
         """
         self.config = config or {}
         self._logger = logging.getLogger("usmsb.health_checker")
-        self._check_registry: Dict[str, callable] = {}
+        self._check_registry: dict[str, callable] = {}
 
         # Register default checks
         self._register_default_checks()
@@ -206,7 +206,7 @@ class HealthChecker:
                 duration_ms=(time.time() - start_time) * 1000,
             )
 
-    def _determine_overall_status(self, checks: List[HealthCheckResult]) -> HealthStatus:
+    def _determine_overall_status(self, checks: list[HealthCheckResult]) -> HealthStatus:
         """Determine overall status from individual checks."""
         if not checks:
             return HealthStatus.UNKNOWN
@@ -222,7 +222,7 @@ class HealthChecker:
         else:
             return HealthStatus.HEALTHY
 
-    async def check_node_health(self, node_config: Dict[str, Any]) -> HealthCheckResult:
+    async def check_node_health(self, node_config: dict[str, Any]) -> HealthCheckResult:
         """
         Check health of a specific node.
 
@@ -267,7 +267,7 @@ class HealthChecker:
                 duration_ms=(time.time() - start_time) * 1000,
             )
 
-    async def check_storage_connection(self, storage_config: Dict[str, Any]) -> HealthCheckResult:
+    async def check_storage_connection(self, storage_config: dict[str, Any]) -> HealthCheckResult:
         """
         Check storage connection.
 
@@ -340,7 +340,7 @@ class HealthChecker:
                 duration_ms=(time.time() - start_time) * 1000,
             )
 
-    async def check_network_connectivity(self, targets: List[Dict[str, Any]]) -> HealthCheckResult:
+    async def check_network_connectivity(self, targets: list[dict[str, Any]]) -> HealthCheckResult:
         """
         Check network connectivity to targets.
 
@@ -416,7 +416,7 @@ class HealthChecker:
             writer.close()
             await writer.wait_closed()
             return True
-        except (asyncio.TimeoutError, OSError):
+        except (TimeoutError, OSError):
             return False
 
     async def _check_disk_space(self) -> HealthCheckResult:
@@ -524,7 +524,7 @@ class HealthChecker:
                 message=f"Network check failed: {str(e)}",
             )
 
-    def _get_disk_stats(self, path: Path) -> Dict[str, int]:
+    def _get_disk_stats(self, path: Path) -> dict[str, int]:
         """Get disk statistics for a path."""
         import shutil
         stat = shutil.disk_usage(path)

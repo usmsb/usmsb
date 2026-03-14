@@ -10,15 +10,14 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from usmsb_sdk.protocol.base import (
     BaseProtocolHandler,
-    ProtocolConfig,
     ExternalAgentStatus,
+    ProtocolConfig,
     SkillDefinition,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +29,14 @@ class A2AEnvelope:
     sender_id: str = ""
     receiver_id: str = ""
     message_type: str = ""
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
     correlation_id: str = ""
     timestamp: float = field(default_factory=time.time)
     ttl: int = 3600  # Time-to-live in seconds
-    signature: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    signature: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "version": self.version,
             "sender_id": self.sender_id,
@@ -52,7 +51,7 @@ class A2AEnvelope:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "A2AEnvelope":
+    def from_dict(cls, data: dict[str, Any]) -> "A2AEnvelope":
         return cls(
             version=data.get("version", "1.0"),
             sender_id=data.get("sender_id", ""),
@@ -72,12 +71,12 @@ class A2ASkillRequest:
     """Request to execute a skill via A2A."""
     skill_id: str
     skill_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     timeout: float = 60.0
     priority: int = 0
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_id": self.skill_id,
             "skill_name": self.skill_name,
@@ -94,11 +93,11 @@ class A2ASkillResponse:
     skill_id: str
     success: bool
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_id": self.skill_id,
             "success": self.success,
@@ -116,11 +115,11 @@ class A2AAgentInfo:
     name: str
     description: str
     version: str
-    capabilities: List[str] = field(default_factory=list)
-    skills: List[Dict[str, Any]] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    skills: list[dict[str, Any]] = field(default_factory=list)
     status: str = "unknown"
     endpoint: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class A2AClient(BaseProtocolHandler):
@@ -151,8 +150,8 @@ class A2AClient(BaseProtocolHandler):
 
     def __init__(
         self,
-        config: Optional[ProtocolConfig] = None,
-        agent_id: Optional[str] = None,
+        config: ProtocolConfig | None = None,
+        agent_id: str | None = None,
     ):
         """
         Initialize the A2A client.
@@ -163,8 +162,8 @@ class A2AClient(BaseProtocolHandler):
         """
         super().__init__(config)
         self._agent_id = agent_id or f"agent-{uuid.uuid4().hex[:8]}"
-        self._remote_agent_info: Optional[A2AAgentInfo] = None
-        self._session: Optional[Any] = None
+        self._remote_agent_info: A2AAgentInfo | None = None
+        self._session: Any | None = None
 
         # Register default message handlers
         self._register_default_handlers()
@@ -219,7 +218,7 @@ class A2AClient(BaseProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -273,7 +272,7 @@ class A2AClient(BaseProtocolHandler):
             if correlation_id in self._pending_requests:
                 del self._pending_requests[correlation_id]
 
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Discover skills from the remote agent.
 
@@ -342,7 +341,7 @@ class A2AClient(BaseProtocolHandler):
 
     # ========== A2A-Specific Methods ==========
 
-    async def _perform_handshake(self) -> Optional[A2AAgentInfo]:
+    async def _perform_handshake(self) -> A2AAgentInfo | None:
         """
         Perform A2A handshake with the remote agent.
 
@@ -404,7 +403,7 @@ class A2AClient(BaseProtocolHandler):
         # Simulated by just logging
         await asyncio.sleep(0.01)
 
-    async def _receive_envelope(self, data: Dict[str, Any]) -> None:
+    async def _receive_envelope(self, data: dict[str, Any]) -> None:
         """
         Handle a received A2A envelope.
 
@@ -460,7 +459,7 @@ class A2AClient(BaseProtocolHandler):
 
     # ========== Utility Methods ==========
 
-    def get_remote_agent_info(self) -> Optional[A2AAgentInfo]:
+    def get_remote_agent_info(self) -> A2AAgentInfo | None:
         """Get information about the remote agent."""
         return self._remote_agent_info
 

@@ -6,26 +6,23 @@ Generic repository pattern for data access abstraction.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Generic, TypeVar
 
-from sqlalchemy import select, update, delete, and_, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from usmsb_sdk.data_management.models import (
-    Base,
     AgentModel,
-    GoalModel,
-    ResourceModel,
-    AgentResourceModel,
-    RuleModel,
-    AgentRuleModel,
-    RiskModel,
-    InformationModel,
+    Base,
     EnvironmentModel,
-    WorkflowModel,
-    SimulationResultModel,
     EventLogModel,
+    GoalModel,
+    InformationModel,
     MetricsModel,
+    ResourceModel,
+    RiskModel,
+    SimulationResultModel,
+    WorkflowModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,12 +34,12 @@ class IRepository(ABC, Generic[ModelType]):
     """Abstract base repository interface."""
 
     @abstractmethod
-    async def get_by_id(self, id: str) -> Optional[ModelType]:
+    async def get_by_id(self, id: str) -> ModelType | None:
         """Get entity by ID."""
         pass
 
     @abstractmethod
-    async def get_all(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> list[ModelType]:
         """Get all entities with pagination."""
         pass
 
@@ -65,7 +62,7 @@ class IRepository(ABC, Generic[ModelType]):
 class BaseRepository(IRepository[ModelType]):
     """Base repository implementation with common operations."""
 
-    def __init__(self, session: AsyncSession, model: Type[ModelType]):
+    def __init__(self, session: AsyncSession, model: type[ModelType]):
         """
         Initialize the repository.
 
@@ -76,7 +73,7 @@ class BaseRepository(IRepository[ModelType]):
         self.session = session
         self.model = model
 
-    async def get_by_id(self, id: str) -> Optional[ModelType]:
+    async def get_by_id(self, id: str) -> ModelType | None:
         """Get entity by ID."""
         try:
             result = await self.session.execute(
@@ -87,7 +84,7 @@ class BaseRepository(IRepository[ModelType]):
             logger.error(f"Error getting {self.model.__name__} by id: {e}")
             return None
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> list[ModelType]:
         """Get all entities with pagination."""
         try:
             result = await self.session.execute(
@@ -154,10 +151,10 @@ class BaseRepository(IRepository[ModelType]):
 
     async def find_by(
         self,
-        filters: Dict[str, Any],
+        filters: dict[str, Any],
         skip: int = 0,
         limit: int = 100,
-    ) -> List[ModelType]:
+    ) -> list[ModelType]:
         """Find entities by filter criteria."""
         try:
             query = select(self.model)
@@ -171,7 +168,7 @@ class BaseRepository(IRepository[ModelType]):
             logger.error(f"Error finding {self.model.__name__}: {e}")
             return []
 
-    async def find_one_by(self, filters: Dict[str, Any]) -> Optional[ModelType]:
+    async def find_one_by(self, filters: dict[str, Any]) -> ModelType | None:
         """Find one entity by filter criteria."""
         results = await self.find_by(filters, limit=1)
         return results[0] if results else None
@@ -183,19 +180,19 @@ class AgentRepository(BaseRepository[AgentModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, AgentModel)
 
-    async def get_by_name(self, name: str) -> Optional[AgentModel]:
+    async def get_by_name(self, name: str) -> AgentModel | None:
         """Get agent by name."""
         return await self.find_one_by({"name": name})
 
-    async def get_by_type(self, agent_type: str, skip: int = 0, limit: int = 100) -> List[AgentModel]:
+    async def get_by_type(self, agent_type: str, skip: int = 0, limit: int = 100) -> list[AgentModel]:
         """Get agents by type."""
         return await self.find_by({"type": agent_type}, skip, limit)
 
-    async def get_by_state(self, state: str, skip: int = 0, limit: int = 100) -> List[AgentModel]:
+    async def get_by_state(self, state: str, skip: int = 0, limit: int = 100) -> list[AgentModel]:
         """Get agents by state."""
         return await self.find_by({"state": state}, skip, limit)
 
-    async def get_with_goals(self, agent_id: str) -> Optional[AgentModel]:
+    async def get_with_goals(self, agent_id: str) -> AgentModel | None:
         """Get agent with goals loaded."""
         from sqlalchemy.orm import selectinload
         try:
@@ -209,7 +206,7 @@ class AgentRepository(BaseRepository[AgentModel]):
             logger.error(f"Error getting agent with goals: {e}")
             return None
 
-    async def get_with_resources(self, agent_id: str) -> Optional[AgentModel]:
+    async def get_with_resources(self, agent_id: str) -> AgentModel | None:
         """Get agent with resources loaded."""
         from sqlalchemy.orm import selectinload
         try:
@@ -228,7 +225,7 @@ class AgentRepository(BaseRepository[AgentModel]):
         query: str,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[AgentModel]:
+    ) -> list[AgentModel]:
         """Search agents by name or attributes."""
         try:
             result = await self.session.execute(
@@ -249,11 +246,11 @@ class GoalRepository(BaseRepository[GoalModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, GoalModel)
 
-    async def get_by_agent(self, agent_id: str, skip: int = 0, limit: int = 100) -> List[GoalModel]:
+    async def get_by_agent(self, agent_id: str, skip: int = 0, limit: int = 100) -> list[GoalModel]:
         """Get goals by agent."""
         return await self.find_by({"agent_id": agent_id}, skip, limit)
 
-    async def get_active_goals(self, agent_id: str) -> List[GoalModel]:
+    async def get_active_goals(self, agent_id: str) -> list[GoalModel]:
         """Get active goals for an agent."""
         try:
             result = await self.session.execute(
@@ -267,11 +264,11 @@ class GoalRepository(BaseRepository[GoalModel]):
             logger.error(f"Error getting active goals: {e}")
             return []
 
-    async def get_by_status(self, status: str, skip: int = 0, limit: int = 100) -> List[GoalModel]:
+    async def get_by_status(self, status: str, skip: int = 0, limit: int = 100) -> list[GoalModel]:
         """Get goals by status."""
         return await self.find_by({"status": status}, skip, limit)
 
-    async def update_progress(self, goal_id: str, progress: float) -> Optional[GoalModel]:
+    async def update_progress(self, goal_id: str, progress: float) -> GoalModel | None:
         """Update goal progress."""
         try:
             goal = await self.get_by_id(goal_id)
@@ -290,19 +287,19 @@ class ResourceRepository(BaseRepository[ResourceModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, ResourceModel)
 
-    async def get_by_name(self, name: str) -> Optional[ResourceModel]:
+    async def get_by_name(self, name: str) -> ResourceModel | None:
         """Get resource by name."""
         return await self.find_one_by({"name": name})
 
-    async def get_by_type(self, resource_type: str, skip: int = 0, limit: int = 100) -> List[ResourceModel]:
+    async def get_by_type(self, resource_type: str, skip: int = 0, limit: int = 100) -> list[ResourceModel]:
         """Get resources by type."""
         return await self.find_by({"type": resource_type}, skip, limit)
 
-    async def get_by_environment(self, environment_id: str, skip: int = 0, limit: int = 100) -> List[ResourceModel]:
+    async def get_by_environment(self, environment_id: str, skip: int = 0, limit: int = 100) -> list[ResourceModel]:
         """Get resources by environment."""
         return await self.find_by({"environment_id": environment_id}, skip, limit)
 
-    async def update_quantity(self, resource_id: str, quantity: float) -> Optional[ResourceModel]:
+    async def update_quantity(self, resource_id: str, quantity: float) -> ResourceModel | None:
         """Update resource quantity."""
         try:
             resource = await self.get_by_id(resource_id)
@@ -321,15 +318,15 @@ class RiskRepository(BaseRepository[RiskModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, RiskModel)
 
-    async def get_by_agent(self, agent_id: str, skip: int = 0, limit: int = 100) -> List[RiskModel]:
+    async def get_by_agent(self, agent_id: str, skip: int = 0, limit: int = 100) -> list[RiskModel]:
         """Get risks by agent."""
         return await self.find_by({"agent_id": agent_id}, skip, limit)
 
-    async def get_by_level(self, risk_level: str, skip: int = 0, limit: int = 100) -> List[RiskModel]:
+    async def get_by_level(self, risk_level: str, skip: int = 0, limit: int = 100) -> list[RiskModel]:
         """Get risks by level."""
         return await self.find_by({"risk_level": risk_level}, skip, limit)
 
-    async def get_high_risks(self, skip: int = 0, limit: int = 100) -> List[RiskModel]:
+    async def get_high_risks(self, skip: int = 0, limit: int = 100) -> list[RiskModel]:
         """Get high and critical risks."""
         try:
             result = await self.session.execute(
@@ -350,11 +347,11 @@ class EnvironmentRepository(BaseRepository[EnvironmentModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, EnvironmentModel)
 
-    async def get_by_name(self, name: str) -> Optional[EnvironmentModel]:
+    async def get_by_name(self, name: str) -> EnvironmentModel | None:
         """Get environment by name."""
         return await self.find_one_by({"name": name})
 
-    async def get_by_type(self, env_type: str, skip: int = 0, limit: int = 100) -> List[EnvironmentModel]:
+    async def get_by_type(self, env_type: str, skip: int = 0, limit: int = 100) -> list[EnvironmentModel]:
         """Get environments by type."""
         return await self.find_by({"type": env_type}, skip, limit)
 
@@ -365,15 +362,15 @@ class WorkflowRepository(BaseRepository[WorkflowModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, WorkflowModel)
 
-    async def get_by_agent(self, agent_id: str, skip: int = 0, limit: int = 100) -> List[WorkflowModel]:
+    async def get_by_agent(self, agent_id: str, skip: int = 0, limit: int = 100) -> list[WorkflowModel]:
         """Get workflows by agent."""
         return await self.find_by({"agent_id": agent_id}, skip, limit)
 
-    async def get_by_status(self, status: str, skip: int = 0, limit: int = 100) -> List[WorkflowModel]:
+    async def get_by_status(self, status: str, skip: int = 0, limit: int = 100) -> list[WorkflowModel]:
         """Get workflows by status."""
         return await self.find_by({"status": status}, skip, limit)
 
-    async def get_pending_workflows(self, skip: int = 0, limit: int = 100) -> List[WorkflowModel]:
+    async def get_pending_workflows(self, skip: int = 0, limit: int = 100) -> list[WorkflowModel]:
         """Get pending workflows."""
         return await self.get_by_status("pending", skip, limit)
 
@@ -384,7 +381,7 @@ class SimulationResultRepository(BaseRepository[SimulationResultModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, SimulationResultModel)
 
-    async def get_by_simulation_id(self, simulation_id: str) -> Optional[SimulationResultModel]:
+    async def get_by_simulation_id(self, simulation_id: str) -> SimulationResultModel | None:
         """Get result by simulation ID."""
         return await self.find_one_by({"simulation_id": simulation_id})
 
@@ -400,7 +397,7 @@ class EventLogRepository(BaseRepository[EventLogModel]):
         event_type: str,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[EventLogModel]:
+    ) -> list[EventLogModel]:
         """Get events by type."""
         return await self.find_by({"event_type": event_type}, skip, limit)
 
@@ -409,7 +406,7 @@ class EventLogRepository(BaseRepository[EventLogModel]):
         agent_id: str,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[EventLogModel]:
+    ) -> list[EventLogModel]:
         """Get events by agent."""
         return await self.find_by({"agent_id": agent_id}, skip, limit)
 
@@ -418,7 +415,7 @@ class EventLogRepository(BaseRepository[EventLogModel]):
         minutes: int = 60,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[EventLogModel]:
+    ) -> list[EventLogModel]:
         """Get recent events."""
         from datetime import datetime, timedelta
         try:
@@ -447,15 +444,15 @@ class MetricsRepository(BaseRepository[MetricsModel]):
         metric_name: str,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[MetricsModel]:
+    ) -> list[MetricsModel]:
         """Get metrics by name."""
         return await self.find_by({"metric_name": metric_name}, skip, limit)
 
     async def get_latest(
         self,
         metric_name: str,
-        agent_id: Optional[str] = None,
-    ) -> Optional[MetricsModel]:
+        agent_id: str | None = None,
+    ) -> MetricsModel | None:
         """Get latest metric value."""
         try:
             query = select(MetricsModel).where(MetricsModel.metric_name == metric_name)
@@ -473,8 +470,8 @@ class MetricsRepository(BaseRepository[MetricsModel]):
         metric_name: str,
         start_time,
         end_time,
-        agent_id: Optional[str] = None,
-    ) -> List[MetricsModel]:
+        agent_id: str | None = None,
+    ) -> list[MetricsModel]:
         """Get metrics as time series."""
         try:
             query = select(MetricsModel).where(
@@ -505,7 +502,7 @@ class InformationRepository(BaseRepository[InformationModel]):
         query: str,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[InformationModel]:
+    ) -> list[InformationModel]:
         """Search information by title or content."""
         try:
             result = await self.session.execute(
@@ -526,10 +523,10 @@ class InformationRepository(BaseRepository[InformationModel]):
 
     async def get_by_tags(
         self,
-        tags: List[str],
+        tags: list[str],
         skip: int = 0,
         limit: int = 100,
-    ) -> List[InformationModel]:
+    ) -> list[InformationModel]:
         """Get information by tags."""
         # This is a simplified implementation
         # For production, use JSON array containment or a proper tag table

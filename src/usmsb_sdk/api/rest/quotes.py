@@ -6,7 +6,6 @@ Provides endpoints for supply chain quote management.
 
 import logging
 from datetime import datetime
-from typing import Optional, List
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -19,29 +18,29 @@ router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
 class QuoteRequest(BaseModel):
     """Quote request model."""
-    request_id: Optional[str] = None
+    request_id: str | None = None
     buyer_id: str
     product_id: str
     product_name: str
     quantity: float
     unit: str = "pieces"
-    target_price: Optional[float] = None
-    delivery_date: Optional[str] = None
-    delivery_location: Optional[str] = None
+    target_price: float | None = None
+    delivery_date: str | None = None
+    delivery_location: str | None = None
     requirements: dict = Field(default_factory=dict)
 
 
 class QuoteResponse(BaseModel):
     """Quote response model."""
-    quote_id: Optional[str] = None
+    quote_id: str | None = None
     request_id: str
     supplier_id: str
     product_id: str
     unit_price: float
     total_price: float
     currency: str = "USD"
-    valid_until: Optional[str] = None
-    delivery_time_days: Optional[int] = None
+    valid_until: str | None = None
+    delivery_time_days: int | None = None
     terms: dict = Field(default_factory=dict)
 
 

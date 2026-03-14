@@ -15,30 +15,49 @@ All registrations use the unified agents table with full field support.
 import json
 import time
 import uuid
-from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.database import (
-    get_agent as db_get_agent,
+    complete_binding_request as db_complete_binding_request,
+)
+from usmsb_sdk.api.database import (
     create_agent as db_create_agent,
+)
+from usmsb_sdk.api.database import (
+    create_api_key as db_create_api_key,
+)
+from usmsb_sdk.api.database import (
+    create_binding_request as db_create_binding_request,
+)
+from usmsb_sdk.api.database import (
+    delete_agent as db_delete_agent,
+)
+from usmsb_sdk.api.database import (
+    get_agent as db_get_agent,
+)
+from usmsb_sdk.api.database import (
+    get_agent_binding_info,
     update_agent_heartbeat,
     update_agent_stake,
-    delete_agent as db_delete_agent,
-    get_agent_binding_info,
-    create_api_key as db_create_api_key,
+)
+from usmsb_sdk.api.database import (
     get_api_keys_by_agent as db_get_api_keys_by_agent,
-    revoke_api_key as db_revoke_api_key,
-    renew_api_key as db_renew_api_key,
-    create_binding_request as db_create_binding_request,
-    get_binding_request_by_code as db_get_binding_request_by_code,
+)
+from usmsb_sdk.api.database import (
     get_binding_request_by_agent as db_get_binding_request_by_agent,
-    complete_binding_request as db_complete_binding_request,
-    get_agent_binding_info as db_get_agent_binding_info,
-    upgrade_api_keys_level as db_upgrade_api_keys_level,
+)
+from usmsb_sdk.api.database import (
+    get_binding_request_by_code as db_get_binding_request_by_code,
+)
+from usmsb_sdk.api.database import (
+    renew_api_key as db_renew_api_key,
+)
+from usmsb_sdk.api.database import (
+    revoke_api_key as db_revoke_api_key,
 )
 from usmsb_sdk.api.rest.api_key_manager import (
     APIKeyManager,
@@ -47,18 +66,18 @@ from usmsb_sdk.api.rest.api_key_manager import (
     get_stake_tier,
     get_tier_benefits,
 )
-from usmsb_sdk.api.rest.unified_auth import (
-    get_current_user_unified,
-    verify_agent_access,
-    ErrorCode,
-)
 from usmsb_sdk.api.rest.auth import get_current_user  # SIWE authentication for owners
 from usmsb_sdk.api.rest.schemas.agent import (
-    AgentRegistrationRequest,
-    MCPRegistrationRequest,
     A2ARegistrationRequest,
-    SkillMDRegistrationRequest,
+    AgentRegistrationRequest,
     AgentTestRequest,
+    MCPRegistrationRequest,
+    SkillMDRegistrationRequest,
+)
+from usmsb_sdk.api.rest.unified_auth import (
+    ErrorCode,
+    get_current_user_unified,
+    verify_agent_access,
 )
 
 router = APIRouter(tags=["AI Agent Registration"])
@@ -70,7 +89,7 @@ class SelfRegistrationRequest(BaseModel):
     """Request for self-registration (no owner required)."""
     name: str = Field(..., description="Agent name")
     description: str = Field(default="", description="Agent description")
-    capabilities: List[str] = Field(default_factory=list, description="Agent capabilities")
+    capabilities: list[str] = Field(default_factory=list, description="Agent capabilities")
 
 
 class BindingRequestRequest(BaseModel):
@@ -81,7 +100,7 @@ class BindingRequestRequest(BaseModel):
 class CreateAPIKeyRequest(BaseModel):
     """Request to create a new API key."""
     name: str = Field(default="New Key", description="Name for the API key")
-    expires_in_days: Optional[int] = Field(default=365, description="Days until expiration")
+    expires_in_days: int | None = Field(default=365, description="Days until expiration")
 
 
 class RenewAPIKeyRequest(BaseModel):
@@ -525,9 +544,9 @@ async def get_agent_profile(user: dict = Depends(get_current_user_unified)):
 
 class UpdateProfileRequest(BaseModel):
     """Request to update agent profile."""
-    name: Optional[str] = None
-    description: Optional[str] = None
-    capabilities: Optional[List[str]] = None
+    name: str | None = None
+    description: str | None = None
+    capabilities: list[str] | None = None
 
 
 @router.patch("/agents/v2/profile")
@@ -759,7 +778,7 @@ async def register_via_skill_md(request: SkillMDRegistrationRequest):
 @router.post("/agents/{agent_id}/heartbeat", deprecated=True)
 async def agent_heartbeat_endpoint(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     status: str = "online"
 ):
     """AI Agent sends heartbeat to stay active.
@@ -795,7 +814,7 @@ async def agent_heartbeat_endpoint(
 @router.delete("/agents/{agent_id}/unregister", deprecated=True)
 async def unregister_ai_agent(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Unregister an AI Agent from the platform.
 
@@ -825,7 +844,7 @@ async def unregister_ai_agent(
 async def test_ai_agent(
     agent_id: str,
     request: AgentTestRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Test an AI Agent by sending a test input.
 
@@ -911,7 +930,7 @@ async def test_ai_agent(
 async def agent_stake_endpoint(
     agent_id: str,
     amount: float,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Stake VIBE tokens for an AI Agent.
 

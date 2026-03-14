@@ -6,16 +6,16 @@ agentic frameworks) providing unified access, load balancing, and failover.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type
+from enum import StrEnum
+from typing import Any
 
 from usmsb_sdk.intelligence_adapters.base import (
     IAgenticFrameworkAdapter,
     IIntelligenceSource,
     IKnowledgeBaseAdapter,
     ILLMAdapter,
-    IntelligenceSourceConfig,
     IntelligenceSourceStatus,
     IntelligenceSourceType,
 )
@@ -23,7 +23,7 @@ from usmsb_sdk.intelligence_adapters.base import (
 logger = logging.getLogger(__name__)
 
 
-class SelectionStrategy(str, Enum):
+class SelectionStrategy(StrEnum):
     """Strategy for selecting among multiple intelligence sources."""
     ROUND_ROBIN = "round_robin"
     LEAST_LOADED = "least_loaded"
@@ -41,7 +41,7 @@ class SourceRegistration:
     priority: int = 0
     is_primary: bool = False
     is_fallback: bool = False
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
 
 class IntelligenceSourceManager:
@@ -70,14 +70,14 @@ class IntelligenceSourceManager:
         self.selection_strategy = selection_strategy
         self.health_check_interval = health_check_interval
 
-        self._sources: Dict[str, SourceRegistration] = {}
-        self._llm_sources: List[str] = []
-        self._knowledge_sources: List[str] = []
-        self._agentic_sources: List[str] = []
+        self._sources: dict[str, SourceRegistration] = {}
+        self._llm_sources: list[str] = []
+        self._knowledge_sources: list[str] = []
+        self._agentic_sources: list[str] = []
         self._round_robin_index = 0
 
-        self._on_source_failure: Optional[Callable[[str, Exception], None]] = None
-        self._on_source_recovery: Optional[Callable[[str], None]] = None
+        self._on_source_failure: Callable[[str, Exception], None] | None = None
+        self._on_source_recovery: Callable[[str], None] | None = None
 
     async def register_source(
         self,
@@ -86,7 +86,7 @@ class IntelligenceSourceManager:
         priority: int = 0,
         is_primary: bool = False,
         is_fallback: bool = False,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> bool:
         """
         Register an intelligence source.
@@ -165,7 +165,7 @@ class IntelligenceSourceManager:
         logger.info(f"Unregistered intelligence source: {name}")
         return True
 
-    def get_llm(self, name: Optional[str] = None) -> Optional[ILLMAdapter]:
+    def get_llm(self, name: str | None = None) -> ILLMAdapter | None:
         """
         Get an LLM adapter.
 
@@ -186,7 +186,7 @@ class IntelligenceSourceManager:
             return self._sources[selected_name].source
         return None
 
-    def get_knowledge_base(self, name: Optional[str] = None) -> Optional[IKnowledgeBaseAdapter]:
+    def get_knowledge_base(self, name: str | None = None) -> IKnowledgeBaseAdapter | None:
         """
         Get a knowledge base adapter.
 
@@ -206,7 +206,7 @@ class IntelligenceSourceManager:
             return self._sources[selected_name].source
         return None
 
-    def get_agentic_framework(self, name: Optional[str] = None) -> Optional[IAgenticFrameworkAdapter]:
+    def get_agentic_framework(self, name: str | None = None) -> IAgenticFrameworkAdapter | None:
         """
         Get an agentic framework adapter.
 
@@ -226,7 +226,7 @@ class IntelligenceSourceManager:
             return self._sources[selected_name].source
         return None
 
-    def _select_source(self, source_names: List[str]) -> Optional[str]:
+    def _select_source(self, source_names: list[str]) -> str | None:
         """Select a source based on the configured strategy."""
         if not source_names:
             return None
@@ -279,7 +279,7 @@ class IntelligenceSourceManager:
 
         return available[0]
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         Perform health check on all sources.
 
@@ -309,7 +309,7 @@ class IntelligenceSourceManager:
             await self.unregister_source(name)
         logger.info("All intelligence sources shut down")
 
-    def get_source_names(self, source_type: Optional[IntelligenceSourceType] = None) -> List[str]:
+    def get_source_names(self, source_type: IntelligenceSourceType | None = None) -> list[str]:
         """
         Get names of registered sources.
 
@@ -327,7 +327,7 @@ class IntelligenceSourceManager:
             if reg.type == source_type
         ]
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get aggregated metrics for all sources."""
         total_requests = 0
         total_successful = 0

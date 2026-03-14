@@ -13,15 +13,13 @@ Authentication:
 """
 
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
-    require_stake_unified,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +42,7 @@ class InitiateNegotiationRequest(BaseModel):
     demand_agent_id: str
     supply_agent_id: str
     demand_id: str
-    initial_message: Optional[str] = None
+    initial_message: str | None = None
     expiration_hours: int = Field(default=24, ge=1, le=168)
 
 
@@ -70,21 +68,21 @@ class VerificationRequestModel(BaseModel):
 class VerificationResponseModel(BaseModel):
     """Response to verification request"""
     response: str
-    attachments: Optional[List[str]] = None
+    attachments: list[str] | None = None
 
 
 class ScopeConfirmationRequest(BaseModel):
     """Request to confirm scope"""
-    deliverables: List[str] = []
-    timeline: Optional[str] = None
-    milestones: List[Dict[str, Any]] = []
-    exclusions: List[str] = []
-    assumptions: List[str] = []
+    deliverables: list[str] = []
+    timeline: str | None = None
+    milestones: list[dict[str, Any]] = []
+    exclusions: list[str] = []
+    assumptions: list[str] = []
 
 
 class ProposeTermsRequest(BaseModel):
     """Request to propose terms"""
-    terms: Dict[str, Any]
+    terms: dict[str, Any]
     proposer_id: str
 
 
@@ -105,7 +103,7 @@ class CancelNegotiationRequest(BaseModel):
 @router.post("")
 async def initiate_negotiation(
     request: InitiateNegotiationRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Initiate a pre-match negotiation between agents.
@@ -149,7 +147,7 @@ async def initiate_negotiation(
 @router.get("/{negotiation_id}")
 async def get_negotiation(
     negotiation_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Get negotiation details.
@@ -188,7 +186,7 @@ async def get_negotiation(
 async def ask_question(
     negotiation_id: str,
     request: AskQuestionRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Ask a clarification question.
@@ -230,7 +228,7 @@ async def answer_question(
     negotiation_id: str,
     question_id: str,
     request: AnswerQuestionRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Answer a clarification question.
@@ -270,7 +268,7 @@ async def answer_question(
 async def request_verification(
     negotiation_id: str,
     request: VerificationRequestModel,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Request capability verification from supply agent.
@@ -327,7 +325,7 @@ async def respond_to_verification(
     negotiation_id: str,
     request_id: str,
     request: VerificationResponseModel,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Respond to a capability verification request.
@@ -373,7 +371,7 @@ async def respond_to_verification(
 async def confirm_scope(
     negotiation_id: str,
     request: ScopeConfirmationRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Confirm the scope of the engagement.
@@ -434,7 +432,7 @@ async def confirm_scope(
 async def propose_terms(
     negotiation_id: str,
     request: ProposeTermsRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Propose terms for the engagement.
@@ -478,8 +476,8 @@ async def propose_terms(
 @router.post("/{negotiation_id}/terms/agree")
 async def agree_to_terms(
     negotiation_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
-    terms: Optional[Dict[str, Any]] = None,
+    user: dict[str, Any] = Depends(get_current_user_unified),
+    terms: dict[str, Any] | None = None,
 ):
     """
     Agree to proposed terms.
@@ -522,7 +520,7 @@ async def agree_to_terms(
 @router.post("/{negotiation_id}/confirm")
 async def confirm_match(
     negotiation_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Confirm the match.
@@ -568,7 +566,7 @@ async def confirm_match(
 async def decline_match(
     negotiation_id: str,
     request: DeclineMatchRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Decline the match.
@@ -607,7 +605,7 @@ async def decline_match(
 async def cancel_negotiation(
     negotiation_id: str,
     request: CancelNegotiationRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Cancel the negotiation.
@@ -645,8 +643,8 @@ async def cancel_negotiation(
 @router.get("/agent/{agent_id}")
 async def get_agent_negotiations(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
-    status: Optional[str] = None,
+    user: dict[str, Any] = Depends(get_current_user_unified),
+    status: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
 ):
     """

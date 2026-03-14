@@ -41,15 +41,15 @@ Usage:
 """
 
 from .decentralized_node import (
-    NodeStatus,
-    ServiceType,
+    DecentralizedPlatform,
+    DistributedServiceRegistry,
     NodeIdentity,
+    NodeStatus,
+    P2PNode,
     ServiceEndpoint,
     ServiceRequest,
     ServiceResponse,
-    DistributedServiceRegistry,
-    P2PNode,
-    DecentralizedPlatform,
+    ServiceType,
 )
 
 __all__ = [

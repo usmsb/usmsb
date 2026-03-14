@@ -20,10 +20,9 @@ DO NOT USE IN PRODUCTION. This is kept for backward compatibility only.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -46,22 +45,22 @@ class AgentRegisterRequest(BaseModel):
     """Agent registration request."""
     agent_id: str
     name: str
-    description: Optional[str] = None
-    wallet_address: Optional[str] = None  # DEPRECATED: No longer used
-    stake_amount: Optional[float] = 0.0
+    description: str | None = None
+    wallet_address: str | None = None  # DEPRECATED: No longer used
+    stake_amount: float | None = 0.0
     capabilities: list = Field(default_factory=list)
     skills: list = Field(default_factory=list)
-    endpoint: Optional[str] = None
+    endpoint: str | None = None
     protocols: list = Field(default_factory=list)
 
 
 class AgentAuthResponse(BaseModel):
     """Agent authentication response."""
     success: bool
-    agent_id: Optional[str] = None
-    token: Optional[str] = None
-    message: Optional[str] = None
-    deprecation_warning: Optional[str] = DEPRECATION_NOTICE
+    agent_id: str | None = None
+    token: str | None = None
+    message: str | None = None
+    deprecation_warning: str | None = DEPRECATION_NOTICE
 
 
 # In-memory storage for demo purposes

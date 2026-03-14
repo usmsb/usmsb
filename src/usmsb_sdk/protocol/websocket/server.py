@@ -5,12 +5,12 @@ This module provides the WebSocket server implementation for real-time bidirecti
 """
 
 import asyncio
-import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class WebSocketServerConfig:
     max_size: int = 10 * 1024 * 1024  # 10MB
     max_connections: int = 1000
     compression: bool = False
-    ssl_cert: Optional[str] = None
-    ssl_key: Optional[str] = None
+    ssl_cert: str | None = None
+    ssl_key: str | None = None
 
 
 @dataclass
@@ -38,10 +38,10 @@ class WebSocketConnection:
     last_activity: float = field(default_factory=time.time)
     messages_received: int = 0
     messages_sent: int = 0
-    subscriptions: Set[str] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    subscriptions: set[str] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "connection_id": self.connection_id,
             "remote_address": self.remote_address,
@@ -67,7 +67,7 @@ class WebSocketServer:
 
     def __init__(
         self,
-        config: Optional[WebSocketServerConfig] = None,
+        config: WebSocketServerConfig | None = None,
         host: str = "0.0.0.0",
         port: int = 8765,
     ):
@@ -80,13 +80,13 @@ class WebSocketServer:
             port: Port to listen on (overrides config).
         """
         self._config = config or WebSocketServerConfig(host=host, port=port)
-        self._server: Optional[Any] = None
+        self._server: Any | None = None
         self._running = False
-        self._connections: Dict[str, WebSocketConnection] = {}
-        self._rooms: Dict[str, Set[str]] = {}  # room_id -> connection_ids
-        self._message_handlers: Dict[str, Callable] = {}
-        self._connection_handlers: List[Callable] = []
-        self._disconnection_handlers: List[Callable] = []
+        self._connections: dict[str, WebSocketConnection] = {}
+        self._rooms: dict[str, set[str]] = {}  # room_id -> connection_ids
+        self._message_handlers: dict[str, Callable] = {}
+        self._connection_handlers: list[Callable] = []
+        self._disconnection_handlers: list[Callable] = []
 
         # Register default handlers
         self._register_default_handlers()
@@ -236,7 +236,7 @@ class WebSocketServer:
 
         logger.info(f"WebSocket connection closed: {connection_id}")
 
-    def get_connection(self, connection_id: str) -> Optional[WebSocketConnection]:
+    def get_connection(self, connection_id: str) -> WebSocketConnection | None:
         """
         Get a connection by ID.
 
@@ -248,7 +248,7 @@ class WebSocketServer:
         """
         return self._connections.get(connection_id)
 
-    def get_connections(self) -> List[WebSocketConnection]:
+    def get_connections(self) -> list[WebSocketConnection]:
         """Get all active connections."""
         return list(self._connections.values())
 
@@ -274,8 +274,8 @@ class WebSocketServer:
     async def handle_message(
         self,
         connection_id: str,
-        message: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        message: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """
         Handle an incoming message.
 
@@ -314,16 +314,16 @@ class WebSocketServer:
     async def _handle_ping(
         self,
         connection: WebSocketConnection,
-        payload: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
         """Handle ping message."""
         return {"type": "pong", "timestamp": time.time()}
 
     async def _handle_subscribe(
         self,
         connection: WebSocketConnection,
-        payload: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
         """Handle subscribe message."""
         room_id = payload.get("room")
         if not room_id:
@@ -340,8 +340,8 @@ class WebSocketServer:
     async def _handle_unsubscribe(
         self,
         connection: WebSocketConnection,
-        payload: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
         """Handle unsubscribe message."""
         room_id = payload.get("room")
         if not room_id:
@@ -361,7 +361,7 @@ class WebSocketServer:
     async def send_to(
         self,
         connection_id: str,
-        message: Dict[str, Any],
+        message: dict[str, Any],
     ) -> bool:
         """
         Send a message to a specific connection.
@@ -387,8 +387,8 @@ class WebSocketServer:
 
     async def broadcast(
         self,
-        message: Dict[str, Any],
-        exclude: Optional[Set[str]] = None,
+        message: dict[str, Any],
+        exclude: set[str] | None = None,
     ) -> int:
         """
         Broadcast a message to all connections.
@@ -413,8 +413,8 @@ class WebSocketServer:
     async def broadcast_to_room(
         self,
         room_id: str,
-        message: Dict[str, Any],
-        exclude: Optional[Set[str]] = None,
+        message: dict[str, Any],
+        exclude: set[str] | None = None,
     ) -> int:
         """
         Broadcast a message to a room.
@@ -442,17 +442,17 @@ class WebSocketServer:
 
     # ========== Utility Methods ==========
 
-    def get_rooms(self) -> List[str]:
+    def get_rooms(self) -> list[str]:
         """Get list of active rooms."""
         return list(self._rooms.keys())
 
-    def get_room_members(self, room_id: str) -> List[str]:
+    def get_room_members(self, room_id: str) -> list[str]:
         """Get members of a room."""
         if room_id not in self._rooms:
             return []
         return list(self._rooms[room_id])
 
-    def get_server_info(self) -> Dict[str, Any]:
+    def get_server_info(self) -> dict[str, Any]:
         """Get server information."""
         return {
             "host": self._config.host,

@@ -6,12 +6,12 @@ Permission Models - 权限数据模型
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """用户角色"""
 
     SUPERADMIN = "superadmin"  # 超级管理员
@@ -23,7 +23,7 @@ class UserRole(str, Enum):
     AI_AGENT = "ai_agent"  # AI Agent
 
 
-class PermissionType(str, Enum):
+class PermissionType(StrEnum):
     """权限类型"""
 
     # 平台管理
@@ -98,7 +98,7 @@ class Permission:
     description: str = ""
     resource: str = ""  # 资源标识
     action: str = ""  # 操作：create, read, update, delete, execute
-    conditions: Dict[str, Any] = field(default_factory=dict)
+    conditions: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
 
     def __post_init__(self):
@@ -113,7 +113,7 @@ class UserPermission:
     id: str = field(default_factory=lambda: str(uuid4())[:8])
     wallet_address: str = ""
     role: UserRole = UserRole.HUMAN
-    permissions: List[PermissionType] = field(default_factory=list)
+    permissions: list[PermissionType] = field(default_factory=list)
 
     # 投票权相关
     stake_amount: float = 0.0  # 质押量
@@ -125,7 +125,7 @@ class UserPermission:
     updated_at: float = field(default_factory=lambda: datetime.now().timestamp())
 
     # 元数据
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.role, str):
@@ -153,7 +153,7 @@ class UserPermission:
         """检查是否有某权限"""
         return permission in self.permissions
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "wallet_address": self.wallet_address,
@@ -169,7 +169,7 @@ class UserPermission:
 
 # ============ 角色默认权限映射 ============
 
-ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
+ROLE_PERMISSIONS: dict[UserRole, list[PermissionType]] = {
     UserRole.SUPERADMIN: [
         # 超级管理员拥有所有权限
         PermissionType.PLATFORM_ADMIN,
@@ -358,7 +358,7 @@ ROLE_PERMISSIONS: Dict[UserRole, List[PermissionType]] = {
 
 # ============ 工具权限映射 ============
 
-TOOL_PERMISSIONS: Dict[str, List[PermissionType]] = {
+TOOL_PERMISSIONS: dict[str, list[PermissionType]] = {
     # ========== 平台管理 ==========
     "start_node": [PermissionType.NODE_START],
     "stop_node": [PermissionType.NODE_STOP],
@@ -482,11 +482,11 @@ TOOL_PERMISSIONS: Dict[str, List[PermissionType]] = {
 }
 
 
-def get_role_permissions(role: UserRole) -> List[PermissionType]:
+def get_role_permissions(role: UserRole) -> list[PermissionType]:
     """获取角色的默认权限"""
     return ROLE_PERMISSIONS.get(role, [PermissionType.CHAT])
 
 
-def get_tool_required_permissions(tool_name: str) -> List[PermissionType]:
+def get_tool_required_permissions(tool_name: str) -> list[PermissionType]:
     """获取工具所需的权限"""
     return TOOL_PERMISSIONS.get(tool_name, [PermissionType.CHAT])

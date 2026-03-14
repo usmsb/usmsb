@@ -3,16 +3,15 @@ Environment API endpoints for AI Civilization Platform
 
 Provides platform environment state and broadcasts.
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 import time
+from typing import Any
+
+from fastapi import APIRouter
+from pydantic import BaseModel
 
 from usmsb_sdk.api.database import (
     get_all_agents,
     get_metrics,
-    get_db,
 )
 
 router = APIRouter(prefix="/environment", tags=["Environment"])
@@ -31,7 +30,7 @@ class EnvironmentState(BaseModel):
     active_demands: int
     active_services: int
     supply_demand_ratio: float
-    hot_skills: List[str]
+    hot_skills: list[str]
     market_trend: str
     timestamp: float
 
@@ -40,11 +39,11 @@ class EnvironmentBroadcast(BaseModel):
     """Environment broadcast message."""
     broadcast_type: str
     message: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     timestamp: float
 
 
-def _calculate_environment_state() -> Dict[str, Any]:
+def _calculate_environment_state() -> dict[str, Any]:
     """Calculate current environment state from database."""
     # Get all agents from unified table
     all_agents = get_all_agents(limit=1000)
@@ -75,7 +74,7 @@ def _calculate_environment_state() -> Dict[str, Any]:
         supply_demand_ratio = round(active_services / active_demands, 2)
 
     # Extract hot skills from agents
-    skill_counts: Dict[str, int] = {}
+    skill_counts: dict[str, int] = {}
     for agent in all_agents:
         import json
         skills = json.loads(agent.get('skills', '[]')) if isinstance(agent.get('skills'), str) else agent.get('skills', [])
@@ -123,7 +122,7 @@ async def get_environment_state():
 @router.get("/metrics")
 async def get_environment_metrics():
     """Get detailed environment metrics."""
-    metrics = get_metrics()
+    get_metrics()
     state = _calculate_environment_state()
 
     return {

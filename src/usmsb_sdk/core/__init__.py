@@ -1,5 +1,17 @@
 """USMSB SDK Core Module."""
 
+from usmsb_sdk.core.config import (
+    AgentConfig as CoreAgentConfig,
+)
+from usmsb_sdk.core.config import (
+    AuthConfig,
+    DatabaseConfig,
+    LoggingConfig,
+    NetworkConfig,
+    PlatformConfig,
+    load_config,
+    load_config_from_env,
+)
 from usmsb_sdk.core.elements import (
     Agent,
     AgentType,
@@ -18,16 +30,6 @@ from usmsb_sdk.core.elements import (
     RuleType,
     Value,
     ValueType,
-)
-from usmsb_sdk.core.config import (
-    NetworkConfig,
-    AuthConfig,
-    AgentConfig as CoreAgentConfig,
-    PlatformConfig,
-    DatabaseConfig,
-    LoggingConfig,
-    load_config,
-    load_config_from_env,
 )
 
 __all__ = [

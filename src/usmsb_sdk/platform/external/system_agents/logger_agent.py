@@ -14,15 +14,14 @@ Skills:
     - analyze: Analyze log patterns
 """
 
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
 import asyncio
 import json
-import logging
 import os
 import re
 from collections import defaultdict
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
@@ -56,9 +55,9 @@ class LogEntry:
         level: LogLevel,
         source: str,
         message: str,
-        timestamp: Optional[datetime] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        tags: Optional[List[str]] = None,
+        timestamp: datetime | None = None,
+        metadata: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
     ):
         self.log_id = log_id
         self.level = level
@@ -69,7 +68,7 @@ class LogEntry:
         self.tags = tags or []
         self.processed = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "log_id": self.log_id,
@@ -88,12 +87,12 @@ class LogEntry:
 
     def matches_filter(
         self,
-        level_filter: Optional[Set[LogLevel]] = None,
-        source_filter: Optional[Set[str]] = None,
-        message_pattern: Optional[str] = None,
-        tags_filter: Optional[Set[str]] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        level_filter: set[LogLevel] | None = None,
+        source_filter: set[str] | None = None,
+        message_pattern: str | None = None,
+        tags_filter: set[str] | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> bool:
         """Check if entry matches filter criteria"""
         if level_filter and self.level not in level_filter:
@@ -122,17 +121,17 @@ class LogStatistics:
 
     def __init__(self):
         self.total_entries = 0
-        self.by_level: Dict[LogLevel, int] = defaultdict(int)
-        self.by_source: Dict[str, int] = defaultdict(int)
-        self.by_hour: Dict[int, int] = defaultdict(int)
+        self.by_level: dict[LogLevel, int] = defaultdict(int)
+        self.by_source: dict[str, int] = defaultdict(int)
+        self.by_hour: dict[int, int] = defaultdict(int)
         self.error_count = 0
         self.warning_count = 0
-        self.first_entry: Optional[datetime] = None
-        self.last_entry: Optional[datetime] = None
-        self.top_sources: List[tuple] = []
-        self.common_patterns: List[tuple] = []
+        self.first_entry: datetime | None = None
+        self.last_entry: datetime | None = None
+        self.top_sources: list[tuple] = []
+        self.common_patterns: list[tuple] = []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "total_entries": self.total_entries,
@@ -153,7 +152,7 @@ class LogBuffer:
 
     def __init__(self, max_size: int = 10000):
         self.max_size = max_size
-        self._buffer: List[LogEntry] = []
+        self._buffer: list[LogEntry] = []
         self._index = 0
 
     def append(self, entry: LogEntry) -> None:
@@ -164,7 +163,7 @@ class LogBuffer:
             self._buffer[self._index] = entry
             self._index = (self._index + 1) % self.max_size
 
-    def get_all(self) -> List[LogEntry]:
+    def get_all(self) -> list[LogEntry]:
         """Get all entries in chronological order"""
         if len(self._buffer) < self.max_size:
             return list(self._buffer)
@@ -172,7 +171,7 @@ class LogBuffer:
         # Buffer is full, need to reorder
         return self._buffer[self._index:] + self._buffer[:self._index]
 
-    def get_recent(self, count: int) -> List[LogEntry]:
+    def get_recent(self, count: int) -> list[LogEntry]:
         """Get most recent entries"""
         all_entries = self.get_all()
         return all_entries[-count:]
@@ -225,7 +224,7 @@ class LoggerAgent(BaseSystemAgent):
     def __init__(
         self,
         config: AgentConfig,
-        system_config: Optional[SystemAgentConfig] = None,
+        system_config: SystemAgentConfig | None = None,
     ):
         """Initialize the logger agent"""
         super().__init__(config, system_config)
@@ -241,11 +240,11 @@ class LoggerAgent(BaseSystemAgent):
         self._archive_interval = timedelta(hours=24)
 
         # Statistics cache
-        self._stats_cache: Optional[LogStatistics] = None
-        self._stats_cache_time: Optional[datetime] = None
+        self._stats_cache: LogStatistics | None = None
+        self._stats_cache_time: datetime | None = None
 
         # Pattern tracking for analysis
-        self._pattern_counts: Dict[str, int] = defaultdict(int)
+        self._pattern_counts: dict[str, int] = defaultdict(int)
 
         # Register logger skills
         self._register_logger_skills()
@@ -478,8 +477,8 @@ class LoggerAgent(BaseSystemAgent):
     async def handle_message(
         self,
         message: Message,
-        session: Optional[Session] = None
-    ) -> Optional[Message]:
+        session: Session | None = None
+    ) -> Message | None:
         """Handle incoming messages"""
         await self.audit_operation("message_received", {
             "message_type": message.type.value if hasattr(message.type, 'value') else str(message.type),
@@ -524,7 +523,7 @@ class LoggerAgent(BaseSystemAgent):
 
         return None
 
-    async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_skill(self, skill_name: str, params: dict[str, Any]) -> Any:
         """Execute logger skills"""
         await self.audit_operation("skill_execution", {
             "skill": skill_name,
@@ -551,7 +550,7 @@ class LoggerAgent(BaseSystemAgent):
 
     # ==================== Skill Implementations ====================
 
-    async def _skill_log(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_log(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute log skill"""
         level_str = params.get("level", "info")
         source = params.get("source", "unknown")
@@ -576,7 +575,7 @@ class LoggerAgent(BaseSystemAgent):
             "timestamp": entry.timestamp.isoformat(),
         }
 
-    async def _skill_query(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_query(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute query skill"""
         levels = params.get("levels")
         sources = params.get("sources")
@@ -635,7 +634,7 @@ class LoggerAgent(BaseSystemAgent):
             "entries": [e.to_dict() for e in paginated],
         }
 
-    async def _skill_export(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_export(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute export skill"""
         self.require_permission(SystemAgentPermission.CONFIGURE)
 
@@ -710,7 +709,7 @@ class LoggerAgent(BaseSystemAgent):
             "file_size_bytes": len(content.encode("utf-8")),
         }
 
-    async def _skill_analyze(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_analyze(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute analyze skill"""
         analysis_type = params.get("analysis_type", "summary")
         time_range = params.get("time_range", 24)
@@ -743,8 +742,8 @@ class LoggerAgent(BaseSystemAgent):
         level: str,
         source: str,
         message: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        tags: Optional[List[str]] = None,
+        metadata: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
     ) -> LogEntry:
         """Record a log entry"""
         async with self._log_lock:
@@ -795,7 +794,7 @@ class LoggerAgent(BaseSystemAgent):
             pattern = " ".join(words[:3])
             self._pattern_counts[pattern] += 1
 
-    def _analyze_summary(self, entries: List[LogEntry], time_range: int) -> Dict[str, Any]:
+    def _analyze_summary(self, entries: list[LogEntry], time_range: int) -> dict[str, Any]:
         """Generate summary statistics"""
         stats = LogStatistics()
 
@@ -835,10 +834,10 @@ class LoggerAgent(BaseSystemAgent):
             "statistics": stats.to_dict(),
         }
 
-    def _analyze_patterns(self, entries: List[LogEntry]) -> Dict[str, Any]:
+    def _analyze_patterns(self, entries: list[LogEntry]) -> dict[str, Any]:
         """Analyze log patterns"""
         # Group by message patterns
-        pattern_groups: Dict[str, List[LogEntry]] = defaultdict(list)
+        pattern_groups: dict[str, list[LogEntry]] = defaultdict(list)
 
         for entry in entries:
             # Create pattern key from first words
@@ -861,20 +860,20 @@ class LoggerAgent(BaseSystemAgent):
                 {
                     "pattern": pattern,
                     "count": len(group),
-                    "sources": list(set(e.source for e in group)),
-                    "levels": list(set(e.level.value for e in group)),
+                    "sources": list({e.source for e in group}),
+                    "levels": list({e.level.value for e in group}),
                     "sample_message": group[0].message if group else None,
                 }
                 for pattern, group in sorted_patterns
             ],
         }
 
-    def _analyze_anomalies(self, entries: List[LogEntry]) -> Dict[str, Any]:
+    def _analyze_anomalies(self, entries: list[LogEntry]) -> dict[str, Any]:
         """Detect log anomalies"""
         anomalies = []
 
         # Check for error spikes
-        error_times: Dict[int, int] = defaultdict(int)
+        error_times: dict[int, int] = defaultdict(int)
         for entry in entries:
             if entry.level in (LogLevel.ERROR, LogLevel.CRITICAL):
                 hour_key = entry.timestamp.hour
@@ -896,7 +895,7 @@ class LoggerAgent(BaseSystemAgent):
                     })
 
         # Check for unusual sources
-        source_counts: Dict[str, int] = defaultdict(int)
+        source_counts: dict[str, int] = defaultdict(int)
         for entry in entries:
             source_counts[entry.source] += 1
 
@@ -917,10 +916,10 @@ class LoggerAgent(BaseSystemAgent):
             "anomalies": anomalies,
         }
 
-    def _analyze_trends(self, entries: List[LogEntry], time_range: int) -> Dict[str, Any]:
+    def _analyze_trends(self, entries: list[LogEntry], time_range: int) -> dict[str, Any]:
         """Analyze log trends over time"""
         # Group by hour
-        hourly_data: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        hourly_data: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         for entry in entries:
             hour = entry.timestamp.hour

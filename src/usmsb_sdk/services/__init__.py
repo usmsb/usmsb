@@ -1,120 +1,120 @@
 """USMSB SDK Services Module."""
 
-from usmsb_sdk.services.behavior_prediction_service import (
-    BehaviorPredictionService,
-    BehaviorPrediction,
-    SystemEvolutionPrediction,
-)
-from usmsb_sdk.services.agentic_workflow_service import (
-    AgenticWorkflowService,
-    Workflow,
-    WorkflowStep,
-    WorkflowStatus,
-    WorkflowResult,
-)
-from usmsb_sdk.services.decision_support_service import (
-    DecisionSupportService,
-    DecisionType,
-    DecisionStatus,
-    DecisionOption,
-    DecisionCriteria,
-    DecisionContext,
-    DecisionAnalysis,
-    DecisionRecommendation,
-)
-from usmsb_sdk.services.system_simulation_service import (
-    SystemSimulationService,
-    SimulationType,
-    SimulationStatus,
-    SimulationConfig,
-    SimulationResult,
-    SimulationStep,
-    SimulationEvent,
-    EventType,
-    AgentState,
-    EnvironmentState,
-)
 from usmsb_sdk.services.active_matching_service import (
     ActiveMatchingService,
     MatchScore,
-    Opportunity,
-    NegotiationSession,
-    NegotiationResult,
     NegotiationProposal,
+    NegotiationResult,
     NegotiationRound,
-    SearchStrategy,
-    NegotiationStrategy,
+    NegotiationSession,
     NegotiationStatus,
+    NegotiationStrategy,
+    Opportunity,
     OpportunityStatus,
-)
-from usmsb_sdk.services.supply_demand_matching_service import (
-    SupplyDemandMatchingService,
-    SupplyListing,
-    DemandListing,
-    Match,
-    MatchStatus,
-    MatchingMode,
-    MatchingStats,
+    SearchStrategy,
 )
 from usmsb_sdk.services.agent_network_explorer import (
-    AgentNetworkExplorer,
     AgentCapabilityInfo,
+    AgentNetworkExplorer,
     AgentRecommendation,
     AgentRelationship,
-    ContactResult,
     ContactRequest,
+    ContactResult,
     ExplorationRecord,
     ExplorationStrategy,
     TrustLevel,
 )
-from usmsb_sdk.services.collaborative_matching_service import (
-    CollaborativeMatchingService,
-    CollaborationSession,
-    CollaborationPlan,
-    CollaborationRole,
-    CollaborationMode,
-    CollaborationStatus,
-    RoleType,
-    ParticipantInvite,
-)
-from usmsb_sdk.services.proactive_learning_service import (
-    ProactiveLearningService,
-    LearningInsight,
-    OptimizedStrategy,
-    MarketInsight,
-    LearningType,
-    InsightCategory,
-)
-from usmsb_sdk.services.dynamic_pricing_service import (
-    DynamicPricingService,
-    PricingStrategy,
-    ServiceCategory,
-    PricingFactor,
-    PricingResult,
-    MarketSnapshot,
-    PriceHistory,
-)
-from usmsb_sdk.services.joint_order_service import (
-    JointOrderService,
-    Demand,
-    OrderPool,
-    Bid,
-    PoolStatus,
-    ServiceStats,
+from usmsb_sdk.services.agentic_workflow_service import (
+    AgenticWorkflowService,
+    Workflow,
+    WorkflowResult,
+    WorkflowStatus,
+    WorkflowStep,
 )
 from usmsb_sdk.services.asset_fractionalization_service import (
     AssetFractionalizationService,
     AssetInfo,
-    Shareholder,
     AssetStatus,
+    Shareholder,
+)
+from usmsb_sdk.services.behavior_prediction_service import (
+    BehaviorPrediction,
+    BehaviorPredictionService,
+    SystemEvolutionPrediction,
+)
+from usmsb_sdk.services.collaborative_matching_service import (
+    CollaborationMode,
+    CollaborationPlan,
+    CollaborationRole,
+    CollaborationSession,
+    CollaborationStatus,
+    CollaborativeMatchingService,
+    ParticipantInvite,
+    RoleType,
+)
+from usmsb_sdk.services.decision_support_service import (
+    DecisionAnalysis,
+    DecisionContext,
+    DecisionCriteria,
+    DecisionOption,
+    DecisionRecommendation,
+    DecisionStatus,
+    DecisionSupportService,
+    DecisionType,
+)
+from usmsb_sdk.services.dynamic_pricing_service import (
+    DynamicPricingService,
+    MarketSnapshot,
+    PriceHistory,
+    PricingFactor,
+    PricingResult,
+    PricingStrategy,
+    ServiceCategory,
+)
+from usmsb_sdk.services.joint_order_service import (
+    Bid,
+    Demand,
+    JointOrderService,
+    OrderPool,
+    PoolStatus,
+    ServiceStats,
+)
+from usmsb_sdk.services.proactive_learning_service import (
+    InsightCategory,
+    LearningInsight,
+    LearningType,
+    MarketInsight,
+    OptimizedStrategy,
+    ProactiveLearningService,
+)
+from usmsb_sdk.services.supply_demand_matching_service import (
+    DemandListing,
+    Match,
+    MatchingMode,
+    MatchingStats,
+    MatchStatus,
+    SupplyDemandMatchingService,
+    SupplyListing,
+)
+from usmsb_sdk.services.system_simulation_service import (
+    AgentState,
+    EnvironmentState,
+    EventType,
+    SimulationConfig,
+    SimulationEvent,
+    SimulationResult,
+    SimulationStatus,
+    SimulationStep,
+    SimulationType,
+    SystemSimulationService,
 )
 from usmsb_sdk.services.zk_credential_service import (
+    Credential,
+    CredentialStatus,
+    CredentialType,
+    PrivateInputs,
     ZKCredentialService,
     ZKProof,
-    Credential,
-    PrivateInputs,
-    CredentialType,
-    CredentialStatus,
 )
 
 __all__ = [

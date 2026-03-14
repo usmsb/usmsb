@@ -6,11 +6,10 @@
 import asyncio
 import json
 import logging
-import sqlite3
 import os
-from dataclasses import dataclass, field
+import sqlite3
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -107,7 +106,7 @@ class ExperienceDB:
         conn.commit()
         conn.close()
 
-    async def add(self, experience: Dict[str, Any]):
+    async def add(self, experience: dict[str, Any]):
         """
         添加经验记录
 
@@ -120,7 +119,7 @@ class ExperienceDB:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._add_experience, experience)
 
-    def _add_experience(self, experience: Dict[str, Any]):
+    def _add_experience(self, experience: dict[str, Any]):
         """添加经验记录 - 内部方法"""
         exp_type = experience.get("type", "error_solution")
 
@@ -190,9 +189,9 @@ class ExperienceDB:
 
     async def search_solutions(
         self,
-        error_type: Optional[str] = None,
-        tool_name: Optional[str] = None,
-    ) -> List[Dict]:
+        error_type: str | None = None,
+        tool_name: str | None = None,
+    ) -> list[dict]:
         """
         搜索解决方案
 
@@ -211,9 +210,9 @@ class ExperienceDB:
 
     def _search_solutions(
         self,
-        error_type: Optional[str],
-        tool_name: Optional[str],
-    ) -> List[Dict]:
+        error_type: str | None,
+        tool_name: str | None,
+    ) -> list[dict]:
         """搜索解决方案 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -252,13 +251,13 @@ class ExperienceDB:
             for row in rows
         ]
 
-    async def get_all_experiences(self) -> Dict[str, List[Dict]]:
+    async def get_all_experiences(self) -> dict[str, list[dict]]:
         """获取所有经验"""
         await self.init()
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_all_experiences)
 
-    def _get_all_experiences(self) -> Dict[str, List[Dict]]:
+    def _get_all_experiences(self) -> dict[str, list[dict]]:
         """获取所有经验 - 内部方法"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

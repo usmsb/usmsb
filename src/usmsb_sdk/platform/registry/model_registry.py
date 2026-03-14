@@ -9,14 +9,13 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ModelStatus(str, Enum):
+class ModelStatus(StrEnum):
     """Status of a registered model."""
     DEVELOPMENT = "development"
     STAGING = "staging"
@@ -25,7 +24,7 @@ class ModelStatus(str, Enum):
     ARCHIVED = "archived"
 
 
-class ModelType(str, Enum):
+class ModelType(StrEnum):
     """Types of AI models."""
     LLM = "llm"
     EMBEDDING = "embedding"
@@ -44,12 +43,12 @@ class ModelVersion:
     checksum: str
     size_bytes: int
     path: str
-    metrics: Dict[str, float] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
     created_at: float = field(default_factory=lambda: time.time())
-    created_by: Optional[str] = None
+    created_by: str | None = None
     description: str = ""
     status: ModelStatus = ModelStatus.DEVELOPMENT
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,28 +58,28 @@ class Model:
     name: str
     type: ModelType
     description: str = ""
-    versions: List[ModelVersion] = field(default_factory=list)
-    latest_version: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
-    owner_id: Optional[str] = None
+    versions: list[ModelVersion] = field(default_factory=list)
+    latest_version: str | None = None
+    tags: list[str] = field(default_factory=list)
+    owner_id: str | None = None
     created_at: float = field(default_factory=lambda: time.time())
     updated_at: float = field(default_factory=lambda: time.time())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_version(self, version: str) -> Optional[ModelVersion]:
+    def get_version(self, version: str) -> ModelVersion | None:
         """Get a specific version."""
         for v in self.versions:
             if v.version == version:
                 return v
         return None
 
-    def get_latest_version(self) -> Optional[ModelVersion]:
+    def get_latest_version(self) -> ModelVersion | None:
         """Get the latest version."""
         if not self.versions:
             return None
         return self.versions[-1]
 
-    def get_production_version(self) -> Optional[ModelVersion]:
+    def get_production_version(self) -> ModelVersion | None:
         """Get the current production version."""
         for v in reversed(self.versions):
             if v.status == ModelStatus.PRODUCTION:
@@ -97,9 +96,9 @@ class DeploymentRecord:
     endpoint: str
     status: str = "active"
     deployed_at: float = field(default_factory=lambda: time.time())
-    deployed_by: Optional[str] = None
-    resource_allocation: Dict[str, Any] = field(default_factory=dict)
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    deployed_by: str | None = None
+    resource_allocation: dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 class ModelRegistry:
@@ -113,7 +112,7 @@ class ModelRegistry:
     - Access control
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         """
         Initialize the Model Registry.
 
@@ -121,18 +120,18 @@ class ModelRegistry:
             storage_path: Path for model storage
         """
         self.storage_path = storage_path or "./models"
-        self._models: Dict[str, Model] = {}
-        self._deployments: Dict[str, DeploymentRecord] = {}
-        self._version_counter: Dict[str, int] = {}
+        self._models: dict[str, Model] = {}
+        self._deployments: dict[str, DeploymentRecord] = {}
+        self._version_counter: dict[str, int] = {}
 
     def register_model(
         self,
         name: str,
         model_type: ModelType,
         description: str = "",
-        owner_id: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        owner_id: str | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Model:
         """
         Register a new model.
@@ -173,11 +172,11 @@ class ModelRegistry:
         model_id: str,
         path: str,
         size_bytes: int,
-        checksum: Optional[str] = None,
-        metrics: Optional[Dict[str, float]] = None,
+        checksum: str | None = None,
+        metrics: dict[str, float] | None = None,
         description: str = "",
-        created_by: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        created_by: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ModelVersion:
         """
         Add a new version to a model.
@@ -228,11 +227,11 @@ class ModelRegistry:
         logger.info(f"Version {version_str} added to model {model_id}")
         return version
 
-    def get_model(self, model_id: str) -> Optional[Model]:
+    def get_model(self, model_id: str) -> Model | None:
         """Get model by ID."""
         return self._models.get(model_id)
 
-    def get_model_by_name(self, name: str) -> Optional[Model]:
+    def get_model_by_name(self, name: str) -> Model | None:
         """Get model by name."""
         for model in self._models.values():
             if model.name == name:
@@ -241,11 +240,11 @@ class ModelRegistry:
 
     def list_models(
         self,
-        model_type: Optional[ModelType] = None,
-        tags: Optional[List[str]] = None,
-        owner_id: Optional[str] = None,
-        status: Optional[ModelStatus] = None,
-    ) -> List[Model]:
+        model_type: ModelType | None = None,
+        tags: list[str] | None = None,
+        owner_id: str | None = None,
+        status: ModelStatus | None = None,
+    ) -> list[Model]:
         """
         List models with optional filters.
 
@@ -270,7 +269,7 @@ class ModelRegistry:
             models = [m for m in models if m.owner_id == owner_id]
 
         if status:
-            models = [m for m in models if m.get_production_version()?.status == status]
+            models = [m for m in models if m.get_production_version() and m.get_production_version().status == status]
 
         return models
 
@@ -347,8 +346,8 @@ class ModelRegistry:
         model_id: str,
         version: str,
         endpoint: str,
-        deployed_by: Optional[str] = None,
-        resource_allocation: Optional[Dict[str, Any]] = None,
+        deployed_by: str | None = None,
+        resource_allocation: dict[str, Any] | None = None,
     ) -> DeploymentRecord:
         """
         Record a model deployment.
@@ -381,9 +380,9 @@ class ModelRegistry:
 
     def get_deployments(
         self,
-        model_id: Optional[str] = None,
-        status: Optional[str] = None,
-    ) -> List[DeploymentRecord]:
+        model_id: str | None = None,
+        status: str | None = None,
+    ) -> list[DeploymentRecord]:
         """Get deployment records."""
         deployments = list(self._deployments.values())
 
@@ -395,7 +394,7 @@ class ModelRegistry:
 
         return deployments
 
-    def get_deployment(self, deployment_id: str) -> Optional[DeploymentRecord]:
+    def get_deployment(self, deployment_id: str) -> DeploymentRecord | None:
         """Get deployment by ID."""
         return self._deployments.get(deployment_id)
 
@@ -403,7 +402,7 @@ class ModelRegistry:
         self,
         deployment_id: str,
         status: str,
-        metrics: Optional[Dict[str, Any]] = None,
+        metrics: dict[str, Any] | None = None,
     ) -> bool:
         """Update deployment status."""
         deployment = self._deployments.get(deployment_id)
@@ -421,7 +420,7 @@ class ModelRegistry:
         model_id: str,
         version1: str,
         version2: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Compare two model versions.
 
@@ -464,7 +463,7 @@ class ModelRegistry:
             "size_diff": v2.size_bytes - v1.size_bytes,
         }
 
-    def get_registry_stats(self) -> Dict[str, Any]:
+    def get_registry_stats(self) -> dict[str, Any]:
         """Get registry statistics."""
         total_models = len(self._models)
         total_versions = sum(len(m.versions) for m in self._models.values())

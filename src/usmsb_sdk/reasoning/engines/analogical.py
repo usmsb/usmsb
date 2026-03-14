@@ -4,17 +4,17 @@ Analogical Reasoning Engine
 类比推理引擎：基于相似性的推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
+    ReasoningType,
     UncertaintyMeasure,
     UncertaintyType,
 )
@@ -28,8 +28,8 @@ class AnalogicalMapping:
 
     source_domain: str
     target_domain: str
-    attribute_mappings: Dict[str, str]
-    relation_mappings: Dict[str, str]
+    attribute_mappings: dict[str, str]
+    relation_mappings: dict[str, str]
     similarity_score: float
 
 
@@ -39,8 +39,8 @@ class Case:
 
     case_id: str
     domain: str
-    attributes: Dict[str, Any]
-    relations: List[Tuple[str, str, str]]
+    attributes: dict[str, Any]
+    relations: list[tuple[str, str, str]]
     outcome: Any
 
 
@@ -57,12 +57,12 @@ class AnalogicalEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._cases: Dict[str, Case] = {}
-        self._domain_knowledge: Dict[str, Dict[str, Any]] = {}
+        self._cases: dict[str, Case] = {}
+        self._domain_knowledge: dict[str, dict[str, Any]] = {}
 
     @property
     def engine_type(self) -> ReasoningType:
@@ -72,7 +72,7 @@ class AnalogicalEngine(BaseReasoningEngine):
         self._cases[case.case_id] = case
 
     def add_domain_knowledge(
-        self, domain: str, attributes: Dict[str, Any], relations: List[Tuple[str, str, str]]
+        self, domain: str, attributes: dict[str, Any], relations: list[tuple[str, str, str]]
     ) -> None:
         self._domain_knowledge[domain] = {
             "attributes": attributes,
@@ -80,8 +80,8 @@ class AnalogicalEngine(BaseReasoningEngine):
         }
 
     def _calculate_attribute_similarity(
-        self, attrs1: Dict[str, Any], attrs2: Dict[str, Any]
-    ) -> Tuple[float, Dict[str, float]]:
+        self, attrs1: dict[str, Any], attrs2: dict[str, Any]
+    ) -> tuple[float, dict[str, float]]:
         if not attrs1 or not attrs2:
             return 0.0, {}
 
@@ -116,8 +116,8 @@ class AnalogicalEngine(BaseReasoningEngine):
         return overall, similarities
 
     def _calculate_relation_similarity(
-        self, rels1: List[Tuple[str, str, str]], rels2: List[Tuple[str, str, str]]
-    ) -> Tuple[float, List[Dict[str, Any]]]:
+        self, rels1: list[tuple[str, str, str]], rels2: list[tuple[str, str, str]]
+    ) -> tuple[float, list[dict[str, Any]]]:
         if not rels1 or not rels2:
             return 0.0, []
 
@@ -142,13 +142,13 @@ class AnalogicalEngine(BaseReasoningEngine):
 
     def _find_similar_cases(
         self,
-        target_attributes: Dict[str, Any],
-        target_relations: List[Tuple[str, str, str]],
+        target_attributes: dict[str, Any],
+        target_relations: list[tuple[str, str, str]],
         top_k: int = 3,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         similar = []
 
-        for case_id, case in self._cases.items():
+        for _case_id, case in self._cases.items():
             attr_sim, attr_details = self._calculate_attribute_similarity(
                 target_attributes, case.attributes
             )
@@ -172,10 +172,10 @@ class AnalogicalEngine(BaseReasoningEngine):
         similar.sort(key=lambda x: x["similarity"], reverse=True)
         return similar[:top_k]
 
-    def _create_mapping(self, source_case: Case, target_attrs: Dict[str, Any]) -> AnalogicalMapping:
+    def _create_mapping(self, source_case: Case, target_attrs: dict[str, Any]) -> AnalogicalMapping:
         attr_mappings = {}
-        for s_attr, s_val in source_case.attributes.items():
-            for t_attr, t_val in target_attrs.items():
+        for s_attr, _s_val in source_case.attributes.items():
+            for t_attr, _t_val in target_attrs.items():
                 if s_attr == t_attr:
                     attr_mappings[s_attr] = t_attr
                     break
@@ -196,11 +196,11 @@ class AnalogicalEngine(BaseReasoningEngine):
         )
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         if not premises:
             return self._create_result(
@@ -230,7 +230,7 @@ class AnalogicalEngine(BaseReasoningEngine):
         for sim_case in similar_cases:
             case = sim_case["case"]
 
-            mapping = self._create_mapping(case, target_attrs)
+            self._create_mapping(case, target_attrs)
 
             step = self._create_step(
                 step_type=ReasoningType.ANALOGICAL,
@@ -287,7 +287,7 @@ class AnalogicalEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         if reasoning_result.confidence.value < 0.3:
@@ -298,7 +298,7 @@ class AnalogicalEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         if not premises:
             return ConfidenceScore(value=0.0)
 

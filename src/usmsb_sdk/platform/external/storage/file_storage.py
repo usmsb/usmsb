@@ -4,7 +4,6 @@ File Storage Implementation
 Provides local file-based storage with JSON support, caching, and file locking.
 """
 
-import asyncio
 import hashlib
 import json
 import logging
@@ -17,11 +16,10 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
 # Platform-specific file locking
 if sys.platform == 'win32':
-    import msvcrt
     HAS_FCNTL = False
 else:
     try:
@@ -31,15 +29,13 @@ else:
         HAS_FCNTL = False
 
 from usmsb_sdk.platform.external.storage.base_storage import (
-    DataLocation,
     DataExistsError,
+    DataLocation,
     DataNotFoundError,
     StorageInterface,
     StorageResult,
     StorageType,
-    StorageError,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +44,7 @@ logger = logging.getLogger(__name__)
 class CacheEntry:
     """Represents a cached item."""
     data: Any
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     timestamp: datetime
     access_count: int = 0
     last_access: datetime = field(default_factory=datetime.utcnow)
@@ -67,7 +63,7 @@ class FileLockManager:
     Supports both thread-level and process-level locking.
     """
 
-    def __init__(self, lock_dir: Optional[Path] = None):
+    def __init__(self, lock_dir: Path | None = None):
         """
         Initialize the lock manager.
 
@@ -76,8 +72,8 @@ class FileLockManager:
         """
         self.lock_dir = lock_dir or Path(tempfile.gettempdir()) / "usmsb_locks"
         self.lock_dir.mkdir(parents=True, exist_ok=True)
-        self._thread_locks: Dict[str, threading.Lock] = {}
-        self._process_locks: Dict[str, Tuple[Any, Path]] = {}
+        self._thread_locks: dict[str, threading.Lock] = {}
+        self._process_locks: dict[str, tuple[Any, Path]] = {}
         self._lock = threading.Lock()
 
     def _get_lock_path(self, key: str) -> Path:
@@ -218,7 +214,7 @@ class LRUCache:
         except (TypeError, ValueError):
             return 0
 
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         """Get item from cache."""
         with self._lock:
             if key in self._cache:
@@ -228,7 +224,7 @@ class LRUCache:
                 return entry
             return None
 
-    def put(self, key: str, data: Any, metadata: Dict[str, Any]) -> None:
+    def put(self, key: str, data: Any, metadata: dict[str, Any]) -> None:
         """Put item in cache."""
         with self._lock:
             size = self._estimate_size(data)
@@ -273,7 +269,7 @@ class LRUCache:
             self._cache.clear()
             self._current_bytes = 0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
             return {
@@ -285,7 +281,7 @@ class LRUCache:
             }
 
 
-class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
+class FileStorage(StorageInterface[Union[dict, list, str, int, float, bool]]):
     """
     File-based storage implementation with JSON support, caching, and locking.
 
@@ -298,7 +294,7 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
 
     def __init__(
         self,
-        base_path: Union[str, Path],
+        base_path: str | Path,
         cache_enabled: bool = True,
         cache_max_size: int = 1000,
         cache_max_bytes: int = 100 * 1024 * 1024,
@@ -388,8 +384,8 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
     async def store(
         self,
         key: str,
-        data: Union[Dict, List, str, int, float, bool],
-        metadata: Optional[Dict[str, Any]] = None,
+        data: dict | list | str | int | float | bool,
+        metadata: dict[str, Any] | None = None,
         overwrite: bool = False,
     ) -> StorageResult:
         """Store data to file."""
@@ -490,13 +486,13 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
 
             try:
                 # Read data
-                with open(data_path, "r", encoding="utf-8") as f:
+                with open(data_path, encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Read metadata
                 metadata = {}
                 if meta_path.exists():
-                    with open(meta_path, "r", encoding="utf-8") as f:
+                    with open(meta_path, encoding="utf-8") as f:
                         metadata = json.load(f)
 
                 # Update cache
@@ -576,10 +572,10 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
 
     async def list_keys(
         self,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[str]:
+    ) -> list[str]:
         """List all keys."""
         data_dir = self.base_path / "data"
         keys = []
@@ -594,7 +590,7 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
         keys.sort()
         return keys[offset:offset + limit]
 
-    async def get_metadata(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, key: str) -> dict[str, Any] | None:
         """Get metadata without retrieving data."""
         meta_path = self._get_metadata_path(key)
 
@@ -602,7 +598,7 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
             return None
 
         try:
-            with open(meta_path, "r", encoding="utf-8") as f:
+            with open(meta_path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Error reading metadata for key {key}: {e}")
@@ -611,7 +607,7 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
     async def update_metadata(
         self,
         key: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         merge: bool = True,
     ) -> StorageResult:
         """Update metadata for a key."""
@@ -631,7 +627,7 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
 
             try:
                 # Read existing metadata
-                with open(meta_path, "r", encoding="utf-8") as f:
+                with open(meta_path, encoding="utf-8") as f:
                     existing = json.load(f)
 
                 # Merge or replace
@@ -686,10 +682,10 @@ class FileStorage(StorageInterface[Union[Dict, List, str, int, float, bool]]):
             logger.error(f"Error clearing storage: {e}")
             return StorageResult(success=False, error=str(e))
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         data_dir = self.base_path / "data"
-        meta_dir = self.base_path / "metadata"
+        self.base_path / "metadata"
 
         file_count = len(list(data_dir.glob("*.json")))
         total_size = sum(f.stat().st_size for f in data_dir.glob("*.json"))

@@ -5,16 +5,13 @@ Manages agent learning, optimization, and market insights.
 Enables agents to improve their performance over time.
 """
 
-import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +42,9 @@ class LearningInsight:
     title: str
     description: str
     confidence: float
-    actionable_recommendations: List[str]
-    supporting_data: Dict[str, Any] = field(default_factory=dict)
-    created_at: Optional[datetime] = None
+    actionable_recommendations: list[str]
+    supporting_data: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime | None = None
 
     @property
     def confidence_level(self) -> str:
@@ -60,7 +57,7 @@ class LearningInsight:
         return "low"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LearningInsight":
+    def from_dict(cls, data: dict[str, Any]) -> "LearningInsight":
         return cls(
             insight_id=data.get("insight_id", ""),
             category=data.get("category", "performance"),
@@ -72,7 +69,7 @@ class LearningInsight:
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "insight_id": self.insight_id,
             "category": self.category,
@@ -91,13 +88,13 @@ class SuccessPattern:
     pattern_id: str
     name: str
     description: str
-    conditions: Dict[str, Any]
+    conditions: dict[str, Any]
     success_rate: float
     sample_size: int
-    factors: List[str]
+    factors: list[str]
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SuccessPattern":
+    def from_dict(cls, data: dict[str, Any]) -> "SuccessPattern":
         return cls(
             pattern_id=data.get("pattern_id", ""),
             name=data.get("name", ""),
@@ -119,9 +116,9 @@ class PerformanceAnalysis:
     total_revenue: float
     average_rating: float
     completion_rate: float
-    top_capabilities: List[str]
-    improvement_areas: List[str]
-    trends: Dict[str, Any]
+    top_capabilities: list[str]
+    improvement_areas: list[str]
+    trends: dict[str, Any]
 
     @property
     def success_rate(self) -> float:
@@ -130,7 +127,7 @@ class PerformanceAnalysis:
         return self.successful_transactions / self.total_transactions
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PerformanceAnalysis":
+    def from_dict(cls, data: dict[str, Any]) -> "PerformanceAnalysis":
         return cls(
             agent_id=data.get("agent_id", ""),
             total_transactions=data.get("total_transactions", 0),
@@ -148,15 +145,15 @@ class PerformanceAnalysis:
 @dataclass
 class MatchingStrategy:
     """Optimized matching strategy for the agent"""
-    optimal_price_range: Dict[str, float]
-    best_contact_timing: List[str]
-    preferred_partner_types: List[str]
-    focus_capabilities: List[str]
+    optimal_price_range: dict[str, float]
+    best_contact_timing: list[str]
+    preferred_partner_types: list[str]
+    focus_capabilities: list[str]
     negotiation_approach: str
     recommended_availability: str
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MatchingStrategy":
+    def from_dict(cls, data: dict[str, Any]) -> "MatchingStrategy":
         strategy = data.get("strategy", data)
         return cls(
             optimal_price_range=strategy.get("optimal_price_range", {"min": 0, "max": 0}),
@@ -177,7 +174,7 @@ class PriceRange:
     confidence: float
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PriceRange":
+    def from_dict(cls, data: dict[str, Any]) -> "PriceRange":
         return cls(
             min=data.get("min", 0),
             max=data.get("max", 0),
@@ -191,17 +188,17 @@ class MarketInsights:
     """Market insights and analysis"""
     demand_level: str
     supply_level: str
-    opportunity_areas: List[str]
-    recommendations: List[str]
-    hot_skills: List[str]
-    trending_categories: List[str]
-    average_prices: Dict[str, float]
+    opportunity_areas: list[str]
+    recommendations: list[str]
+    hot_skills: list[str]
+    trending_categories: list[str]
+    average_prices: dict[str, float]
     competitor_count: int
     supply_demand_ratio: float
-    market_trends: List[str]
+    market_trends: list[str]
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MarketInsights":
+    def from_dict(cls, data: dict[str, Any]) -> "MarketInsights":
         return cls(
             demand_level=data.get("demand_level", "medium"),
             supply_level=data.get("supply_level", "medium"),
@@ -223,8 +220,8 @@ class CompetitiveAnalysis:
     my_ranking: int
     total_competitors: int
     market_share: float
-    competitive_advantages: List[str]
-    improvement_suggestions: List[str]
+    competitive_advantages: list[str]
+    improvement_suggestions: list[str]
     price_position: str  # budget, competitive, premium
 
     @property
@@ -243,7 +240,7 @@ class DemandForecast:
     predicted_demand_30d: float
     trend: str  # increasing, stable, decreasing
     confidence: float
-    factors: List[str]
+    factors: list[str]
 
 
 @dataclass
@@ -251,12 +248,12 @@ class Experience:
     """An experience to report for learning"""
     experience_type: str  # transaction, negotiation, collaboration
     outcome: str  # success, failure, partial
-    details: Dict[str, Any]
-    lessons_learned: List[str]
-    rating: Optional[int] = None
-    feedback: Optional[str] = None
+    details: dict[str, Any]
+    lessons_learned: list[str]
+    rating: int | None = None
+    feedback: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "experience_type": self.experience_type,
             "outcome": self.outcome,
@@ -283,17 +280,17 @@ class LearningManager:
         self,
         platform_client: PlatformClient,
         agent_id: str,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
         self.agent_id = agent_id
         self.logger = logger or logging.getLogger(__name__)
 
         # Caches
-        self._insights_cache: Optional[List[LearningInsight]] = None
-        self._strategy_cache: Optional[MatchingStrategy] = None
-        self._market_cache: Optional[MarketInsights] = None
-        self._cache_time: Optional[datetime] = None
+        self._insights_cache: list[LearningInsight] | None = None
+        self._strategy_cache: MatchingStrategy | None = None
+        self._market_cache: MarketInsights | None = None
+        self._cache_time: datetime | None = None
         self._cache_ttl = 300  # 5 minutes
 
     def _is_cache_valid(self) -> bool:
@@ -326,7 +323,7 @@ class LearningManager:
 
     # ==================== Insights ====================
 
-    async def get_insights(self) -> List[LearningInsight]:
+    async def get_insights(self) -> list[LearningInsight]:
         """Get learning insights for this agent"""
         if self._insights_cache and self._is_cache_valid():
             return self._insights_cache
@@ -341,12 +338,12 @@ class LearningManager:
 
         return []
 
-    async def get_insights_by_category(self, category: str) -> List[LearningInsight]:
+    async def get_insights_by_category(self, category: str) -> list[LearningInsight]:
         """Get insights filtered by category"""
         insights = await self.get_insights()
         return [i for i in insights if i.category == category]
 
-    async def get_success_patterns(self) -> List[SuccessPattern]:
+    async def get_success_patterns(self) -> list[SuccessPattern]:
         """Get patterns associated with successful outcomes"""
         response = await self._platform.analyze_learning()
 
@@ -476,8 +473,8 @@ class LearningManager:
         self,
         tx_id: str,
         success: bool,
-        rating: Optional[int] = None,
-        feedback: Optional[str] = None,
+        rating: int | None = None,
+        feedback: str | None = None,
     ) -> bool:
         """Report a transaction result"""
         experience = Experience(
@@ -514,7 +511,7 @@ class LearningManager:
         self,
         session_id: str,
         success: bool,
-        final_price: Optional[float] = None,
+        final_price: float | None = None,
         rounds: int = 0,
     ) -> bool:
         """Report a negotiation result"""
@@ -532,7 +529,7 @@ class LearningManager:
 
     # ==================== Summary ====================
 
-    async def get_learning_summary(self) -> Dict[str, Any]:
+    async def get_learning_summary(self) -> dict[str, Any]:
         """Get complete learning summary"""
         performance = await self.analyze_performance()
         insights = await self.get_insights()
@@ -550,7 +547,7 @@ class LearningManager:
                 "count": len(insights),
                 "by_category": {
                     cat: len([i for i in insights if i.category == cat])
-                    for cat in set(i.category for i in insights)
+                    for cat in {i.category for i in insights}
                 },
             },
             "strategy": {

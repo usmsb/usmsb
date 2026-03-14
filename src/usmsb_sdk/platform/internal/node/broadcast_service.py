@@ -16,15 +16,15 @@ import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class BroadcastMessageType(str, Enum):
+class BroadcastMessageType(StrEnum):
     """Types of broadcast messages."""
     # Node messages
     NODE_ANNOUNCE = "node_announce"
@@ -58,7 +58,7 @@ class BroadcastMessageType(str, Enum):
     CUSTOM = "custom"
 
 
-class MessagePriority(str, Enum):
+class MessagePriority(StrEnum):
     """Priority levels for messages."""
     LOW = "low"
     NORMAL = "normal"
@@ -66,7 +66,7 @@ class MessagePriority(str, Enum):
     CRITICAL = "critical"
 
 
-class DeliveryGuarantee(str, Enum):
+class DeliveryGuarantee(StrEnum):
     """Delivery guarantee levels."""
     BEST_EFFORT = "best_effort"      # No guarantee
     AT_LEAST_ONCE = "at_least_once"  # May deliver duplicates
@@ -80,10 +80,10 @@ class MessageAck:
     node_id: str
     status: str  # "received", "processed", "failed"
     timestamp: float = field(default_factory=time.time)
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "node_id": self.node_id,
@@ -100,20 +100,20 @@ class BroadcastMessage:
     message_id: str
     message_type: BroadcastMessageType
     sender_id: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     priority: MessagePriority = MessagePriority.NORMAL
     guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_LEAST_ONCE
-    topic: Optional[str] = None
-    target_nodes: List[str] = field(default_factory=list)
-    exclude_nodes: List[str] = field(default_factory=list)
+    topic: str | None = None
+    target_nodes: list[str] = field(default_factory=list)
+    exclude_nodes: list[str] = field(default_factory=list)
     ttl: float = 300.0
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     sequence_num: int = 0
-    correlation_id: Optional[str] = None
-    reply_to: Optional[str] = None
+    correlation_id: str | None = None
+    reply_to: str | None = None
     compressed: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.expires_at is None:
@@ -128,7 +128,7 @@ class BroadcastMessage:
         content = f"{self.message_id}:{self.message_type.value}:{self.sender_id}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "message_id": self.message_id,
@@ -162,7 +162,7 @@ class BroadcastMessage:
         return data.encode()
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BroadcastMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "BroadcastMessage":
         """Create message from dictionary."""
         return cls(
             message_id=data.get("message_id", str(uuid.uuid4())),
@@ -205,8 +205,8 @@ class PendingMessage:
     """Tracks a message waiting for acknowledgments."""
     message: BroadcastMessage
     sent_at: float = field(default_factory=time.time)
-    target_nodes: Set[str] = field(default_factory=set)
-    acked_nodes: Set[str] = field(default_factory=set)
+    target_nodes: set[str] = field(default_factory=set)
+    acked_nodes: set[str] = field(default_factory=set)
     retry_count: int = 0
     max_retries: int = 3
     timeout: float = 30.0
@@ -215,7 +215,7 @@ class PendingMessage:
         """Check if all acknowledgments received."""
         return self.acked_nodes >= self.target_nodes
 
-    def get_pending_nodes(self) -> Set[str]:
+    def get_pending_nodes(self) -> set[str]:
         """Get nodes that haven't acknowledged."""
         return self.target_nodes - self.acked_nodes
 
@@ -231,13 +231,13 @@ class BroadcastStats:
     total_messages_received: int = 0
     total_acks_sent: int = 0
     total_acks_received: int = 0
-    messages_by_type: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    messages_by_type: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     failed_deliveries: int = 0
     retries: int = 0
     avg_latency_ms: float = 0.0
     active_subscriptions: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_messages_sent": self.total_messages_sent,
             "total_messages_received": self.total_messages_received,
@@ -256,9 +256,9 @@ class Subscription:
     """A subscription to broadcast topics."""
     subscription_id: str
     subscriber_id: str
-    topics: List[str]
-    message_types: List[BroadcastMessageType] = field(default_factory=list)
-    callback: Optional[Callable[[BroadcastMessage], None]] = None
+    topics: list[str]
+    message_types: list[BroadcastMessageType] = field(default_factory=list)
+    callback: Callable[[BroadcastMessage], None] | None = None
     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     active: bool = True
     created_at: float = field(default_factory=time.time)
@@ -337,21 +337,21 @@ class NodeBroadcastService:
         self.compression_threshold = compression_threshold
 
         # WebSocket server
-        self._server: Optional[Any] = None
+        self._server: Any | None = None
         self._running = False
 
         # Connected clients (node_id -> websocket)
-        self._connections: Dict[str, Any] = {}
+        self._connections: dict[str, Any] = {}
 
         # Subscriptions
-        self._subscriptions: Dict[str, Subscription] = {}
-        self._topic_subscribers: Dict[str, Set[str]] = defaultdict(set)
+        self._subscriptions: dict[str, Subscription] = {}
+        self._topic_subscribers: dict[str, set[str]] = defaultdict(set)
 
         # Pending messages (for reliable delivery)
-        self._pending_messages: Dict[str, PendingMessage] = {}
+        self._pending_messages: dict[str, PendingMessage] = {}
 
         # Message deduplication
-        self._seen_messages: Dict[str, float] = {}
+        self._seen_messages: dict[str, float] = {}
         self._seen_messages_ttl = 3600.0
 
         # Sequence numbers
@@ -361,12 +361,12 @@ class NodeBroadcastService:
         self._stats = BroadcastStats()
 
         # Background tasks
-        self._tasks: Set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task] = set()
 
         # Event handlers
-        self._on_message_received: Optional[Callable[[BroadcastMessage], None]] = None
-        self._on_client_connected: Optional[Callable[[str], None]] = None
-        self._on_client_disconnected: Optional[Callable[[str], None]] = None
+        self._on_message_received: Callable[[BroadcastMessage], None] | None = None
+        self._on_client_connected: Callable[[str], None] | None = None
+        self._on_client_disconnected: Callable[[str], None] | None = None
 
     # ==================== Lifecycle ====================
 
@@ -440,7 +440,7 @@ class NodeBroadcastService:
         self._running = False
 
         # Close all connections
-        for node_id, ws in list(self._connections.items()):
+        for _node_id, ws in list(self._connections.items()):
             try:
                 if hasattr(ws, 'close'):
                     await ws.close()
@@ -496,7 +496,7 @@ class NodeBroadcastService:
             async for data in websocket:
                 await self._handle_message(data, remote_node_id)
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Client identification timeout")
         except Exception as e:
             logger.error(f"Connection error: {e}")
@@ -515,7 +515,7 @@ class NodeBroadcastService:
         writer: asyncio.StreamWriter
     ) -> None:
         """Handle TCP connection (fallback)."""
-        peer = writer.get_extra_info('peername')
+        writer.get_extra_info('peername')
         remote_node_id = None
 
         try:
@@ -546,7 +546,7 @@ class NodeBroadcastService:
                     break
                 await self._handle_message(data.decode().strip(), remote_node_id)
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         except Exception as e:
             logger.debug(f"TCP connection error: {e}")
@@ -564,7 +564,7 @@ class NodeBroadcastService:
         async with self._server:
             await self._server.serve_forever()
 
-    async def _handle_message(self, data: str, sender_id: Optional[str]) -> None:
+    async def _handle_message(self, data: str, sender_id: str | None) -> None:
         """Handle received message."""
         try:
             msg_data = json.loads(data)
@@ -674,7 +674,7 @@ class NodeBroadcastService:
             except Exception as e:
                 logger.error(f"Failed to send ack: {e}")
 
-    async def _handle_ack(self, ack_data: Dict[str, Any]) -> None:
+    async def _handle_ack(self, ack_data: dict[str, Any]) -> None:
         """Handle received acknowledgment."""
         message_id = ack_data.get("message_id")
         node_id = ack_data.get("node_id")
@@ -693,14 +693,14 @@ class NodeBroadcastService:
     async def broadcast(
         self,
         message_type: BroadcastMessageType,
-        payload: Dict[str, Any],
-        topic: Optional[str] = None,
-        target_nodes: Optional[List[str]] = None,
-        exclude_nodes: Optional[List[str]] = None,
+        payload: dict[str, Any],
+        topic: str | None = None,
+        target_nodes: list[str] | None = None,
+        exclude_nodes: list[str] | None = None,
         priority: MessagePriority = MessagePriority.NORMAL,
         guarantee: DeliveryGuarantee = DeliveryGuarantee.AT_LEAST_ONCE,
         ttl: float = DEFAULT_MESSAGE_TTL,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Broadcast a message to connected nodes.
@@ -765,7 +765,7 @@ class NodeBroadcastService:
     async def _send_to_targets(
         self,
         message: BroadcastMessage,
-        targets: Set[str]
+        targets: set[str]
     ) -> int:
         """Send message to target nodes."""
         sent = 0
@@ -794,7 +794,7 @@ class NodeBroadcastService:
         self,
         topic: str,
         message_type: BroadcastMessageType,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         **kwargs
     ) -> str:
         """Broadcast to a specific topic."""
@@ -809,7 +809,7 @@ class NodeBroadcastService:
         self,
         node_id: str,
         message_type: BroadcastMessageType,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         **kwargs
     ) -> str:
         """Send message to a specific node."""
@@ -824,9 +824,9 @@ class NodeBroadcastService:
 
     async def subscribe(
         self,
-        topics: Union[str, List[str]],
-        callback: Optional[Callable[[BroadcastMessage], None]] = None,
-        message_types: Optional[List[BroadcastMessageType]] = None,
+        topics: str | list[str],
+        callback: Callable[[BroadcastMessage], None] | None = None,
+        message_types: list[BroadcastMessageType] | None = None,
     ) -> str:
         """
         Subscribe to broadcast topics.
@@ -881,7 +881,7 @@ class NodeBroadcastService:
         subscription_id: str,
         timeout: float = 1.0,
         max_messages: int = 100,
-    ) -> List[BroadcastMessage]:
+    ) -> list[BroadcastMessage]:
         """Get pending messages for a subscription."""
         if subscription_id not in self._subscriptions:
             return []
@@ -903,7 +903,7 @@ class NodeBroadcastService:
     async def connect(
         self,
         address: str,
-        port: Optional[int] = None,
+        port: int | None = None,
         timeout: float = 10.0,
     ) -> bool:
         """
@@ -1128,7 +1128,7 @@ class NodeBroadcastService:
         """Get broadcast statistics."""
         return self._stats
 
-    def get_connected_nodes(self) -> List[str]:
+    def get_connected_nodes(self) -> list[str]:
         """Get list of connected node IDs."""
         return list(self._connections.keys())
 

@@ -5,13 +5,9 @@
 """
 
 import asyncio
-import io
-import json
 import logging
 import os
-import sys
-from contextlib import redirect_stdout, redirect_stderr
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..session.user_session import UserSession
@@ -22,7 +18,7 @@ from .security import SecurityLevel
 logger = logging.getLogger(__name__)
 
 
-def get_execution_tools() -> List[Tool]:
+def get_execution_tools() -> list[Tool]:
     """获取执行工具列表（支持 UserSession）"""
     return [
         Tool(
@@ -175,10 +171,10 @@ async def register_tools(registry):
 
 
 # 每个用户会话的技能缓存（通过 session.wallet_address 隔离）
-_skills_cache: Dict[str, Dict[str, Any]] = {}
+_skills_cache: dict[str, dict[str, Any]] = {}
 
 
-async def execute_python(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def execute_python(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     执行 Python 代码（用户隔离沙箱版本）
 
@@ -212,7 +208,7 @@ async def execute_python(session: "UserSession", params: dict) -> Dict[str, Any]
         }
 
 
-async def run_command(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def run_command(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     在沙箱中执行 shell 命令（用户隔离版本）
 
@@ -266,11 +262,9 @@ async def run_command(session: "UserSession", params: dict) -> Dict[str, Any]:
 
 
 import platform
-import socket
-import os
 
 
-async def start_vscode_server(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def start_vscode_server(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     启动 VSCode Server（仅 Linux 支持）
 
@@ -317,7 +311,7 @@ async def start_vscode_server(session: "UserSession", params: dict) -> Dict[str,
         cmd = f"code-server --port {port} --password {password} {workspace_path}"
 
     # 启动后台进程
-    start_result = await session.sandbox.run_command(
+    await session.sandbox.run_command(
         command=f"nohup {cmd} > vscode.log 2>&1 &",
         cwd=workspace_path,
         timeout=10,
@@ -328,7 +322,7 @@ async def start_vscode_server(session: "UserSession", params: dict) -> Dict[str,
 
     return {
         "status": "success",
-        "message": f"VSCode Server 已启动",
+        "message": "VSCode Server 已启动",
         "vscode_url": server_url,
         "workspace": workspace_path,
         "port": port,
@@ -336,7 +330,7 @@ async def start_vscode_server(session: "UserSession", params: dict) -> Dict[str,
     }
 
 
-async def stop_vscode_server(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def stop_vscode_server(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     停止 VSCode Server
 
@@ -365,7 +359,7 @@ async def stop_vscode_server(session: "UserSession", params: dict) -> Dict[str, 
     }
 
 
-async def get_vscode_status(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def get_vscode_status(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     获取 VSCode Server 状态
 
@@ -402,7 +396,7 @@ async def get_vscode_status(session: "UserSession", params: dict) -> Dict[str, A
     }
 
 
-async def execute_javascript(params: dict) -> Dict[str, Any]:
+async def execute_javascript(params: dict) -> dict[str, Any]:
     """
     执行 JavaScript 代码（全局版本，不需要用户会话）
 
@@ -446,7 +440,7 @@ async def execute_javascript(params: dict) -> Dict[str, Any]:
 
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
             return {"status": "error", "message": f"执行超时（{timeout}秒）"}
 
@@ -465,7 +459,7 @@ async def execute_javascript(params: dict) -> Dict[str, Any]:
             pass
 
 
-async def browser_open(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def browser_open(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     打开浏览器并访问 URL（用户隔离版本）
 
@@ -528,7 +522,7 @@ async def browser_open(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def browser_click(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def browser_click(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     点击页面元素（用户隔离版本）
 
@@ -554,7 +548,7 @@ async def browser_click(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def browser_fill(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def browser_fill(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     填写表单输入框（用户隔离版本）
 
@@ -582,7 +576,7 @@ async def browser_fill(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def browser_get_content(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def browser_get_content(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     获取页面内容（用户隔离版本）
 
@@ -627,7 +621,7 @@ async def browser_get_content(session: "UserSession", params: dict) -> Dict[str,
         }
 
 
-async def browser_screenshot(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def browser_screenshot(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     截图（用户隔离版本）
 
@@ -653,7 +647,7 @@ async def browser_screenshot(session: "UserSession", params: dict) -> Dict[str, 
         }
 
 
-async def browser_close(session: "UserSession", params: dict = None) -> Dict[str, Any]:
+async def browser_close(session: "UserSession", params: dict = None) -> dict[str, Any]:
     """
     关闭浏览器（用户隔离版本）
 
@@ -674,7 +668,7 @@ async def browser_close(session: "UserSession", params: dict = None) -> Dict[str
         }
 
 
-async def parse_skill_md(params: dict) -> Dict[str, Any]:
+async def parse_skill_md(params: dict) -> dict[str, Any]:
     """
     解析 skills.md 文件
 
@@ -693,7 +687,7 @@ async def parse_skill_md(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": f"文件不存在: {file_path}"}
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
         # 初始化该用户的技能缓存
@@ -741,7 +735,7 @@ async def parse_skill_md(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def execute_skill(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def execute_skill(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     执行指定技能（用户隔离版本）
 
@@ -792,7 +786,7 @@ async def execute_skill(session: "UserSession", params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def list_skills(params: dict = None) -> Dict[str, Any]:
+async def list_skills(params: dict = None) -> dict[str, Any]:
     """
     列出所有已加载的技能
 
@@ -816,7 +810,7 @@ async def list_skills(params: dict = None) -> Dict[str, Any]:
     }
 
 
-async def start_jupyter(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def start_jupyter(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     在沙箱中启动 JupyterLab
 
@@ -873,7 +867,7 @@ async def start_jupyter(session: "UserSession", params: dict) -> Dict[str, Any]:
             # Linux/Mac: 使用 nohup 在后台启动
             cmd = f"nohup jupyter lab --port={port} --NotebookApp.token='{token}' --NotebookApp.password='' --no-browser --ip=0.0.0.0 > /dev/null 2>&1 &"
 
-        result = await session.sandbox.run_command(
+        await session.sandbox.run_command(
             command=cmd,
             timeout=10,
         )
@@ -897,7 +891,7 @@ async def start_jupyter(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def jupyter_status(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def jupyter_status(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     获取 JupyterLab 状态
 
@@ -916,7 +910,7 @@ async def jupyter_status(session: "UserSession", params: dict) -> Dict[str, Any]
     try:
         # 检查 Jupyter 进程是否运行
         if platform.system() == "Windows":
-            cmd = f'tasklist | findstr "jupyter"'
+            cmd = 'tasklist | findstr "jupyter"'
         else:
             cmd = f"pgrep -f 'jupyter.*{port}'"
 
@@ -940,7 +934,7 @@ async def jupyter_status(session: "UserSession", params: dict) -> Dict[str, Any]
         }
 
 
-async def stop_jupyter(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def stop_jupyter(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     停止 JupyterLab
 

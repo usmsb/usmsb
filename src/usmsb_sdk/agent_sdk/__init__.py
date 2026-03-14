@@ -54,121 +54,121 @@ Example Usage:
     })
 """
 
-from usmsb_sdk.agent_sdk.base_agent import BaseAgent
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
+    CapabilityDefinition,
     ProtocolConfig,
     ProtocolType,
     SkillDefinition,
     SkillParameter,
-    CapabilityDefinition,
 )
-from usmsb_sdk.agent_sdk.registration import (
-    RegistrationManager,
-    RegistrationStatus,
-    PlatformNode,
+from usmsb_sdk.agent_sdk.base_agent import BaseAgent
+from usmsb_sdk.agent_sdk.collaboration import (
+    CollaborationManager,
+    CollaborationParticipant,
+    CollaborationPlan,
+    CollaborationResult,
+    CollaborationRole,
+    CollaborationSession,
+    Contribution,
 )
 from usmsb_sdk.agent_sdk.communication import (
     CommunicationManager,
     Message,
     MessageType,
-    Session,
     P2PConnection,
+    Session,
 )
 from usmsb_sdk.agent_sdk.discovery import (
-    DiscoveryManager,
-    DiscoveryFilter,
+    AgentComparison,
     AgentInfo,
-    RecommendationResult,
+    DimensionScore,
+    DiscoveryFilter,
+    DiscoveryManager,
     # Enhanced Discovery
     EnhancedDiscoveryManager,
     MatchDimension,
-    DimensionScore,
     MultiDimensionalMatchResult,
+    RecommendationResult,
     SearchCriteria,
     WatchCondition,
     WatchEvent,
-    AgentComparison,
+)
+from usmsb_sdk.agent_sdk.gene_capsule import (
+    ChangeRecord,
+    DesensitizationResult,
+    ExperienceGene,
+    ExperienceValueScore,
+    GeneCapsule,
+    GeneCapsuleManager,
+    PatternGene,
+    PatternType,
+    ProficiencyLevel,
+    ShareLevel,
+    SkillGene,
+    VerificationStatus,
 )
 from usmsb_sdk.agent_sdk.http_server import (
     HTTPServer,
     run_agent_with_http,
 )
+from usmsb_sdk.agent_sdk.learning import (
+    Experience,
+    LearningInsight,
+    LearningManager,
+    MarketInsights,
+    MatchingStrategy,
+    PerformanceAnalysis,
+)
+from usmsb_sdk.agent_sdk.marketplace import (
+    Demand,
+    DemandDefinition,
+    MarketplaceManager,
+    MatchScore,
+    Opportunity,
+    PriceRange,
+    Service,
+    ServiceDefinition,
+)
+from usmsb_sdk.agent_sdk.negotiation import (
+    NegotiationContext,
+    NegotiationManager,
+    NegotiationRound,
+    NegotiationSession,
+    NegotiationTerms,
+    ProposalResult,
+)
 from usmsb_sdk.agent_sdk.p2p_server import (
+    DHT,
     P2PServer,
     PeerInfo,
-    DHT,
     run_agent_with_p2p,
 )
 
 # Platform integration modules
 from usmsb_sdk.agent_sdk.platform_client import (
+    APIResponse,
     PlatformClient,
     RegistrationResult,
-    APIResponse,
 )
-from usmsb_sdk.agent_sdk.marketplace import (
-    MarketplaceManager,
-    ServiceDefinition,
-    Service,
-    DemandDefinition,
-    Demand,
-    Opportunity,
-    MatchScore,
-    PriceRange,
+from usmsb_sdk.agent_sdk.registration import (
+    PlatformNode,
+    RegistrationManager,
+    RegistrationStatus,
 )
 from usmsb_sdk.agent_sdk.wallet import (
-    WalletManager,
-    WalletBalance,
     StakeInfo,
     StakeResult,
     Transaction,
+    WalletBalance,
     WalletLimits,
-)
-from usmsb_sdk.agent_sdk.negotiation import (
-    NegotiationManager,
-    NegotiationSession,
-    NegotiationTerms,
-    NegotiationContext,
-    NegotiationRound,
-    ProposalResult,
-)
-from usmsb_sdk.agent_sdk.collaboration import (
-    CollaborationManager,
-    CollaborationSession,
-    CollaborationRole,
-    CollaborationParticipant,
-    CollaborationPlan,
-    Contribution,
-    CollaborationResult,
+    WalletManager,
 )
 from usmsb_sdk.agent_sdk.workflow import (
-    WorkflowManager,
     Workflow,
-    WorkflowStep,
+    WorkflowManager,
     WorkflowResult,
-)
-from usmsb_sdk.agent_sdk.learning import (
-    LearningManager,
-    LearningInsight,
-    PerformanceAnalysis,
-    MatchingStrategy,
-    MarketInsights,
-    Experience,
-)
-from usmsb_sdk.agent_sdk.gene_capsule import (
-    GeneCapsuleManager,
-    GeneCapsule,
-    ExperienceGene,
-    SkillGene,
-    PatternGene,
-    ExperienceValueScore,
-    DesensitizationResult,
-    ChangeRecord,
-    ShareLevel,
-    VerificationStatus,
-    ProficiencyLevel,
-    PatternType,
+    WorkflowStep,
 )
 
 # Alias for backward compatibility

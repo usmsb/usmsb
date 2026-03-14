@@ -1,8 +1,7 @@
 import json
 import logging
-from typing import List, Optional
 
-from .types import RetrievalIntent, CandidateMessage
+from .types import CandidateMessage, RetrievalIntent
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +13,7 @@ class CandidateSearch:
 
     async def search(
         self, user_id: str, intent: RetrievalIntent, limit: int = 100
-    ) -> List[CandidateMessage]:
+    ) -> list[CandidateMessage]:
         try:
             keywords = self._extract_keywords(intent)
             logger.info(f"[INFO_EXTRACT] Candidate search keywords: {keywords}")
@@ -62,7 +61,7 @@ class CandidateSearch:
             logger.warning(f"Candidate search failed: {e}")
             return []
 
-    def _extract_keywords(self, intent: RetrievalIntent) -> List[str]:
+    def _extract_keywords(self, intent: RetrievalIntent) -> list[str]:
         keywords = set()
 
         desc = intent.description.lower()
@@ -80,34 +79,6 @@ class CandidateSearch:
             file=sys.stderr,
         )
 
-        common_words = {
-            "需要",
-            "用户",
-            "提供",
-            "直接",
-            "请",
-            "这个",
-            "那个",
-            "什么",
-            "的",
-            "了",
-            "是",
-            "我",
-            "你",
-            "他",
-            "她",
-            "它",
-            "有",
-            "没有",
-            "可以",
-            "能够",
-            "需要",
-            "想要",
-            "获取",
-            "查找",
-            "找到",
-            "获得",
-        }
 
         for text in [desc, format_hint]:
             for word in [
@@ -157,8 +128,8 @@ class CandidateSearch:
         return list(keywords)
 
     async def _rank_by_relevance(
-        self, candidates: List[CandidateMessage], intent: RetrievalIntent, limit: int = 20
-    ) -> List[CandidateMessage]:
+        self, candidates: list[CandidateMessage], intent: RetrievalIntent, limit: int = 20
+    ) -> list[CandidateMessage]:
         try:
             logger.info(f"[INFO_EXTRACT] Starting ranking with {len(candidates)} candidates")
 
@@ -189,7 +160,7 @@ class CandidateSearch:
 - 只返回真正可能包含目标信息的候选
 - 排除明显不相关的消息
 """
-            logger.info(f"[INFO_EXTRACT] Calling LLM for ranking...")
+            logger.info("[INFO_EXTRACT] Calling LLM for ranking...")
             response = await self.llm.chat(prompt)
             logger.info(f"[INFO_EXTRACT] Ranking LLM response: {response[:500]}...")
             data = self._parse_json(response)
@@ -204,7 +175,7 @@ class CandidateSearch:
             logger.warning(f"Ranking failed: {e}")
             return candidates[:limit]
 
-    def _parse_json(self, response: str) -> Optional[dict]:
+    def _parse_json(self, response: str) -> dict | None:
         try:
             if "```json" in response:
                 response = response.split("```json")[1].split("```")[0]

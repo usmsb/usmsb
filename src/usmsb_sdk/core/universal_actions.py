@@ -15,15 +15,15 @@ This module provides the 9 universal action interfaces defined in the USMSB mode
 Each interface has an LLM-powered implementation.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TypeVar, Generic
-from enum import Enum
 import asyncio
 import json
 import logging
 import time
 import uuid
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any, Generic, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ T = TypeVar('T')
 
 # ============== Action Result Types ==============
 
-class ActionResultStatus(str, Enum):
+class ActionResultStatus(StrEnum):
     """Status of an action result."""
     SUCCESS = "success"
     PARTIAL = "partial"
@@ -44,9 +44,9 @@ class ActionResultStatus(str, Enum):
 class ActionResult(Generic[T]):
     """Result of an action execution."""
     status: ActionResultStatus
-    data: Optional[T] = None
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    data: T | None = None
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     execution_time: float = 0.0
     timestamp: float = field(default_factory=time.time)
 
@@ -65,7 +65,7 @@ class IPerceptionService(ABC):
     async def perceive(
         self,
         input_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         感知输入数据，提取结构化信息。
@@ -83,8 +83,8 @@ class IPerceptionService(ABC):
     async def extract_entities(
         self,
         text: str,
-        entity_types: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None
+        entity_types: list[str] | None = None,
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """从文本中提取实体。"""
         pass
@@ -93,7 +93,7 @@ class IPerceptionService(ABC):
     async def analyze_sentiment(
         self,
         text: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """分析文本情感。"""
         pass
@@ -112,7 +112,7 @@ class IDecisionService(ABC):
         self,
         agent: Any,
         goal: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         为Agent做出决策。
@@ -131,9 +131,9 @@ class IDecisionService(ABC):
     async def plan_actions(
         self,
         goal: Any,
-        constraints: Optional[Dict[str, Any]] = None,
-        available_actions: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None
+        constraints: dict[str, Any] | None = None,
+        available_actions: list[str] | None = None,
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """规划行动序列以达成目标。"""
         pass
@@ -141,9 +141,9 @@ class IDecisionService(ABC):
     @abstractmethod
     async def select_strategy(
         self,
-        situation: Dict[str, Any],
-        strategies: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None
+        situation: dict[str, Any],
+        strategies: list[dict[str, Any]],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """从多个策略中选择最优策略。"""
         pass
@@ -160,9 +160,9 @@ class IExecutionService(ABC):
     @abstractmethod
     async def execute(
         self,
-        action: Dict[str, Any],
+        action: dict[str, Any],
         agent: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         执行一个行动。
@@ -182,7 +182,7 @@ class IExecutionService(ABC):
         self,
         code: str,
         language: str = "python",
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行代码。"""
         pass
@@ -191,8 +191,8 @@ class IExecutionService(ABC):
     async def call_tool(
         self,
         tool_name: str,
-        params: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        params: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """调用外部工具。"""
         pass
@@ -212,7 +212,7 @@ class IInteractionService(ABC):
         sender: Any,
         receiver: Any,
         message: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         在两个实体之间进行交互。
@@ -232,9 +232,9 @@ class IInteractionService(ABC):
     async def broadcast(
         self,
         sender: Any,
-        recipients: List[Any],
+        recipients: list[Any],
         message: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """广播消息给多个接收者。"""
         pass
@@ -242,9 +242,9 @@ class IInteractionService(ABC):
     @abstractmethod
     async def negotiate(
         self,
-        parties: List[Any],
+        parties: list[Any],
         topic: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """在多方之间进行协商。"""
         pass
@@ -263,7 +263,7 @@ class ITransformationService(ABC):
         self,
         input_data: Any,
         target_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         将输入转化为目标类型。
@@ -284,7 +284,7 @@ class ITransformationService(ABC):
         data: Any,
         from_format: str,
         to_format: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """转换数据格式。"""
         pass
@@ -292,9 +292,9 @@ class ITransformationService(ABC):
     @abstractmethod
     async def synthesize(
         self,
-        inputs: List[Any],
+        inputs: list[Any],
         synthesis_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """合成多个输入为新的输出。"""
         pass
@@ -313,7 +313,7 @@ class IEvaluationService(ABC):
         self,
         item: Any,
         criteria: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         根据标准评估项目。
@@ -331,9 +331,9 @@ class IEvaluationService(ABC):
     @abstractmethod
     async def compare(
         self,
-        items: List[Any],
+        items: list[Any],
         criteria: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """比较多个项目。"""
         pass
@@ -342,8 +342,8 @@ class IEvaluationService(ABC):
     async def measure_performance(
         self,
         entity: Any,
-        metrics: List[str],
-        context: Optional[Dict[str, Any]] = None
+        metrics: list[str],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """测量实体性能。"""
         pass
@@ -361,7 +361,7 @@ class IFeedbackService(ABC):
     async def process_feedback(
         self,
         feedback_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         处理反馈数据。
@@ -380,7 +380,7 @@ class IFeedbackService(ABC):
         self,
         source: Any,
         feedback_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """收集反馈。"""
         pass
@@ -388,8 +388,8 @@ class IFeedbackService(ABC):
     @abstractmethod
     async def generate_adjustments(
         self,
-        feedback_history: List[Any],
-        context: Optional[Dict[str, Any]] = None
+        feedback_history: list[Any],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """根据反馈历史生成调整建议。"""
         pass
@@ -408,7 +408,7 @@ class ILearningService(ABC):
         self,
         experience_data: Any,
         agent: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         从经验中学习。
@@ -427,7 +427,7 @@ class ILearningService(ABC):
     async def update_knowledge(
         self,
         knowledge: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """更新知识库。"""
         pass
@@ -437,7 +437,7 @@ class ILearningService(ABC):
         self,
         agent: Any,
         performance_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """优化Agent行为。"""
         pass
@@ -456,7 +456,7 @@ class IRiskManagementService(ABC):
         self,
         risk: Any,
         agent: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """
         管理风险。
@@ -474,8 +474,8 @@ class IRiskManagementService(ABC):
     @abstractmethod
     async def identify_risks(
         self,
-        situation: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        situation: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """识别潜在风险。"""
         pass
@@ -484,7 +484,7 @@ class IRiskManagementService(ABC):
     async def assess_risk(
         self,
         risk: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """评估风险等级。"""
         pass
@@ -494,7 +494,7 @@ class IRiskManagementService(ABC):
         self,
         risk: Any,
         strategy: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """缓解风险。"""
         pass
@@ -511,7 +511,7 @@ class LLMPerceptionService(IPerceptionService):
     async def perceive(
         self,
         input_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """使用LLM进行感知。"""
         start_time = time.time()
@@ -554,8 +554,8 @@ class LLMPerceptionService(IPerceptionService):
     async def extract_entities(
         self,
         text: str,
-        entity_types: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None
+        entity_types: list[str] | None = None,
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """使用LLM提取实体。"""
         start_time = time.time()
@@ -591,7 +591,7 @@ class LLMPerceptionService(IPerceptionService):
     async def analyze_sentiment(
         self,
         text: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """使用LLM分析情感。"""
         start_time = time.time()
@@ -632,7 +632,7 @@ class LLMDecisionService(IDecisionService):
         self,
         agent: Any,
         goal: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """使用LLM进行决策。"""
         start_time = time.time()
@@ -671,9 +671,9 @@ Context: {json.dumps(context) if context else 'None'}
     async def plan_actions(
         self,
         goal: Any,
-        constraints: Optional[Dict[str, Any]] = None,
-        available_actions: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None
+        constraints: dict[str, Any] | None = None,
+        available_actions: list[str] | None = None,
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """使用LLM规划行动序列。"""
         start_time = time.time()
@@ -710,9 +710,9 @@ Context: {json.dumps(context) if context else 'None'}
 
     async def select_strategy(
         self,
-        situation: Dict[str, Any],
-        strategies: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None
+        situation: dict[str, Any],
+        strategies: list[dict[str, Any]],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """使用LLM选择策略。"""
         start_time = time.time()
@@ -756,9 +756,9 @@ class LLMExecutionService(IExecutionService):
 
     async def execute(
         self,
-        action: Dict[str, Any],
+        action: dict[str, Any],
         agent: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行行动。"""
         start_time = time.time()
@@ -804,16 +804,16 @@ class LLMExecutionService(IExecutionService):
         self,
         code: str,
         language: str = "python",
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行代码（沙箱环境）。"""
         start_time = time.time()
         try:
             # 安全警告：生产环境应使用真正的沙箱
             if language == "python":
+                import os
                 import subprocess
                 import tempfile
-                import os
 
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
                     f.write(code)
@@ -854,8 +854,8 @@ class LLMExecutionService(IExecutionService):
     async def call_tool(
         self,
         tool_name: str,
-        params: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        params: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """调用工具。"""
         start_time = time.time()
@@ -895,7 +895,7 @@ class LLMInteractionService(IInteractionService):
         sender: Any,
         receiver: Any,
         message: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行交互。"""
         start_time = time.time()
@@ -943,9 +943,9 @@ class LLMInteractionService(IInteractionService):
     async def broadcast(
         self,
         sender: Any,
-        recipients: List[Any],
+        recipients: list[Any],
         message: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """广播消息。"""
         start_time = time.time()
@@ -966,9 +966,9 @@ class LLMInteractionService(IInteractionService):
 
     async def negotiate(
         self,
-        parties: List[Any],
+        parties: list[Any],
         topic: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行协商。"""
         start_time = time.time()
@@ -1013,7 +1013,7 @@ class LLMTransformationService(ITransformationService):
         self,
         input_data: Any,
         target_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行转化。"""
         start_time = time.time()
@@ -1043,12 +1043,13 @@ class LLMTransformationService(ITransformationService):
         data: Any,
         from_format: str,
         to_format: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """转换格式。"""
         start_time = time.time()
         try:
             import json as json_module
+
             import yaml
 
             result = data
@@ -1083,9 +1084,9 @@ class LLMTransformationService(ITransformationService):
 
     async def synthesize(
         self,
-        inputs: List[Any],
+        inputs: list[Any],
         synthesis_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """合成多个输入。"""
         start_time = time.time()
@@ -1122,7 +1123,7 @@ class LLMEvaluationService(IEvaluationService):
         self,
         item: Any,
         criteria: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """执行评估。"""
         start_time = time.time()
@@ -1157,9 +1158,9 @@ class LLMEvaluationService(IEvaluationService):
 
     async def compare(
         self,
-        items: List[Any],
+        items: list[Any],
         criteria: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """比较多个项目。"""
         start_time = time.time()
@@ -1195,8 +1196,8 @@ class LLMEvaluationService(IEvaluationService):
     async def measure_performance(
         self,
         entity: Any,
-        metrics: List[str],
-        context: Optional[Dict[str, Any]] = None
+        metrics: list[str],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """测量性能。"""
         start_time = time.time()
@@ -1240,7 +1241,7 @@ class LLMFeedbackService(IFeedbackService):
     async def process_feedback(
         self,
         feedback_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """处理反馈。"""
         start_time = time.time()
@@ -1275,7 +1276,7 @@ class LLMFeedbackService(IFeedbackService):
         self,
         source: Any,
         feedback_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """收集反馈。"""
         start_time = time.time()
@@ -1292,8 +1293,8 @@ class LLMFeedbackService(IFeedbackService):
 
     async def generate_adjustments(
         self,
-        feedback_history: List[Any],
-        context: Optional[Dict[str, Any]] = None
+        feedback_history: list[Any],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """生成调整建议。"""
         start_time = time.time()
@@ -1330,13 +1331,13 @@ class LLMLearningService(ILearningService):
 
     def __init__(self, llm_adapter):
         self.llm = llm_adapter
-        self._learned_knowledge: Dict[str, Any] = {}
+        self._learned_knowledge: dict[str, Any] = {}
 
     async def learn(
         self,
         experience_data: Any,
         agent: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """从经验中学习。"""
         start_time = time.time()
@@ -1375,7 +1376,7 @@ class LLMLearningService(ILearningService):
     async def update_knowledge(
         self,
         knowledge: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """更新知识。"""
         start_time = time.time()
@@ -1393,7 +1394,7 @@ class LLMLearningService(ILearningService):
         self,
         agent: Any,
         performance_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """优化行为。"""
         start_time = time.time()
@@ -1438,7 +1439,7 @@ class LLMRiskManagementService(IRiskManagementService):
         self,
         risk: Any,
         agent: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """管理风险。"""
         start_time = time.time()
@@ -1475,8 +1476,8 @@ class LLMRiskManagementService(IRiskManagementService):
 
     async def identify_risks(
         self,
-        situation: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        situation: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """识别风险。"""
         start_time = time.time()
@@ -1510,7 +1511,7 @@ class LLMRiskManagementService(IRiskManagementService):
     async def assess_risk(
         self,
         risk: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """评估风险。"""
         start_time = time.time()
@@ -1547,7 +1548,7 @@ class LLMRiskManagementService(IRiskManagementService):
         self,
         risk: Any,
         strategy: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> ActionResult:
         """缓解风险。"""
         start_time = time.time()
@@ -1587,7 +1588,7 @@ class UniversalActionServiceFactory:
     """通用行动服务工厂。"""
 
     @staticmethod
-    def create_all_services(llm_adapter) -> Dict[str, Any]:
+    def create_all_services(llm_adapter) -> dict[str, Any]:
         """创建所有通用行动服务。"""
         return {
             "perception": LLMPerceptionService(llm_adapter),

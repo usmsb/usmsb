@@ -11,6 +11,7 @@ AGI 多层记忆系统
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import math
@@ -19,15 +20,14 @@ import sqlite3
 import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
-import hashlib
+from datetime import datetime
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class MemoryLayer(str, Enum):
+class MemoryLayer(StrEnum):
     WORKING = "working"
     EPISODIC = "episodic"
     SEMANTIC = "semantic"
@@ -35,7 +35,7 @@ class MemoryLayer(str, Enum):
     PERMANENT = "permanent"
 
 
-class ConsolidationStatus(str, Enum):
+class ConsolidationStatus(StrEnum):
     ENCODED = "encoded"
     CONSOLIDATING = "consolidating"
     CONSOLIDATED = "consolidated"
@@ -56,14 +56,14 @@ class MemoryItem:
     forgetting_strength: float = 1.0
     next_review: float = field(default_factory=lambda: datetime.now().timestamp())
     review_interval: int = 1
-    keywords: List[str] = field(default_factory=list)
-    associations: Set[str] = field(default_factory=set)
-    context: Dict[str, Any] = field(default_factory=dict)
-    usmsb_element: Optional[str] = None
+    keywords: list[str] = field(default_factory=list)
+    associations: set[str] = field(default_factory=set)
+    context: dict[str, Any] = field(default_factory=dict)
+    usmsb_element: str | None = None
     user_id: str = ""
     embedding_hash: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "content": self.content,
@@ -119,8 +119,8 @@ class ImportanceEvaluator:
         self.config = config
 
     def evaluate(
-        self, content: str, context: Optional[Dict[str, Any]] = None
-    ) -> Tuple[float, float, List[str]]:
+        self, content: str, context: dict[str, Any] | None = None
+    ) -> tuple[float, float, list[str]]:
         frequency_score = self._eval_frequency(content)
         emotional_score = self._eval_emotional(content)
         utility_score = self._eval_utility(content, context)
@@ -155,7 +155,7 @@ class ImportanceEvaluator:
                 score += 0.15
         return min(1.0, score)
 
-    def _eval_utility(self, content: str, context: Optional[Dict[str, Any]]) -> float:
+    def _eval_utility(self, content: str, context: dict[str, Any] | None) -> float:
         score = 0.5
         if context:
             if context.get("is_question"):
@@ -166,7 +166,7 @@ class ImportanceEvaluator:
                 score += 0.2
         return min(1.0, score)
 
-    def _extract_keywords(self, content: str) -> List[str]:
+    def _extract_keywords(self, content: str) -> list[str]:
         keywords = []
         all_patterns = (
             self._CRITICAL_PATTERNS
@@ -209,7 +209,7 @@ class AGIMemorySystem:
     def __init__(
         self,
         db_path: str = "agi_memory.db",
-        config: Optional[MemoryConfig] = None,
+        config: MemoryConfig | None = None,
         llm_manager=None,
     ):
         self.db_path = db_path
@@ -220,11 +220,11 @@ class AGIMemorySystem:
         self.evaluator = ImportanceEvaluator(self.config)
         self.forgetting = ForgettingCurve(self.config.forgetting_rate)
 
-        self._working: List[MemoryItem] = []
-        self._cache: Dict[str, MemoryItem] = {}
-        self._associations: Dict[str, Set[str]] = defaultdict(set)
+        self._working: list[MemoryItem] = []
+        self._cache: dict[str, MemoryItem] = {}
+        self._associations: dict[str, set[str]] = defaultdict(set)
         self._lock = threading.RLock()
-        self._consolidation_task: Optional[asyncio.Task] = None
+        self._consolidation_task: asyncio.Task | None = None
 
     async def init(self):
         if self._initialized:
@@ -331,8 +331,8 @@ class AGIMemorySystem:
         content: str,
         user_id: str = "",
         layer: MemoryLayer = MemoryLayer.EPISODIC,
-        context: Optional[Dict[str, Any]] = None,
-        usmsb_element: Optional[str] = None,
+        context: dict[str, Any] | None = None,
+        usmsb_element: str | None = None,
     ) -> MemoryItem:
         """记忆内容，自动评估重要性并分配到合适层级"""
         await self.init()
@@ -376,8 +376,8 @@ class AGIMemorySystem:
         query: str,
         user_id: str = "",
         top_k: int = 10,
-        layers: Optional[List[MemoryLayer]] = None,
-    ) -> List[Tuple[MemoryItem, float]]:
+        layers: list[MemoryLayer] | None = None,
+    ) -> list[tuple[MemoryItem, float]]:
         """智能召回相关记忆"""
         await self.init()
 
@@ -402,7 +402,7 @@ class AGIMemorySystem:
 
         return scored[:top_k]
 
-    async def get_permanent(self, user_id: str = "") -> List[MemoryItem]:
+    async def get_permanent(self, user_id: str = "") -> list[MemoryItem]:
         """获取永久记忆"""
         await self.init()
         with self._lock:
@@ -438,7 +438,7 @@ class AGIMemorySystem:
 
         return "\n".join(parts) if len(parts) > 1 else ""
 
-    def _calc_relevance(self, query: str, query_words: Set[str], mem: MemoryItem) -> float:
+    def _calc_relevance(self, query: str, query_words: set[str], mem: MemoryItem) -> float:
         content_words = set(mem.content.lower().split())
         overlap = len(query_words & content_words) / max(len(query_words), 1)
 
@@ -529,7 +529,7 @@ class AGIMemorySystem:
         conn.commit()
         conn.close()
 
-    async def _get_relevant(self, user_id: str) -> List[MemoryItem]:
+    async def _get_relevant(self, user_id: str) -> list[MemoryItem]:
         with self._lock:
             memories = list(self._working)
             memories.extend(
@@ -575,7 +575,7 @@ class AGIMemorySystem:
             if mem.importance >= self.config.consolidation_threshold:
                 await self._promote(mem)
 
-    def _get_consolidation_candidates(self) -> List[MemoryItem]:
+    def _get_consolidation_candidates(self) -> list[MemoryItem]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(

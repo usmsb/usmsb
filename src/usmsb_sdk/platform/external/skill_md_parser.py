@@ -8,14 +8,14 @@ Implements support for external agent protocols:
 - P2P: Peer-to-peer networking
 """
 import asyncio
-import json
 import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
+
 import aiohttp
 
 logger = logging.getLogger(__name__)
@@ -28,17 +28,17 @@ class SkillDefinition:
     """A parsed skill definition from skill.md."""
     name: str
     description: str
-    inputs: List[Dict[str, Any]]
-    outputs: List[Dict[str, Any]]
-    endpoint: Optional[str] = None
-    authentication: Optional[str] = None
-    rate_limit: Optional[int] = None
-    pricing: Optional[Dict[str, float]] = None
-    tags: List[str] = field(default_factory=list)
+    inputs: list[dict[str, Any]]
+    outputs: list[dict[str, Any]]
+    endpoint: str | None = None
+    authentication: str | None = None
+    rate_limit: int | None = None
+    pricing: dict[str, float] | None = None
+    tags: list[str] = field(default_factory=list)
     version: str = "1.0.0"
-    author: Optional[str] = None
+    author: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -83,7 +83,7 @@ class SkillMdParser:
     """
 
     @staticmethod
-    def parse(content: str) -> List[SkillDefinition]:
+    def parse(content: str) -> list[SkillDefinition]:
         """
         Parse skill.md content into skill definitions.
 
@@ -116,7 +116,7 @@ class SkillMdParser:
         return skills
 
     @staticmethod
-    def _parse_skill(name: str, body: str) -> Optional[SkillDefinition]:
+    def _parse_skill(name: str, body: str) -> SkillDefinition | None:
         """Parse a single skill definition."""
         try:
             sections = SkillMdParser._extract_sections(body)
@@ -139,7 +139,7 @@ class SkillMdParser:
             return None
 
     @staticmethod
-    def _parse_skill_from_sections(content: str) -> Optional[SkillDefinition]:
+    def _parse_skill_from_sections(content: str) -> SkillDefinition | None:
         """Parse a skill from sections without explicit name."""
         sections = SkillMdParser._extract_sections(content)
 
@@ -160,7 +160,7 @@ class SkillMdParser:
         )
 
     @staticmethod
-    def _extract_sections(content: str) -> Dict[str, str]:
+    def _extract_sections(content: str) -> dict[str, str]:
         """Extract markdown sections into a dictionary."""
         sections = {}
         current_section = None
@@ -186,7 +186,7 @@ class SkillMdParser:
         return sections
 
     @staticmethod
-    def _parse_inputs(content: str) -> List[Dict[str, Any]]:
+    def _parse_inputs(content: str) -> list[dict[str, Any]]:
         """Parse inputs section."""
         inputs = []
         for line in content.split('\n'):
@@ -214,7 +214,7 @@ class SkillMdParser:
         return inputs
 
     @staticmethod
-    def _parse_outputs(content: str) -> List[Dict[str, Any]]:
+    def _parse_outputs(content: str) -> list[dict[str, Any]]:
         """Parse outputs section."""
         outputs = []
         for line in content.split('\n'):
@@ -230,7 +230,7 @@ class SkillMdParser:
         return outputs
 
     @staticmethod
-    def _parse_rate_limit(content: str) -> Optional[int]:
+    def _parse_rate_limit(content: str) -> int | None:
         """Parse rate limit."""
         match = re.search(r'(\d+)\s*requests?\s*(?:per|/)\s*(\w+)', content)
         if match:
@@ -238,7 +238,7 @@ class SkillMdParser:
         return None
 
     @staticmethod
-    def _parse_pricing(content: str) -> Optional[Dict[str, float]]:
+    def _parse_pricing(content: str) -> dict[str, float] | None:
         """Parse pricing information."""
         pricing = {}
         for line in content.split('\n'):
@@ -251,7 +251,7 @@ class SkillMdParser:
         return pricing if pricing else None
 
     @staticmethod
-    def _parse_tags(content: str) -> List[str]:
+    def _parse_tags(content: str) -> list[str]:
         """Parse tags."""
         tags = []
         for line in content.split('\n'):
@@ -269,7 +269,7 @@ class SkillMdParser:
 
 # ==================== A2A Protocol ====================
 
-class A2AMessageType(str, Enum):
+class A2AMessageType(StrEnum):
     """A2A message types."""
     HELLO = "hello"
     BYE = "bye"
@@ -286,12 +286,12 @@ class A2AMessage:
     message_type: A2AMessageType
     sender_id: str
     receiver_id: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     message_id: str = ""
     timestamp: float = field(default_factory=time.time)
     ttl: int = 10  # Time to live for routing
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.message_type.value,
             "senderId": self.sender_id,
@@ -303,7 +303,7 @@ class A2AMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "A2AMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "A2AMessage":
         return cls(
             message_type=A2AMessageType(data.get("type", "request")),
             sender_id=data.get("senderId", ""),
@@ -332,8 +332,8 @@ class A2AProtocol:
         """
         self.agent_id = agent_id
         self.endpoint = endpoint
-        self._handlers: Dict[str, Callable] = {}
-        self._pending_responses: Dict[str, asyncio.Future] = {}
+        self._handlers: dict[str, Callable] = {}
+        self._pending_responses: dict[str, asyncio.Future] = {}
 
     def register_handler(
         self,
@@ -348,7 +348,7 @@ class A2AProtocol:
         receiver_endpoint: str,
         message: A2AMessage,
         timeout: float = 30.0,
-    ) -> Optional[A2AMessage]:
+    ) -> A2AMessage | None:
         """
         Send a message to another agent.
 
@@ -380,7 +380,7 @@ class A2AProtocol:
             logger.error(f"A2A send error: {e}")
             return None
 
-    async def handle_message(self, message: A2AMessage) -> Optional[A2AMessage]:
+    async def handle_message(self, message: A2AMessage) -> A2AMessage | None:
         """Handle an incoming message."""
         handler = self._handlers.get(message.message_type.value)
         if handler:
@@ -417,10 +417,10 @@ class MCPTool:
     """An MCP tool definition."""
     name: str
     description: str
-    input_schema: Dict[str, Any]
-    output_schema: Optional[Dict[str, Any]] = None
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -433,10 +433,10 @@ class MCPTool:
 class MCPToolCall:
     """An MCP tool call request."""
     tool_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     call_id: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "toolName": self.tool_name,
             "arguments": self.arguments,
@@ -450,9 +450,9 @@ class MCPToolResult:
     call_id: str
     success: bool
     result: Any
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "callId": self.call_id,
             "success": self.success,
@@ -468,7 +468,7 @@ class MCPAdapter:
     Implements MCP for tool discovery and execution.
     """
 
-    def __init__(self, agent_id: str, tools: List[MCPTool] = None):
+    def __init__(self, agent_id: str, tools: list[MCPTool] = None):
         """
         Initialize MCP adapter.
 
@@ -477,8 +477,8 @@ class MCPAdapter:
             tools: Available tools
         """
         self.agent_id = agent_id
-        self._tools: Dict[str, MCPTool] = {}
-        self._tool_handlers: Dict[str, Callable] = {}
+        self._tools: dict[str, MCPTool] = {}
+        self._tool_handlers: dict[str, Callable] = {}
 
         if tools:
             for tool in tools:
@@ -487,13 +487,13 @@ class MCPAdapter:
     def register_tool(
         self,
         tool: MCPTool,
-        handler: Callable[[Dict[str, Any]], Any],
+        handler: Callable[[dict[str, Any]], Any],
     ) -> None:
         """Register a tool with its handler."""
         self._tools[tool.name] = tool
         self._tool_handlers[tool.name] = handler
 
-    def list_tools(self) -> List[MCPTool]:
+    def list_tools(self) -> list[MCPTool]:
         """List available tools."""
         return list(self._tools.values())
 
@@ -585,13 +585,13 @@ class ExternalAgentProfile:
     name: str
     endpoint: str
     protocol: str  # "skill.md", "a2a", "mcp"
-    skills: List[SkillDefinition]
-    capabilities: List[str]
+    skills: list[SkillDefinition]
+    capabilities: list[str]
     status: str = "offline"
     last_seen: float = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agentId": self.agent_id,
             "name": self.name,
@@ -614,15 +614,15 @@ class ExternalAgentRegistry:
 
     def __init__(self):
         """Initialize the registry."""
-        self._agents: Dict[str, ExternalAgentProfile] = {}
-        self._skill_index: Dict[str, List[str]] = {}  # skill -> agent_ids
+        self._agents: dict[str, ExternalAgentProfile] = {}
+        self._skill_index: dict[str, list[str]] = {}  # skill -> agent_ids
 
     async def register_from_skill_md(
         self,
         skill_md_url: str,
         agent_name: str = None,
-        metadata: Dict[str, Any] = None,
-    ) -> Optional[ExternalAgentProfile]:
+        metadata: dict[str, Any] = None,
+    ) -> ExternalAgentProfile | None:
         """
         Register an agent from its skill.md URL.
 
@@ -650,10 +650,10 @@ class ExternalAgentRegistry:
                 return None
 
             # Extract capabilities
-            capabilities = list(set(
+            capabilities = list({
                 skill.name.lower().replace(' ', '_')
                 for skill in skills
-            ))
+            })
 
             # Create profile
             import hashlib
@@ -720,17 +720,17 @@ class ExternalAgentRegistry:
             return True
         return False
 
-    def get_agent(self, agent_id: str) -> Optional[ExternalAgentProfile]:
+    def get_agent(self, agent_id: str) -> ExternalAgentProfile | None:
         """Get an agent by ID."""
         return self._agents.get(agent_id)
 
-    def find_by_skill(self, skill_name: str) -> List[ExternalAgentProfile]:
+    def find_by_skill(self, skill_name: str) -> list[ExternalAgentProfile]:
         """Find agents with a specific skill."""
         skill_key = skill_name.lower()
         agent_ids = self._skill_index.get(skill_key, [])
         return [self._agents[aid] for aid in agent_ids if aid in self._agents]
 
-    def find_by_capability(self, capability: str) -> List[ExternalAgentProfile]:
+    def find_by_capability(self, capability: str) -> list[ExternalAgentProfile]:
         """Find agents with a specific capability."""
         cap_lower = capability.lower()
         return [
@@ -738,7 +738,7 @@ class ExternalAgentRegistry:
             if cap_lower in [c.lower() for c in agent.capabilities]
         ]
 
-    def list_agents(self, status: str = None) -> List[ExternalAgentProfile]:
+    def list_agents(self, status: str = None) -> list[ExternalAgentProfile]:
         """List all registered agents."""
         agents = list(self._agents.values())
         if status:

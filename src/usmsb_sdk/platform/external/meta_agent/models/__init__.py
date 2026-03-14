@@ -8,7 +8,7 @@ Meta Agent 数据模型
 - BackgroundTaskContext: 后台任务上下文
 """
 
-from .chat_result import ChatResult, ToolRetryInfo, BackgroundTaskContext
+from .chat_result import BackgroundTaskContext, ChatResult, ToolRetryInfo
 
 __all__ = [
     "ChatResult",

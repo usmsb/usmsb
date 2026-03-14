@@ -26,15 +26,14 @@ New Features (v2.0):
 """
 
 import asyncio
-import json
 import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union, TypeVar, Generic, TYPE_CHECKING
+from enum import StrEnum
+from typing import Any, TypeVar
 
 # Lazy import protocol handlers to avoid circular dependency
 # Protocol imports are done via get_protocol_module() when needed
@@ -49,61 +48,35 @@ def _get_protocol_module():
     return _protocol_module
 
 # Import ProtocolConfig from base_handler (safe - no circular import)
-from usmsb_sdk.platform.external.protocol.base_handler import ProtocolConfig
+# Import authentication modules
+from usmsb_sdk.platform.external.auth import (
+    MINIMUM_STAKE_FOR_REGISTRATION,
+    AuthContext,
+    AuthCoordinator,
+    FullAuthResult,
+    IStakeVerifier,
+    IWalletAuthenticator,
+    MockStakeVerifier,
+    MockWalletAuthenticator,
+    Permission,
+    VerificationContext,
+)
 
 # Import node management modules
 from usmsb_sdk.platform.external.node import (
     NodeManager,
-    NodeState,
-    NodeConnection,
-    ConnectionStatus,
-    NodeDiscoveryService,
-    DiscoveredNode,
-    NodeHealthStatus,
-    HealthCheckResult,
-    NodeBroadcastService,
-    BroadcastMessage,
-    BroadcastMessageType,
-    SyncService,
     SyncMode,
-    SyncStatus,
     SyncResult,
-    DataChunk,
-    NodeConfig,
+    SyncService,
 )
+from usmsb_sdk.platform.external.protocol.base_handler import ProtocolConfig
 
 # Import storage modules
 from usmsb_sdk.platform.external.storage import (
-    StorageInterface,
-    StorageType,
-    StorageResult,
-    StorageError,
-    DataLocation,
-    StorageManager,
     CacheStrategy,
+    StorageManager,
     SyncStrategy,
-    ConsistencyLevel,
-    FileStorage,
-    SQLiteStorage,
-    IPFSStorage,
-)
-
-# Import authentication modules
-from usmsb_sdk.platform.external.auth import (
-    AuthCoordinator,
-    SessionInfo,
-    VerificationContext,
-    Permission,
-    StakeTier,
-    AuthContext,
-    FullAuthResult,
-    WalletAuthResult,
-    StakeVerificationResult,
-    IWalletAuthenticator,
-    MockWalletAuthenticator,
-    IStakeVerifier,
-    MockStakeVerifier,
-    MINIMUM_STAKE_FOR_REGISTRATION,
+    create_storage_manager,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,7 +84,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar('T')
 
 
-class ExternalAgentProtocol(str, Enum):
+class ExternalAgentProtocol(StrEnum):
     """Supported external agent protocols."""
     A2A = "a2a"           # Agent-to-Agent
     MCP = "mcp"           # Model Context Protocol
@@ -121,7 +94,7 @@ class ExternalAgentProtocol(str, Enum):
     GRPC = "grpc"         # gRPC
 
 
-class ExternalAgentStatus(str, Enum):
+class ExternalAgentStatus(StrEnum):
     """Status of external agent."""
     UNKNOWN = "unknown"
     ONLINE = "online"
@@ -130,7 +103,7 @@ class ExternalAgentStatus(str, Enum):
     ERROR = "error"
 
 
-class SkillMatchLevel(str, Enum):
+class SkillMatchLevel(StrEnum):
     """Level of skill matching."""
     EXACT = "exact"
     PARTIAL = "partial"
@@ -145,13 +118,13 @@ class SkillDefinition:
     name: str
     description: str
     category: str = "general"
-    input_schema: Dict[str, Any] = field(default_factory=dict)
-    output_schema: Dict[str, Any] = field(default_factory=dict)
-    keywords: List[str] = field(default_factory=list)
-    prerequisites: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
+    keywords: list[str] = field(default_factory=list)
+    prerequisites: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_id": self.skill_id,
             "name": self.name,
@@ -165,7 +138,7 @@ class SkillDefinition:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SkillDefinition":
+    def from_dict(cls, data: dict[str, Any]) -> "SkillDefinition":
         return cls(
             skill_id=data.get("skill_id", str(uuid.uuid4())),
             name=data.get("name", "Unknown"),
@@ -212,19 +185,19 @@ class ExternalAgentProfile:
     description: str
     protocol: ExternalAgentProtocol
     endpoint: str
-    skills: List[SkillDefinition] = field(default_factory=list)
-    capabilities: List[str] = field(default_factory=list)
+    skills: list[SkillDefinition] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     status: ExternalAgentStatus = ExternalAgentStatus.UNKNOWN
     reputation: float = 1.0
     last_seen: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     # New fields for auth integration
-    wallet_address: Optional[str] = None
+    wallet_address: str | None = None
     stake_amount: float = 0.0
-    registered_at: Optional[float] = None
-    source_node: Optional[str] = None  # Which node this agent was discovered from
+    registered_at: float | None = None
+    source_node: str | None = None  # Which node this agent was discovered from
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "name": self.name,
@@ -244,7 +217,7 @@ class ExternalAgentProfile:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExternalAgentProfile":
+    def from_dict(cls, data: dict[str, Any]) -> "ExternalAgentProfile":
         skills = [SkillDefinition.from_dict(s) for s in data.get("skills", [])]
         return cls(
             agent_id=data.get("agent_id", str(uuid.uuid4())),
@@ -271,19 +244,19 @@ class ExternalAgentCall:
     call_id: str
     agent_id: str
     skill_name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     timeout: float = 60.0
     priority: int = 0
     created_at: float = field(default_factory=time.time)
     status: str = "pending"
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    result: Any | None = None
+    error: str | None = None
     execution_time: float = 0.0
     # New fields for auth
-    session_token: Optional[str] = None
+    session_token: str | None = None
     authenticated: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "call_id": self.call_id,
             "agent_id": self.agent_id,
@@ -308,13 +281,13 @@ class ExternalAgentResponse:
     agent_id: str
     success: bool
     result: Any = None
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     # New fields for auth
     authenticated: bool = False
-    permissions: List[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "call_id": self.call_id,
             "agent_id": self.agent_id,
@@ -344,14 +317,14 @@ class ProtocolHandler(ABC):
     async def call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float = 60.0,
     ) -> ExternalAgentResponse:
         """Call a skill on the external agent."""
         pass
 
     @abstractmethod
-    async def discover_skills(self) -> List[SkillDefinition]:
+    async def discover_skills(self) -> list[SkillDefinition]:
         """Discover available skills from the agent."""
         pass
 
@@ -367,7 +340,7 @@ class A2AProtocolHandler(ProtocolHandler):
 
     def __init__(self):
         self._connected = False
-        self._endpoint: Optional[str] = None
+        self._endpoint: str | None = None
 
     async def connect(self, endpoint: str) -> bool:
         """Connect to A2A agent."""
@@ -385,7 +358,7 @@ class A2AProtocolHandler(ProtocolHandler):
     async def call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float = 60.0,
     ) -> ExternalAgentResponse:
         """Call skill via A2A protocol."""
@@ -412,7 +385,7 @@ class A2AProtocolHandler(ProtocolHandler):
                 metadata={"execution_time": time.time() - start_time},
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ExternalAgentResponse(
                 call_id=call_id,
                 agent_id="",
@@ -428,7 +401,7 @@ class A2AProtocolHandler(ProtocolHandler):
                 error=str(e),
             )
 
-    async def discover_skills(self) -> List[SkillDefinition]:
+    async def discover_skills(self) -> list[SkillDefinition]:
         """Discover skills via A2A protocol."""
         # In real implementation, query agent for skills
         return []
@@ -445,7 +418,7 @@ class HTTPProtocolHandler(ProtocolHandler):
 
     def __init__(self):
         self._connected = False
-        self._endpoint: Optional[str] = None
+        self._endpoint: str | None = None
 
     async def connect(self, endpoint: str) -> bool:
         """Connect to HTTP agent."""
@@ -462,7 +435,7 @@ class HTTPProtocolHandler(ProtocolHandler):
     async def call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float = 60.0,
     ) -> ExternalAgentResponse:
         """Call skill via HTTP."""
@@ -498,7 +471,7 @@ class HTTPProtocolHandler(ProtocolHandler):
                 error=str(e),
             )
 
-    async def discover_skills(self) -> List[SkillDefinition]:
+    async def discover_skills(self) -> list[SkillDefinition]:
         """Discover skills via HTTP."""
         # GET {endpoint}/skills
         return []
@@ -537,10 +510,10 @@ class ExternalAgentAdapter:
 
     def __init__(
         self,
-        storage_manager: Optional[StorageManager] = None,
-        auth_coordinator: Optional[AuthCoordinator] = None,
-        node_manager: Optional[NodeManager] = None,
-        sync_service: Optional[SyncService] = None,
+        storage_manager: StorageManager | None = None,
+        auth_coordinator: AuthCoordinator | None = None,
+        node_manager: NodeManager | None = None,
+        sync_service: SyncService | None = None,
         use_new_handlers: bool = True,
     ):
         """
@@ -554,24 +527,24 @@ class ExternalAgentAdapter:
             use_new_handlers: Whether to use new protocol handlers from protocol/ module
         """
         # Registered external agents
-        self._agents: Dict[str, ExternalAgentProfile] = {}
+        self._agents: dict[str, ExternalAgentProfile] = {}
 
         # Protocol handlers
-        self._handlers: Dict[str, ProtocolHandler] = {}
+        self._handlers: dict[str, ProtocolHandler] = {}
 
         # Pending calls
-        self._pending_calls: Dict[str, ExternalAgentCall] = {}
+        self._pending_calls: dict[str, ExternalAgentCall] = {}
 
         # Call history
-        self._call_history: List[ExternalAgentCall] = []
+        self._call_history: list[ExternalAgentCall] = []
 
         # Skill index for quick lookup
-        self._skill_index: Dict[str, List[str]] = {}  # skill_name -> agent_ids
+        self._skill_index: dict[str, list[str]] = {}  # skill_name -> agent_ids
 
         # Callbacks
-        self.on_agent_registered: Optional[Callable[[ExternalAgentProfile], None]] = None
-        self.on_agent_status_changed: Optional[Callable[[str, ExternalAgentStatus], None]] = None
-        self.on_call_completed: Optional[Callable[[ExternalAgentCall], None]] = None
+        self.on_agent_registered: Callable[[ExternalAgentProfile], None] | None = None
+        self.on_agent_status_changed: Callable[[str, ExternalAgentStatus], None] | None = None
+        self.on_call_completed: Callable[[ExternalAgentCall], None] | None = None
 
         # New: Storage manager
         self._storage_manager = storage_manager
@@ -690,7 +663,7 @@ class ExternalAgentAdapter:
     def _get_protocol_handler(
         self,
         protocol: ExternalAgentProtocol,
-        config: Optional[ProtocolConfig] = None,
+        config: ProtocolConfig | None = None,
     ) -> ProtocolHandler:
         """
         Get or create a protocol handler.
@@ -728,9 +701,9 @@ class ExternalAgentAdapter:
         description: str,
         protocol: ExternalAgentProtocol,
         endpoint: str,
-        skills: Optional[List[SkillDefinition]] = None,
-        capabilities: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        skills: list[SkillDefinition] | None = None,
+        capabilities: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ExternalAgentProfile:
         """
         Register an external agent.
@@ -805,11 +778,11 @@ class ExternalAgentAdapter:
         endpoint: str,
         wallet_address: str,
         auth_context: AuthContext,
-        skills: Optional[List[SkillDefinition]] = None,
-        capabilities: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        skills: list[SkillDefinition] | None = None,
+        capabilities: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
         minimum_stake: float = MINIMUM_STAKE_FOR_REGISTRATION,
-    ) -> Union[ExternalAgentProfile, FullAuthResult]:
+    ) -> ExternalAgentProfile | FullAuthResult:
         """
         Register an external agent with storage persistence and authentication.
 
@@ -941,17 +914,17 @@ class ExternalAgentAdapter:
         logger.info(f"Unregistered external agent: {agent_id}")
         return True
 
-    def get_agent(self, agent_id: str) -> Optional[ExternalAgentProfile]:
+    def get_agent(self, agent_id: str) -> ExternalAgentProfile | None:
         """Get an agent profile by ID."""
         return self._agents.get(agent_id)
 
     def list_agents(
         self,
-        protocol: Optional[ExternalAgentProtocol] = None,
-        status: Optional[ExternalAgentStatus] = None,
-        wallet_address: Optional[str] = None,
-        min_stake: Optional[float] = None,
-    ) -> List[ExternalAgentProfile]:
+        protocol: ExternalAgentProtocol | None = None,
+        status: ExternalAgentStatus | None = None,
+        wallet_address: str | None = None,
+        min_stake: float | None = None,
+    ) -> list[ExternalAgentProfile]:
         """
         List registered agents with optional filtering.
 
@@ -986,7 +959,7 @@ class ExternalAgentAdapter:
         self,
         skill_name: str,
         match_level: SkillMatchLevel = SkillMatchLevel.PARTIAL,
-    ) -> List[ExternalAgentProfile]:
+    ) -> list[ExternalAgentProfile]:
         """
         Find agents that have a specific skill.
 
@@ -997,7 +970,7 @@ class ExternalAgentAdapter:
         Returns:
             List of matching agent profiles
         """
-        skill_lower = skill_name.lower()
+        skill_name.lower()
         matching_agents = []
 
         for agent in self._agents.values():
@@ -1021,7 +994,7 @@ class ExternalAgentAdapter:
     def find_agents_by_capability(
         self,
         capability: str,
-    ) -> List[ExternalAgentProfile]:
+    ) -> list[ExternalAgentProfile]:
         """Find agents that have a specific capability."""
         capability_lower = capability.lower()
         return [
@@ -1029,7 +1002,7 @@ class ExternalAgentAdapter:
             if any(capability_lower in c.lower() for c in agent.capabilities)
         ]
 
-    def get_skill(self, agent_id: str, skill_name: str) -> Optional[SkillDefinition]:
+    def get_skill(self, agent_id: str, skill_name: str) -> SkillDefinition | None:
         """Get a specific skill from an agent."""
         agent = self._agents.get(agent_id)
         if not agent:
@@ -1047,7 +1020,7 @@ class ExternalAgentAdapter:
         self,
         agent_id: str,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float = 60.0,
         priority: int = 0,
     ) -> ExternalAgentResponse:
@@ -1107,7 +1080,7 @@ class ExternalAgentAdapter:
             # Update agent last seen
             self._agents[agent_id].last_seen = time.time()
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             call.status = "timeout"
             call.error = "Call timed out"
             call.execution_time = time.time() - start_time
@@ -1145,12 +1118,12 @@ class ExternalAgentAdapter:
         self,
         agent_id: str,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         session_token: str,
-        auth_context: Optional[AuthContext] = None,
+        auth_context: AuthContext | None = None,
         timeout: float = 60.0,
         priority: int = 0,
-        required_permissions: Optional[List[Permission]] = None,
+        required_permissions: list[Permission] | None = None,
     ) -> ExternalAgentResponse:
         """
         Call a skill on an external agent with authentication.
@@ -1239,7 +1212,7 @@ class ExternalAgentAdapter:
     async def call_best_agent(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         selection_criteria: str = "reputation",
         timeout: float = 60.0,
     ) -> ExternalAgentResponse:
@@ -1291,10 +1264,10 @@ class ExternalAgentAdapter:
     async def broadcast_to_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         max_responses: int = 5,
         timeout: float = 30.0,
-    ) -> List[ExternalAgentResponse]:
+    ) -> list[ExternalAgentResponse]:
         """
         Broadcast a call to all agents with a skill.
 
@@ -1333,9 +1306,9 @@ class ExternalAgentAdapter:
 
     async def sync_agents_from_nodes(
         self,
-        node_ids: Optional[List[str]] = None,
+        node_ids: list[str] | None = None,
         sync_mode: SyncMode = SyncMode.INCREMENTAL,
-        since: Optional[float] = None,
+        since: float | None = None,
     ) -> SyncResult:
         """
         Synchronize agent registrations from other network nodes.
@@ -1436,9 +1409,9 @@ class ExternalAgentAdapter:
 
     def _get_agent_changes(
         self,
-        since: Optional[float] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        since: float | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get agent changes for synchronization.
 
@@ -1466,7 +1439,7 @@ class ExternalAgentAdapter:
 
         return changes
 
-    def _apply_agent_changes(self, changes: List[Dict[str, Any]]) -> int:
+    def _apply_agent_changes(self, changes: list[dict[str, Any]]) -> int:
         """
         Apply agent changes from synchronization.
 
@@ -1568,7 +1541,7 @@ class ExternalAgentAdapter:
 
         return status
 
-    async def check_all_agents_status(self) -> Dict[str, ExternalAgentStatus]:
+    async def check_all_agents_status(self) -> dict[str, ExternalAgentStatus]:
         """Check status of all registered agents."""
         tasks = {aid: self.check_agent_status(aid) for aid in self._agents}
         results = {}
@@ -1580,7 +1553,7 @@ class ExternalAgentAdapter:
 
     # ========== Utility Methods ==========
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get adapter statistics."""
         successful_calls = sum(1 for c in self._call_history if c.status == "completed")
         failed_calls = sum(1 for c in self._call_history if c.status != "completed")
@@ -1620,9 +1593,9 @@ class ExternalAgentAdapter:
 
     def get_call_history(
         self,
-        agent_id: Optional[str] = None,
+        agent_id: str | None = None,
         limit: int = 100,
-    ) -> List[ExternalAgentCall]:
+    ) -> list[ExternalAgentCall]:
         """Get call history."""
         history = self._call_history
 
@@ -1658,12 +1631,12 @@ class ExternalAgentAdapter:
 
 # ========== Convenience Functions ==========
 
-def create_skill_from_dict(data: Dict[str, Any]) -> SkillDefinition:
+def create_skill_from_dict(data: dict[str, Any]) -> SkillDefinition:
     """Create a SkillDefinition from a dictionary."""
     return SkillDefinition.from_dict(data)
 
 
-def create_agent_from_skill_md(skill_md_content: str) -> Optional[ExternalAgentProfile]:
+def create_agent_from_skill_md(skill_md_content: str) -> ExternalAgentProfile | None:
     """
     Parse a skill.md file and create an agent profile.
 
@@ -1690,7 +1663,7 @@ def create_agent_from_skill_md(skill_md_content: str) -> Optional[ExternalAgentP
         endpoint = ""
         skills = []
 
-        for i, line in enumerate(lines):
+        for _i, line in enumerate(lines):
             line = line.strip()
 
             if line.startswith('# ') and not name:
@@ -1732,10 +1705,10 @@ def create_agent_from_skill_md(skill_md_content: str) -> Optional[ExternalAgentP
 
 
 async def create_external_agent_adapter(
-    storage_base_path: Optional[str] = None,
+    storage_base_path: str | None = None,
     enable_auth: bool = False,
-    wallet_authenticator: Optional[IWalletAuthenticator] = None,
-    stake_verifier: Optional[IStakeVerifier] = None,
+    wallet_authenticator: IWalletAuthenticator | None = None,
+    stake_verifier: IStakeVerifier | None = None,
     use_new_handlers: bool = True,
 ) -> ExternalAgentAdapter:
     """

@@ -3,7 +3,7 @@ Intent parser for natural language requests.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .types import ActionType, Intent
 
@@ -16,7 +16,7 @@ class IntentParser:
     """
 
     # Pattern definitions for each action type
-    PATTERNS: Dict[ActionType, List[str]] = {
+    PATTERNS: dict[ActionType, list[str]] = {
         # ==================== Collaboration ====================
         ActionType.COLLABORATION_CREATE: [
             r"创建.*协作",
@@ -466,9 +466,9 @@ class IntentParser:
 
         raise ValueError(f"Cannot parse request: {request}")
 
-    def _extract_parameters(self, request: str, action: ActionType) -> Dict[str, Any]:
+    def _extract_parameters(self, request: str, action: ActionType) -> dict[str, Any]:
         """Extract parameters from the request based on action type."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
 
         # ==================== Common Extractions ====================
 
@@ -710,7 +710,7 @@ class IntentParser:
 
         return params
 
-    def _extract_skills(self, request: str) -> List[str]:
+    def _extract_skills(self, request: str) -> list[str]:
         """Extract skill keywords from request."""
         request_lower = request.lower()
         found_skills = []

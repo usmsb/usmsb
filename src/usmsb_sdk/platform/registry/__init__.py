@@ -1,21 +1,21 @@
 """USMSB Platform Registry Module."""
 
-from usmsb_sdk.platform.registry.model_registry import (
-    ModelRegistry,
-    Model,
-    ModelVersion,
-    ModelType,
-    ModelStatus,
-    DeploymentRecord,
-)
 from usmsb_sdk.platform.registry.dataset_catalog import (
-    DatasetCatalog,
-    Dataset,
-    DatasetVersion,
-    DatasetType,
-    DatasetStatus,
     AccessLevel,
+    Dataset,
+    DatasetCatalog,
+    DatasetStatus,
+    DatasetType,
+    DatasetVersion,
     QualityMetrics,
+)
+from usmsb_sdk.platform.registry.model_registry import (
+    DeploymentRecord,
+    Model,
+    ModelRegistry,
+    ModelStatus,
+    ModelType,
+    ModelVersion,
 )
 
 __all__ = [

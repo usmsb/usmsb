@@ -9,19 +9,17 @@
 - 守护策略: GUARDIAN_DAEMON / AGI_CONSOLIDATION / NONE
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class RecallStrategy(str, Enum):
+class RecallStrategy(StrEnum):
     """召回策略"""
 
     SMART_RECALL = "SMART_RECALL"  # LLM决策9维检索
@@ -30,7 +28,7 @@ class RecallStrategy(str, Enum):
     HYBRID = "HYBRID"  # 组合策略
 
 
-class StorageStrategy(str, Enum):
+class StorageStrategy(StrEnum):
     """存储策略"""
 
     VECTOR_KB = "VECTOR_KB"  # 向量知识库
@@ -39,7 +37,7 @@ class StorageStrategy(str, Enum):
     HYBRID_STORAGE = "HYBRID_STORAGE"  # 组合存储
 
 
-class GuardianStrategy(str, Enum):
+class GuardianStrategy(StrEnum):
     """守护策略"""
 
     GUARDIAN_DAEMON = "GUARDIAN_DAEMON"  # 全面自我进化
@@ -78,10 +76,10 @@ class ExecutionResult:
 
     success: bool
     response: str = ""
-    strategy_used: Optional[StrategyConfig] = None
+    strategy_used: StrategyConfig | None = None
     execution_time: float = 0.0
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class StrategySelector:
@@ -97,7 +95,7 @@ class StrategySelector:
     def __init__(self, llm_manager):
         self.llm = llm_manager
 
-    async def select_strategy(self, user_task: str, context: Dict[str, Any]) -> StrategyConfig:
+    async def select_strategy(self, user_task: str, context: dict[str, Any]) -> StrategyConfig:
         """
         基于任务特征选择最优策略组合
         """
@@ -115,7 +113,7 @@ class StrategySelector:
 
         return strategy
 
-    async def _extract_task_features(self, user_task: str, context: Dict[str, Any]) -> TaskFeatures:
+    async def _extract_task_features(self, user_task: str, context: dict[str, Any]) -> TaskFeatures:
         """提取任务特征"""
 
         # 使用LLM分析任务特征
@@ -247,7 +245,7 @@ class StrategyOrchestrator:
     def __init__(
         self,
         llm_manager,
-        config: Optional[StrategyConfig] = None,
+        config: StrategyConfig | None = None,
         # 组件注入
         memory_manager=None,
         vector_kb=None,
@@ -276,7 +274,7 @@ class StrategyOrchestrator:
         self._active_guardian = None
 
         # 执行历史
-        self._execution_history: List[Dict[str, Any]] = []
+        self._execution_history: list[dict[str, Any]] = []
 
         logger.info("StrategyOrchestrator initialized")
 
@@ -284,8 +282,8 @@ class StrategyOrchestrator:
         self,
         user_task: str,
         user_id: str = "",
-        context: Optional[Dict[str, Any]] = None,
-        force_strategy: Optional[StrategyConfig] = None,
+        context: dict[str, Any] | None = None,
+        force_strategy: StrategyConfig | None = None,
     ) -> ExecutionResult:
         """
         选择策略并执行
@@ -366,7 +364,7 @@ class StrategyOrchestrator:
             self._active_guardian = self.guardian_daemon
 
     async def _execute_recall(
-        self, strategy: RecallStrategy, user_task: str, user_id: str, context: Dict[str, Any]
+        self, strategy: RecallStrategy, user_task: str, user_id: str, context: dict[str, Any]
     ) -> str:
         """执行召回"""
 
@@ -451,7 +449,7 @@ class StrategyOrchestrator:
             logger.warning(f"Failed to dynamic update memories: {e}")
 
     async def _execute_storage(
-        self, strategy: StorageStrategy, user_task: str, user_id: str, context: Dict[str, Any]
+        self, strategy: StorageStrategy, user_task: str, user_id: str, context: dict[str, Any]
     ):
         """执行存储"""
 
@@ -463,7 +461,7 @@ class StrategyOrchestrator:
             await self.vector_kb.add_document(user_task, metadata={"user_id": user_id})
 
     async def _execute_guardian(
-        self, strategy: GuardianStrategy, user_task: str, context: Dict[str, Any]
+        self, strategy: GuardianStrategy, user_task: str, context: dict[str, Any]
     ):
         """执行守护"""
 
@@ -496,11 +494,11 @@ class StrategyOrchestrator:
         if len(self._execution_history) > 100:
             self._execution_history = self._execution_history[-100:]
 
-    def get_execution_history(self) -> List[Dict[str, Any]]:
+    def get_execution_history(self) -> list[dict[str, Any]]:
         """获取执行历史"""
         return self._execution_history
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息"""
 
         if not self._execution_history:

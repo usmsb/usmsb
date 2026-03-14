@@ -2,7 +2,7 @@
 Environment-related Pydantic schemas.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class EnvironmentCreate(BaseModel):
 
     name: str = Field(..., min_length=1)
     type: str = Field(default="social")
-    state: Dict[str, Any] = Field(default_factory=dict)
+    state: dict[str, Any] = Field(default_factory=dict)
 
 
 class EnvironmentResponse(BaseModel):
@@ -29,7 +29,7 @@ class EnvironmentResponse(BaseModel):
     environment_id: str
     name: str
     type: str = "social"
-    state: Dict[str, Any] = {}
+    state: dict[str, Any] = {}
     goals: list = []
     created_at: float = 0.0
     updated_at: float = 0.0

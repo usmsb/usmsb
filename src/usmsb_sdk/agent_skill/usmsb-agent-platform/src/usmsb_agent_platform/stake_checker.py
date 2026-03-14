@@ -2,9 +2,8 @@
 Stake checker for verifying stake requirements.
 """
 
-from typing import Dict, Optional, Tuple
 
-from .types import ActionType, StakeInfo, StakeTier, StakeRequirement
+from .types import ActionType, StakeInfo, StakeRequirement, StakeTier
 
 
 class StakeChecker:
@@ -20,7 +19,7 @@ class StakeChecker:
     MIN_STAKE_WHITEPAPER: int = 100  # Bronze tier
 
     # Tier configuration
-    TIER_CONFIG: Dict[StakeTier, Dict[str, int]] = {
+    TIER_CONFIG: dict[StakeTier, dict[str, int]] = {
         StakeTier.NONE: {"min": 0, "max_agents": 0, "discount": 0},
         StakeTier.BRONZE: {"min": 100, "max_agents": 1, "discount": 0},
         StakeTier.SILVER: {"min": 1000, "max_agents": 3, "discount": 5},
@@ -28,7 +27,7 @@ class StakeChecker:
         StakeTier.PLATINUM: {"min": 10000, "max_agents": 50, "discount": 20},
     }
 
-    def __init__(self, platform_client: Optional[object] = None):
+    def __init__(self, platform_client: object | None = None):
         """
         Initialize stake checker.
 
@@ -36,7 +35,7 @@ class StakeChecker:
             platform_client: Optional platform client for fetching stake info
         """
         self.client = platform_client
-        self._cache: Dict[str, StakeInfo] = {}
+        self._cache: dict[str, StakeInfo] = {}
 
     async def get_stake_info(self, agent_id: str) -> StakeInfo:
         """
@@ -63,7 +62,7 @@ class StakeChecker:
         self._cache[agent_id] = info
         return info
 
-    async def verify_stake(self, agent_id: str, action: ActionType) -> Tuple[bool, Optional[str]]:
+    async def verify_stake(self, agent_id: str, action: ActionType) -> tuple[bool, str | None]:
         """
         Verify if an agent has sufficient stake for an action.
 
@@ -93,7 +92,7 @@ class StakeChecker:
 
     async def get_stake_requirement(
         self, agent_id: str, action: ActionType
-    ) -> Optional[StakeRequirement]:
+    ) -> StakeRequirement | None:
         """
         Get detailed stake requirement for an action.
 
@@ -126,7 +125,7 @@ class StakeChecker:
 
     async def verify_stake_with_detail(
         self, agent_id: str, action: ActionType
-    ) -> Tuple[bool, Optional[StakeRequirement]]:
+    ) -> tuple[bool, StakeRequirement | None]:
         """
         Verify stake and return detailed requirement info on failure.
 
@@ -205,7 +204,7 @@ class StakeChecker:
         """
         return min(0.5 + (stake_amount / 1000), 1.0)
 
-    def clear_cache(self, agent_id: Optional[str] = None):
+    def clear_cache(self, agent_id: str | None = None):
         """
         Clear stake info cache.
 

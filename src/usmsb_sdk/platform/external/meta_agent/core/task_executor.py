@@ -20,8 +20,9 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from ..models.task_plan import (
     StepResult,
@@ -34,7 +35,7 @@ from ..models.task_plan import (
     should_confirm_plan,
     should_use_step_by_step,
 )
-from ..services.task_progress_store import TaskProgressStore, TaskProgressRecord
+from ..services.task_progress_store import TaskProgressRecord, TaskProgressStore
 
 if TYPE_CHECKING:
     from ..agent import MetaAgent
@@ -55,8 +56,8 @@ class TaskExecutor:
 
     def __init__(self, agent: "MetaAgent"):
         self.agent = agent
-        self._active_tasks: Dict[str, TaskPlan] = {}
-        self._progress_store: Optional[TaskProgressStore] = None
+        self._active_tasks: dict[str, TaskPlan] = {}
+        self._progress_store: TaskProgressStore | None = None
 
     def init_progress_store(self, db_path: str):
         """Initialize progress store"""
@@ -68,8 +69,8 @@ class TaskExecutor:
     async def analyze_and_plan(
         self,
         user_request: str,
-        wallet_address: Optional[str] = None,
-        conversation_id: Optional[str] = None,
+        wallet_address: str | None = None,
+        conversation_id: str | None = None,
     ) -> TaskPlan:
         """
         Analyze task and generate execution plan
@@ -132,7 +133,7 @@ class TaskExecutor:
         self,
         user_request: str,
         complexity: TaskComplexity,
-    ) -> List[TaskStep]:
+    ) -> list[TaskStep]:
         """
         Use LLM to generate execution steps with detailed English prompts.
         """
@@ -284,7 +285,7 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
             # Fallback to single step
             return [
                 TaskStep(
-                    step_id=f"task_default_step",
+                    step_id="task_default_step",
                     name="Execute Request",
                     description=user_request,
                     action="direct_execute",
@@ -293,12 +294,12 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
                 )
             ]
 
-    def _parse_steps_json(self, response: str) -> List[Dict]:
+    def _parse_steps_json(self, response: str) -> list[dict]:
         """Parse steps JSON - supports multiple formats"""
         logger.info(f"[TaskExecutor] Parsing steps JSON, response length: {len(response)}")
 
-        import re
         import json
+        import re
 
         # Method 1: Direct JSON
         try:
@@ -354,7 +355,7 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
                 except json.JSONDecodeError as e:
                     logger.warning(f"[TaskExecutor] Array extraction failed: {e}")
 
-        logger.warning(f"[TaskExecutor] All parse methods failed")
+        logger.warning("[TaskExecutor] All parse methods failed")
         return []
 
     # ==================== Execution ====================
@@ -362,7 +363,7 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
     async def execute_plan(
         self,
         plan: TaskPlan,
-        progress_callback: Optional[Callable[[TaskPlan], None]] = None,
+        progress_callback: Callable[[TaskPlan], None] | None = None,
     ) -> TaskPlan:
         """
         Execute task plan
@@ -469,7 +470,7 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
                 execution_time=execution_time,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return StepResult(
                 step_id=step.step_id,
                 success=False,
@@ -489,7 +490,7 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
         self,
         step: TaskStep,
         plan: TaskPlan,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute directly (simple task)"""
         logger.info(f"[TaskExecutor] _execute_direct called for step: {step.name}")
         request = step.params.get("request", plan.user_request)
@@ -511,7 +512,7 @@ Directly execute this task and return the result. If you need to create files or
         self,
         step: TaskStep,
         plan: TaskPlan,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create directory"""
         path = step.params.get("path", "")
 
@@ -527,7 +528,7 @@ Directly execute this task and return the result. If you need to create files or
         self,
         step: TaskStep,
         plan: TaskPlan,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create file"""
         file_path = step.params.get("file_path", "")
         content = step.params.get("content", "")
@@ -544,7 +545,7 @@ Directly execute this task and return the result. If you need to create files or
         self,
         step: TaskStep,
         plan: TaskPlan,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Write code via LLM"""
         code_request = step.params.get("code_request", step.description)
 
@@ -571,7 +572,7 @@ Return only the code, no explanations."""
         self,
         step: TaskStep,
         plan: TaskPlan,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute command"""
         command = step.params.get("command", "")
         cwd = step.params.get("cwd", "/workspace")
@@ -588,7 +589,7 @@ Return only the code, no explanations."""
         self,
         step: TaskStep,
         plan: TaskPlan,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute via LLM"""
         prompt = f"""Execute step:
 
@@ -644,7 +645,7 @@ Return the result of executing this step."""
 
     # ==================== Task Management ====================
 
-    def get_task(self, task_id: str) -> Optional[TaskPlan]:
+    def get_task(self, task_id: str) -> TaskPlan | None:
         """Get task by ID"""
         task = self._active_tasks.get(task_id)
         if task:
@@ -658,7 +659,7 @@ Return the result of executing this step."""
 
         return None
 
-    def _rebuild_plan_from_record(self, record: TaskProgressRecord) -> Optional[TaskPlan]:
+    def _rebuild_plan_from_record(self, record: TaskProgressRecord) -> TaskPlan | None:
         """Rebuild plan from database record"""
         try:
             plan_data = record.plan_data
@@ -693,7 +694,7 @@ Return the result of executing this step."""
             logger.error(f"[TaskExecutor] Failed to rebuild plan: {e}")
             return None
 
-    def get_tasks_by_wallet(self, wallet_address: str) -> List[TaskPlan]:
+    def get_tasks_by_wallet(self, wallet_address: str) -> list[TaskPlan]:
         """Get all tasks for a wallet"""
         tasks = []
 
@@ -747,8 +748,8 @@ Return the result of executing this step."""
     def modify_plan(
         self,
         task_id: str,
-        modifications: Dict[str, Any],
-    ) -> Optional[TaskPlan]:
+        modifications: dict[str, Any],
+    ) -> TaskPlan | None:
         """Modify task plan"""
         task = self._active_tasks.get(task_id)
         if not task:

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
 from enum import Enum
 
 
@@ -26,7 +25,7 @@ class InfoNeed:
     need_tool_validation: bool = False
     tool_name: str = ""
     fulfilled: bool = False
-    value: Optional[str] = None
+    value: str | None = None
 
 
 @dataclass
@@ -59,7 +58,7 @@ class ExtractedInfo:
 @dataclass
 class ValidationResult:
     is_valid: bool
-    validated_value: Optional[str] = None
+    validated_value: str | None = None
     method: str = ""
     error: str = ""
     reasoning: str = ""

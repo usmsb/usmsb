@@ -5,7 +5,6 @@ Meta Agent Router
 import asyncio
 import json
 import logging
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -34,15 +33,15 @@ def set_permission_manager(manager):
 
 class ChatRequest(BaseModel):
     message: str
-    wallet_address: Optional[str] = None
-    context: Optional[dict] = None
+    wallet_address: str | None = None
+    context: dict | None = None
 
 
 class ChatResponse(BaseModel):
     response: str
     success: bool = True
-    tool_used: Optional[str] = None
-    details: Optional[dict] = None
+    tool_used: str | None = None
+    details: dict | None = None
 
 
 class ToolInfo(BaseModel):
@@ -54,8 +53,8 @@ class HistoryMessage(BaseModel):
     id: str
     role: str
     content: str
-    timestamp: Optional[float] = None
-    tool_calls: Optional[List[Dict]] = None
+    timestamp: float | None = None
+    tool_calls: list[dict] | None = None
 
 
 class EvolutionStats(BaseModel):
@@ -68,7 +67,7 @@ class EvolutionStats(BaseModel):
 class UserInfo(BaseModel):
     wallet_address: str
     role: str
-    permissions: List[str] = []
+    permissions: list[str] = []
     stake_amount: float = 0.0
     token_balance: float = 0.0
     voting_power: float = 0.0
@@ -77,7 +76,7 @@ class UserInfo(BaseModel):
 class UpdateRoleRequest(BaseModel):
     wallet_address: str
     new_role: str
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class UpdateStakeRequest(BaseModel):
@@ -95,8 +94,8 @@ class PermissionStats(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Chat with Meta Agent."""
-    import logging
     import asyncio
+    import logging
 
     logger = logging.getLogger(__name__)
     logger.info(
@@ -124,7 +123,7 @@ async def chat(request: ChatRequest):
             response=result,
             success=True,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error("Chat timeout after 180 seconds")
         return ChatResponse(
             response="请求超时（3分钟），请稍后再试或尝试简化问题。",
@@ -199,7 +198,7 @@ async def debug_tools_for_wallet(wallet_address: str):
         return {"error": str(e)}
 
 
-@router.get("/history/{wallet_address}", response_model=List[HistoryMessage])
+@router.get("/history/{wallet_address}", response_model=list[HistoryMessage])
 async def get_history(wallet_address: str, limit: int = 50):
     """Get conversation history for a wallet address."""
     if _meta_agent is None:
@@ -391,7 +390,7 @@ class TaskPlanResponse(BaseModel):
     completed_steps: int
     progress_percentage: float
     estimated_time: int
-    steps: List[Dict]
+    steps: list[dict]
 
 
 class ConfirmPlanRequest(BaseModel):
@@ -464,7 +463,7 @@ async def cancel_task_plan(task_id: str):
 
 
 @router.get("/tasks/{wallet_address}")
-async def get_wallet_tasks(wallet_address: str, status: Optional[str] = None):
+async def get_wallet_tasks(wallet_address: str, status: str | None = None):
     """Get all tasks for a wallet address."""
     if _meta_agent is None:
         raise HTTPException(status_code=500, detail="Meta agent not initialized")

@@ -5,15 +5,14 @@ Implementation of the ILLMAdapter interface for OpenAI's GPT models.
 Supports GPT-4, GPT-4-turbo, GPT-3.5-turbo and other OpenAI models.
 """
 
-import asyncio
 import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
-    from openai import AsyncOpenAI, APIError, RateLimitError, APIConnectionError
+    from openai import APIConnectionError, APIError, AsyncOpenAI, RateLimitError
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -41,7 +40,7 @@ class OpenAIAdapter(ILLMAdapter):
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
 
-    def __init__(self, config: Optional[IntelligenceSourceConfig] = None):
+    def __init__(self, config: IntelligenceSourceConfig | None = None):
         """
         Initialize OpenAI adapter.
 
@@ -63,7 +62,7 @@ class OpenAIAdapter(ILLMAdapter):
         self.max_tokens = config.extra_params.get("max_tokens", self.DEFAULT_MAX_TOKENS)
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
 
-        self._client: Optional[AsyncOpenAI] = None
+        self._client: AsyncOpenAI | None = None
 
     async def initialize(self) -> bool:
         """Initialize the OpenAI client."""
@@ -126,7 +125,7 @@ class OpenAIAdapter(ILLMAdapter):
     async def generate_text(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -179,7 +178,7 @@ class OpenAIAdapter(ILLMAdapter):
         self,
         system_prompt: str,
         user_prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -240,10 +239,10 @@ class OpenAIAdapter(ILLMAdapter):
     async def understand_intent(
         self,
         text: str,
-        schema: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        schema: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Understand intent from text.
 
@@ -298,9 +297,9 @@ Respond in JSON format with keys: intent, entities (list), sentiment, urgency, c
 
     async def reason(
         self,
-        facts: List[str],
+        facts: list[str],
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -323,9 +322,9 @@ Please reason through this step by step and provide your answer."""
         self,
         item: Any,
         criteria: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Evaluate an item against criteria.
 
@@ -388,9 +387,9 @@ Criteria: {criteria}"""
     async def embed(
         self,
         text: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Generate embeddings for text.
 
@@ -434,7 +433,7 @@ Criteria: {criteria}"""
     async def generate_stream(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ):
         """

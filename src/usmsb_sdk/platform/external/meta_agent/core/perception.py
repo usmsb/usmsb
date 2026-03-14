@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class PerceptionService:
         self.llm = llm_manager
 
     async def perceive(
-        self, input_data: Any, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, input_data: Any, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         感知输入数据，提取结构化信息
 
@@ -41,11 +41,11 @@ class PerceptionService:
         return {"type": "unknown", "data": input_data}
 
     async def _perceive_text(
-        self, text: str, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, text: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """感知文本输入"""
         prompt = f"""分析以下用户输入，提取关键信息:
-        
+
 输入: {text}
 
 请提取:
@@ -75,7 +75,7 @@ class PerceptionService:
                 return intent
         return "unknown"
 
-    def _extract_entities(self, text: str) -> List[Dict[str, str]]:
+    def _extract_entities(self, text: str) -> list[dict[str, str]]:
         """提取实体"""
         return []
 
@@ -95,15 +95,15 @@ class PerceptionService:
     async def extract_entities(
         self,
         text: str,
-        entity_types: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        entity_types: list[str] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """从文本中提取实体"""
         return {"entities": [], "types": entity_types or []}
 
     async def analyze_sentiment(
-        self, text: str, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, text: str, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """分析文本情感"""
         sentiment = self._extract_sentiment(text)
         return {

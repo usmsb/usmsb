@@ -9,22 +9,22 @@ This module provides transaction capabilities between agents:
 - Cross-chain transaction support
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from decimal import Decimal
-from enum import Enum
-from typing import Any, Dict, List, Optional, Callable
 import asyncio
 import hashlib
-import json
 import logging
 import time
 import uuid
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from decimal import Decimal
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class TransactionType(str, Enum):
+class TransactionType(StrEnum):
     """Types of agent transactions."""
     TRANSFER = "transfer"              # Direct transfer between agents
     SERVICE_PAYMENT = "service_payment"  # Payment for services
@@ -36,7 +36,7 @@ class TransactionType(str, Enum):
     TIP = "tip"                        # Tip/Donation
 
 
-class AgentTransactionStatus(str, Enum):
+class AgentTransactionStatus(StrEnum):
     """Status of agent transactions."""
     PENDING = "pending"
     PROCESSING = "processing"
@@ -58,7 +58,7 @@ class AgentWallet:
     staked: Decimal = Decimal("0")
     delegated: Decimal = Decimal("0")
     created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -74,15 +74,15 @@ class AgentTransaction:
     token: str = "USMSB"  # Token symbol
     chain: str = "custom"
     status: AgentTransactionStatus = AgentTransactionStatus.PENDING
-    blockchain_tx_hash: Optional[str] = None
-    service_id: Optional[str] = None  # For service payments
-    escrow_release_condition: Optional[str] = None
-    escrow_timeout: Optional[float] = None
+    blockchain_tx_hash: str | None = None
+    service_id: str | None = None  # For service payments
+    escrow_release_condition: str | None = None
+    escrow_timeout: float | None = None
     created_at: float = field(default_factory=time.time)
-    confirmed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    confirmed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "transaction_type": self.transaction_type.value,
@@ -111,7 +111,7 @@ class IAgentTransactionService(ABC):
         pass
 
     @abstractmethod
-    async def get_wallet(self, agent_id: str) -> Optional[AgentWallet]:
+    async def get_wallet(self, agent_id: str) -> AgentWallet | None:
         """Get agent wallet."""
         pass
 
@@ -127,7 +127,7 @@ class IAgentTransactionService(ABC):
         to_agent: str,
         amount: Decimal,
         token: str = "USMSB",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AgentTransaction:
         """Transfer tokens between agents."""
         pass
@@ -167,7 +167,7 @@ class IAgentTransactionService(ABC):
         pass
 
     @abstractmethod
-    async def get_transaction(self, transaction_id: str) -> Optional[AgentTransaction]:
+    async def get_transaction(self, transaction_id: str) -> AgentTransaction | None:
         """Get transaction by ID."""
         pass
 
@@ -176,7 +176,7 @@ class IAgentTransactionService(ABC):
         self,
         agent_id: str,
         limit: int = 50,
-    ) -> List[AgentTransaction]:
+    ) -> list[AgentTransaction]:
         """Get transaction history for an agent."""
         pass
 
@@ -196,10 +196,10 @@ class AgentTransactionService(IAgentTransactionService):
             blockchain_adapter: Blockchain adapter for on-chain operations
         """
         self.blockchain = blockchain_adapter
-        self._wallets: Dict[str, AgentWallet] = {}
-        self._transactions: Dict[str, AgentTransaction] = {}
-        self._escrows: Dict[str, AgentTransaction] = {}
-        self._escrow_handlers: Dict[str, Callable] = {}
+        self._wallets: dict[str, AgentWallet] = {}
+        self._transactions: dict[str, AgentTransaction] = {}
+        self._escrows: dict[str, AgentTransaction] = {}
+        self._escrow_handlers: dict[str, Callable] = {}
 
     async def create_wallet(self, agent_id: str, chain: str = "custom") -> AgentWallet:
         """Create a wallet for an agent."""
@@ -226,7 +226,7 @@ class AgentTransactionService(IAgentTransactionService):
 
         return wallet
 
-    async def get_wallet(self, agent_id: str) -> Optional[AgentWallet]:
+    async def get_wallet(self, agent_id: str) -> AgentWallet | None:
         """Get agent wallet."""
         return self._wallets.get(agent_id)
 
@@ -241,7 +241,7 @@ class AgentTransactionService(IAgentTransactionService):
         to_agent: str,
         amount: Decimal,
         token: str = "USMSB",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AgentTransaction:
         """Transfer tokens between agents."""
         # Get wallets
@@ -454,7 +454,7 @@ class AgentTransactionService(IAgentTransactionService):
                 break
             await asyncio.sleep(60)  # Check every minute
 
-    async def get_transaction(self, transaction_id: str) -> Optional[AgentTransaction]:
+    async def get_transaction(self, transaction_id: str) -> AgentTransaction | None:
         """Get transaction by ID."""
         return self._transactions.get(transaction_id)
 
@@ -462,7 +462,7 @@ class AgentTransactionService(IAgentTransactionService):
         self,
         agent_id: str,
         limit: int = 50,
-    ) -> List[AgentTransaction]:
+    ) -> list[AgentTransaction]:
         """Get transaction history for an agent."""
         transactions = [
             tx for tx in self._transactions.values()
@@ -554,7 +554,7 @@ class AgentTransactionService(IAgentTransactionService):
         from_agent: str,
         to_agent: str,
         amount: Decimal,
-        message: Optional[str] = None,
+        message: str | None = None,
     ) -> AgentTransaction:
         """Send a tip/donation to another agent."""
         transaction = await self.transfer(

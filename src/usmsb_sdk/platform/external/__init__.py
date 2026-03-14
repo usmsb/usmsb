@@ -10,187 +10,192 @@ a deprecation warning.
 """
 
 # Protocol handlers
-from usmsb_sdk.platform.external.protocol import (
-    # Base
-    BaseProtocolHandler,
-    ProtocolConfig,
-    ProtocolMessage,
-    ProtocolResponse,
-    ConnectionInfo,
-    # A2A
-    A2AProtocolHandler,
-    A2AEnvelope,
-    A2ASkillRequest,
-    A2ASkillResponse,
-    A2AAgentInfo,
-    # HTTP
-    HTTPProtocolHandler,
-    HTTPEndpointConfig,
-    HTTPAuthConfig,
-    HTTPRequest,
-    HTTPResponse,
-    HTTPSkillEndpoint,
-    # MCP
-    MCPProtocolHandler,
-    MCPServerInfo,
-    MCPTool,
-    MCPResource,
-    MCPPrompt,
-    MCPToolCall,
-    MCPToolResult,
-    MCPMessage,
-    # P2P
-    P2PProtocolHandler,
-    P2PNodeInfo,
-    P2PMessage,
-    P2PSkillRequest,
-    P2PSkillResponse,
-    P2PDHTEntry,
-    # WebSocket
-    WebSocketProtocolHandler,
-    WebSocketConfig,
-    WebSocketMessage,
-    WebSocketEvent,
-    WebSocketSubscription,
-    # gRPC
-    gRPCProtocolHandler,
-    gRPCConfig,
-    gRPCMethod,
-    gRPCRequest,
-    gRPCResponse,
-    gRPCServiceDefinition,
-    gRPCError,
-    gRPCErrorCode,
-    LoadBalancingStrategy,
-    ConnectionPool,
-    ConnectionEndpoint,
-    ProtoMessageBuilder,
-    create_grpc_handler,
-    call_grpc_method,
-    GRPC_AVAILABLE,
-    # Factory
-    create_protocol_handler,
-    get_handler_class,
-    SUPPORTED_PROTOCOLS,
-)
-
-# Node management - imports from new location (will emit deprecation warning)
-from usmsb_sdk.platform.external.node import (
-    # Config
-    NodeConfig,
-    NetworkConfig,
-    SyncConfig,
-    SecurityConfig,
-    NodeCapabilities,
-    # Node Manager
-    NodeManager,
-    NodeState,
-    NodeConnection,
-    ConnectionStatus,
-    # Discovery
-    NodeDiscoveryService,
-    DiscoveredNode,
-    NodeHealthStatus,
-    HealthCheckResult,
-    # Broadcast
-    NodeBroadcastService,
-    BroadcastMessage,
-    BroadcastMessageType,
-    MessageAck,
-    # Sync
-    SyncService,
-    SyncMode,
-    SyncStatus,
-    SyncResult,
-    DataChunk,
-)
-
-# Storage module
-from usmsb_sdk.platform.external.storage import (
-    # Base
-    StorageInterface,
-    StorageType,
-    StorageResult,
-    StorageError,
-    DataLocation,
-    # File Storage
-    FileStorage,
-    FileLockManager,
-    # SQLite Storage
-    SQLiteStorage,
-    SessionStateManager,
-    TransactionRecordManager,
-    AgentRegistryManager,
-    # IPFS Storage
-    IPFSStorage,
-    DataShardingManager,
-    IPFSConnectionConfig,
-    # Storage Manager
-    StorageManager,
-    CacheStrategy,
-    SyncStrategy,
-    ConsistencyLevel,
-    create_storage_manager,
-)
-
 # Auth module
 from usmsb_sdk.platform.external.auth import (
-    # Enums
-    Permission,
-    StakeTier,
+    MAX_SESSION_DURATION_HOURS,
+    MINIMUM_STAKE_FOR_REGISTRATION,
+    SESSION_DURATION_HOURS,
+    STAKE_LOCK_PERIOD_DAYS,
+    AgentRegistration,
     # Base types
     AuthContext,
+    AuthCoordinator,
     BaseAuthResult,
-    WalletAuthResult,
-    StakeVerificationResult,
     FullAuthResult,
     IAuthProvider,
-    # Wallet authentication
-    WalletBinding,
-    IWalletAuthenticator,
-    MockWalletAuthenticator,
-    # Stake verification
-    StakeInfo,
-    AgentRegistration,
     IStakeVerifier,
+    IWalletAuthenticator,
     MockStakeVerifier,
-    MINIMUM_STAKE_FOR_REGISTRATION,
-    STAKE_LOCK_PERIOD_DAYS,
+    MockWalletAuthenticator,
+    # Enums
+    Permission,
     # Coordinator
     SessionInfo,
+    # Stake verification
+    StakeInfo,
+    StakeTier,
+    StakeVerificationResult,
     VerificationContext,
-    AuthCoordinator,
-    SESSION_DURATION_HOURS,
-    MAX_SESSION_DURATION_HOURS,
+    WalletAuthResult,
+    # Wallet authentication
+    WalletBinding,
 )
-
-# Launcher module
-from usmsb_sdk.platform.external.launcher import (
-    PlatformLauncher,
-    PlatformStatus,
-    NodeInfo,
-    ConfigWizard,
-    HealthChecker,
-    HealthReport,
-    StatusMonitor,
-    cli_main,
+from usmsb_sdk.platform.external.external_agent_adapter import (
+    A2AProtocolHandler as LegacyA2AProtocolHandler,
 )
 
 # External Agent Adapter (with legacy compatibility)
 from usmsb_sdk.platform.external.external_agent_adapter import (
     ExternalAgentAdapter,
+    ExternalAgentCall,
     ExternalAgentProfile,
     ExternalAgentProtocol,
-    ExternalAgentStatus,
-    ExternalAgentCall,
     ExternalAgentResponse,
-    SkillDefinition as AdapterSkillDefinition,
-    SkillMatchLevel,
+    ExternalAgentStatus,
     ProtocolHandler,
-    A2AProtocolHandler as LegacyA2AProtocolHandler,
-    HTTPProtocolHandler as LegacyHTTPProtocolHandler,
-    create_skill_from_dict,
+    SkillMatchLevel,
     create_agent_from_skill_md,
+    create_skill_from_dict,
+)
+from usmsb_sdk.platform.external.external_agent_adapter import (
+    HTTPProtocolHandler as LegacyHTTPProtocolHandler,
+)
+from usmsb_sdk.platform.external.external_agent_adapter import (
+    SkillDefinition as AdapterSkillDefinition,
+)
+
+# Launcher module
+from usmsb_sdk.platform.external.launcher import (
+    ConfigWizard,
+    HealthChecker,
+    HealthReport,
+    NodeInfo,
+    PlatformLauncher,
+    PlatformStatus,
+    StatusMonitor,
+    cli_main,
+)
+
+# Node management - imports from new location (will emit deprecation warning)
+from usmsb_sdk.platform.external.node import (
+    BroadcastMessage,
+    BroadcastMessageType,
+    ConnectionStatus,
+    DataChunk,
+    DiscoveredNode,
+    HealthCheckResult,
+    MessageAck,
+    NetworkConfig,
+    # Broadcast
+    NodeBroadcastService,
+    NodeCapabilities,
+    # Config
+    NodeConfig,
+    NodeConnection,
+    # Discovery
+    NodeDiscoveryService,
+    NodeHealthStatus,
+    # Node Manager
+    NodeManager,
+    NodeState,
+    SecurityConfig,
+    SyncConfig,
+    SyncMode,
+    SyncResult,
+    # Sync
+    SyncService,
+    SyncStatus,
+)
+from usmsb_sdk.platform.external.protocol import (
+    GRPC_AVAILABLE,
+    SUPPORTED_PROTOCOLS,
+    A2AAgentInfo,
+    A2AEnvelope,
+    # A2A
+    A2AProtocolHandler,
+    A2ASkillRequest,
+    A2ASkillResponse,
+    # Base
+    BaseProtocolHandler,
+    ConnectionEndpoint,
+    ConnectionInfo,
+    ConnectionPool,
+    HTTPAuthConfig,
+    HTTPEndpointConfig,
+    # HTTP
+    HTTPProtocolHandler,
+    HTTPRequest,
+    HTTPResponse,
+    HTTPSkillEndpoint,
+    LoadBalancingStrategy,
+    MCPMessage,
+    MCPPrompt,
+    # MCP
+    MCPProtocolHandler,
+    MCPResource,
+    MCPServerInfo,
+    MCPTool,
+    MCPToolCall,
+    MCPToolResult,
+    P2PDHTEntry,
+    P2PMessage,
+    P2PNodeInfo,
+    # P2P
+    P2PProtocolHandler,
+    P2PSkillRequest,
+    P2PSkillResponse,
+    ProtocolConfig,
+    ProtocolMessage,
+    ProtocolResponse,
+    ProtoMessageBuilder,
+    WebSocketConfig,
+    WebSocketEvent,
+    WebSocketMessage,
+    # WebSocket
+    WebSocketProtocolHandler,
+    WebSocketSubscription,
+    call_grpc_method,
+    create_grpc_handler,
+    # Factory
+    create_protocol_handler,
+    get_handler_class,
+    gRPCConfig,
+    gRPCError,
+    gRPCErrorCode,
+    gRPCMethod,
+    # gRPC
+    gRPCProtocolHandler,
+    gRPCRequest,
+    gRPCResponse,
+    gRPCServiceDefinition,
+)
+
+# Storage module
+from usmsb_sdk.platform.external.storage import (
+    AgentRegistryManager,
+    CacheStrategy,
+    ConsistencyLevel,
+    DataLocation,
+    DataShardingManager,
+    FileLockManager,
+    # File Storage
+    FileStorage,
+    IPFSConnectionConfig,
+    # IPFS Storage
+    IPFSStorage,
+    SessionStateManager,
+    # SQLite Storage
+    SQLiteStorage,
+    StorageError,
+    # Base
+    StorageInterface,
+    # Storage Manager
+    StorageManager,
+    StorageResult,
+    StorageType,
+    SyncStrategy,
+    TransactionRecordManager,
+    create_storage_manager,
 )
 
 __all__ = [

@@ -9,14 +9,15 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ComputeType(str, Enum):
+class ComputeType(StrEnum):
     """Types of compute resources."""
     CPU = "cpu"
     GPU = "gpu"
@@ -24,7 +25,7 @@ class ComputeType(str, Enum):
     DISTRIBUTED = "distributed"
 
 
-class ResourceStatus(str, Enum):
+class ResourceStatus(StrEnum):
     """Status of a compute resource."""
     AVAILABLE = "available"
     BUSY = "busy"
@@ -32,7 +33,7 @@ class ResourceStatus(str, Enum):
     MAINTENANCE = "maintenance"
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     """Status of a compute job."""
     QUEUED = "queued"
     SCHEDULED = "scheduled"
@@ -48,12 +49,12 @@ class ComputeSpec:
     cpu_cores: int = 1
     cpu_memory_gb: float = 4.0
     gpu_count: int = 0
-    gpu_type: Optional[str] = None
+    gpu_type: str | None = None
     gpu_memory_gb: float = 0.0
     storage_gb: float = 100.0
     network_bandwidth_mbps: float = 1000.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "cpu_cores": self.cpu_cores,
             "cpu_memory_gb": self.cpu_memory_gb,
@@ -73,12 +74,12 @@ class ComputeResource:
     type: ComputeType
     spec: ComputeSpec
     status: ResourceStatus = ResourceStatus.AVAILABLE
-    endpoint: Optional[str] = None
-    owner_id: Optional[str] = None
+    endpoint: str | None = None
+    owner_id: str | None = None
     price_per_hour: float = 0.0
     utilized: float = 0.0  # 0.0 to 1.0
     created_at: float = field(default_factory=lambda: time.time())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def available_spec(self) -> ComputeSpec:
         """Get available (non-utilized) specs."""
@@ -111,20 +112,20 @@ class ComputeJob:
     name: str
     owner_id: str
     required_spec: ComputeSpec
-    command: Optional[str] = None
-    docker_image: Optional[str] = None
-    environment: Dict[str, str] = field(default_factory=dict)
-    input_data: Optional[str] = None
-    output_path: Optional[str] = None
+    command: str | None = None
+    docker_image: str | None = None
+    environment: dict[str, str] = field(default_factory=dict)
+    input_data: str | None = None
+    output_path: str | None = None
     status: JobStatus = JobStatus.QUEUED
-    resource_id: Optional[str] = None
+    resource_id: str | None = None
     priority: int = 0
     created_at: float = field(default_factory=lambda: time.time())
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: Any | None = None
+    error: str | None = None
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -135,7 +136,7 @@ class Allocation:
     job_id: str
     allocated_spec: ComputeSpec
     started_at: float
-    duration_seconds: Optional[float] = None
+    duration_seconds: float | None = None
     cost: float = 0.0
     status: str = "active"
 
@@ -149,7 +150,7 @@ class IComputeResourceAdapter(ABC):
     """
 
     @abstractmethod
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize compute resource connection."""
         pass
 
@@ -159,7 +160,7 @@ class IComputeResourceAdapter(ABC):
         pass
 
     @abstractmethod
-    async def discover_resources(self) -> List[ComputeResource]:
+    async def discover_resources(self) -> list[ComputeResource]:
         """Discover available compute resources."""
         pass
 
@@ -169,7 +170,7 @@ class IComputeResourceAdapter(ABC):
         name: str,
         spec: ComputeSpec,
         endpoint: str,
-        owner_id: Optional[str] = None,
+        owner_id: str | None = None,
         price_per_hour: float = 0.0,
     ) -> ComputeResource:
         """Register a new compute resource."""
@@ -181,7 +182,7 @@ class IComputeResourceAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_resource(self, resource_id: str) -> Optional[ComputeResource]:
+    async def get_resource(self, resource_id: str) -> ComputeResource | None:
         """Get resource by ID."""
         pass
 
@@ -204,13 +205,13 @@ class IComputeResourceAdapter(ABC):
     async def submit_job(
         self,
         job: ComputeJob,
-        resource_id: Optional[str] = None,
+        resource_id: str | None = None,
     ) -> ComputeJob:
         """Submit a compute job."""
         pass
 
     @abstractmethod
-    async def get_job(self, job_id: str) -> Optional[ComputeJob]:
+    async def get_job(self, job_id: str) -> ComputeJob | None:
         """Get job by ID."""
         pass
 
@@ -220,12 +221,12 @@ class IComputeResourceAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_job_logs(self, job_id: str) -> List[str]:
+    async def get_job_logs(self, job_id: str) -> list[str]:
         """Get job logs."""
         pass
 
     @abstractmethod
-    async def get_job_metrics(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_metrics(self, job_id: str) -> dict[str, Any]:
         """Get job performance metrics."""
         pass
 
@@ -233,7 +234,7 @@ class IComputeResourceAdapter(ABC):
     async def monitor_resource(
         self,
         resource_id: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """Set up resource monitoring."""
         pass
@@ -254,16 +255,15 @@ class LocalComputeAdapter(IComputeResourceAdapter):
 
     def __init__(self):
         """Initialize local compute adapter."""
-        self._resources: Dict[str, ComputeResource] = {}
-        self._jobs: Dict[str, ComputeJob] = {}
-        self._allocations: Dict[str, Allocation] = {}
-        self._monitors: Dict[str, Any] = {}
-        self._local_resource_id: Optional[str] = None
+        self._resources: dict[str, ComputeResource] = {}
+        self._jobs: dict[str, ComputeJob] = {}
+        self._allocations: dict[str, Allocation] = {}
+        self._monitors: dict[str, Any] = {}
+        self._local_resource_id: str | None = None
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize local compute adapter."""
         import multiprocessing
-        import shutil
 
         # Detect local resources
         cpu_cores = multiprocessing.cpu_count()
@@ -316,7 +316,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
         self._jobs.clear()
         self._allocations.clear()
 
-    async def discover_resources(self) -> List[ComputeResource]:
+    async def discover_resources(self) -> list[ComputeResource]:
         """Return local resources."""
         return list(self._resources.values())
 
@@ -325,7 +325,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
         name: str,
         spec: ComputeSpec,
         endpoint: str,
-        owner_id: Optional[str] = None,
+        owner_id: str | None = None,
         price_per_hour: float = 0.0,
     ) -> ComputeResource:
         """Register a resource (limited support for local)."""
@@ -355,7 +355,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
             return True
         return False
 
-    async def get_resource(self, resource_id: str) -> Optional[ComputeResource]:
+    async def get_resource(self, resource_id: str) -> ComputeResource | None:
         """Get resource by ID."""
         return self._resources.get(resource_id)
 
@@ -409,7 +409,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
     async def submit_job(
         self,
         job: ComputeJob,
-        resource_id: Optional[str] = None,
+        resource_id: str | None = None,
     ) -> ComputeJob:
         """Submit a compute job."""
         resource_id = resource_id or self._local_resource_id
@@ -462,7 +462,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
         finally:
             await self.release(allocation.id)
 
-    async def get_job(self, job_id: str) -> Optional[ComputeJob]:
+    async def get_job(self, job_id: str) -> ComputeJob | None:
         """Get job by ID."""
         return self._jobs.get(job_id)
 
@@ -476,7 +476,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
         job.completed_at = time.time()
         return True
 
-    async def get_job_logs(self, job_id: str) -> List[str]:
+    async def get_job_logs(self, job_id: str) -> list[str]:
         """Get job logs."""
         job = self._jobs.get(job_id)
         if not job:
@@ -489,7 +489,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
             f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Job completed",
         ]
 
-    async def get_job_metrics(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_metrics(self, job_id: str) -> dict[str, Any]:
         """Get job metrics."""
         job = self._jobs.get(job_id)
         if not job:
@@ -506,7 +506,7 @@ class LocalComputeAdapter(IComputeResourceAdapter):
     async def monitor_resource(
         self,
         resource_id: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """Set up resource monitoring."""
         import uuid
@@ -559,18 +559,19 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
 
     def __init__(self):
         """Initialize Kubernetes adapter."""
-        self._resources: Dict[str, ComputeResource] = {}
-        self._jobs: Dict[str, ComputeJob] = {}
-        self._allocations: Dict[str, Allocation] = {}
+        self._resources: dict[str, ComputeResource] = {}
+        self._jobs: dict[str, ComputeJob] = {}
+        self._allocations: dict[str, Allocation] = {}
         self._namespace = "usmsb"
         self._connected = False
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize Kubernetes connection."""
         try:
             # Try to import kubernetes client
             try:
-                from kubernetes import client, config as k8s_config
+                from kubernetes import client
+                from kubernetes import config as k8s_config
                 self._k8s_client = client
                 self._k8s_config = k8s_config
 
@@ -599,7 +600,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
         self._jobs.clear()
         self._connected = False
 
-    async def discover_resources(self) -> List[ComputeResource]:
+    async def discover_resources(self) -> list[ComputeResource]:
         """Discover Kubernetes nodes."""
         resources = []
 
@@ -646,7 +647,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
         name: str,
         spec: ComputeSpec,
         endpoint: str,
-        owner_id: Optional[str] = None,
+        owner_id: str | None = None,
         price_per_hour: float = 0.0,
     ) -> ComputeResource:
         """Register resource (not typically used with Kubernetes)."""
@@ -673,7 +674,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
             return True
         return False
 
-    async def get_resource(self, resource_id: str) -> Optional[ComputeResource]:
+    async def get_resource(self, resource_id: str) -> ComputeResource | None:
         """Get resource by ID."""
         return self._resources.get(resource_id)
 
@@ -705,7 +706,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
     async def submit_job(
         self,
         job: ComputeJob,
-        resource_id: Optional[str] = None,
+        resource_id: str | None = None,
     ) -> ComputeJob:
         """Submit job as Kubernetes Job."""
         job.status = JobStatus.SCHEDULED
@@ -762,7 +763,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
 
         return job
 
-    async def get_job(self, job_id: str) -> Optional[ComputeJob]:
+    async def get_job(self, job_id: str) -> ComputeJob | None:
         """Get job by ID."""
         return self._jobs.get(job_id)
 
@@ -786,7 +787,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
         job.completed_at = time.time()
         return True
 
-    async def get_job_logs(self, job_id: str) -> List[str]:
+    async def get_job_logs(self, job_id: str) -> list[str]:
         """Get Kubernetes job logs."""
         logs = []
 
@@ -810,7 +811,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
 
         return logs
 
-    async def get_job_metrics(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_metrics(self, job_id: str) -> dict[str, Any]:
         """Get job metrics."""
         job = self._jobs.get(job_id)
         if not job:
@@ -825,7 +826,7 @@ class KubernetesComputeAdapter(IComputeResourceAdapter):
     async def monitor_resource(
         self,
         resource_id: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """Monitor Kubernetes resource."""
         import uuid

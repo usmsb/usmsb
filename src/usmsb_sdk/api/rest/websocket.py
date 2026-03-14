@@ -8,19 +8,17 @@ Provides real-time communication:
 - Chat messages
 """
 import asyncio
-import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
-from enum import Enum
+from enum import StrEnum
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     """WebSocket message types."""
     # System
     PING = "ping"
@@ -57,9 +55,9 @@ class MessageType(str, Enum):
 class ConnectedClient:
     """A connected WebSocket client."""
     websocket: WebSocket
-    agent_id: Optional[str] = None
-    session_id: Optional[str] = None
-    subscribed_topics: Set[str] = field(default_factory=set)
+    agent_id: str | None = None
+    session_id: str | None = None
+    subscribed_topics: set[str] = field(default_factory=set)
     connected_at: float = field(default_factory=time.time)
     last_ping: float = field(default_factory=time.time)
 
@@ -76,17 +74,17 @@ class WebSocketManager:
     def __init__(self):
         """Initialize the WebSocket manager."""
         # Active connections
-        self._connections: Dict[WebSocket, ConnectedClient] = {}
+        self._connections: dict[WebSocket, ConnectedClient] = {}
 
         # Agent to connections mapping (one agent can have multiple connections)
-        self._agent_connections: Dict[str, List[WebSocket]] = {}
+        self._agent_connections: dict[str, list[WebSocket]] = {}
 
         # Topic subscribers
-        self._topic_subscribers: Dict[str, Set[WebSocket]] = {}
+        self._topic_subscribers: dict[str, set[WebSocket]] = {}
 
         # Background tasks
         self._running = False
-        self._ping_task: Optional[asyncio.Task] = None
+        self._ping_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Start background tasks."""
@@ -396,7 +394,7 @@ class WebSocketManager:
 
 
 # Global WebSocket manager instance
-_ws_manager: Optional[WebSocketManager] = None
+_ws_manager: WebSocketManager | None = None
 
 
 async def get_ws_manager() -> WebSocketManager:

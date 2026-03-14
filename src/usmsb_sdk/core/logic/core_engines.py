@@ -14,23 +14,23 @@ Each engine coordinates USMSB elements and universal actions to form
 complete system behaviors.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Callable
-from enum import Enum
 import asyncio
-import json
 import logging
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 # ============== Engine Base Classes ==============
 
-class EngineStatus(str, Enum):
+class EngineStatus(StrEnum):
     """Status of a logic engine."""
     IDLE = "idle"
     RUNNING = "running"
@@ -47,27 +47,27 @@ class EngineState:
     status: EngineStatus = EngineStatus.IDLE
     iteration: int = 0
     last_update: float = field(default_factory=time.time)
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 class ILogicEngine(ABC):
     """Abstract base class for all logic engines."""
 
-    def __init__(self, engine_id: Optional[str] = None):
+    def __init__(self, engine_id: str | None = None):
         self.engine_id = engine_id or str(uuid.uuid4())[:8]
         self.state = EngineState(
             engine_id=self.engine_id,
             engine_type=self.__class__.__name__
         )
-        self._callbacks: List[Callable] = []
+        self._callbacks: list[Callable] = []
 
     @abstractmethod
-    async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run the engine logic."""
         pass
 
     @abstractmethod
-    async def step(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def step(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute one step of the engine."""
         pass
 
@@ -75,7 +75,7 @@ class ILogicEngine(ABC):
         """Register a callback for engine events."""
         self._callbacks.append(callback)
 
-    async def _notify_callbacks(self, event: str, data: Dict[str, Any]) -> None:
+    async def _notify_callbacks(self, event: str, data: dict[str, Any]) -> None:
         """Notify all registered callbacks."""
         for callback in self._callbacks:
             try:
@@ -100,21 +100,21 @@ class ResourceState:
     resource_type: str
     quantity: float
     quality: float = 1.0
-    location: Optional[str] = None
-    owner: Optional[str] = None
-    transformation_history: List[Dict[str, Any]] = field(default_factory=list)
+    location: str | None = None
+    owner: str | None = None
+    transformation_history: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
 class ValueCreation:
     """Record of value creation."""
     value_id: str
-    source_resources: List[str]
+    source_resources: list[str]
     transformation_type: str
     value_amount: float
     value_type: str  # economic, social, environmental, etc.
     created_at: float = field(default_factory=time.time)
-    beneficiaries: List[str] = field(default_factory=list)
+    beneficiaries: list[str] = field(default_factory=list)
 
 
 class ResourceTransformationValueEngine(ILogicEngine):
@@ -130,11 +130,11 @@ class ResourceTransformationValueEngine(ILogicEngine):
         super().__init__()
         self.transformation_service = transformation_service
         self.evaluation_service = evaluation_service
-        self._resources: Dict[str, ResourceState] = {}
-        self._values: Dict[str, ValueCreation] = {}
-        self._resource_history: List[Dict[str, Any]] = []
+        self._resources: dict[str, ResourceState] = {}
+        self._values: dict[str, ValueCreation] = {}
+        self._resource_history: list[dict[str, Any]] = []
 
-    async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run the complete transformation chain."""
         self.state.status = EngineStatus.RUNNING
 
@@ -164,12 +164,12 @@ class ResourceTransformationValueEngine(ILogicEngine):
         await self._notify_callbacks("chain_completed", results)
         return results
 
-    async def step(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def step(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute one transformation step."""
         step = context.get("step", {})
         input_resources = step.get("inputs", [])
         transformation_type = step.get("type", "generic")
-        agent = context.get("agent")
+        context.get("agent")
 
         result = {
             "step_id": str(uuid.uuid4())[:8],
@@ -214,7 +214,9 @@ class ResourceTransformationValueEngine(ILogicEngine):
 
             # Calculate efficiency
             if result["value_created"]:
-                result["efficiency"] = result["value_created"]["amount"] / max(len(input_resources), 1)
+                result["efficiency"] = (
+                    result["value_created"]["amount"] / max(len(input_resources), 1)
+                )
 
             # Record history
             self._resource_history.append({
@@ -235,15 +237,15 @@ class ResourceTransformationValueEngine(ILogicEngine):
         """Register a resource for tracking."""
         self._resources[resource.resource_id] = resource
 
-    def get_resource_state(self, resource_id: str) -> Optional[ResourceState]:
+    def get_resource_state(self, resource_id: str) -> ResourceState | None:
         """Get current state of a resource."""
         return self._resources.get(resource_id)
 
-    def get_value_history(self) -> List[ValueCreation]:
+    def get_value_history(self) -> list[ValueCreation]:
         """Get history of value creations."""
         return list(self._values.values())
 
-    def get_resource_flow(self) -> List[Dict[str, Any]]:
+    def get_resource_flow(self) -> list[dict[str, Any]]:
         """Get the flow of resources through transformations."""
         return self._resource_history.copy()
 
@@ -265,10 +267,10 @@ class InformationPacket:
 class DecisionRecord:
     """Record of a decision made."""
     decision_id: str
-    input_information: List[str]
-    decision_content: Dict[str, Any]
+    input_information: list[str]
+    decision_content: dict[str, Any]
     confidence: float = 0.0
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
     created_at: float = field(default_factory=time.time)
 
 
@@ -278,7 +280,7 @@ class ControlInstruction:
     instruction_id: str
     target: str
     action: str
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     priority: int = 0
     created_at: float = field(default_factory=time.time)
 
@@ -298,11 +300,11 @@ class InformationDecisionControlEngine(ILogicEngine):
         self.decision_service = decision_service
         self.execution_service = execution_service
         self._information_buffer: asyncio.Queue = asyncio.Queue()
-        self._decisions: Dict[str, DecisionRecord] = {}
-        self._control_instructions: Dict[str, ControlInstruction] = {}
-        self._loop_history: List[Dict[str, Any]] = []
+        self._decisions: dict[str, DecisionRecord] = {}
+        self._control_instructions: dict[str, ControlInstruction] = {}
+        self._loop_history: list[dict[str, Any]] = []
 
-    async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run the complete information-decision-control loop."""
         self.state.status = EngineStatus.RUNNING
 
@@ -354,7 +356,7 @@ class InformationDecisionControlEngine(ILogicEngine):
         await self._notify_callbacks("loop_completed", results)
         return results
 
-    async def step(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def step(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute one step of the loop."""
         step_type = context.get("step_type", "perceive")
 
@@ -381,8 +383,8 @@ class InformationDecisionControlEngine(ILogicEngine):
     async def process_information(
         self,
         raw_input: Any,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Process raw input into structured information."""
         result = {
             "input": raw_input,
@@ -414,9 +416,9 @@ class InformationDecisionControlEngine(ILogicEngine):
         self,
         information: Any,
         agent: Any,
-        goals: List[Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        goals: list[Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Make a decision based on information and goals."""
         result = {
             "decision": None,
@@ -453,9 +455,9 @@ class InformationDecisionControlEngine(ILogicEngine):
 
     async def generate_control(
         self,
-        decision: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        decision: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Generate control instruction from decision."""
         result = {
             "instruction": None,
@@ -490,10 +492,10 @@ class InformationDecisionControlEngine(ILogicEngine):
 
     async def execute_control(
         self,
-        instruction: Dict[str, Any],
+        instruction: dict[str, Any],
         agent: Any,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute a control instruction."""
         result = {
             "instruction_id": instruction.get("id"),
@@ -523,13 +525,13 @@ class InformationDecisionControlEngine(ILogicEngine):
 
         return result
 
-    def get_decision_history(self) -> List[DecisionRecord]:
+    def get_decision_history(self) -> list[DecisionRecord]:
         """Get history of decisions."""
         return list(self._decisions.values())
 
-    def get_pending_instructions(self) -> List[ControlInstruction]:
+    def get_pending_instructions(self) -> list[ControlInstruction]:
         """Get pending control instructions."""
-        return [i for i in self._control_instructions.values()]
+        return list(self._control_instructions.values())
 
 
 # ============== 4. System-Environment Interaction ==============
@@ -540,9 +542,9 @@ class EnvironmentState:
     environment_id: str
     name: str
     type: str
-    state: Dict[str, Any] = field(default_factory=dict)
-    variables: Dict[str, float] = field(default_factory=dict)
-    constraints: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
+    variables: dict[str, float] = field(default_factory=dict)
+    constraints: dict[str, Any] = field(default_factory=dict)
     last_updated: float = field(default_factory=time.time)
 
 
@@ -552,9 +554,9 @@ class EnvironmentEvent:
     event_id: str
     event_type: str
     source: str
-    impact: Dict[str, Any]
+    impact: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
-    duration: Optional[float] = None
+    duration: float | None = None
 
 
 class SystemEnvironmentEngine(ILogicEngine):
@@ -570,12 +572,12 @@ class SystemEnvironmentEngine(ILogicEngine):
         super().__init__()
         self.perception_service = perception_service
         self.execution_service = execution_service
-        self._environments: Dict[str, EnvironmentState] = {}
+        self._environments: dict[str, EnvironmentState] = {}
         self._event_queue: asyncio.Queue = asyncio.Queue()
-        self._interaction_history: List[Dict[str, Any]] = []
-        self._environment_rules: Dict[str, List[Callable]] = defaultdict(list)
+        self._interaction_history: list[dict[str, Any]] = []
+        self._environment_rules: dict[str, list[Callable]] = defaultdict(list)
 
-    async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run system-environment interaction cycle."""
         self.state.status = EngineStatus.RUNNING
 
@@ -612,7 +614,7 @@ class SystemEnvironmentEngine(ILogicEngine):
         await self._notify_callbacks("interaction_completed", results)
         return results
 
-    async def step(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def step(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute one interaction step."""
         step_type = context.get("step_type", "update")
 
@@ -638,16 +640,16 @@ class SystemEnvironmentEngine(ILogicEngine):
         """Register an environment."""
         self._environments[environment.environment_id] = environment
 
-    def get_environment(self, environment_id: str) -> Optional[EnvironmentState]:
+    def get_environment(self, environment_id: str) -> EnvironmentState | None:
         """Get environment state."""
         return self._environments.get(environment_id)
 
     async def apply_action(
         self,
         environment_id: str,
-        action: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        action: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Apply an action to the environment."""
         result = {
             "action": action,
@@ -695,7 +697,7 @@ class SystemEnvironmentEngine(ILogicEngine):
     async def update_environment(
         self,
         environment_id: str,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> None:
         """Update environment state based on rules and time."""
         environment = self._environments.get(environment_id)
@@ -718,8 +720,8 @@ class SystemEnvironmentEngine(ILogicEngine):
         self,
         environment_id: str,
         agent: Any,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Generate perception for an agent from the environment."""
         environment = self._environments.get(environment_id)
         if not environment:
@@ -752,8 +754,8 @@ class SystemEnvironmentEngine(ILogicEngine):
     async def generate_feedback(
         self,
         environment_id: str,
-        context: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Generate feedback from environment to agents."""
         environment = self._environments.get(environment_id)
         if not environment:
@@ -797,7 +799,7 @@ class SystemEnvironmentEngine(ILogicEngine):
         self,
         environment_id: str,
         event_type: str,
-        impact: Dict[str, Any]
+        impact: dict[str, Any]
     ) -> EnvironmentEvent:
         """Emit an environment event."""
         event = EnvironmentEvent(
@@ -823,21 +825,21 @@ class EmergentPattern:
     pattern_id: str
     pattern_type: str
     description: str
-    participants: List[str]
+    participants: list[str]
     strength: float  # 0.0 to 1.0
     first_observed: float
     last_observed: float
     occurrences: int = 1
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class SelfOrganizationState:
     """State of self-organization in the system."""
     organization_id: str
-    participants: List[str]
+    participants: list[str]
     organization_type: str
-    structure: Dict[str, Any]
+    structure: dict[str, Any]
     stability: float
     created_at: float = field(default_factory=time.time)
 
@@ -852,12 +854,12 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
 
     def __init__(self):
         super().__init__()
-        self._interaction_data: List[Dict[str, Any]] = []
-        self._emergent_patterns: Dict[str, EmergentPattern] = {}
-        self._organizations: Dict[str, SelfOrganizationState] = {}
-        self._pattern_detectors: List[Callable] = []
+        self._interaction_data: list[dict[str, Any]] = []
+        self._emergent_patterns: dict[str, EmergentPattern] = {}
+        self._organizations: dict[str, SelfOrganizationState] = {}
+        self._pattern_detectors: list[Callable] = []
 
-    async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run emergence detection and self-organization analysis."""
         self.state.status = EngineStatus.RUNNING
 
@@ -892,7 +894,7 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
         await self._notify_callbacks("emergence_analysis_completed", results)
         return results
 
-    async def step(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def step(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute one analysis step."""
         step_type = context.get("step_type", "detect_patterns")
 
@@ -913,10 +915,10 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
 
     async def detect_patterns(
         self,
-        agents: List[Any],
-        interactions: List[Dict[str, Any]],
-        context: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        agents: list[Any],
+        interactions: list[dict[str, Any]],
+        context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Detect emergent patterns from interactions."""
         detected = []
 
@@ -992,10 +994,10 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
 
     async def analyze_organization(
         self,
-        agents: List[Any],
-        interactions: List[Dict[str, Any]],
-        context: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        agents: list[Any],
+        interactions: list[dict[str, Any]],
+        context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Analyze self-organization in the system."""
         organizations = []
 
@@ -1049,9 +1051,9 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
 
     async def calculate_network_metrics(
         self,
-        agents: List[Any],
-        interactions: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        agents: list[Any],
+        interactions: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Calculate network-level metrics."""
         metrics = {
             "total_agents": len(agents),
@@ -1075,11 +1077,11 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
 
         # Calculate network density
         possible_edges = len(agents) * (len(agents) - 1)
-        actual_edges = len(set(
+        actual_edges = len({
             tuple(sorted([i.get("sender"), i.get("receiver")]))
             for i in interactions
             if i.get("sender") and i.get("receiver")
-        ))
+        })
         if possible_edges > 0:
             metrics["network_density"] = actual_edges / possible_edges
 
@@ -1089,11 +1091,11 @@ class EmergenceSelfOrganizationEngine(ILogicEngine):
         """Add a custom pattern detector."""
         self._pattern_detectors.append(detector)
 
-    def get_patterns(self) -> List[EmergentPattern]:
+    def get_patterns(self) -> list[EmergentPattern]:
         """Get all detected patterns."""
         return list(self._emergent_patterns.values())
 
-    def get_organizations(self) -> List[SelfOrganizationState]:
+    def get_organizations(self) -> list[SelfOrganizationState]:
         """Get all identified organizations."""
         return list(self._organizations.values())
 
@@ -1106,10 +1108,10 @@ class AdaptationRecord:
     adaptation_id: str
     agent_id: str
     adaptation_type: str  # capability, rule, goal_priority, behavior
-    before_state: Dict[str, Any]
-    after_state: Dict[str, Any]
+    before_state: dict[str, Any]
+    after_state: dict[str, Any]
     trigger: str
-    effectiveness: Optional[float] = None
+    effectiveness: float | None = None
     created_at: float = field(default_factory=time.time)
 
 
@@ -1119,8 +1121,8 @@ class EvolutionMetric:
     metric_name: str
     initial_value: float
     current_value: float
-    target_value: Optional[float] = None
-    history: List[Dict[str, Any]] = field(default_factory=list)
+    target_value: float | None = None
+    history: list[dict[str, Any]] = field(default_factory=list)
 
 
 class AdaptationEvolutionEngine(ILogicEngine):
@@ -1136,12 +1138,12 @@ class AdaptationEvolutionEngine(ILogicEngine):
         super().__init__()
         self.learning_service = learning_service
         self.feedback_service = feedback_service
-        self._adaptations: Dict[str, AdaptationRecord] = {}
-        self._evolution_metrics: Dict[str, EvolutionMetric] = {}
-        self._adaptation_rules: List[Callable] = []
-        self._agent_performance: Dict[str, List[float]] = defaultdict(list)
+        self._adaptations: dict[str, AdaptationRecord] = {}
+        self._evolution_metrics: dict[str, EvolutionMetric] = {}
+        self._adaptation_rules: list[Callable] = []
+        self._agent_performance: dict[str, list[float]] = defaultdict(list)
 
-    async def run(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, context: dict[str, Any]) -> dict[str, Any]:
         """Run adaptation and evolution cycle."""
         self.state.status = EngineStatus.RUNNING
 
@@ -1187,7 +1189,7 @@ class AdaptationEvolutionEngine(ILogicEngine):
         await self._notify_callbacks("evolution_cycle_completed", results)
         return results
 
-    async def step(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def step(self, context: dict[str, Any]) -> dict[str, Any]:
         """Execute one adaptation step."""
         step_type = context.get("step_type", "adapt")
 
@@ -1207,8 +1209,8 @@ class AdaptationEvolutionEngine(ILogicEngine):
     async def analyze_and_adapt(
         self,
         agent: Any,
-        context: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        context: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """Analyze agent performance and trigger adaptations."""
         if not agent:
             return None
@@ -1259,8 +1261,8 @@ class AdaptationEvolutionEngine(ILogicEngine):
         agent: Any,
         adaptation_type: str,
         trigger: str,
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Trigger an adaptation for an agent."""
         agent_id = getattr(agent, 'id', str(agent)) if agent else "unknown"
 
@@ -1308,9 +1310,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
     async def _adapt_behavior(
         self,
         agent: Any,
-        current_state: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        current_state: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Adapt agent behavior patterns."""
         # Use learning service to suggest behavior changes
         if self.learning_service:
@@ -1326,9 +1328,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
     async def _adapt_capability(
         self,
         agent: Any,
-        current_state: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        current_state: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Adapt agent capabilities."""
         new_capabilities = list(current_state.get("capabilities", []))
 
@@ -1343,9 +1345,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
     async def _adapt_rules(
         self,
         agent: Any,
-        current_state: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        current_state: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Adapt agent rules."""
         # Simplified rule adaptation
         return current_state
@@ -1353,9 +1355,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
     async def _adapt_goal_priority(
         self,
         agent: Any,
-        current_state: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        current_state: dict[str, Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Adapt agent goal priorities."""
         goals = list(getattr(agent, 'goals', []))
         if len(goals) > 1:
@@ -1366,9 +1368,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
     async def apply_learning(
         self,
         agent: Any,
-        feedback_history: List[Any],
-        context: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+        feedback_history: list[Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """Apply learning from feedback."""
         if not self.learning_service or not agent:
             return None
@@ -1401,9 +1403,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
 
     async def update_evolution_metrics(
         self,
-        agents: List[Any],
-        context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        agents: list[Any],
+        context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update and return evolution metrics."""
         metrics = {}
 
@@ -1429,9 +1431,9 @@ class AdaptationEvolutionEngine(ILogicEngine):
 
     async def generate_recommendations(
         self,
-        agents: List[Any],
-        context: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        agents: list[Any],
+        context: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Generate evolution recommendations."""
         recommendations = []
 
@@ -1467,7 +1469,7 @@ class AdaptationEvolutionEngine(ILogicEngine):
         """Add a custom adaptation rule."""
         self._adaptation_rules.append(rule)
 
-    def get_adaptation_history(self, agent_id: Optional[str] = None) -> List[AdaptationRecord]:
+    def get_adaptation_history(self, agent_id: str | None = None) -> list[AdaptationRecord]:
         """Get adaptation history."""
         if agent_id:
             return [a for a in self._adaptations.values() if a.agent_id == agent_id]
@@ -1479,7 +1481,7 @@ class AdaptationEvolutionEngine(ILogicEngine):
 class LogicEngineRegistry:
     """Registry for all logic engines."""
 
-    _engines: Dict[str, ILogicEngine] = {}
+    _engines: dict[str, ILogicEngine] = {}
 
     @classmethod
     def register(cls, name: str, engine: ILogicEngine) -> None:
@@ -1487,12 +1489,12 @@ class LogicEngineRegistry:
         cls._engines[name] = engine
 
     @classmethod
-    def get(cls, name: str) -> Optional[ILogicEngine]:
+    def get(cls, name: str) -> ILogicEngine | None:
         """Get an engine by name."""
         return cls._engines.get(name)
 
     @classmethod
-    def list_engines(cls) -> List[str]:
+    def list_engines(cls) -> list[str]:
         """List all registered engines."""
         return list(cls._engines.keys())
 
@@ -1506,7 +1508,7 @@ class LogicEngineRegistry:
         evaluation_service=None,
         learning_service=None,
         feedback_service=None,
-    ) -> Dict[str, ILogicEngine]:
+    ) -> dict[str, ILogicEngine]:
         """Create and register all engines."""
         engines = {
             "resource_value": ResourceTransformationValueEngine(

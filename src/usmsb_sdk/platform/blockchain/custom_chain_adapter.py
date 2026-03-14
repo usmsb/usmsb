@@ -14,16 +14,17 @@ import hashlib
 import json
 import logging
 import time
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Callable
-from enum import Enum
-import uuid
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class CustomChainNetwork(str, Enum):
+class CustomChainNetwork(StrEnum):
     """Custom chain network types."""
     MAINNET = "usmsb_mainnet"
     TESTNET = "usmsb_testnet"
@@ -37,12 +38,12 @@ class Block:
     hash: str
     parent_hash: str
     timestamp: float
-    transactions: List[Dict[str, Any]]
+    transactions: list[dict[str, Any]]
     state_root: str
     validator: str
-    signature: Optional[str] = None
+    signature: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "number": self.number,
             "hash": self.hash,
@@ -63,7 +64,7 @@ class AgentIdentity:
     reputation: Decimal = Decimal("0")
     stake: Decimal = Decimal("0")
     created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class CustomChainAdapter:
@@ -82,18 +83,18 @@ class CustomChainAdapter:
 
     def __init__(self, network: CustomChainNetwork = CustomChainNetwork.LOCAL):
         self.network = network
-        self._chain: List[Block] = []
-        self._state: Dict[str, Any] = {}  # World state
-        self._identities: Dict[str, AgentIdentity] = {}
-        self._wallets: Dict[str, Dict[str, Any]] = {}
-        self._validators: Dict[str, Decimal] = {}  # address -> stake
-        self._pending_txs: List[Dict[str, Any]] = []
-        self._subscriptions: Dict[str, Callable] = {}
+        self._chain: list[Block] = []
+        self._state: dict[str, Any] = {}  # World state
+        self._identities: dict[str, AgentIdentity] = {}
+        self._wallets: dict[str, dict[str, Any]] = {}
+        self._validators: dict[str, Decimal] = {}  # address -> stake
+        self._pending_txs: list[dict[str, Any]] = []
+        self._subscriptions: dict[str, Callable] = {}
         self._running = False
-        self._block_task: Optional[asyncio.Task] = None
+        self._block_task: asyncio.Task | None = None
         self._node_id = str(uuid.uuid4())[:8]
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize the custom chain."""
         try:
             # Create genesis block
@@ -135,7 +136,7 @@ class CustomChainAdapter:
         """Always connected for local chain."""
         return True
 
-    async def create_wallet(self, password: Optional[str] = None) -> Dict[str, Any]:
+    async def create_wallet(self, password: str | None = None) -> dict[str, Any]:
         """Create a new wallet."""
         address = "usmsb_" + hashlib.sha256(f"{time.time()}{uuid.uuid4()}".encode()).hexdigest()[:32]
         private_key = hashlib.sha256(f"{address}{password or ''}".encode()).hexdigest()
@@ -157,7 +158,7 @@ class CustomChainAdapter:
         self,
         agent_id: str,
         public_key: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AgentIdentity:
         """Register an agent identity on the chain."""
         # Create address from agent_id
@@ -186,7 +187,7 @@ class CustomChainAdapter:
         logger.info(f"Registered agent identity: {agent_id} -> {address}")
         return identity
 
-    async def get_agent_identity(self, agent_id: str) -> Optional[AgentIdentity]:
+    async def get_agent_identity(self, agent_id: str) -> AgentIdentity | None:
         """Get agent identity."""
         return self._identities.get(agent_id)
 
@@ -195,9 +196,9 @@ class CustomChainAdapter:
         from_address: str,
         to_address: str,
         value: Decimal,
-        private_key: Optional[str] = None,
-        data: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        private_key: str | None = None,
+        data: str | None = None,
+    ) -> dict[str, Any]:
         """Transfer tokens."""
         # Check balance
         from_balance = self._state["balances"].get(from_address, Decimal("0"))
@@ -234,7 +235,7 @@ class CustomChainAdapter:
         """Get balance."""
         return self._state["balances"].get(address, Decimal("0"))
 
-    async def stake(self, address: str, amount: Decimal) -> Dict[str, Any]:
+    async def stake(self, address: str, amount: Decimal) -> dict[str, Any]:
         """Stake tokens for validation."""
         balance = self._state["balances"].get(address, Decimal("0"))
         if balance < amount:
@@ -254,7 +255,7 @@ class CustomChainAdapter:
 
         return {"status": "confirmed", "stake": str(self._state["stakes"][address])}
 
-    async def unstake(self, address: str, amount: Decimal) -> Dict[str, Any]:
+    async def unstake(self, address: str, amount: Decimal) -> dict[str, Any]:
         """Unstake tokens."""
         staked = self._state["stakes"].get(address, Decimal("0"))
         if staked < amount:
@@ -271,7 +272,7 @@ class CustomChainAdapter:
         title: str,
         description: str,
         proposal_type: str = "general",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a governance proposal."""
         proposal_id = hashlib.sha256(f"{title}{time.time()}".encode()).hexdigest()[:16]
 
@@ -306,8 +307,8 @@ class CustomChainAdapter:
         voter: str,
         proposal_id: str,
         support: bool,
-        weight: Optional[Decimal] = None,
-    ) -> Dict[str, Any]:
+        weight: Decimal | None = None,
+    ) -> dict[str, Any]:
         """Vote on a proposal."""
         proposal = self._state["governance"]["proposals"].get(proposal_id)
         if not proposal:
@@ -348,7 +349,7 @@ class CustomChainAdapter:
 
         return {"status": "confirmed", "vote_weight": str(vote_weight)}
 
-    async def get_proposal(self, proposal_id: str) -> Optional[Dict[str, Any]]:
+    async def get_proposal(self, proposal_id: str) -> dict[str, Any] | None:
         """Get proposal by ID."""
         return self._state["governance"]["proposals"].get(proposal_id)
 
@@ -356,7 +357,7 @@ class CustomChainAdapter:
         """Get current block number."""
         return len(self._chain) - 1
 
-    async def get_block(self, block_number: int) -> Optional[Block]:
+    async def get_block(self, block_number: int) -> Block | None:
         """Get block by number."""
         if 0 <= block_number < len(self._chain):
             return self._chain[block_number]
@@ -365,7 +366,7 @@ class CustomChainAdapter:
     async def subscribe_to_events(
         self,
         event_type: str,
-        callback: Callable[[Dict[str, Any]], None],
+        callback: Callable[[dict[str, Any]], None],
     ) -> str:
         """Subscribe to chain events."""
         subscription_id = str(uuid.uuid4())
@@ -448,7 +449,7 @@ class CustomChainAdapter:
         logger.debug(f"Produced block {block_number} with {len(txs)} transactions")
         return block
 
-    async def get_chain_info(self) -> Dict[str, Any]:
+    async def get_chain_info(self) -> dict[str, Any]:
         """Get chain information."""
         return {
             "network": self.network.value,
@@ -469,11 +470,11 @@ class CrossChainBridge:
     def __init__(
         self,
         usmsb_chain: CustomChainAdapter,
-        ethereum_adapter: Optional[Any] = None,
+        ethereum_adapter: Any | None = None,
     ):
         self.usmsb_chain = usmsb_chain
         self.ethereum = ethereum_adapter
-        self._pending_bridges: Dict[str, Dict] = {}
+        self._pending_bridges: dict[str, dict] = {}
         self._bridge_contracts = {}
 
     async def bridge_to_ethereum(
@@ -482,7 +483,7 @@ class CrossChainBridge:
         to_eth_address: str,
         amount: Decimal,
         token: str = "USMSB",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Bridge tokens from USMSB chain to Ethereum."""
         # Lock tokens on USMSB chain
         balance = await self.usmsb_chain.get_balance(from_address)
@@ -523,7 +524,7 @@ class CrossChainBridge:
         amount: Decimal,
         token: str = "USMSB",
         eth_tx_hash: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Bridge tokens from Ethereum to USMSB chain."""
         bridge_id = hashlib.sha256(f"{from_eth_address}{to_usmsb_address}{amount}{time.time()}".encode()).hexdigest()[:16]
 
@@ -551,6 +552,6 @@ class CrossChainBridge:
             "status": "completed",
         }
 
-    async def get_bridge_status(self, bridge_id: str) -> Optional[Dict[str, Any]]:
+    async def get_bridge_status(self, bridge_id: str) -> dict[str, Any] | None:
         """Get bridge transaction status."""
         return self._pending_bridges.get(bridge_id)

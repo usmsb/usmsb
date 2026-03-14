@@ -11,12 +11,12 @@ Conversation Models - 基于 USMSB 模型的对话数据结构
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 
-class ParticipantType(str, Enum):
+class ParticipantType(StrEnum):
     """参与者类型"""
 
     HUMAN = "human"
@@ -25,7 +25,7 @@ class ParticipantType(str, Enum):
     SYSTEM_AGENT = "system_agent"
 
 
-class ConversationStatus(str, Enum):
+class ConversationStatus(StrEnum):
     """会话状态"""
 
     ACTIVE = "active"
@@ -33,7 +33,7 @@ class ConversationStatus(str, Enum):
     ENDED = "ended"
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """消息角色"""
 
     USER = "user"
@@ -50,9 +50,9 @@ class Participant:
 
     id: str
     type: ParticipantType
-    name: Optional[str] = None
-    wallet_address: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    name: str | None = None
+    wallet_address: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -80,20 +80,20 @@ class Message:
     information_type: str = "text"
     quality: float = 1.0
     relevance: float = 1.0
-    embeddings: Optional[List[float]] = None
+    embeddings: list[float] | None = None
 
     # 元数据
-    intent: Optional[str] = None
-    entities: List[Dict[str, Any]] = field(default_factory=list)
-    sentiment: Optional[str] = None
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    intent: str | None = None
+    entities: list[dict[str, Any]] = field(default_factory=list)
+    sentiment: str | None = None
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.role, str):
             self.role = MessageRole(self.role)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "role": self.role.value,
@@ -120,8 +120,8 @@ class ConversationGoal:
     priority: int = 0
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     updated_at: float = field(default_factory=lambda: datetime.now().timestamp())
-    completed_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    completed_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -140,11 +140,11 @@ class LearningOutcome:
     knowledge_type: str = "insight"  # insight, fact, skill, preference, pattern
     content: str = ""
     confidence: float = 0.5
-    applicable_contexts: List[str] = field(default_factory=list)
+    applicable_contexts: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     applied_count: int = 0
     effectiveness: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -165,7 +165,7 @@ class Conversation:
     id: str = field(default_factory=lambda: str(uuid4()))
 
     # 参与者
-    participants: List[Participant] = field(default_factory=list)
+    participants: list[Participant] = field(default_factory=list)
 
     # 隐私隔离：每个会话属于特定的用户/Agent
     owner_id: str = ""  # 钱包地址或 Agent ID
@@ -175,29 +175,29 @@ class Conversation:
     status: ConversationStatus = ConversationStatus.ACTIVE
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     updated_at: float = field(default_factory=lambda: datetime.now().timestamp())
-    ended_at: Optional[float] = None
+    ended_at: float | None = None
 
     # 消息流
-    messages: List[Message] = field(default_factory=list)
+    messages: list[Message] = field(default_factory=list)
 
     # 会话目标
-    goals: List[ConversationGoal] = field(default_factory=list)
+    goals: list[ConversationGoal] = field(default_factory=list)
 
     # 学习产出
-    learning_outcomes: List[LearningOutcome] = field(default_factory=list)
+    learning_outcomes: list[LearningOutcome] = field(default_factory=list)
 
     # 会话上下文 (Environment)
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
     # 隐私规则
     is_private: bool = True  # 默认私有
-    access_list: List[str] = field(default_factory=list)  # 有权访问的 ID 列表
+    access_list: list[str] = field(default_factory=list)  # 有权访问的 ID 列表
 
     # 元数据
-    summary: Optional[str] = None
+    summary: str | None = None
     total_tokens: int = 0
-    satisfaction_score: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    satisfaction_score: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.status, str):
@@ -210,11 +210,11 @@ class Conversation:
         self.messages.append(message)
         self.updated_at = datetime.now().timestamp()
 
-    def get_last_n_messages(self, n: int = 10) -> List[Message]:
+    def get_last_n_messages(self, n: int = 10) -> list[Message]:
         """获取最近 N 条消息"""
         return self.messages[-n:] if self.messages else []
 
-    def get_messages_for_llm(self, max_tokens: int = 4000) -> List[Dict[str, str]]:
+    def get_messages_for_llm(self, max_tokens: int = 4000) -> list[dict[str, str]]:
         """获取用于 LLM 的消息格式（过滤掉后台任务消息）"""
         background_roles = {
             MessageRole.BACKGROUND_TASK,
@@ -248,7 +248,7 @@ class Conversation:
         self.ended_at = datetime.now().timestamp()
         self.updated_at = self.ended_at
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "owner_id": self.owner_id,

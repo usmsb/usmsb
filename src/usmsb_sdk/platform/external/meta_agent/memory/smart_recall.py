@@ -10,14 +10,14 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
 
-class RetrievalDimension(str, Enum):
+class RetrievalDimension(StrEnum):
     """检索维度枚举"""
     SEMANTIC_VECTOR = "semantic_vector"       # 语义向量
     KEYWORD = "keyword"                        # 关键词精确匹配
@@ -37,12 +37,12 @@ class MemoryItem:
     content: str
     timestamp: float
     importance: float = 0.5
-    dimensions: Dict[str, Any] = field(default_factory=dict)
-    entities: List[str] = field(default_factory=list)
-    task_type: Optional[str] = None
-    success: Optional[bool] = None  # None=未评估, True=成功, False=失败
+    dimensions: dict[str, Any] = field(default_factory=dict)
+    entities: list[str] = field(default_factory=list)
+    task_type: str | None = None
+    success: bool | None = None  # None=未评估, True=成功, False=失败
     user_emphasized: bool = False   # 用户是否强调要记住
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
 
     def __post_init__(self):
         if not self.id:
@@ -54,8 +54,8 @@ class MemoryItem:
 @dataclass
 class RetrievalResult:
     """检索结果"""
-    items: List[MemoryItem]
-    scores: Dict[str, float]
+    items: list[MemoryItem]
+    scores: dict[str, float]
     reasoning: str  # LLM给出的检索理由
 
 
@@ -65,7 +65,7 @@ class IntentUnderstanding:
     explicit_intent: str = ""      # 显式意图
     implicit_intent: str = ""       # 隐式意图
     potential_intent: str = ""      # 潜在意图
-    entities: List[str] = field(default_factory=list)
+    entities: list[str] = field(default_factory=list)
     task_type: str = "general"
     reasoning: str = ""
 
@@ -100,7 +100,7 @@ class IntelligentRecall:
         self.kg = knowledge_graph
 
         # 检索维度默认权重
-        self.dimension_weights: Dict[RetrievalDimension, float] = {
+        self.dimension_weights: dict[RetrievalDimension, float] = {
             RetrievalDimension.SEMANTIC_VECTOR: 0.20,
             RetrievalDimension.KEYWORD: 0.15,
             RetrievalDimension.TASK_TYPE: 0.15,
@@ -120,7 +120,7 @@ class IntelligentRecall:
     async def recall(
         self,
         user_input: str,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> str:
         """
         主召回流程
@@ -165,7 +165,7 @@ class IntelligentRecall:
     async def _smart_understand(
         self,
         user_input: str,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> IntentUnderstanding:
         """智能理解：调用LLM分析用户真正想要什么"""
         prompt = f"""分析用户输入，提取意图信息。
@@ -218,8 +218,8 @@ class IntelligentRecall:
     async def _smart_decide_dimensions(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
-    ) -> List[RetrievalDimension]:
+        context: dict[str, Any]
+    ) -> list[RetrievalDimension]:
         """智能决策：调用LLM决定用哪些维度检索"""
         prompt = f"""基于意图分析结果，决定检索维度。
 
@@ -286,9 +286,9 @@ class IntelligentRecall:
     async def _smart_search(
         self,
         understanding: IntentUnderstanding,
-        dimensions: List[RetrievalDimension],
-        context: Dict[str, Any]
-    ) -> List[RetrievalResult]:
+        dimensions: list[RetrievalDimension],
+        context: dict[str, Any]
+    ) -> list[RetrievalResult]:
         """智能检索：并行执行多维度检索"""
         tasks = []
 
@@ -327,7 +327,7 @@ class IntelligentRecall:
     async def _search_semantic(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """语义向量检索"""
         query = understanding.explicit_intent or understanding.potential_intent
@@ -376,7 +376,7 @@ class IntelligentRecall:
         except:
             return ""
 
-    async def _memory_search(self, query: str, top_k: int = 20) -> List[MemoryItem]:
+    async def _memory_search(self, query: str, top_k: int = 20) -> list[MemoryItem]:
         """内存搜索（降级方案）"""
         if not self.memory_db:
             return []
@@ -399,7 +399,7 @@ class IntelligentRecall:
     async def _search_keyword(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """关键词精确匹配"""
         keywords = understanding.entities
@@ -421,7 +421,7 @@ class IntelligentRecall:
             reasoning=f"Keyword search: {keywords}"
         )
 
-    async def _extract_keywords(self, understanding: IntentUnderstanding) -> List[str]:
+    async def _extract_keywords(self, understanding: IntentUnderstanding) -> list[str]:
         """提取关键词"""
         # 使用实体作为关键词
         return understanding.entities
@@ -429,7 +429,7 @@ class IntelligentRecall:
     async def _search_task_type(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """任务类型检索"""
         task_type = understanding.task_type
@@ -448,7 +448,7 @@ class IntelligentRecall:
     async def _search_time_context(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """时间上下文检索"""
         # 获取时间范围
@@ -493,7 +493,7 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _search_entity_relation(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """实体关联检索"""
         entities = understanding.entities
@@ -523,7 +523,7 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _search_experience_lesson(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """经验教训检索"""
         if not self.memory_db:
@@ -550,7 +550,7 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _search_user_document(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """用户文档检索"""
         user_docs = context.get("user_documents", [])
@@ -573,7 +573,7 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _search_knowledge_base(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """知识库检索"""
         query = understanding.explicit_intent
@@ -595,7 +595,7 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _search_knowledge_graph(
         self,
         understanding: IntentUnderstanding,
-        context: Dict[str, Any]
+        context: dict[str, Any]
     ) -> RetrievalResult:
         """知识图谱推理"""
         entities = understanding.entities
@@ -626,9 +626,9 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _smart_rank(
         self,
         understanding: IntentUnderstanding,
-        results: List[RetrievalResult],
-        context: Dict[str, Any]
-    ) -> List[MemoryItem]:
+        results: list[RetrievalResult],
+        context: dict[str, Any]
+    ) -> list[MemoryItem]:
         """智能排序：调用LLM决定优先级"""
         # 收集所有结果
         all_items = []
@@ -650,9 +650,9 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
     async def _llm_rank(
         self,
         understanding: IntentUnderstanding,
-        items: List[MemoryItem],
-        context: Dict[str, Any]
-    ) -> List[MemoryItem]:
+        items: list[MemoryItem],
+        context: dict[str, Any]
+    ) -> list[MemoryItem]:
         """调用LLM进行智能排序"""
         items_to_rank = items[:50]  # 限制数量
 
@@ -695,7 +695,7 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
             logger.warning(f"LLM rank failed: {e}")
             return self._weighted_rank(items)
 
-    def _weighted_rank(self, items: List[MemoryItem]) -> List[MemoryItem]:
+    def _weighted_rank(self, items: list[MemoryItem]) -> list[MemoryItem]:
         """使用权重排序"""
         for item in items:
             score = (
@@ -712,9 +712,9 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
 
     async def _smart_assemble(
         self,
-        items: List[MemoryItem],
-        context: Dict[str, Any]
-    ) -> List[MemoryItem]:
+        items: list[MemoryItem],
+        context: dict[str, Any]
+    ) -> list[MemoryItem]:
         """智能组装：调用LLM决定放入哪些内容"""
         max_tokens = context.get("max_context_tokens", 100000)
         current_length = self._estimate_length(items)
@@ -728,10 +728,10 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
 
     async def _llm_assemble(
         self,
-        items: List[MemoryItem],
-        context: Dict[str, Any],
+        items: list[MemoryItem],
+        context: dict[str, Any],
         max_tokens: int
-    ) -> List[MemoryItem]:
+    ) -> list[MemoryItem]:
         """调用LLM决定组装哪些内容"""
         target_length = int(max_tokens * 0.7)
 
@@ -768,8 +768,8 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
 
     async def _smart_compress(
         self,
-        items: List[MemoryItem],
-        context: Dict[str, Any]
+        items: list[MemoryItem],
+        context: dict[str, Any]
     ) -> str:
         """智能压缩：调用LLM决定如何压缩"""
         max_tokens = context.get("max_context_tokens", 100000)
@@ -784,8 +784,8 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
 
     async def _llm_compress(
         self,
-        items: List[MemoryItem],
-        context: Dict[str, Any],
+        items: list[MemoryItem],
+        context: dict[str, Any],
         max_tokens: int
     ) -> str:
         """调用LLM进行智能压缩"""
@@ -810,12 +810,12 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
 
     # ==================== 辅助方法 ====================
 
-    def _estimate_length(self, items: List[MemoryItem]) -> int:
+    def _estimate_length(self, items: list[MemoryItem]) -> int:
         """估算token数量"""
         total_chars = sum(len(item.content) for item in items)
         return total_chars // 4
 
-    def _format_context(self, items: List[MemoryItem]) -> str:
+    def _format_context(self, items: list[MemoryItem]) -> str:
         """格式化上下文"""
         sections = []
         sorted_items = sorted(items, key=lambda x: x.timestamp, reverse=True)
@@ -825,9 +825,9 @@ JSON: {{"time_range": "...", "reasoning": "..."}}
 
         return "\n\n".join(sections)
 
-    def _deduplicate(self, items: List[MemoryItem]) -> List[MemoryItem]:
+    def _deduplicate(self, items: list[MemoryItem]) -> list[MemoryItem]:
         """去重"""
-        seen: Set[str] = set()
+        seen: set[str] = set()
         unique = []
         for item in items:
             if item.id not in seen:

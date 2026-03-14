@@ -15,10 +15,7 @@ Skills:
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
-import asyncio
-import logging
-import math
+from typing import Any
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
@@ -31,7 +28,6 @@ from usmsb_sdk.agent_sdk.discovery import AgentInfo
 from usmsb_sdk.platform.external.system_agents.base_system_agent import (
     BaseSystemAgent,
     SystemAgentConfig,
-    SystemAgentPermission,
 )
 
 
@@ -43,8 +39,8 @@ class AgentRating:
         agent_id: str,
         rating: float,
         reviewer_id: str,
-        task_type: Optional[str] = None,
-        comment: Optional[str] = None,
+        task_type: str | None = None,
+        comment: str | None = None,
     ):
         self.agent_id = agent_id
         self.rating = min(5.0, max(0.0, rating))  # Clamp to 0-5 range
@@ -53,7 +49,7 @@ class AgentRating:
         self.comment = comment
         self.created_at = datetime.now()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert rating to dictionary"""
         return {
             "agent_id": self.agent_id,
@@ -70,13 +66,13 @@ class AgentProfile:
 
     def __init__(self, agent_info: AgentInfo):
         self.agent_info = agent_info
-        self.ratings: List[AgentRating] = []
+        self.ratings: list[AgentRating] = []
         self.success_count = 0
         self.failure_count = 0
         self.recommendation_count = 0
-        self.last_recommended: Optional[datetime] = None
-        self.tags: List[str] = []
-        self.performance_metrics: Dict[str, float] = {}
+        self.last_recommended: datetime | None = None
+        self.tags: list[str] = []
+        self.performance_metrics: dict[str, float] = {}
 
     @property
     def average_rating(self) -> float:
@@ -126,7 +122,7 @@ class AgentProfile:
             + experience_score * experience_weight
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert profile to dictionary"""
         return {
             "agent_id": self.agent_info.agent_id,
@@ -150,8 +146,8 @@ class RecommendationResult:
         self,
         request_id: str,
         query: str,
-        results: List[Tuple[AgentProfile, float]],  # (profile, score)
-        metadata: Optional[Dict[str, Any]] = None,
+        results: list[tuple[AgentProfile, float]],  # (profile, score)
+        metadata: dict[str, Any] | None = None,
     ):
         self.request_id = request_id
         self.query = query
@@ -159,7 +155,7 @@ class RecommendationResult:
         self.metadata = metadata or {}
         self.created_at = datetime.now()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert result to dictionary"""
         return {
             "request_id": self.request_id,
@@ -214,25 +210,25 @@ class RecommenderAgent(BaseSystemAgent):
     def __init__(
         self,
         config: AgentConfig,
-        system_config: Optional[SystemAgentConfig] = None,
+        system_config: SystemAgentConfig | None = None,
     ):
         """Initialize the recommender agent"""
         super().__init__(config, system_config)
 
         # Agent profiles database
-        self._agent_profiles: Dict[str, AgentProfile] = {}
+        self._agent_profiles: dict[str, AgentProfile] = {}
 
         # Recommendation history
-        self._recommendation_history: List[RecommendationResult] = []
+        self._recommendation_history: list[RecommendationResult] = []
 
         # User preferences (user_id -> preferences)
-        self._user_preferences: Dict[str, Dict[str, Any]] = {}
+        self._user_preferences: dict[str, dict[str, Any]] = {}
 
         # Request counter for unique IDs
         self._request_counter = 0
 
         # Skill keyword mappings for matching
-        self._skill_keywords: Dict[str, List[str]] = {
+        self._skill_keywords: dict[str, list[str]] = {
             "pdf_processing": ["pdf", "document", "extract", "parse"],
             "image_analysis": ["image", "picture", "photo", "analyze", "vision"],
             "text_generation": ["text", "generate", "write", "content"],
@@ -462,8 +458,8 @@ class RecommenderAgent(BaseSystemAgent):
         await self._refresh_agent_profiles()
 
     async def handle_message(
-        self, message: Message, session: Optional[Session] = None
-    ) -> Optional[Message]:
+        self, message: Message, session: Session | None = None
+    ) -> Message | None:
         """Handle incoming messages"""
         await self.audit_operation(
             "message_received",
@@ -503,7 +499,7 @@ class RecommenderAgent(BaseSystemAgent):
 
         return None
 
-    async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_skill(self, skill_name: str, params: dict[str, Any]) -> Any:
         """Execute recommender skills"""
         await self.audit_operation(
             "skill_execution",
@@ -530,7 +526,7 @@ class RecommenderAgent(BaseSystemAgent):
 
     # ==================== Skill Implementations ====================
 
-    async def _skill_recommend(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_recommend(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute recommend skill"""
         task_description = params.get("task_description", "")
         required_skills = params.get("required_skills", [])
@@ -544,9 +540,9 @@ class RecommenderAgent(BaseSystemAgent):
         request_id = f"rec-{self._request_counter:06d}"
 
         # Score and rank agents
-        scored_agents: List[Tuple[AgentProfile, float]] = []
+        scored_agents: list[tuple[AgentProfile, float]] = []
 
-        for agent_id, profile in self._agent_profiles.items():
+        for _agent_id, profile in self._agent_profiles.items():
             # Skip if rating is below minimum
             if profile.average_rating < min_rating:
                 continue
@@ -592,7 +588,7 @@ class RecommenderAgent(BaseSystemAgent):
 
         return result.to_dict()
 
-    async def _skill_search(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _skill_search(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """Execute search skill"""
         query = params.get("query", "").lower()
         skill_filter = params.get("skill")
@@ -643,7 +639,7 @@ class RecommenderAgent(BaseSystemAgent):
 
         return results[:limit]
 
-    async def _skill_rate(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_rate(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute rate skill"""
         agent_id = params.get("agent_id")
         rating = params.get("rating")
@@ -694,7 +690,7 @@ class RecommenderAgent(BaseSystemAgent):
             "total_ratings": len(profile.ratings),
         }
 
-    async def _skill_get_history(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _skill_get_history(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """Execute get_history skill"""
         user_id = params.get("user_id")
         agent_id = params.get("agent_id")
@@ -730,7 +726,7 @@ class RecommenderAgent(BaseSystemAgent):
             for agent_info in agents:
                 await self._register_agent_profile(agent_info)
 
-    async def _register_agent_profile(self, agent_info: Optional[AgentInfo]) -> None:
+    async def _register_agent_profile(self, agent_info: AgentInfo | None) -> None:
         """Register or update an agent profile"""
         if not agent_info:
             return
@@ -758,9 +754,9 @@ class RecommenderAgent(BaseSystemAgent):
         self,
         profile: AgentProfile,
         task_description: str,
-        required_skills: List[str],
-        required_capabilities: List[str],
-        user_id: Optional[str],
+        required_skills: list[str],
+        required_capabilities: list[str],
+        user_id: str | None,
     ) -> float:
         """
         Calculate match score between profile and requirements.
@@ -823,7 +819,7 @@ class RecommenderAgent(BaseSystemAgent):
 
         return min(100.0, (overlap / len(task_words)) * 100)
 
-    def _calculate_skill_match(self, profile: AgentProfile, required_skills: List[str]) -> float:
+    def _calculate_skill_match(self, profile: AgentProfile, required_skills: list[str]) -> float:
         """Calculate skill matching score"""
         if not required_skills:
             return 100.0
@@ -835,7 +831,7 @@ class RecommenderAgent(BaseSystemAgent):
         return (matched / len(required)) * 100
 
     def _calculate_capability_match(
-        self, profile: AgentProfile, required_capabilities: List[str]
+        self, profile: AgentProfile, required_capabilities: list[str]
     ) -> float:
         """Calculate capability matching score"""
         if not required_capabilities:
@@ -863,7 +859,7 @@ class RecommenderAgent(BaseSystemAgent):
 
     # ==================== Public Helper Methods ====================
 
-    def update_user_preferences(self, user_id: str, preferences: Dict[str, Any]) -> None:
+    def update_user_preferences(self, user_id: str, preferences: dict[str, Any]) -> None:
         """Update user preferences for personalization"""
         if user_id not in self._user_preferences:
             self._user_preferences[user_id] = {
@@ -884,12 +880,12 @@ class RecommenderAgent(BaseSystemAgent):
 
         self._user_preferences[user_id]["used_agents"][agent_id] = datetime.now().isoformat()
 
-    def get_agent_profile(self, agent_id: str) -> Optional[Dict[str, Any]]:
+    def get_agent_profile(self, agent_id: str) -> dict[str, Any] | None:
         """Get profile for a specific agent"""
         if agent_id in self._agent_profiles:
             return self._agent_profiles[agent_id].to_dict()
         return None
 
-    def get_all_profiles(self) -> List[Dict[str, Any]]:
+    def get_all_profiles(self) -> list[dict[str, Any]]:
         """Get all agent profiles"""
         return [p.to_dict() for p in self._agent_profiles.values()]

@@ -1,11 +1,11 @@
 """USMSB SDK Core Logic Module."""
 
 from usmsb_sdk.core.logic.goal_action_outcome import (
+    ActionResult,
     GoalActionOutcomeLoop,
     GoalManager,
-    LoopStatus,
-    ActionResult,
     LoopIteration,
+    LoopStatus,
 )
 
 __all__ = [

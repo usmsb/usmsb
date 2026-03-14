@@ -4,13 +4,13 @@
 提供通用的敏感信息处理架构，支持动态注册不同平台/服务的敏感信息处理逻辑。
 """
 
-import re
 import logging
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Pattern
-
+from re import Pattern
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class SensitiveInfoMatch:
     value: str
     source: str
     confidence: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class SensitiveInfoHandler(ABC):
@@ -53,7 +53,7 @@ class SensitiveInfoHandler(ABC):
         self.description = description
 
     @abstractmethod
-    def get_keywords(self) -> List[str]:
+    def get_keywords(self) -> list[str]:
         """
         获取用于检索的关键词列表
 
@@ -63,7 +63,7 @@ class SensitiveInfoHandler(ABC):
         pass
 
     @abstractmethod
-    def get_patterns(self) -> Dict[str, Pattern]:
+    def get_patterns(self) -> dict[str, Pattern]:
         """
         获取用于正则匹配的模式
 
@@ -93,7 +93,7 @@ class SensitiveInfoHandler(ABC):
             是否符合格式
         """
         patterns = self.get_patterns()
-        for pattern_name, pattern in patterns.items():
+        for _pattern_name, pattern in patterns.items():
                 try:
                     if re.search(pattern, value, re.IGNORECASE):
                         return True
@@ -104,7 +104,7 @@ class SensitiveInfoHandler(ABC):
     async def validate_with_api(
         self,
         value: str,
-        api_client: Optional[Any] = None
+        api_client: Any | None = None
     ) -> bool:
         """
         通过 API 验证值是否有效（可选实现)
@@ -142,7 +142,7 @@ class GenericAPIKeyHandler(SensitiveInfoHandler):
             description="通用 API Key 处理器，支持多种常见格式但不包含特定平台"
         )
 
-    def get_keywords(self) -> List[str]:
+    def get_keywords(self) -> list[str]:
         return [
             "api key",
             "apikey",
@@ -154,7 +154,7 @@ class GenericAPIKeyHandler(SensitiveInfoHandler):
             "认证",
         ]
 
-    def get_patterns(self) -> Dict[str, Pattern]:
+    def get_patterns(self) -> dict[str, Pattern]:
         return {
             # 通用 UUID 格式 (不特定于任何平台)
             "uuid_format": r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
@@ -181,7 +181,7 @@ class PasswordHandler(SensitiveInfoHandler):
             description="密码处理处理器"
         )
 
-    def get_keywords(self) -> List[str]:
+    def get_keywords(self) -> list[str]:
         return [
             "password",
             "密码",
@@ -189,7 +189,7 @@ class PasswordHandler(SensitiveInfoHandler):
             "pwd",
         ]
 
-    def get_patterns(self) -> Dict[str, Pattern]:
+    def get_patterns(self) -> dict[str, Pattern]:
         return {
             "password_assignment": r"(?:密码|password|passwd|pwd)\s*[是为：:\s]+\s*\S+",
         }
@@ -211,7 +211,7 @@ class TokenHandler(SensitiveInfoHandler):
             description="认证令牌处理器"
         )
 
-    def get_keywords(self) -> List[str]:
+    def get_keywords(self) -> list[str]:
         return [
             "token",
             "令牌",
@@ -219,7 +219,7 @@ class TokenHandler(SensitiveInfoHandler):
             "bearer",
         ]
 
-    def get_patterns(self) -> Dict[str, Pattern]:
+    def get_patterns(self) -> dict[str, Pattern]:
         return {
             "bearer": r"Bearer\s+[a-zA-Z0-9_\-\.]+",
             "token_assignment": r"token\s*[是为：:\s]+\s*[a-zA-Z0-9_\-]+",
@@ -238,7 +238,7 @@ class AccountHandler(SensitiveInfoHandler):
             description="账号信息处理器"
         )
 
-    def get_keywords(self) -> List[str]:
+    def get_keywords(self) -> list[str]:
         return [
             "account",
             "账号",
@@ -249,7 +249,7 @@ class AccountHandler(SensitiveInfoHandler):
             "登录",
         ]
 
-    def get_patterns(self) -> Dict[str, Pattern]:
+    def get_patterns(self) -> dict[str, Pattern]:
         return {
             "account_assignment": r"(?:账号|账户|username|用户名)\s*[是为：:\s]+\s*\S+",
         }
@@ -267,7 +267,7 @@ class SensitiveInfoRegistry:
     """
 
     def __init__(self):
-        self._handlers: Dict[str, SensitiveInfoHandler] = {}
+        self._handlers: dict[str, SensitiveInfoHandler] = {}
         self._initialized = False
 
     def register(self, handler: SensitiveInfoHandler) -> None:
@@ -291,15 +291,15 @@ class SensitiveInfoRegistry:
             del self._handlers[name]
             logger.info(f"Unregistered sensitive info handler: {name}")
 
-    def get_handler(self, name: str) -> Optional[SensitiveInfoHandler]:
+    def get_handler(self, name: str) -> SensitiveInfoHandler | None:
         """获取指定处理器"""
         return self._handlers.get(name)
 
-    def get_all_handlers(self) -> List[SensitiveInfoHandler]:
+    def get_all_handlers(self) -> list[SensitiveInfoHandler]:
         """获取所有处理器"""
         return list(self._handlers.values())
 
-    def get_all_keywords(self) -> List[str]:
+    def get_all_keywords(self) -> list[str]:
         """
         获取所有处理器的关键词
 
@@ -311,7 +311,7 @@ class SensitiveInfoRegistry:
             keywords.update(handler.get_keywords())
         return list(keywords)
 
-    def get_all_patterns(self) -> Dict[str, Pattern]:
+    def get_all_patterns(self) -> dict[str, Pattern]:
         """
         获取所有处理器的正则模式
 
@@ -338,7 +338,7 @@ class SensitiveInfoRegistry:
                 hints.append(hint)
         return "\n".join(hints) if hints else ""
 
-    def detect_info_type(self, value: str) -> Optional[str]:
+    def detect_info_type(self, value: str) -> str | None:
         """
         检测值的敏感信息类型
 
@@ -353,7 +353,7 @@ class SensitiveInfoRegistry:
                 return handler.get_info_type()
         return None
 
-    def extract_from_content(self, content: str) -> List[SensitiveInfoMatch]:
+    def extract_from_content(self, content: str) -> list[SensitiveInfoMatch]:
         """
         从内容中提取所有敏感信息
 
@@ -415,7 +415,7 @@ class SensitiveInfoRegistry:
 
 
 # 全局注册表实例（延迟初始化)
-_sensitive_info_registry: Optional[SensitiveInfoRegistry] = None
+_sensitive_info_registry: SensitiveInfoRegistry | None = None
 
 
 def get_sensitive_info_registry() -> SensitiveInfoRegistry:

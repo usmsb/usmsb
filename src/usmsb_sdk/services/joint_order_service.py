@@ -9,20 +9,18 @@ Implements the off-chain logic for joint orders:
 """
 
 import asyncio
-import hashlib
-import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class PoolStatus(str, Enum):
+class PoolStatus(StrEnum):
     """Pool status enumeration."""
 
     CREATED = "created"
@@ -45,12 +43,12 @@ class Demand:
     user_id: str
     service_type: str
     budget: float
-    requirements: Dict[str, Any]
-    deadline: Optional[float] = None
+    requirements: dict[str, Any]
+    deadline: float | None = None
     created_at: float = field(default_factory=time.time)
     status: str = "active"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "demandId": self.demand_id,
             "userId": self.user_id,
@@ -70,7 +68,7 @@ class OrderPool:
     pool_id: str
     service_type: str
     creator_id: str
-    demands: List[Demand]
+    demands: list[Demand]
     total_budget: float
     min_budget: float
     participant_count: int
@@ -79,12 +77,12 @@ class OrderPool:
     bidding_ends_at: float
     delivery_deadline: float
     status: PoolStatus
-    bids: List["Bid"] = field(default_factory=list)
-    winning_bid_id: Optional[str] = None
-    winning_provider: Optional[str] = None
-    winning_price: Optional[float] = None
+    bids: list["Bid"] = field(default_factory=list)
+    winning_bid_id: str | None = None
+    winning_provider: str | None = None
+    winning_price: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "poolId": self.pool_id,
             "serviceType": self.service_type,
@@ -119,7 +117,7 @@ class Bid:
     created_at: float = field(default_factory=time.time)
     is_winner: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "bidId": self.bid_id,
             "poolId": self.pool_id,
@@ -145,7 +143,7 @@ class ServiceStats:
     total_volume: float = 0.0
     total_bids: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "totalDemands": self.total_demands,
             "totalPools": self.total_pools,
@@ -178,7 +176,7 @@ class JointOrderService:
     def __init__(
         self,
         web3_provider=None,
-        contract_address: Optional[str] = None,
+        contract_address: str | None = None,
         reputation_service=None,
         matching_engine=None,
     ):
@@ -196,20 +194,20 @@ class JointOrderService:
         self.reputation = reputation_service
         self.matching_engine = matching_engine
 
-        self._demands: Dict[str, Demand] = {}
-        self._pools: Dict[str, OrderPool] = {}
-        self._user_demands: Dict[str, List[str]] = {}
-        self._service_pools: Dict[str, List[str]] = {}
+        self._demands: dict[str, Demand] = {}
+        self._pools: dict[str, OrderPool] = {}
+        self._user_demands: dict[str, list[str]] = {}
+        self._service_pools: dict[str, list[str]] = {}
 
         self._stats = ServiceStats()
 
-        self.on_pool_created: Optional[Callable[[OrderPool], None]] = None
-        self.on_pool_funded: Optional[Callable[[OrderPool], None]] = None
-        self.on_bid_submitted: Optional[Callable[[Bid], None]] = None
-        self.on_pool_awarded: Optional[Callable[[OrderPool, Bid], None]] = None
+        self.on_pool_created: Callable[[OrderPool], None] | None = None
+        self.on_pool_funded: Callable[[OrderPool], None] | None = None
+        self.on_bid_submitted: Callable[[Bid], None] | None = None
+        self.on_pool_awarded: Callable[[OrderPool, Bid], None] | None = None
 
         self._running = False
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
 
     async def start(self) -> None:
         """Start background tasks."""
@@ -290,8 +288,8 @@ class JointOrderService:
         user_id: str,
         service_type: str,
         budget: float,
-        requirements: Dict[str, Any],
-        deadline: Optional[float] = None,
+        requirements: dict[str, Any],
+        deadline: float | None = None,
     ) -> Demand:
         """
         Create a new demand.
@@ -329,11 +327,11 @@ class JointOrderService:
 
         return demand
 
-    def get_demand(self, demand_id: str) -> Optional[Demand]:
+    def get_demand(self, demand_id: str) -> Demand | None:
         """Get a demand by ID."""
         return self._demands.get(demand_id)
 
-    def get_user_demands(self, user_id: str) -> List[Demand]:
+    def get_user_demands(self, user_id: str) -> list[Demand]:
         """Get all demands for a user."""
         demand_ids = self._user_demands.get(user_id, [])
         return [self._demands[did] for did in demand_ids if did in self._demands]
@@ -345,9 +343,9 @@ class JointOrderService:
         creator_id: str,
         service_type: str,
         min_budget: float,
-        funding_duration: Optional[float] = None,
-        bidding_duration: Optional[float] = None,
-        delivery_deadline: Optional[float] = None,
+        funding_duration: float | None = None,
+        bidding_duration: float | None = None,
+        delivery_deadline: float | None = None,
     ) -> OrderPool:
         """
         Create a new order pool.
@@ -447,7 +445,7 @@ class JointOrderService:
         self,
         new_demand: Demand,
         similarity_threshold: float = 0.7,
-    ) -> Tuple[Optional[OrderPool], bool]:
+    ) -> tuple[OrderPool | None, bool]:
         """
         Try to aggregate a new demand into an existing pool.
 
@@ -508,8 +506,8 @@ class JointOrderService:
         budget_ratio = min(demand1.budget, demand2.budget) / max(demand1.budget, demand2.budget)
         score += budget_ratio * 0.4
 
-        req1 = set(str(v) for v in demand1.requirements.values())
-        req2 = set(str(v) for v in demand2.requirements.values())
+        req1 = {str(v) for v in demand1.requirements.values()}
+        req2 = {str(v) for v in demand2.requirements.values()}
         if req1 or req2:
             req_similarity = len(req1 & req2) / len(req1 | req2)
             score += req_similarity * 0.4
@@ -532,8 +530,8 @@ class JointOrderService:
         price: float,
         delivery_time_hours: int,
         proposal: str,
-        reputation_score: Optional[float] = None,
-    ) -> Optional[Bid]:
+        reputation_score: float | None = None,
+    ) -> Bid | None:
         """
         Submit a bid for a pool.
 
@@ -629,7 +627,7 @@ class JointOrderService:
     async def evaluate_bids(
         self,
         pool_id: str,
-    ) -> Optional[Bid]:
+    ) -> Bid | None:
         """
         Evaluate bids and select the winner.
 
@@ -650,8 +648,8 @@ class JointOrderService:
     async def award_pool(
         self,
         pool_id: str,
-        bid_id: Optional[str] = None,
-    ) -> Optional[Bid]:
+        bid_id: str | None = None,
+    ) -> Bid | None:
         """
         Award the pool to a provider.
 
@@ -744,16 +742,16 @@ class JointOrderService:
 
     # ==================== Utility Methods ====================
 
-    def get_pool(self, pool_id: str) -> Optional[OrderPool]:
+    def get_pool(self, pool_id: str) -> OrderPool | None:
         """Get a pool by ID."""
         return self._pools.get(pool_id)
 
-    def get_pools_by_service(self, service_type: str) -> List[OrderPool]:
+    def get_pools_by_service(self, service_type: str) -> list[OrderPool]:
         """Get all pools for a service type."""
         pool_ids = self._service_pools.get(service_type, [])
         return [self._pools[pid] for pid in pool_ids if pid in self._pools]
 
-    def get_active_pools(self) -> List[OrderPool]:
+    def get_active_pools(self) -> list[OrderPool]:
         """Get all active pools."""
         return [
             p
@@ -762,12 +760,12 @@ class JointOrderService:
             in [PoolStatus.CREATED, PoolStatus.FUNDED, PoolStatus.BIDDING, PoolStatus.AWARDED]
         ]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get service statistics."""
         return self._stats.to_dict()
 
 
-_joint_order_service: Optional[JointOrderService] = None
+_joint_order_service: JointOrderService | None = None
 
 
 async def get_joint_order_service() -> JointOrderService:

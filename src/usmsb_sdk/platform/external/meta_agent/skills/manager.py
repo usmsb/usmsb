@@ -12,10 +12,11 @@ import json
 import logging
 import os
 import re
+import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
-import sqlite3
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +30,15 @@ class Skill:
     version: str = "1.0.0"
     author: str = "unknown"
     category: str = "general"
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     returns: str = "string"
-    examples: List[str] = field(default_factory=list)
-    handler: Optional[Callable] = None
+    examples: list[str] = field(default_factory=list)
+    handler: Callable | None = None
     source: str = "builtin"
     enabled: bool = True
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -51,7 +52,7 @@ class Skill:
             "enabled": self.enabled,
         }
 
-    def to_function_schema(self, provider: str = "anthropic") -> Dict[str, Any]:
+    def to_function_schema(self, provider: str = "anthropic") -> dict[str, Any]:
         """转换为 Function Calling 的 JSON Schema 格式
 
         Args:
@@ -116,7 +117,7 @@ class SkillsManager:
 
     def __init__(self, db_path: str = "meta_agent.db"):
         self.db_path = db_path
-        self.skills: Dict[str, Skill] = {}
+        self.skills: dict[str, Skill] = {}
         self._initialized = False
 
     async def init(self):
@@ -263,7 +264,7 @@ class SkillsManager:
 
         logger.info(f"Loaded {len(stored_skills)} external skills")
 
-    def _load_stored_skills(self) -> List:
+    def _load_stored_skills(self) -> list:
         """加载存储的技能"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -287,7 +288,7 @@ class SkillsManager:
 
     async def _load_skill_from_md(self, file_path: str):
         """从 skills.md 文件解析技能"""
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
         skills = self._parse_skills_md(content)
@@ -307,7 +308,7 @@ class SkillsManager:
                 await self._save_skill(skill)
                 logger.info(f"Loaded skill from md: {skill.name}")
 
-    def _parse_skills_md(self, content: str) -> List[Dict[str, Any]]:
+    def _parse_skills_md(self, content: str) -> list[dict[str, Any]]:
         """解析 skills.md 格式"""
         skills = []
 
@@ -333,7 +334,6 @@ class SkillsManager:
                     except:
                         pass
                 elif line.startswith("```"):
-                    code_block = []
                     continue
 
             if skill.get("name"):
@@ -343,7 +343,7 @@ class SkillsManager:
 
     async def _load_skill_from_json(self, file_path: str):
         """从 JSON 文件加载技能"""
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
 
         if isinstance(data, list):
@@ -352,7 +352,7 @@ class SkillsManager:
         elif isinstance(data, dict):
             await self._register_skill_from_dict(data, file_path)
 
-    async def _register_skill_from_dict(self, data: Dict, source: str):
+    async def _register_skill_from_dict(self, data: dict, source: str):
         """从字典注册技能"""
         skill = Skill(
             name=data.get("name", "unknown"),
@@ -408,19 +408,19 @@ class SkillsManager:
         conn.commit()
         conn.close()
 
-    def get_skill(self, name: str) -> Optional[Skill]:
+    def get_skill(self, name: str) -> Skill | None:
         """获取技能"""
         return self.skills.get(name)
 
-    def list_skills(self) -> List[str]:
+    def list_skills(self) -> list[str]:
         """列出所有技能名称"""
         return list(self.skills.keys())
 
-    def get_skills_by_category(self, category: str) -> List[Skill]:
+    def get_skills_by_category(self, category: str) -> list[Skill]:
         """按类别获取技能"""
         return [s for s in self.skills.values() if s.category == category]
 
-    def get_skills_schema(self, provider: str = "anthropic") -> List[Dict[str, Any]]:
+    def get_skills_schema(self, provider: str = "anthropic") -> list[dict[str, Any]]:
         """
         获取所有技能的 JSON Schema 格式（用于 Function Calling）
 
@@ -459,8 +459,8 @@ class SkillsManager:
         self,
         name: str,
         description: str,
-        handler: Optional[Callable] = None,
-        parameters: Optional[Dict] = None,
+        handler: Callable | None = None,
+        parameters: dict | None = None,
         category: str = "custom",
     ) -> Skill:
         """注册新技能"""
@@ -482,7 +482,7 @@ class SkillsManager:
     async def execute_skill(
         self,
         name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
     ) -> Any:
         """执行技能"""
         skill = self.skills.get(name)

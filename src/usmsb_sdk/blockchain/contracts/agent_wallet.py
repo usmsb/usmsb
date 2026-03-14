@@ -12,14 +12,14 @@ AgentWallet合约客户端模块
 - 紧急功能
 """
 
-from typing import Dict, Optional, Any, Tuple
-from web3 import Web3
+from typing import Any
+
 from eth_account import Account
-import asyncio
+from web3 import Web3
 
 from ..config import BlockchainConfig
-from .base import BaseContractClient, TransactionError, ContractError
 from .abi_loader import load_abi_and_bytecode
+from .base import BaseContractClient, ContractError, TransactionError
 
 
 class AgentWalletFactory:
@@ -34,7 +34,7 @@ class AgentWalletFactory:
         bytecode: str,
         abi: list,
         config: BlockchainConfig,
-        contract_addresses: Dict[str, str],
+        contract_addresses: dict[str, str],
     ):
         """
         初始化AgentWallet工厂
@@ -61,11 +61,11 @@ class AgentWalletFactory:
         agent_address: str,
         from_address: str,
         private_key: str,
-        vibe_token_address: Optional[str] = None,
-        registry_address: Optional[str] = None,
-        staking_address: Optional[str] = None,
-        gas: Optional[int] = None,
-    ) -> Tuple[str, str]:
+        vibe_token_address: str | None = None,
+        registry_address: str | None = None,
+        staking_address: str | None = None,
+        gas: int | None = None,
+    ) -> tuple[str, str]:
         """
         部署新的AgentWallet合约
 
@@ -106,7 +106,9 @@ class AgentWalletFactory:
         # 从配置或参数获取合约地址
         vibe_token = vibe_token_address or self.contract_addresses.get("VIBEToken")
         registry = registry_address or self.contract_addresses.get("AgentRegistry")
-        staking = staking_address or self.contract_addresses.get("VIBStaking", "0x0000000000000000000000000000000000000000")
+        staking = staking_address or self.contract_addresses.get(
+            "VIBStaking", "0x0000000000000000000000000000000000000000"
+        )
 
         if not vibe_token:
             raise ContractError("VIBEToken address not provided")
@@ -118,8 +120,14 @@ class AgentWalletFactory:
             _owner=checksum_owner,
             _agent=checksum_agent,
             _vibeToken=self.web3.to_checksum_address(vibe_token),
-            _registry=self.web3.to_checksum_address(registry) if registry else "0x0000000000000000000000000000000000000000",
-            _stakingContract=self.web3.to_checksum_address(staking) if staking else "0x0000000000000000000000000000000000000000",
+            _registry=(
+                self.web3.to_checksum_address(registry)
+                if registry else "0x0000000000000000000000000000000000000000"
+            ),
+            _stakingContract=(
+                self.web3.to_checksum_address(staking)
+                if staking else "0x0000000000000000000000000000000000000000"
+            ),
         )
 
         # 估算gas
@@ -157,9 +165,9 @@ class AgentWalletFactory:
     def from_config(
         cls,
         config: BlockchainConfig,
-        contract_addresses: Optional[Dict[str, str]] = None,
-        bytecode: Optional[str] = None,
-        abi: Optional[list] = None,
+        contract_addresses: dict[str, str] | None = None,
+        bytecode: str | None = None,
+        abi: list | None = None,
     ) -> "AgentWalletFactory":
         """
         从配置创建工厂实例
@@ -237,8 +245,8 @@ class AgentWalletClient(BaseContractClient):
         self,
         web3_client=None,
         config=None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Any] = None,
+        contract_address: str | None = None,
+        abi: Any | None = None,
     ):
         """
         初始化AgentWallet客户端
@@ -296,7 +304,7 @@ class AgentWalletClient(BaseContractClient):
         amount: int,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         充值VIBE到钱包
@@ -342,7 +350,7 @@ class AgentWalletClient(BaseContractClient):
         amount: int,
         agent_address: str,
         agent_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         Agent执行转账
@@ -396,7 +404,7 @@ class AgentWalletClient(BaseContractClient):
         amount: int,
         agent_address: str,
         agent_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         请求大额转账（需要Owner审批）
@@ -449,7 +457,7 @@ class AgentWalletClient(BaseContractClient):
         request_id: str,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         Owner批准转账请求
@@ -501,7 +509,7 @@ class AgentWalletClient(BaseContractClient):
         request_id: str,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         Owner拒绝转账请求
@@ -825,7 +833,7 @@ class AgentWalletClient(BaseContractClient):
         self,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         暂停钱包（Owner调用）
@@ -865,7 +873,7 @@ class AgentWalletClient(BaseContractClient):
         self,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         恢复钱包（Owner调用）
@@ -905,7 +913,7 @@ class AgentWalletClient(BaseContractClient):
         daily_limit: int,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         更新限额（仅Owner）
@@ -951,7 +959,7 @@ class AgentWalletClient(BaseContractClient):
         allowed: bool,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         更新白名单（仅Owner）
@@ -998,7 +1006,7 @@ class AgentWalletClient(BaseContractClient):
         lock_period: int,
         caller_address: str,
         caller_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         质押VIBE代币
@@ -1044,7 +1052,7 @@ class AgentWalletClient(BaseContractClient):
         self,
         caller_address: str,
         caller_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         取消质押
@@ -1084,7 +1092,7 @@ class AgentWalletClient(BaseContractClient):
         self,
         caller_address: str,
         caller_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         领取质押奖励
@@ -1127,7 +1135,7 @@ class AgentWalletClient(BaseContractClient):
         amount: int,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         发起紧急提取（需要时间锁）
@@ -1178,7 +1186,7 @@ class AgentWalletClient(BaseContractClient):
         self,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         确认紧急提取（在时间锁到期后调用）
@@ -1218,7 +1226,7 @@ class AgentWalletClient(BaseContractClient):
         self,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         取消待生效的紧急提取
@@ -1258,8 +1266,8 @@ class AgentWalletClient(BaseContractClient):
     def from_config(
         cls,
         config=None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Any] = None,
+        contract_address: str | None = None,
+        abi: Any | None = None,
     ) -> "AgentWalletClient":
         """
         从配置创建客户端实例

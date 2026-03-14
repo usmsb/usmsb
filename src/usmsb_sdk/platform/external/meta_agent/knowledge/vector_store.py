@@ -10,6 +10,7 @@
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import math
@@ -17,8 +18,7 @@ import os
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
-import hashlib
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ class KnowledgeItem:
 
     id: str
     content: str
-    embedding: Optional[List[float]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    embedding: list[float] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     source: str = "unknown"
     category: str = "general"
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
@@ -63,7 +63,7 @@ class LocalEmbeddingService:
         self.vector_dim = vector_dim
         self._use_api = llm_manager is not None and hasattr(llm_manager, "_adapter")
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """生成文本向量"""
         if self._use_api:
             try:
@@ -73,7 +73,7 @@ class LocalEmbeddingService:
 
         return self._embed_local(text)
 
-    async def _embed_with_api(self, text: str) -> List[float]:
+    async def _embed_with_api(self, text: str) -> list[float]:
         """使用 MiniMax API 生成向量"""
         if self.llm_manager and hasattr(self.llm_manager, "_adapter"):
             adapter = self.llm_manager._adapter
@@ -82,7 +82,7 @@ class LocalEmbeddingService:
 
         raise ValueError("No embedding API available")
 
-    def _embed_local(self, text: str) -> List[float]:
+    def _embed_local(self, text: str) -> list[float]:
         """
         本地生成简单向量（降级方案）
         基于 hash 和文本特征
@@ -108,7 +108,7 @@ class LocalEmbeddingService:
 
         return vector
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """批量生成向量"""
         return [await self.embed(text) for text in texts]
 
@@ -194,7 +194,7 @@ class VectorKnowledgeBase:
     async def add_knowledge(
         self,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         source: str = "unknown",
         category: str = "general",
     ) -> str:
@@ -256,9 +256,9 @@ class VectorKnowledgeBase:
         self,
         query: str,
         top_k: int = 5,
-        category: Optional[str] = None,
+        category: str | None = None,
         min_score: float = 0.0,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """语义搜索"""
         await self.init()
 
@@ -281,11 +281,11 @@ class VectorKnowledgeBase:
 
     def _search_vectors(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int,
-        category: Optional[str],
+        category: str | None,
         min_score: float,
-    ) -> List[SearchResult]:
+    ) -> list[SearchResult]:
         """向量搜索"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -330,12 +330,12 @@ class VectorKnowledgeBase:
         results.sort(key=lambda x: x.score, reverse=True)
         return results[:top_k]
 
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """计算余弦相似度"""
         if len(vec1) != len(vec2):
             return 0.0
 
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=False))
         norm1 = math.sqrt(sum(a * a for a in vec1))
         norm2 = math.sqrt(sum(b * b for b in vec2))
 
@@ -361,8 +361,8 @@ class VectorKnowledgeBase:
 
     async def add_knowledge_batch(
         self,
-        items: List[Dict[str, Any]],
-    ) -> List[str]:
+        items: list[dict[str, Any]],
+    ) -> list[str]:
         """批量添加知识"""
         ids = []
         for item in items:
@@ -375,7 +375,7 @@ class VectorKnowledgeBase:
             ids.append(kid)
         return ids
 
-    async def get_by_category(self, category: str, limit: int = 100) -> List[KnowledgeItem]:
+    async def get_by_category(self, category: str, limit: int = 100) -> list[KnowledgeItem]:
         """按类别获取知识"""
         await self.init()
 
@@ -387,7 +387,7 @@ class VectorKnowledgeBase:
             limit,
         )
 
-    def _query_by_category(self, category: str, limit: int) -> List[KnowledgeItem]:
+    def _query_by_category(self, category: str, limit: int) -> list[KnowledgeItem]:
         """查询类别知识"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -422,8 +422,8 @@ class VectorKnowledgeBase:
         predicate: str,
         object: str,
         confidence: float = 1.0,
-        source: Optional[str] = None,
-        metadata: Optional[Dict] = None,
+        source: str | None = None,
+        metadata: dict | None = None,
     ) -> str:
         """添加知识图谱三元组"""
         await self.init()
@@ -454,8 +454,8 @@ class VectorKnowledgeBase:
         predicate: str,
         object: str,
         confidence: float,
-        source: Optional[str],
-        metadata: Optional[Dict],
+        source: str | None,
+        metadata: dict | None,
     ):
         """插入三元组"""
         conn = sqlite3.connect(self.db_path)
@@ -484,10 +484,10 @@ class VectorKnowledgeBase:
 
     async def query_graph(
         self,
-        subject: Optional[str] = None,
-        predicate: Optional[str] = None,
-        object: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        subject: str | None = None,
+        predicate: str | None = None,
+        object: str | None = None,
+    ) -> list[dict[str, Any]]:
         """查询知识图谱"""
         await self.init()
 
@@ -502,10 +502,10 @@ class VectorKnowledgeBase:
 
     def _query_triples(
         self,
-        subject: Optional[str],
-        predicate: Optional[str],
-        object: Optional[str],
-    ) -> List[Dict[str, Any]]:
+        subject: str | None,
+        predicate: str | None,
+        object: str | None,
+    ) -> list[dict[str, Any]]:
         """查询三元组"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -541,14 +541,14 @@ class VectorKnowledgeBase:
             for row in rows
         ]
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """获取知识库统计"""
         await self.init()
 
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_stats)
 
-    def _get_stats(self) -> Dict[str, Any]:
+    def _get_stats(self) -> dict[str, Any]:
         """获取统计"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

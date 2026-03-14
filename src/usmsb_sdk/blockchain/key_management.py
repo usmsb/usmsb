@@ -4,10 +4,10 @@ Agent私钥管理模块
 提供Agent私钥的安全加密存储和解密功能，使用Fernet对称加密。
 """
 
-import os
-import hashlib
 import base64
-from typing import Dict, Tuple
+import hashlib
+import os
+
 from cryptography.fernet import Fernet
 from eth_account import Account
 
@@ -30,8 +30,8 @@ class AgentKeyManager:
 
         if not encryption_key:
             raise ValueError(
-                "Encryption key not provided. "
-                "Set AGENT_KEY_ENCRYPTION_KEY environment variable or pass encryption_key parameter."
+                "Encryption key not provided. Set AGENT_KEY_ENCRYPTION_KEY "
+                "environment variable or pass encryption_key parameter."
             )
 
         # 派生32字节的加密密钥（Fernet需要32字节）
@@ -99,7 +99,7 @@ class AgentKeyManager:
         decrypted_bytes = self.cipher.decrypt(encrypted_bytes)
         return decrypted_bytes.decode('utf-8')
 
-    def generate_agent_keypair(self) -> Dict[str, str]:
+    def generate_agent_keypair(self) -> dict[str, str]:
         """
         生成Agent密钥对
 
@@ -128,7 +128,7 @@ class AgentKeyManager:
             "encrypted_private_key": self.encrypt_private_key(private_key),
         }
 
-    def generate_agent_keypair_raw(self) -> Tuple[str, str]:
+    def generate_agent_keypair_raw(self) -> tuple[str, str]:
         """
         生成Agent密钥对（原始格式）
 
@@ -146,7 +146,7 @@ class AgentKeyManager:
         return account.address, account.key.hex()
 
     @staticmethod
-    def create_from_mnemonic(mnemonic: str, index: int = 0) -> Dict[str, str]:
+    def create_from_mnemonic(mnemonic: str, index: int = 0) -> dict[str, str]:
         """
         从助记词创建账户（使用HD钱包）
 

@@ -17,9 +17,9 @@ Authentication:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.rest.unified_auth import (
@@ -50,7 +50,7 @@ class SendMessageRequest(BaseModel):
 
 class RecommendRequest(BaseModel):
     """推荐请求"""
-    demand: Dict[str, Any] = Field(..., description="需求信息")
+    demand: dict[str, Any] = Field(..., description="需求信息")
     limit: int = Field(default=5, description="返回数量限制")
 
 
@@ -63,20 +63,20 @@ class ConsultRequest(BaseModel):
 class ShowcaseRequest(BaseModel):
     """展示请求"""
     agent_id: str = Field(..., description="Agent ID")
-    showcase: Dict[str, Any] = Field(..., description="展示内容")
+    showcase: dict[str, Any] = Field(..., description="展示内容")
 
 
 class NotifyOpportunityRequest(BaseModel):
     """通知机会请求"""
     agent_id: str = Field(..., description="Agent ID")
-    opportunity: Dict[str, Any] = Field(..., description="机会信息")
+    opportunity: dict[str, Any] = Field(..., description="机会信息")
 
 
 class GeneCapsuleMatchRequest(BaseModel):
     """基因胶囊匹配请求"""
     demand_description: str = Field(..., description="需求描述")
-    required_skills: List[str] = Field(default_factory=list, description="所需技能")
-    category: Optional[str] = Field(default=None, description="类别")
+    required_skills: list[str] = Field(default_factory=list, description="所需技能")
+    category: str | None = Field(default=None, description="类别")
     limit: int = Field(default=10, description="返回数量限制")
 
 
@@ -85,7 +85,9 @@ class GeneCapsuleMatchRequest(BaseModel):
 def get_meta_agent_service():
     """获取 MetaAgentService 实例"""
     # 尝试从全局获取
-    from usmsb_sdk.platform.external.meta_agent.tools.precise_matching import _get_meta_agent_service
+    from usmsb_sdk.platform.external.meta_agent.tools.precise_matching import (
+        _get_meta_agent_service,
+    )
     service = _get_meta_agent_service()
     if not service:
         raise HTTPException(status_code=503, detail="MetaAgentService not available")
@@ -97,7 +99,7 @@ def get_meta_agent_service():
 @router.post("/conversations")
 async def initiate_conversation(
     request: InitiateConversationRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -144,7 +146,7 @@ async def initiate_conversation(
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -183,7 +185,7 @@ async def get_conversation(
 async def send_message(
     conversation_id: str,
     request: SendMessageRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -230,7 +232,7 @@ async def send_message(
 @router.post("/recommend")
 async def recommend_agents(
     request: RecommendRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -262,7 +264,7 @@ async def recommend_agents(
 @router.post("/match/gene-capsule")
 async def match_by_gene_capsule(
     request: GeneCapsuleMatchRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -301,7 +303,7 @@ async def match_by_gene_capsule(
 
 @router.get("/profiles")
 async def get_all_profiles(
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -328,8 +330,8 @@ async def get_all_profiles(
 @router.get("/profiles/{agent_id}")
 async def get_agent_profile(
     agent_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
-    conversation_id: Optional[str] = None,
+    user: dict[str, Any] = Depends(get_current_user_unified),
+    conversation_id: str | None = None,
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -369,7 +371,7 @@ async def get_agent_profile(
 @router.post("/consult")
 async def consult(
     request: ConsultRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -410,7 +412,7 @@ async def consult(
 @router.post("/showcase")
 async def receive_showcase(
     request: ShowcaseRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -450,7 +452,7 @@ async def receive_showcase(
 @router.post("/opportunities/notify")
 async def notify_opportunity(
     request: NotifyOpportunityRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -495,7 +497,7 @@ async def notify_opportunity(
 
 @router.post("/opportunities/scan")
 async def scan_opportunities(
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """
@@ -521,7 +523,7 @@ async def scan_opportunities(
 
 @router.post("/opportunities/auto-match")
 async def auto_match_and_notify(
-    user: Dict[str, Any] = Depends(get_current_user_unified),
+    user: dict[str, Any] = Depends(get_current_user_unified),
     service = Depends(get_meta_agent_service),
 ):
     """

@@ -3,6 +3,7 @@ Tools 模块 - 所有工具注册
 """
 
 import logging
+
 from .registry import Tool, ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -10,18 +11,18 @@ logger = logging.getLogger(__name__)
 
 async def register_tools(registry):
     """注册所有工具"""
-    from .platform import get_platform_tools
-    from .monitor import get_monitor_tools
     from .blockchain import get_blockchain_tools
-    from .ipfs import get_ipfs_tools
     from .database import get_database_tools
-    from .ui import get_ui_tools
-    from .governance import get_governance_tools
-    from .system import get_system_tools
-    from .web import get_web_tool_objects
     from .execution import get_execution_tools
-    from .system_agents import get_system_agents_tools
+    from .governance import get_governance_tools
+    from .ipfs import get_ipfs_tools
+    from .monitor import get_monitor_tools
+    from .platform import get_platform_tools
     from .precise_matching import get_precise_matching_tools
+    from .system import get_system_tools
+    from .system_agents import get_system_agents_tools
+    from .ui import get_ui_tools
+    from .web import get_web_tool_objects
 
     all_tools = []
     all_tools.extend(get_platform_tools())

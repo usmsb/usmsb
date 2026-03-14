@@ -15,12 +15,12 @@ This module defines the 9 core elements of the USMSB (Universal System Model of 
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 
-class AgentType(str, Enum):
+class AgentType(StrEnum):
     """Agent type enumeration."""
     HUMAN = "human"
     AI_AGENT = "ai_agent"
@@ -28,7 +28,7 @@ class AgentType(str, Enum):
     SYSTEM = "system"
 
 
-class GoalStatus(str, Enum):
+class GoalStatus(StrEnum):
     """Goal status enumeration."""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -37,7 +37,7 @@ class GoalStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ResourceType(str, Enum):
+class ResourceType(StrEnum):
     """Resource type enumeration."""
     TANGIBLE = "tangible"
     INTANGIBLE = "intangible"
@@ -46,7 +46,7 @@ class ResourceType(str, Enum):
     DATA = "data"
 
 
-class RuleType(str, Enum):
+class RuleType(StrEnum):
     """Rule type enumeration."""
     LEGAL = "legal"
     SOCIAL = "social"
@@ -55,7 +55,7 @@ class RuleType(str, Enum):
     ETHICAL = "ethical"
 
 
-class InformationType(str, Enum):
+class InformationType(StrEnum):
     """Information type enumeration."""
     TEXT = "text"
     IMAGE = "image"
@@ -66,7 +66,7 @@ class InformationType(str, Enum):
     KNOWLEDGE = "knowledge"
 
 
-class ValueType(str, Enum):
+class ValueType(StrEnum):
     """Value type enumeration."""
     ECONOMIC = "economic"
     SOCIAL = "social"
@@ -76,7 +76,7 @@ class ValueType(str, Enum):
     KNOWLEDGE = "knowledge"
 
 
-class RiskType(str, Enum):
+class RiskType(StrEnum):
     """Risk type enumeration."""
     MARKET = "market"
     TECHNICAL = "technical"
@@ -86,7 +86,7 @@ class RiskType(str, Enum):
     REPUTATIONAL = "reputational"
 
 
-class EnvironmentType(str, Enum):
+class EnvironmentType(StrEnum):
     """Environment type enumeration."""
     NATURAL = "natural"
     SOCIAL = "social"
@@ -118,11 +118,11 @@ class Goal:
     description: str = ""
     priority: int = 0
     status: GoalStatus = GoalStatus.PENDING
-    associated_agent_id: Optional[str] = None
-    parent_goal_id: Optional[str] = None
+    associated_agent_id: str | None = None
+    parent_goal_id: str | None = None
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.status, str):
@@ -150,13 +150,13 @@ class Resource:
     name: str = ""
     type: ResourceType = ResourceType.TANGIBLE
     quantity: float = 0.0
-    unit: Optional[str] = None
+    unit: str | None = None
     status: str = "available"
-    owner_agent_id: Optional[str] = None
-    value: Optional[float] = None
+    owner_agent_id: str | None = None
+    value: float | None = None
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -188,20 +188,20 @@ class Rule:
     name: str = ""
     description: str = ""
     type: RuleType = RuleType.SOCIAL
-    scope: List[str] = field(default_factory=list)
+    scope: list[str] = field(default_factory=list)
     priority: int = 0
     is_active: bool = True
-    conditions: Dict[str, Any] = field(default_factory=dict)
-    consequences: Dict[str, Any] = field(default_factory=dict)
+    conditions: dict[str, Any] = field(default_factory=dict)
+    consequences: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
             self.type = RuleType(self.type)
 
-    def applies_to(self, context: Dict[str, Any]) -> bool:
+    def applies_to(self, context: dict[str, Any]) -> bool:
         """Check if rule applies to given context."""
         # Basic implementation - can be extended
         if not self.is_active:
@@ -225,12 +225,12 @@ class Information:
     id: str = field(default_factory=generate_id)
     content: Any = None
     type: InformationType = InformationType.TEXT
-    source: Optional[str] = None
+    source: str | None = None
     timestamp: float = field(default_factory=get_timestamp)
     quality: float = 1.0  # 0.0 to 1.0
     relevance: float = 1.0  # 0.0 to 1.0
-    embeddings: Optional[List[float]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    embeddings: list[float] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -252,13 +252,13 @@ class Value:
     id: str = field(default_factory=generate_id)
     name: str = ""
     type: ValueType = ValueType.ECONOMIC
-    metric: Optional[float] = None
-    unit: Optional[str] = None
-    description: Optional[str] = None
-    associated_entity_id: Optional[str] = None
-    associated_action_id: Optional[str] = None
+    metric: float | None = None
+    unit: str | None = None
+    description: str | None = None
+    associated_entity_id: str | None = None
+    associated_action_id: str | None = None
     created_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -284,12 +284,12 @@ class Risk:
     probability: float = 0.0  # 0.0 to 1.0
     impact: float = 0.0  # 0.0 to 1.0
     severity: float = 0.0  # probability * impact
-    associated_entity_id: Optional[str] = None
-    mitigation_strategy: Optional[str] = None
+    associated_entity_id: str | None = None
+    mitigation_strategy: str | None = None
     status: str = "identified"
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -317,12 +317,12 @@ class Environment:
     id: str = field(default_factory=generate_id)
     name: str = ""
     type: EnvironmentType = EnvironmentType.SOCIAL
-    state: Dict[str, Any] = field(default_factory=dict)
-    influencing_factors: List[str] = field(default_factory=list)
-    constraints: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
+    influencing_factors: list[str] = field(default_factory=list)
+    constraints: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -349,12 +349,12 @@ class Object:
     id: str = field(default_factory=generate_id)
     name: str = ""
     type: str = "generic"
-    properties: Dict[str, Any] = field(default_factory=dict)
-    current_state: Dict[str, Any] = field(default_factory=dict)
-    owner_agent_id: Optional[str] = None
+    properties: dict[str, Any] = field(default_factory=dict)
+    current_state: dict[str, Any] = field(default_factory=dict)
+    owner_agent_id: str | None = None
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def update_property(self, key: str, value: Any) -> None:
         """Update object property."""
@@ -381,15 +381,15 @@ class Agent:
     id: str = field(default_factory=generate_id)
     name: str = ""
     type: AgentType = AgentType.AI_AGENT
-    capabilities: List[str] = field(default_factory=list)
-    state: Dict[str, Any] = field(default_factory=dict)
-    goals: List[Goal] = field(default_factory=list)
-    resources: List[Resource] = field(default_factory=list)
-    rules: List[Rule] = field(default_factory=list)
-    information_buffer: List[Information] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
+    state: dict[str, Any] = field(default_factory=dict)
+    goals: list[Goal] = field(default_factory=list)
+    resources: list[Resource] = field(default_factory=list)
+    rules: list[Rule] = field(default_factory=list)
+    information_buffer: list[Information] = field(default_factory=list)
     created_at: float = field(default_factory=get_timestamp)
     updated_at: float = field(default_factory=get_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if isinstance(self.type, str):
@@ -410,11 +410,11 @@ class Agent:
                 return True
         return False
 
-    def get_active_goals(self) -> List[Goal]:
+    def get_active_goals(self) -> list[Goal]:
         """Get all active (pending or in-progress) goals."""
         return [g for g in self.goals if g.status in (GoalStatus.PENDING, GoalStatus.IN_PROGRESS)]
 
-    def get_highest_priority_goal(self) -> Optional[Goal]:
+    def get_highest_priority_goal(self) -> Goal | None:
         """Get the highest priority active goal."""
         active_goals = self.get_active_goals()
         if not active_goals:
@@ -427,7 +427,7 @@ class Agent:
         self.resources.append(resource)
         self.updated_at = get_timestamp()
 
-    def get_resource_by_type(self, resource_type: ResourceType) -> List[Resource]:
+    def get_resource_by_type(self, resource_type: ResourceType) -> list[Resource]:
         """Get resources by type."""
         return [r for r in self.resources if r.type == resource_type]
 
@@ -469,7 +469,7 @@ class Agent:
             self.capabilities.append(capability)
             self.updated_at = get_timestamp()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert agent to dictionary representation."""
         return {
             "id": self.id,
@@ -479,7 +479,15 @@ class Agent:
             "state": self.state,
             "goals": [{"id": g.id, "name": g.name, "status": g.status.value} for g in self.goals],
             "goals_count": len(self.goals),
-            "resources": [{"id": r.id, "name": r.name, "type": r.type.value, "quantity": r.quantity} for r in self.resources],
+ "resources": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "type": r.type.value,
+                    "quantity": r.quantity,
+                }
+                for r in self.resources
+            ],
             "rules_count": len(self.rules),
             "information_buffer_size": len(self.information_buffer),
             "created_at": self.created_at,
@@ -492,7 +500,7 @@ class Agent:
         """Check if agent has available resources."""
         return any(r.status == "available" and r.quantity > 0 for r in self.resources)
 
-    def get_available_resources(self) -> List["Resource"]:
+    def get_available_resources(self) -> list["Resource"]:
         """Get all available resources."""
         return [r for r in self.resources if r.status == "available" and r.quantity > 0]
 
@@ -508,7 +516,7 @@ class Agent:
         """Check if agent supports collaboration."""
         return self.metadata.get("collaboration_enabled", True)
 
-    def add_match_history(self, match_result: Dict[str, Any]) -> None:
+    def add_match_history(self, match_result: dict[str, Any]) -> None:
         """Add a match result to history for learning."""
         if "match_history" not in self.metadata:
             self.metadata["match_history"] = []
@@ -521,7 +529,7 @@ class Agent:
         if len(self.metadata["match_history"]) > max_history:
             self.metadata["match_history"] = self.metadata["match_history"][-max_history:]
 
-    def get_match_history(self) -> List[Dict[str, Any]]:
+    def get_match_history(self) -> list[dict[str, Any]]:
         """Get match history for learning."""
         return self.metadata.get("match_history", [])
 
@@ -534,7 +542,7 @@ class Agent:
         """Get agent reputation score."""
         return self.metadata.get("reputation", 1.0)
 
-    def add_negotiation_result(self, result: Dict[str, Any]) -> None:
+    def add_negotiation_result(self, result: dict[str, Any]) -> None:
         """Add negotiation result to history."""
         if "negotiation_history" not in self.metadata:
             self.metadata["negotiation_history"] = []
@@ -544,7 +552,9 @@ class Agent:
         })
         max_history = self.metadata.get("max_negotiation_history", 50)
         if len(self.metadata["negotiation_history"]) > max_history:
-            self.metadata["negotiation_history"] = self.metadata["negotiation_history"][-max_history:]
+            self.metadata["negotiation_history"] = (
+                self.metadata["negotiation_history"][-max_history:]
+            )
 
     def get_negotiation_success_rate(self) -> float:
         """Calculate negotiation success rate from history."""
@@ -554,7 +564,7 @@ class Agent:
         successful = sum(1 for h in history if h.get("success", False))
         return successful / len(history)
 
-    def suggest_price(self, base_price: float, context: Dict[str, Any] = None) -> float:
+    def suggest_price(self, base_price: float, context: dict[str, Any] = None) -> float:
         """Suggest a price based on reputation and market context."""
         reputation = self.get_reputation()
         # Higher reputation = can charge more

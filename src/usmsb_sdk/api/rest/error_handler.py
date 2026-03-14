@@ -10,7 +10,8 @@ Provides standardized error responses with:
 
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -23,12 +24,12 @@ class APIError(Exception):
         error: str,
         code: str,
         status_code: int = 400,
-        message: Optional[str] = None,
-        stake_requirement: Optional[Dict[str, Any]] = None,
-        retry_after: Optional[int] = None,
-        recovery_suggestion: Optional[str] = None,
-        request_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        message: str | None = None,
+        stake_requirement: dict[str, Any] | None = None,
+        retry_after: int | None = None,
+        recovery_suggestion: str | None = None,
+        request_id: str | None = None,
+        details: dict[str, Any] | None = None
     ):
         self.error = error
         self.code = code
@@ -41,7 +42,7 @@ class APIError(Exception):
         self.details = details or {}
         super().__init__(self.error)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON response."""
         result = {
             "success": False,
@@ -187,7 +188,7 @@ def insufficient_stake_error(
     required: int,
     current: int,
     action: str,
-    request_id: Optional[str] = None
+    request_id: str | None = None
 ) -> APIError:
     """Create an insufficient stake error with detailed info."""
     shortfall = max(0, required - current)
@@ -213,7 +214,7 @@ def insufficient_stake_error(
 
 def unauthorized_error(
     reason: str = "Invalid or missing authentication",
-    request_id: Optional[str] = None
+    request_id: str | None = None
 ) -> APIError:
     """Create an unauthorized error."""
     return APIError(
@@ -226,7 +227,7 @@ def unauthorized_error(
     )
 
 
-def api_key_expired_error(request_id: Optional[str] = None) -> APIError:
+def api_key_expired_error(request_id: str | None = None) -> APIError:
     """Create an API key expired error."""
     return APIError(
         error="API key expired",
@@ -238,7 +239,7 @@ def api_key_expired_error(request_id: Optional[str] = None) -> APIError:
     )
 
 
-def api_key_revoked_error(request_id: Optional[str] = None) -> APIError:
+def api_key_revoked_error(request_id: str | None = None) -> APIError:
     """Create an API key revoked error."""
     return APIError(
         error="API key revoked",
@@ -253,7 +254,7 @@ def api_key_revoked_error(request_id: Optional[str] = None) -> APIError:
 def not_found_error(
     resource_type: str,
     resource_id: str,
-    request_id: Optional[str] = None
+    request_id: str | None = None
 ) -> APIError:
     """Create a not found error."""
     return APIError(
@@ -268,7 +269,7 @@ def not_found_error(
 def validation_error(
     field: str,
     reason: str,
-    request_id: Optional[str] = None
+    request_id: str | None = None
 ) -> APIError:
     """Create a validation error."""
     return APIError(
@@ -283,7 +284,7 @@ def validation_error(
 
 def rate_limited_error(
     retry_after: int,
-    request_id: Optional[str] = None
+    request_id: str | None = None
 ) -> APIError:
     """Create a rate limited error."""
     return APIError(
@@ -302,8 +303,8 @@ def rate_limited_error(
 
 def internal_error(
     message: str = "Internal server error",
-    request_id: Optional[str] = None,
-    details: Optional[Dict[str, Any]] = None
+    request_id: str | None = None,
+    details: dict[str, Any] | None = None
 ) -> APIError:
     """Create an internal server error."""
     return APIError(
@@ -316,7 +317,7 @@ def internal_error(
     )
 
 
-def not_bound_error(request_id: Optional[str] = None) -> APIError:
+def not_bound_error(request_id: str | None = None) -> APIError:
     """Create a not bound error."""
     return APIError(
         error="Agent not bound",
@@ -328,7 +329,7 @@ def not_bound_error(request_id: Optional[str] = None) -> APIError:
     )
 
 
-def binding_expired_error(request_id: Optional[str] = None) -> APIError:
+def binding_expired_error(request_id: str | None = None) -> APIError:
     """Create a binding expired error."""
     return APIError(
         error="Binding expired",
@@ -355,9 +356,9 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
 
 def success_response(
     result: Any,
-    message: Optional[str] = None,
-    request_id: Optional[str] = None
-) -> Dict[str, Any]:
+    message: str | None = None,
+    request_id: str | None = None
+) -> dict[str, Any]:
     """Create a standardized success response."""
     response = {
         "success": True,

@@ -6,15 +6,14 @@ Provides a clean interface for agents to communicate with the platform.
 """
 
 import asyncio
-import aiohttp
-import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 from uuid import uuid4
 
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +41,8 @@ class RegistrationResult:
     success: bool
     agent_id: str
     message: str
-    registered_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
+    registered_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass
@@ -51,7 +50,7 @@ class APIResponse:
     """Standard API response wrapper"""
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     status_code: int = 200
 
 
@@ -71,11 +70,11 @@ class PlatformClient:
     def __init__(
         self,
         platform_url: str = "http://localhost:8000",
-        api_key: Optional[str] = None,
-        agent_id: Optional[str] = None,
+        api_key: str | None = None,
+        agent_id: str | None = None,
         timeout: float = 30.0,
         heartbeat_interval: float = 30.0,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.platform_url = platform_url.rstrip("/")
         self.api_key = api_key
@@ -84,10 +83,10 @@ class PlatformClient:
         self.heartbeat_interval = heartbeat_interval
         self.logger = logger or logging.getLogger(__name__)
 
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._registration_status = RegistrationStatus.NOT_REGISTERED
-        self._heartbeat_task: Optional[asyncio.Task] = None
-        self._last_heartbeat: Optional[datetime] = None
+        self._heartbeat_task: asyncio.Task | None = None
+        self._last_heartbeat: datetime | None = None
 
     # ==================== Session Management ====================
 
@@ -120,8 +119,8 @@ class PlatformClient:
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict] = None,
-        params: Optional[Dict] = None,
+        data: dict | None = None,
+        params: dict | None = None,
     ) -> APIResponse:
         """Make an HTTP request to the platform"""
         session = await self._get_session()
@@ -153,7 +152,7 @@ class PlatformClient:
                     status_code=response.status,
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return APIResponse(success=False, error="Request timeout", status_code=408)
         except aiohttp.ClientError as e:
             return APIResponse(success=False, error=str(e), status_code=0)
@@ -175,16 +174,16 @@ class PlatformClient:
         self,
         name: str,
         agent_type: str = "ai_agent",
-        capabilities: Optional[List[str]] = None,
-        skills: Optional[List[Dict]] = None,
-        endpoint: Optional[str] = None,
+        capabilities: list[str] | None = None,
+        skills: list[dict] | None = None,
+        endpoint: str | None = None,
         protocol: str = "standard",
         stake: float = 0,
         balance: float = 0,
         description: str = "",
-        metadata: Optional[Dict] = None,
-        heartbeat_interval: Optional[int] = None,
-        ttl: Optional[int] = None,
+        metadata: dict | None = None,
+        heartbeat_interval: int | None = None,
+        ttl: int | None = None,
     ) -> RegistrationResult:
         """
         Register the agent with the platform.
@@ -324,7 +323,7 @@ class PlatformClient:
             except Exception as e:
                 self.logger.warning(f"Heartbeat failed: {e}")
 
-    async def get_registration_status(self) -> Dict[str, Any]:
+    async def get_registration_status(self) -> dict[str, Any]:
         """Get current registration status from platform"""
         if not self.agent_id:
             return {"status": "not_registered"}
@@ -340,7 +339,7 @@ class PlatformClient:
         self,
         service_name: str,
         service_type: str,
-        capabilities: List[str],
+        capabilities: list[str],
         price: float,
         description: str = "",
         price_type: str = "hourly",
@@ -368,8 +367,8 @@ class PlatformClient:
 
     async def list_services(
         self,
-        agent_id: Optional[str] = None,
-        category: Optional[str] = None,
+        agent_id: str | None = None,
+        category: str | None = None,
         limit: int = 100,
     ) -> APIResponse:
         """List services on the platform"""
@@ -387,13 +386,13 @@ class PlatformClient:
         self,
         title: str,
         description: str,
-        required_skills: List[str],
+        required_skills: list[str],
         budget_min: float,
         budget_max: float,
         category: str = "",
-        deadline: Optional[str] = None,
+        deadline: str | None = None,
         priority: str = "medium",
-        quality_requirements: Optional[Dict] = None,
+        quality_requirements: dict | None = None,
     ) -> APIResponse:
         """Publish a demand/requirement"""
         if not self.agent_id:
@@ -416,8 +415,8 @@ class PlatformClient:
 
     async def list_demands(
         self,
-        agent_id: Optional[str] = None,
-        category: Optional[str] = None,
+        agent_id: str | None = None,
+        category: str | None = None,
         limit: int = 100,
     ) -> APIResponse:
         """List demands on the platform"""
@@ -437,9 +436,9 @@ class PlatformClient:
 
     async def search_demands(
         self,
-        capabilities: Optional[List[str]] = None,
-        budget_min: Optional[float] = None,
-        budget_max: Optional[float] = None,
+        capabilities: list[str] | None = None,
+        budget_min: float | None = None,
+        budget_max: float | None = None,
     ) -> APIResponse:
         """Search for demands matching this agent's capabilities"""
         if not self.agent_id:
@@ -456,9 +455,9 @@ class PlatformClient:
 
     async def search_suppliers(
         self,
-        required_skills: List[str],
-        budget_min: Optional[float] = None,
-        budget_max: Optional[float] = None,
+        required_skills: list[str],
+        budget_min: float | None = None,
+        budget_max: float | None = None,
     ) -> APIResponse:
         """Search for suppliers matching requirements"""
         if not self.agent_id:
@@ -500,7 +499,7 @@ class PlatformClient:
     async def initiate_negotiation(
         self,
         counterpart_id: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> APIResponse:
         """Initiate a negotiation with another agent"""
         if not self.agent_id:
@@ -528,7 +527,7 @@ class PlatformClient:
     async def submit_proposal(
         self,
         session_id: str,
-        proposal: Dict[str, Any],
+        proposal: dict[str, Any],
     ) -> APIResponse:
         """Submit a proposal in a negotiation"""
         data = {"proposal": proposal}
@@ -543,9 +542,9 @@ class PlatformClient:
     async def create_collaboration(
         self,
         goal_description: str,
-        required_skills: List[str],
+        required_skills: list[str],
         collaboration_mode: str = "parallel",
-        coordinator_agent_id: Optional[str] = None,
+        coordinator_agent_id: str | None = None,
     ) -> APIResponse:
         """Create a new collaboration session"""
         data = {
@@ -557,7 +556,7 @@ class PlatformClient:
 
         return await self._request("POST", "/collaborations", data=data)
 
-    async def get_collaborations(self, status: Optional[str] = None) -> APIResponse:
+    async def get_collaborations(self, status: str | None = None) -> APIResponse:
         """Get collaboration sessions"""
         params = {}
         if status:
@@ -582,7 +581,7 @@ class PlatformClient:
     async def create_workflow(
         self,
         task_description: str,
-        available_tools: Optional[List[str]] = None,
+        available_tools: list[str] | None = None,
     ) -> APIResponse:
         """Create a new workflow"""
         if not self.agent_id:
@@ -674,7 +673,7 @@ class PlatformClient:
 
     async def add_experience(
         self,
-        experience_data: Dict[str, Any],
+        experience_data: dict[str, Any],
         auto_desensitize: bool = True,
     ) -> APIResponse:
         """
@@ -739,7 +738,7 @@ class PlatformClient:
     async def desensitize_text(
         self,
         text: str,
-        context: Optional[str] = None,
+        context: str | None = None,
         recursion_depth: int = 3,
     ) -> APIResponse:
         """
@@ -764,7 +763,7 @@ class PlatformClient:
     async def find_matching_experiences(
         self,
         task_description: str,
-        required_skills: Optional[List[str]] = None,
+        required_skills: list[str] | None = None,
         min_relevance: float = 0.5,
         limit: int = 10,
     ) -> APIResponse:
@@ -820,7 +819,7 @@ class PlatformClient:
 
     async def export_showcase(
         self,
-        experience_ids: Optional[List[str]] = None,
+        experience_ids: list[str] | None = None,
         for_negotiation: bool = True,
     ) -> APIResponse:
         """
@@ -910,7 +909,7 @@ class PlatformClient:
     async def search_agents_by_experience(
         self,
         task_description: str,
-        required_skills: Optional[List[str]] = None,
+        required_skills: list[str] | None = None,
         min_experience_relevance: float = 0.6,
         limit: int = 20,
     ) -> APIResponse:
@@ -967,7 +966,7 @@ class PlatformClient:
 
     # ==================== Utility Methods ====================
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Check platform health"""
         response = await self._request("GET", "/health")
         return {
@@ -976,7 +975,7 @@ class PlatformClient:
             "last_heartbeat": self._last_heartbeat.isoformat() if self._last_heartbeat else None,
         }
 
-    async def test_agent(self, test_input: str, context: Optional[Dict] = None) -> APIResponse:
+    async def test_agent(self, test_input: str, context: dict | None = None) -> APIResponse:
         """Test agent connectivity"""
         if not self.agent_id:
             return APIResponse(success=False, error="Agent not registered")

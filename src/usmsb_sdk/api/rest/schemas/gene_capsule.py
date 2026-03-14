@@ -5,9 +5,9 @@ Request and response models for gene capsule endpoints.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from typing import Any
 
+from pydantic import BaseModel, Field
 
 # ==================== Enums ====================
 
@@ -40,7 +40,7 @@ class ProficiencyLevel:
 class AddExperienceRequest(BaseModel):
     """Request to add a new experience gene"""
     agent_id: str
-    experience: Dict[str, Any] = Field(..., description="Experience details")
+    experience: dict[str, Any] = Field(..., description="Experience details")
     auto_desensitize: bool = Field(default=True, description="Auto-desensitize sensitive data")
 
 
@@ -54,7 +54,7 @@ class UpdateVisibilityRequest(BaseModel):
 class DesensitizeTextRequest(BaseModel):
     """Request for LLM-based text desensitization"""
     text: str
-    context: Optional[str] = None
+    context: str | None = None
     recursion_depth: int = Field(default=3, ge=1, le=5)
 
 
@@ -62,7 +62,7 @@ class FindMatchingExperiencesRequest(BaseModel):
     """Request to find matching experiences"""
     agent_id: str
     task_description: str
-    required_skills: Optional[List[str]] = None
+    required_skills: list[str] | None = None
     min_relevance: float = Field(default=0.5, ge=0.0, le=1.0)
     limit: int = Field(default=10, ge=1, le=100)
 
@@ -76,14 +76,14 @@ class SkillRecommendationsRequest(BaseModel):
 class ExportShowcaseRequest(BaseModel):
     """Request to export experience showcase"""
     agent_id: str
-    experience_ids: Optional[List[str]] = None
+    experience_ids: list[str] | None = None
     for_negotiation: bool = True
 
 
 class SearchAgentsByExperienceRequest(BaseModel):
     """Request to search agents by their experience"""
     task_description: str
-    required_skills: Optional[List[str]] = None
+    required_skills: list[str] | None = None
     min_experience_relevance: float = Field(default=0.6, ge=0.0, le=1.0)
     limit: int = Field(default=20, ge=1, le=100)
 
@@ -99,43 +99,43 @@ class ExperienceGeneResponse(BaseModel):
     """Response model for a single experience gene"""
     gene_id: str
     task_type: str
-    task_category: Optional[str] = None
-    task_description: Optional[str] = None
-    techniques_used: List[str] = []
-    tools_used: List[str] = []
-    outcome: Optional[str] = None
+    task_category: str | None = None
+    task_description: str | None = None
+    techniques_used: list[str] = []
+    tools_used: list[str] = []
+    outcome: str | None = None
     quality_score: float = 0.0
     completion_time: float = 0.0
-    client_rating: Optional[int] = None
-    client_review: Optional[str] = None
-    lessons_learned: List[str] = []
+    client_rating: int | None = None
+    client_review: str | None = None
+    lessons_learned: list[str] = []
     verified: bool = False
     verification_status: str = "unverified"
     verification_score: float = 0.0
     share_level: str = "semi_public"
-    value_score: Optional[float] = None
-    created_at: Optional[datetime] = None
+    value_score: float | None = None
+    created_at: datetime | None = None
 
 
 class SkillGeneResponse(BaseModel):
     """Response model for a skill gene"""
     skill_id: str
     skill_name: str
-    category: Optional[str] = None
+    category: str | None = None
     proficiency_level: str = "basic"
     times_used: int = 0
     success_count: int = 0
     avg_quality_score: float = 0.0
-    verified_at: Optional[datetime] = None
+    verified_at: datetime | None = None
 
 
 class PatternGeneResponse(BaseModel):
     """Response model for a pattern gene"""
     pattern_id: str
     pattern_name: str
-    pattern_type: Optional[str] = None
-    trigger_conditions: List[str] = []
-    approach: Optional[str] = None
+    pattern_type: str | None = None
+    trigger_conditions: list[str] = []
+    approach: str | None = None
     success_rate: float = 0.0
     usage_count: int = 0
 
@@ -149,18 +149,18 @@ class GeneCapsuleResponse(BaseModel):
     success_rate: float = 0.0
     avg_satisfaction: float = 0.0
     verification_status: str = "pending"
-    experiences: List[ExperienceGeneResponse] = []
-    skills: List[SkillGeneResponse] = []
-    patterns: List[PatternGeneResponse] = []
-    created_at: Optional[datetime] = None
-    last_updated: Optional[datetime] = None
+    experiences: list[ExperienceGeneResponse] = []
+    skills: list[SkillGeneResponse] = []
+    patterns: list[PatternGeneResponse] = []
+    created_at: datetime | None = None
+    last_updated: datetime | None = None
 
 
 class DesensitizeTextResponse(BaseModel):
     """Response for text desensitization"""
     original_text: str
     desensitized_text: str
-    detected_entities: List[Dict[str, Any]] = []
+    detected_entities: list[dict[str, Any]] = []
     rounds_completed: int = 0
     confidence: float = 0.0
 
@@ -169,9 +169,9 @@ class MatchingExperienceResponse(BaseModel):
     """Response for matched experience"""
     experience: ExperienceGeneResponse
     relevance_score: float
-    matching_skills: List[str] = []
-    matching_techniques: List[str] = []
-    reasoning: Optional[str] = None
+    matching_skills: list[str] = []
+    matching_techniques: list[str] = []
+    reasoning: str | None = None
 
 
 class ValueScoresResponse(BaseModel):
@@ -189,19 +189,19 @@ class ShowcaseResponse(BaseModel):
     """Response for exported showcase"""
     agent_id: str
     showcase_id: str
-    experiences: List[ExperienceGeneResponse]
-    skills: List[SkillGeneResponse]
-    patterns: List[PatternGeneResponse]
+    experiences: list[ExperienceGeneResponse]
+    skills: list[SkillGeneResponse]
+    patterns: list[PatternGeneResponse]
     generated_at: datetime
-    summary: Optional[str] = None
+    summary: str | None = None
 
 
 class AgentExperienceSearchResult(BaseModel):
     """Result from searching agents by experience"""
     agent_id: str
-    agent_name: Optional[str] = None
+    agent_name: str | None = None
     overall_relevance: float
-    matched_experiences: List[MatchingExperienceResponse]
+    matched_experiences: list[MatchingExperienceResponse]
     verified_experiences_count: int
     total_experience_value: float
 
@@ -210,7 +210,7 @@ class VerificationStatusResponse(BaseModel):
     """Response for verification status"""
     experience_id: str
     status: str
-    verification_methods: List[str] = []
+    verification_methods: list[str] = []
     verification_score: float = 0.0
-    verified_at: Optional[datetime] = None
-    details: Optional[Dict[str, Any]] = None
+    verified_at: datetime | None = None
+    details: dict[str, Any] | None = None

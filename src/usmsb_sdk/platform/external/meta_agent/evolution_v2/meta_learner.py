@@ -4,21 +4,14 @@
 学习如何学习，优化学习策略
 """
 
-import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Any
 
 from .models import (
-    MetaLearningRecord,
-    LearningType,
     LearningGoal,
-    Capability,
-    KnowledgeUnit,
-    KnowledgeState,
+    MetaLearningRecord,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,10 +23,10 @@ class LearningStrategy:
 
     name: str
     description: str
-    applicable_contexts: List[str]
+    applicable_contexts: list[str]
     expected_efficiency: float
-    parameters: Dict[str, Any] = field(default_factory=dict)
-    success_history: List[float] = field(default_factory=list)
+    parameters: dict[str, Any] = field(default_factory=dict)
+    success_history: list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -45,7 +38,7 @@ class LearningContext:
     prior_knowledge: float
     time_available: float
     goal_importance: float
-    resource_constraints: Dict[str, Any] = field(default_factory=dict)
+    resource_constraints: dict[str, Any] = field(default_factory=dict)
 
 
 class MetaLearner:
@@ -64,12 +57,12 @@ class MetaLearner:
         self.llm = llm_manager
         self.knowledge = knowledge_base
 
-        self._strategies: Dict[str, LearningStrategy] = {}
-        self._meta_records: List[MetaLearningRecord] = []
-        self._learning_history: List[Dict[str, Any]] = []
+        self._strategies: dict[str, LearningStrategy] = {}
+        self._meta_records: list[MetaLearningRecord] = []
+        self._learning_history: list[dict[str, Any]] = []
 
-        self._context_patterns: Dict[str, List[str]] = {}
-        self._optimal_conditions: Dict[str, Dict[str, Any]] = {}
+        self._context_patterns: dict[str, list[str]] = {}
+        self._optimal_conditions: dict[str, dict[str, Any]] = {}
 
         self._initialized = False
 
@@ -143,8 +136,8 @@ class MetaLearner:
     async def select_optimal_strategy(
         self,
         context: LearningContext,
-        available_strategies: Optional[List[str]] = None,
-    ) -> Tuple[str, float]:
+        available_strategies: list[str] | None = None,
+    ) -> tuple[str, float]:
         """
         选择最优学习策略
 
@@ -252,7 +245,7 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         执行学习过程
 
@@ -302,7 +295,7 @@ class MetaLearner:
         strategy: LearningStrategy,
         goal: LearningGoal,
         context: LearningContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """应用学习策略"""
         result = {
             "efficiency": strategy.expected_efficiency,
@@ -337,8 +330,8 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """应用迭代练习策略"""
         iterations = params.get("iterations", 3)
         knowledge_gained = []
@@ -367,8 +360,8 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """应用类比迁移策略"""
         threshold = params.get("similarity_threshold", 0.5)
 
@@ -395,8 +388,8 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """应用分块学习策略"""
         chunk_size = params.get("chunk_size", 5)
 
@@ -425,8 +418,8 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """应用间隔重复策略"""
         intervals = params.get("intervals", [1, 3, 7, 14, 30])
 
@@ -447,8 +440,8 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """应用自我解释策略"""
         depth = params.get("explain_depth", 2)
 
@@ -472,8 +465,8 @@ class MetaLearner:
         self,
         goal: LearningGoal,
         context: LearningContext,
-        params: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         """应用精细加工策略"""
         depth = params.get("depth", 3)
         make_associations = params.get("associations", True)
@@ -501,7 +494,7 @@ class MetaLearner:
     def _update_strategy_performance(
         self,
         strategy_name: str,
-        result: Dict[str, Any],
+        result: dict[str, Any],
     ):
         """更新策略性能记录"""
         if strategy_name in self._strategies:
@@ -516,7 +509,7 @@ class MetaLearner:
                 strategy.expected_efficiency * 0.7 + avg_performance * 0.3
             )
 
-    async def optimize_learning_parameters(self) -> Dict[str, Any]:
+    async def optimize_learning_parameters(self) -> dict[str, Any]:
         """
         优化学习参数
 
@@ -526,7 +519,7 @@ class MetaLearner:
 
         optimizations = {}
 
-        for strategy_name, strategy in self._strategies.items():
+        for strategy_name, _strategy in self._strategies.items():
             strategy_records = [
                 r for r in self._meta_records if r.learning_strategy == strategy_name
             ]
@@ -546,7 +539,7 @@ class MetaLearner:
 
         return optimizations
 
-    def _extract_best_params(self, record: MetaLearningRecord) -> Dict[str, Any]:
+    def _extract_best_params(self, record: MetaLearningRecord) -> dict[str, Any]:
         """从最佳记录中提取参数"""
         params = {}
         for approach in record.recommended_approaches:
@@ -559,8 +552,8 @@ class MetaLearner:
     async def learn_from_failure(
         self,
         failed_goal: LearningGoal,
-        failure_context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        failure_context: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         从失败中学习
 
@@ -585,8 +578,8 @@ class MetaLearner:
         self,
         source_domain: str,
         target_domain: str,
-        knowledge_ids: List[str],
-    ) -> Dict[str, Any]:
+        knowledge_ids: list[str],
+    ) -> dict[str, Any]:
         """
         知识迁移
 
@@ -612,7 +605,7 @@ class MetaLearner:
         if not self._initialized:
             await self.initialize()
 
-    def get_meta_learning_stats(self) -> Dict[str, Any]:
+    def get_meta_learning_stats(self) -> dict[str, Any]:
         """获取元学习统计"""
         return {
             "total_learning_sessions": len(self._meta_records),
@@ -630,7 +623,7 @@ class MetaLearner:
             "optimal_conditions": self._optimal_conditions,
         }
 
-    async def _practice_iteration(self, goal: LearningGoal, iteration: int) -> Dict[str, Any]:
+    async def _practice_iteration(self, goal: LearningGoal, iteration: int) -> dict[str, Any]:
         if not self.llm:
             return {"knowledge": [], "improvements": []}
         prompt = f"""针对学习目标"{goal.title}"进行第{iteration + 1}次练习。
@@ -647,20 +640,19 @@ class MetaLearner:
         except Exception:
             return {"knowledge": [], "improvements": []}
 
-    async def _find_similar_domains(self, domain: str, threshold: float) -> List[str]:
+    async def _find_similar_domains(self, domain: str, threshold: float) -> list[str]:
         return ["编程", "问题解决", "系统设计"][:2]
 
-    async def _extract_transferable_knowledge(self, source: str, target: str) -> List[str]:
+    async def _extract_transferable_knowledge(self, source: str, target: str) -> list[str]:
         return [f"从{source}迁移到{target}的知识模式"]
 
-    async def _decompose_goal(self, goal: LearningGoal, chunk_size: int) -> List[Dict]:
+    async def _decompose_goal(self, goal: LearningGoal, chunk_size: int) -> list[dict]:
         return [{"id": i, "content": f"子任务{i}"} for i in range(chunk_size)]
 
-    async def _learn_chunk(self, chunk: Dict) -> Dict[str, Any]:
+    async def _learn_chunk(self, chunk: dict) -> dict[str, Any]:
         return {"knowledge": f"学习了{chunk.get('id')}"}
 
-    def _create_repetition_schedule(self, goal: LearningGoal, intervals: List[int]) -> List[Dict]:
-        import time
+    def _create_repetition_schedule(self, goal: LearningGoal, intervals: list[int]) -> list[dict]:
 
         return [{"day": d, "goal_id": goal.id} for d in intervals]
 
@@ -669,18 +661,18 @@ class MetaLearner:
             return f"深度{depth}解释: {goal.title}"
         return f"对'{goal.title}'的第{depth}层解释"
 
-    async def _elaborate_knowledge(self, goal: LearningGoal, depth: int) -> List[str]:
+    async def _elaborate_knowledge(self, goal: LearningGoal, depth: int) -> list[str]:
         return [f"精细加工{i}: {goal.title}" for i in range(depth)]
 
-    async def _find_knowledge_associations(self, goal: LearningGoal) -> List[Dict]:
+    async def _find_knowledge_associations(self, goal: LearningGoal) -> list[dict]:
         return [{"from": goal.id, "to": "related_knowledge"}]
 
-    async def _analyze_failure(self, goal: LearningGoal, context: Dict) -> Dict[str, Any]:
+    async def _analyze_failure(self, goal: LearningGoal, context: dict) -> dict[str, Any]:
         return {
             "failure_reasons": ["策略不匹配"],
             "strategy_adjustments": ["iterative_practice"],
             "alternative_approaches": ["尝试分块学习"],
         }
 
-    async def _adapt_knowledge(self, knowledge: Any, source: str, target: str) -> Dict[str, Any]:
+    async def _adapt_knowledge(self, knowledge: Any, source: str, target: str) -> dict[str, Any]:
         return {"original": knowledge, "adapted_for": target}

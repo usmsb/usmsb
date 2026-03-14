@@ -8,11 +8,11 @@ VIBDividend 分红合约客户端
 - 获取分红统计
 """
 
-from typing import Optional, Dict, Any, Union, List
+from typing import Any
 
-from .base import BaseContractClient, TransactionError, ContractError
 from ..config import BlockchainConfig
 from ..web3_client import Web3Client
+from .base import BaseContractClient, ContractError, TransactionError
 
 
 class VIBDividendClient(BaseContractClient):
@@ -30,10 +30,10 @@ class VIBDividendClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Web3Client] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Union[List[Dict], str]] = None,
+        web3_client: Web3Client | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: list[dict] | str | None = None,
     ):
         """
         初始化 VIBDividend 客户端
@@ -58,7 +58,7 @@ class VIBDividendClient(BaseContractClient):
 
         self.set_contract(contract_address, abi)
 
-    def _get_default_abi(self) -> List[Dict]:
+    def _get_default_abi(self) -> list[dict]:
         """获取默认 ABI"""
         return [
             # 只读函数
@@ -141,7 +141,7 @@ class VIBDividendClient(BaseContractClient):
         self,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """领取分红
 
@@ -196,7 +196,7 @@ class VIBDividendClient(BaseContractClient):
         except Exception as e:
             raise ContractError(f"Failed to get dividend balance: {e}")
 
-    async def get_dividend_stats(self) -> Dict[str, Any]:
+    async def get_dividend_stats(self) -> dict[str, Any]:
         """获取分红统计
 
         Returns:
@@ -239,7 +239,7 @@ class VIBDividendClient(BaseContractClient):
         except Exception as e:
             raise ContractError(f"Failed to get dividend stats: {e}")
 
-    async def check_claim_available(self, user: str) -> Dict[str, Any]:
+    async def check_claim_available(self, user: str) -> dict[str, Any]:
         """检查用户是否可以领取分红
 
         Args:
@@ -286,7 +286,7 @@ class VIBDividendClient(BaseContractClient):
         private_key: str,
         timeout: int = 120,
         poll_latency: float = 0.1,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """领取分红并等待交易确认
 
         Args:

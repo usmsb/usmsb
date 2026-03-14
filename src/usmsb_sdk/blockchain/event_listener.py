@@ -12,17 +12,15 @@
 
 import asyncio
 import logging
-from typing import Callable, Dict, List, Optional, Any, Tuple
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from web3 import Web3
 from web3.contract import Contract
-from web3.exceptions import ContractLogicError, TimeExhausted
 
 from .config import BlockchainConfig
-from .contracts.base import BaseContractClient
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +30,10 @@ class EventFilter:
     """事件过滤器配置"""
     contract_name: str
     event_name: str
-    from_block: Optional[int] = None
-    to_block: Optional[str] = "latest"
-    address: Optional[str] = None
-    argument_filters: Optional[Dict[str, Any]] = None
+    from_block: int | None = None
+    to_block: str | None = "latest"
+    address: str | None = None
+    argument_filters: dict[str, Any] | None = None
 
 
 @dataclass
@@ -46,7 +44,7 @@ class ParsedEvent:
     event: Any
     block_number: int
     transaction_hash: str
-    args: Dict[str, Any]
+    args: dict[str, Any]
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -94,7 +92,11 @@ class BlockchainEventListener:
         },
         "VIBDividend": {
             "DividendClaimed": {"user": "address", "amount": "uint256"},
-            "DividendDeposited": {"from": "address", "amount": "uint256", "dividendPerToken": "uint256"},
+            "DividendDeposited": {
+                "from": "address",
+                "amount": "uint256",
+                "dividendPerToken": "uint256",
+            },
         },
         "VIBGovernance": {
             "ProposalCreated": {
@@ -115,7 +117,7 @@ class BlockchainEventListener:
         },
     }
 
-    def __init__(self, config: BlockchainConfig, contracts: Dict[str, Contract]):
+    def __init__(self, config: BlockchainConfig, contracts: dict[str, Contract]):
         """
         初始化事件监听器
 
@@ -128,11 +130,11 @@ class BlockchainEventListener:
         self.web3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
         # 事件处理器注册表 {contract.event: [handlers]}
-        self.handlers: Dict[str, List[Callable]] = {}
+        self.handlers: dict[str, list[Callable]] = {}
 
         # 运行状态
         self.running = False
-        self.listen_task: Optional[asyncio.Task] = None
+        self.listen_task: asyncio.Task | None = None
 
         # 同步状态
         self.last_block = self.web3.eth.block_number
@@ -145,7 +147,7 @@ class BlockchainEventListener:
         self.retry_delay: int = 5
 
         # 事件缓存
-        self.event_cache: List[ParsedEvent] = []
+        self.event_cache: list[ParsedEvent] = []
         self.cache_max_size: int = 10000
 
         # 统计
@@ -202,7 +204,7 @@ class BlockchainEventListener:
             except ValueError:
                 logger.warning(f"Handler not found for {key}")
 
-    async def start(self, poll_interval: Optional[int] = None):
+    async def start(self, poll_interval: int | None = None):
         """
         启动事件监听
 
@@ -386,7 +388,7 @@ class BlockchainEventListener:
     async def _fetch_and_dispatch(
         self,
         contract_name: str,
-        event_names: List[str],
+        event_names: list[str],
         from_block: int,
         to_block: int
     ):
@@ -468,7 +470,7 @@ class BlockchainEventListener:
         contract_name: str,
         event_name: str,
         event
-    ) -> Optional[ParsedEvent]:
+    ) -> ParsedEvent | None:
         """
         解析事件数据
 
@@ -513,9 +515,9 @@ class BlockchainEventListener:
         self,
         contract_name: str,
         event_name: str,
-        from_block: Optional[int] = None,
-        to_block: Optional[str] = "latest"
-    ) -> List[ParsedEvent]:
+        from_block: int | None = None,
+        to_block: str | None = "latest"
+    ) -> list[ParsedEvent]:
         """
         获取历史事件
 
@@ -545,10 +547,10 @@ class BlockchainEventListener:
 
     def get_cached_events(
         self,
-        contract_name: Optional[str] = None,
-        event_name: Optional[str] = None,
-        limit: Optional[int] = None
-    ) -> List[ParsedEvent]:
+        contract_name: str | None = None,
+        event_name: str | None = None,
+        limit: int | None = None
+    ) -> list[ParsedEvent]:
         """
         从缓存获取事件
 
@@ -573,7 +575,7 @@ class BlockchainEventListener:
 
         return events
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取监听器统计信息"""
         return {
             **self.stats,
@@ -592,7 +594,7 @@ class BlockchainEventListener:
 
 def create_event_listener(
     config: BlockchainConfig,
-    contract_map: Dict[str, Tuple[str, Any]]
+    contract_map: dict[str, tuple[str, Any]]
 ) -> BlockchainEventListener:
     """
     创建事件监听器的便捷函数
@@ -633,10 +635,10 @@ class EventFilterBuilder:
     def __init__(self, contract_name: str, event_name: str):
         self.contract_name = contract_name
         self.event_name = event_name
-        self._from_block: Optional[int] = None
-        self._to_block: Optional[str] = "latest"
-        self._address: Optional[str] = None
-        self._argument_filters: Optional[Dict[str, Any]] = None
+        self._from_block: int | None = None
+        self._to_block: str | None = "latest"
+        self._address: str | None = None
+        self._argument_filters: dict[str, Any] | None = None
 
     def from_block(self, block: int) -> 'EventFilterBuilder':
         """设置起始区块"""
@@ -719,7 +721,7 @@ class TypedEventListener(BlockchainEventListener):
 
     async def subscribe(
         self,
-        filters: List[EventFilter],
+        filters: list[EventFilter],
         handler: EventCallback
     ):
         """

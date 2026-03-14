@@ -4,15 +4,14 @@ Reasoning Engine Interfaces
 定义推理引擎的核心接口和数据结构
 """
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
-import time
-import uuid
+from enum import StrEnum
+from typing import Any
 
 
-class ReasoningType(str, Enum):
+class ReasoningType(StrEnum):
     """推理类型枚举"""
 
     DEDUCTIVE = "deductive"
@@ -27,7 +26,7 @@ class ReasoningType(str, Enum):
     META = "meta"
 
 
-class UncertaintyType(str, Enum):
+class UncertaintyType(StrEnum):
     """不确定性类型"""
 
     PROBABILISTIC = "probabilistic"
@@ -73,7 +72,7 @@ class ConfidenceScore:
             evidence_count=self.evidence_count + other.evidence_count,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "value": self.value,
             "lower_bound": self.lower_bound,
@@ -89,10 +88,10 @@ class UncertaintyMeasure:
 
     uncertainty_type: UncertaintyType
     value: Any
-    distribution: Optional[Dict[str, float]] = None
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    distribution: dict[str, float] | None = None
+    parameters: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "uncertainty_type": self.uncertainty_type.value,
             "value": self.value,
@@ -107,16 +106,16 @@ class ReasoningStep:
 
     step_id: str
     step_type: ReasoningType
-    input_premises: List[str]
-    output_conclusions: List[str]
+    input_premises: list[str]
+    output_conclusions: list[str]
     inference_rule: str
     confidence: ConfidenceScore
-    uncertainty: Optional[UncertaintyMeasure] = None
+    uncertainty: UncertaintyMeasure | None = None
     reasoning_trace: str = ""
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "step_id": self.step_id,
             "step_type": self.step_type.value,
@@ -139,15 +138,15 @@ class ReasoningResult:
     reasoning_type: ReasoningType
     conclusion: Any
     confidence: ConfidenceScore
-    uncertainty: Optional[UncertaintyMeasure] = None
-    reasoning_chain: List[ReasoningStep] = field(default_factory=list)
-    alternatives: List[Dict[str, Any]] = field(default_factory=list)
-    explanations: List[str] = field(default_factory=list)
-    contradictions: List[Dict[str, Any]] = field(default_factory=list)
+    uncertainty: UncertaintyMeasure | None = None
+    reasoning_chain: list[ReasoningStep] = field(default_factory=list)
+    alternatives: list[dict[str, Any]] = field(default_factory=list)
+    explanations: list[str] = field(default_factory=list)
+    contradictions: list[dict[str, Any]] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "result_id": self.result_id,
             "reasoning_type": self.reasoning_type.value,
@@ -174,7 +173,7 @@ class IReasoningEngine(ABC):
 
     @abstractmethod
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         """
         执行推理
@@ -189,7 +188,7 @@ class IReasoningEngine(ABC):
         pass
 
     @abstractmethod
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         """
         验证推理有效性
 
@@ -202,7 +201,7 @@ class IReasoningEngine(ABC):
         pass
 
     @abstractmethod
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         """
         计算结论的置信度
 
@@ -216,7 +215,7 @@ class IReasoningEngine(ABC):
         pass
 
     @abstractmethod
-    async def explain(self, reasoning_result: ReasoningResult) -> List[str]:
+    async def explain(self, reasoning_result: ReasoningResult) -> list[str]:
         """
         生成推理解释
 
@@ -238,27 +237,27 @@ class IReasoningChain(ABC):
         pass
 
     @abstractmethod
-    def get_step(self, step_id: str) -> Optional[ReasoningStep]:
+    def get_step(self, step_id: str) -> ReasoningStep | None:
         """获取推理步骤"""
         pass
 
     @abstractmethod
-    def get_chain(self) -> List[ReasoningStep]:
+    def get_chain(self) -> list[ReasoningStep]:
         """获取完整推理链"""
         pass
 
     @abstractmethod
-    def validate_consistency(self) -> Tuple[bool, List[Dict[str, Any]]]:
+    def validate_consistency(self) -> tuple[bool, list[dict[str, Any]]]:
         """验证一致性"""
         pass
 
     @abstractmethod
-    def detect_contradictions(self) -> List[Dict[str, Any]]:
+    def detect_contradictions(self) -> list[dict[str, Any]]:
         """检测矛盾"""
         pass
 
     @abstractmethod
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         pass
 
@@ -268,8 +267,8 @@ class IKnowledgeGraphAdapter(ABC):
 
     @abstractmethod
     async def query(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """查询知识图谱"""
         pass
 
@@ -281,16 +280,16 @@ class IKnowledgeGraphAdapter(ABC):
         pass
 
     @abstractmethod
-    async def get_related_concepts(self, concept: str, max_depth: int = 2) -> List[Dict[str, Any]]:
+    async def get_related_concepts(self, concept: str, max_depth: int = 2) -> list[dict[str, Any]]:
         """获取相关概念"""
         pass
 
     @abstractmethod
-    async def infer_relations(self, entity1: str, entity2: str) -> List[Dict[str, Any]]:
+    async def infer_relations(self, entity1: str, entity2: str) -> list[dict[str, Any]]:
         """推断实体间关系"""
         pass
 
     @abstractmethod
-    async def check_consistency(self, facts: List[Tuple[str, str, str]]) -> Tuple[bool, List[str]]:
+    async def check_consistency(self, facts: list[tuple[str, str, str]]) -> tuple[bool, list[str]]:
         """检查一致性"""
         pass

@@ -4,15 +4,13 @@ Wallet Module
 Manages agent wallet, staking, and transactions.
 """
 
-import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +58,7 @@ class WalletBalance:
         return self.available_balance + self.staked_amount + self.locked_amount
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WalletBalance":
+    def from_dict(cls, data: dict[str, Any]) -> "WalletBalance":
         return cls(
             available_balance=data.get("available_balance", data.get("vibe_balance", 0)),
             staked_amount=data.get("staked_amount", data.get("stake", 0)),
@@ -69,7 +67,7 @@ class WalletBalance:
             pending_outgoing=data.get("pending_outgoing", 0),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "available_balance": self.available_balance,
             "staked_amount": self.staked_amount,
@@ -86,11 +84,11 @@ class StakeInfo:
     staked_amount: float
     stake_status: str
     locked_stake: float
-    unlock_available_at: Optional[datetime]
+    unlock_available_at: datetime | None
     reputation_boost: float
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StakeInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "StakeInfo":
         unlock_at = None
         if data.get("unlock_available_at"):
             if isinstance(data["unlock_available_at"], (int, float)):
@@ -109,7 +107,7 @@ class StakeInfo:
             reputation_boost=reputation,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "staked_amount": self.staked_amount,
             "stake_status": self.stake_status,
@@ -127,16 +125,16 @@ class Transaction:
     amount: float
     counterparty_id: str
     status: str
-    title: Optional[str]
-    description: Optional[str]
+    title: str | None
+    description: str | None
     platform_fee: float
-    created_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    rating: Optional[int]
-    review: Optional[str]
+    created_at: datetime | None
+    completed_at: datetime | None
+    rating: int | None
+    review: str | None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Transaction":
+    def from_dict(cls, data: dict[str, Any]) -> "Transaction":
         created_at = None
         if data.get("created_at"):
             if isinstance(data["created_at"], (int, float)):
@@ -166,7 +164,7 @@ class Transaction:
             review=data.get("review"),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "tx_id": self.tx_id,
             "tx_type": self.tx_type,
@@ -195,7 +193,7 @@ class WalletLimits:
         return max(0, self.daily_limit - self.daily_spent)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WalletLimits":
+    def from_dict(cls, data: dict[str, Any]) -> "WalletLimits":
         return cls(
             max_per_tx=data.get("max_per_tx", 500),
             daily_limit=data.get("daily_limit", 1000),
@@ -213,7 +211,7 @@ class StakeResult:
     message: str
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "StakeResult":
+    def from_dict(cls, data: dict[str, Any]) -> "StakeResult":
         return cls(
             success=data.get("success", False),
             amount=data.get("amount", 0),
@@ -237,14 +235,14 @@ class WalletManager:
     def __init__(
         self,
         platform_client: PlatformClient,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
         self.logger = logger or logging.getLogger(__name__)
 
         # Local cache
-        self._balance_cache: Optional[WalletBalance] = None
-        self._stake_cache: Optional[StakeInfo] = None
+        self._balance_cache: WalletBalance | None = None
+        self._stake_cache: StakeInfo | None = None
 
     # ==================== Balance ====================
 
@@ -362,7 +360,7 @@ class WalletManager:
             message="Unstaking not yet supported",
         )
 
-    async def get_unstake_status(self) -> Dict[str, Any]:
+    async def get_unstake_status(self) -> dict[str, Any]:
         """Get unstaking status and unlock time"""
         stake_info = await self.get_stake_info()
         return {
@@ -375,9 +373,9 @@ class WalletManager:
 
     async def get_transaction_history(
         self,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 50,
-    ) -> List[Transaction]:
+    ) -> list[Transaction]:
         """
         Get transaction history.
 
@@ -393,13 +391,13 @@ class WalletManager:
         self.logger.debug("Transaction history not yet available from platform")
         return []
 
-    async def get_pending_transactions(self) -> List[Transaction]:
+    async def get_pending_transactions(self) -> list[Transaction]:
         """Get pending (non-completed) transactions"""
         all_tx = await self.get_transaction_history()
         pending_statuses = ["created", "escrowed", "in_progress", "delivered", "disputed"]
         return [tx for tx in all_tx if tx.status in pending_statuses]
 
-    async def get_transaction(self, tx_id: str) -> Optional[Transaction]:
+    async def get_transaction(self, tx_id: str) -> Transaction | None:
         """Get a specific transaction"""
         # TODO: Implement when platform has transaction endpoint
         return None
@@ -415,7 +413,7 @@ class WalletManager:
             daily_spent=0,
         )
 
-    async def check_can_spend(self, amount: float) -> Dict[str, Any]:
+    async def check_can_spend(self, amount: float) -> dict[str, Any]:
         """
         Check if agent can spend specified amount.
 
@@ -438,7 +436,7 @@ class WalletManager:
 
     # ==================== Summary ====================
 
-    async def get_wallet_summary(self) -> Dict[str, Any]:
+    async def get_wallet_summary(self) -> dict[str, Any]:
         """Get complete wallet summary"""
         balance = await self.get_balance()
         stake_info = await self.get_stake_info()

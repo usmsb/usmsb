@@ -4,11 +4,12 @@
 提供通用的合约交互接口，支持EIP-1559交易构建。
 """
 
-from typing import Optional, Dict, Any, List, Union
-from web3 import Web3
-from web3.contract import Contract
+from typing import Any
+
 from eth_account import Account
 from eth_account.messages import encode_defunct
+from web3 import Web3
+from web3.contract import Contract
 
 from ..config import BlockchainConfig
 from ..web3_client import Web3Client
@@ -36,10 +37,10 @@ class BaseContractClient:
 
     def __init__(
         self,
-        web3_client: Optional[Web3Client] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Union[List[Dict], str]] = None,
+        web3_client: Web3Client | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: list[dict] | str | None = None,
     ):
         """
         初始化基础合约客户端
@@ -54,7 +55,7 @@ class BaseContractClient:
         self.web3_client = web3_client or Web3Client(config=self.config)
         self.contract_address = contract_address
         self.abi = abi
-        self._contract: Optional[Contract] = None
+        self._contract: Contract | None = None
 
     @property
     def w3(self) -> Web3:
@@ -62,7 +63,7 @@ class BaseContractClient:
         return self.web3_client.w3
 
     @property
-    def contract(self) -> Optional[Contract]:
+    def contract(self) -> Contract | None:
         """获取合约实例"""
         if self._contract is None and self.contract_address and self.abi:
             self._contract = self._create_contract()
@@ -78,7 +79,7 @@ class BaseContractClient:
         checksum_address = self.w3.to_checksum_address(self.contract_address)
         return self.w3.eth.contract(address=checksum_address, abi=self.abi)
 
-    def set_contract(self, address: str, abi: Union[List[Dict], str]) -> None:
+    def set_contract(self, address: str, abi: list[dict] | str) -> None:
         """
         设置合约
 
@@ -94,15 +95,15 @@ class BaseContractClient:
         self,
         from_address: str,
         value: int = 0,
-        gas: Optional[int] = None,
-        gas_price: Optional[int] = None,
-        max_fee_per_gas: Optional[int] = None,
-        max_priority_fee_per_gas: Optional[int] = None,
-        nonce: Optional[int] = None,
-        data: Optional[str] = None,
-        to: Optional[str] = None,
+        gas: int | None = None,
+        gas_price: int | None = None,
+        max_fee_per_gas: int | None = None,
+        max_priority_fee_per_gas: int | None = None,
+        nonce: int | None = None,
+        data: str | None = None,
+        to: str | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         构建交易（支持EIP-1559）
 
@@ -131,7 +132,7 @@ class BaseContractClient:
         if nonce is None:
             nonce = self.w3.eth.get_transaction_count(from_address)
 
-        tx: Dict[str, Any] = {
+        tx: dict[str, Any] = {
             "from": from_address,
             "nonce": nonce,
             "value": value,
@@ -193,7 +194,7 @@ class BaseContractClient:
         # 本地Anvil/Hardhat默认支持
         return self.config.chain_id in [8453, 84532, 31337]
 
-    def _get_eip1559_fees(self) -> Dict[str, int]:
+    def _get_eip1559_fees(self) -> dict[str, int]:
         """
         获取EIP-1559费用建议
 
@@ -226,7 +227,7 @@ class BaseContractClient:
 
     def sign_transaction(
         self,
-        transaction: Dict[str, Any],
+        transaction: dict[str, Any],
         private_key: str,
     ) -> bytes:
         """
@@ -258,7 +259,7 @@ class BaseContractClient:
 
     def sign_and_send_transaction(
         self,
-        transaction: Dict[str, Any],
+        transaction: dict[str, Any],
         private_key: str,
     ) -> str:
         """
@@ -279,12 +280,12 @@ class BaseContractClient:
         contract_function,
         from_address: str,
         value: int = 0,
-        gas: Optional[int] = None,
-        gas_price: Optional[int] = None,
-        max_fee_per_gas: Optional[int] = None,
-        max_priority_fee_per_gas: Optional[int] = None,
+        gas: int | None = None,
+        gas_price: int | None = None,
+        max_fee_per_gas: int | None = None,
+        max_priority_fee_per_gas: int | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         构建合约调用交易
 
@@ -318,7 +319,7 @@ class BaseContractClient:
     def call_contract_function(
         self,
         contract_function,
-        block_identifier: Optional[Any] = None,
+        block_identifier: Any | None = None,
     ) -> Any:
         """
         调用合约只读函数
@@ -389,7 +390,7 @@ class BaseContractClient:
         )
         return address
 
-    def get_transaction_receipt(self, tx_hash: str) -> Dict[str, Any]:
+    def get_transaction_receipt(self, tx_hash: str) -> dict[str, Any]:
         """
         获取交易收据
 
@@ -413,7 +414,7 @@ class BaseContractClient:
         timeout: int = 120,
         poll_latency: float = 0.1,
         raise_on_failure: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         等待交易完成
 

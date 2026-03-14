@@ -10,16 +10,14 @@
 6. 技能描述
 """
 
-import json
 import logging
 import os
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from ..prompts.system_prompt import SYSTEM_PROMPT, PERSONALITY, CAPABILITIES
-from ..prompts.tool_prompts import get_tool_prompt, get_all_tools_prompt
 from ..knowledge.vector_store import VectorKnowledgeBase
+from ..prompts.system_prompt import SYSTEM_PROMPT
+from ..prompts.tool_prompts import get_tool_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +41,11 @@ class UserInfo:
 
     address: str
     role: str = "USER"
-    permissions: List[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
     voting_power: float = 0.0
     stake: float = 0.0
     binding_type: str = "unknown"
-    preferences: Dict[str, Any] = field(default_factory=dict)
+    preferences: dict[str, Any] = field(default_factory=dict)
 
 
 class ContextManager:
@@ -60,13 +58,13 @@ class ContextManager:
     def __init__(
         self,
         db_path: str = "context.db",
-        knowledge_base: Optional[VectorKnowledgeBase] = None,
-        config: Optional[ContextConfig] = None,
+        knowledge_base: VectorKnowledgeBase | None = None,
+        config: ContextConfig | None = None,
     ):
         self.db_path = db_path
         self.knowledge_base = knowledge_base
         self.config = config or ContextConfig()
-        self._user_preferences: Dict[str, Dict[str, Any]] = {}
+        self._user_preferences: dict[str, dict[str, Any]] = {}
 
     async def init(self):
         """初始化"""
@@ -78,8 +76,8 @@ class ContextManager:
 
     def build_system_prompt(
         self,
-        user_info: Optional[UserInfo] = None,
-        available_tools: Optional[List[str]] = None,
+        user_info: UserInfo | None = None,
+        available_tools: list[str] | None = None,
     ) -> str:
         """构建系统提示词"""
         parts = [SYSTEM_PROMPT]
@@ -126,12 +124,12 @@ class ContextManager:
     async def build_messages(
         self,
         user_message: str,
-        conversation_history: List[Dict[str, str]],
-        user_info: Optional[UserInfo] = None,
-        available_tools: Optional[List[str]] = None,
-        memory_context: Optional[Dict[str, Any]] = None,
+        conversation_history: list[dict[str, str]],
+        user_info: UserInfo | None = None,
+        available_tools: list[str] | None = None,
+        memory_context: dict[str, Any] | None = None,
         smart_recall_context: str = "",
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         构建完整的消息列表
 
@@ -182,7 +180,7 @@ class ContextManager:
 
         return messages
 
-    async def _get_knowledge_context(self, query: str) -> Optional[str]:
+    async def _get_knowledge_context(self, query: str) -> str | None:
         """获取相关知识上下文"""
         if not self.knowledge_base or not self.config.include_knowledge:
             return None
@@ -209,7 +207,7 @@ class ContextManager:
             logger.warning(f"Failed to get knowledge context: {e}")
             return None
 
-    def _build_memory_prompt(self, memory_context: Dict[str, Any]) -> str:
+    def _build_memory_prompt(self, memory_context: dict[str, Any]) -> str:
         """构建分层记忆提示词"""
         if not memory_context:
             return ""
@@ -258,8 +256,8 @@ class ContextManager:
 
     def build_function_calling_tools(
         self,
-        available_tools: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        available_tools: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         构建 Function Calling 工具定义
 
@@ -403,7 +401,7 @@ class ContextManager:
     async def load_project_knowledge(
         self,
         project_path: str,
-        categories: Optional[List[str]] = None,
+        categories: list[str] | None = None,
     ) -> int:
         """
         加载项目知识到知识库
@@ -422,12 +420,12 @@ class ContextManager:
             if not os.path.exists(category_path):
                 continue
 
-            for root, dirs, files in os.walk(category_path):
+            for root, _dirs, files in os.walk(category_path):
                 for file in files:
                     if file.endswith((".md", ".txt", ".py", ".json", ".yaml", ".yml")):
                         file_path = os.path.join(root, file)
                         try:
-                            with open(file_path, "r", encoding="utf-8") as f:
+                            with open(file_path, encoding="utf-8") as f:
                                 content = f.read()
 
                             if content.strip():
@@ -458,6 +456,6 @@ class ContextManager:
             self._user_preferences[user_address] = {}
         self._user_preferences[user_address][key] = value
 
-    def get_user_preferences(self, user_address: str) -> Dict[str, Any]:
+    def get_user_preferences(self, user_address: str) -> dict[str, Any]:
         """获取用户偏好"""
         return self._user_preferences.get(user_address, {})

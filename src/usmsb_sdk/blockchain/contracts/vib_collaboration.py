@@ -9,11 +9,11 @@ VIBCollaboration 协作分成合约客户端
 - 获取用户总收入
 """
 
-from typing import List, Optional, Dict, Any, Union
+from typing import Any
 
-from .base import BaseContractClient, TransactionError, ContractError
 from ..config import BlockchainConfig
 from ..web3_client import Web3Client
+from .base import BaseContractClient, ContractError, TransactionError
 
 
 class VIBCollaborationClient(BaseContractClient):
@@ -35,10 +35,10 @@ class VIBCollaborationClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Web3Client] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Union[List[Dict], str]] = None,
+        web3_client: Web3Client | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: list[dict] | str | None = None,
     ):
         """
         初始化 VIBCollaboration 客户端
@@ -63,7 +63,7 @@ class VIBCollaborationClient(BaseContractClient):
 
         self.set_contract(contract_address, abi)
 
-    def _get_default_abi(self) -> List[Dict]:
+    def _get_default_abi(self) -> list[dict]:
         """获取默认 ABI"""
         return [
             # 只读函数
@@ -171,7 +171,7 @@ class VIBCollaborationClient(BaseContractClient):
         coordinator: str,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """创建协作项目
 
@@ -234,11 +234,11 @@ class VIBCollaborationClient(BaseContractClient):
     async def add_contributors(
         self,
         project_id: str,
-        contributors: List[str],
-        weights: List[int],
+        contributors: list[str],
+        weights: list[int],
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """添加贡献者
 
@@ -326,7 +326,7 @@ class VIBCollaborationClient(BaseContractClient):
         amount: int,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """分发收入
 
@@ -371,7 +371,7 @@ class VIBCollaborationClient(BaseContractClient):
         except Exception as e:
             raise TransactionError(f"Failed to distribute revenue: {e}")
 
-    async def get_project_info(self, project_id: str) -> Dict[str, Any]:
+    async def get_project_info(self, project_id: str) -> dict[str, Any]:
         """获取项目信息
 
         Args:
@@ -431,7 +431,7 @@ class VIBCollaborationClient(BaseContractClient):
     async def get_contributors(
         self,
         project_id: str,
-    ) -> List[str]:
+    ) -> list[str]:
         """获取项目的贡献者列表
 
         Args:
@@ -557,7 +557,7 @@ class VIBCollaborationClient(BaseContractClient):
         except Exception as e:
             raise ContractError(f"Failed to get user total income: {e}")
 
-    async def estimate_distribution(self, amount: int) -> Dict[str, int]:
+    async def estimate_distribution(self, amount: int) -> dict[str, int]:
         """预估分成金额
 
         Args:

@@ -5,13 +5,14 @@ Authentication: All endpoints require authentication (no stake required)
 """
 
 import json
-from typing import Any, Dict
+from typing import Any
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends
 
 from usmsb_sdk.api.database import (
-    get_agent as db_get_agent,
     get_all_agents as db_get_all_agents,
+)
+from usmsb_sdk.api.database import (
     get_metrics as db_get_metrics,
 )
 from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
@@ -19,11 +20,11 @@ from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 router = APIRouter(prefix="/learning", tags=["Proactive Learning"])
 
 # In-memory storage for learning data
-learning_store: Dict[str, Any] = {}
+learning_store: dict[str, Any] = {}
 
 
 @router.post("/analyze")
-async def analyze_agent_learning(user: Dict[str, Any] = Depends(get_current_user_unified)):
+async def analyze_agent_learning(user: dict[str, Any] = Depends(get_current_user_unified)):
     """Analyze agent's match history for learning insights.
 
     Requires:
@@ -50,7 +51,7 @@ async def analyze_agent_learning(user: Dict[str, Any] = Depends(get_current_user
 
 
 @router.get("/insights")
-async def get_learning_insights(user: Dict[str, Any] = Depends(get_current_user_unified)):
+async def get_learning_insights(user: dict[str, Any] = Depends(get_current_user_unified)):
     """Get learning insights for the authenticated agent.
 
     Requires:
@@ -79,7 +80,7 @@ async def get_learning_insights(user: Dict[str, Any] = Depends(get_current_user_
 
 
 @router.get("/strategy")
-async def get_optimized_strategy(user: Dict[str, Any] = Depends(get_current_user_unified)):
+async def get_optimized_strategy(user: dict[str, Any] = Depends(get_current_user_unified)):
     """Get optimized matching strategy for the authenticated agent.
 
     Requires:
@@ -110,7 +111,7 @@ async def get_optimized_strategy(user: Dict[str, Any] = Depends(get_current_user
 
 
 @router.get("/market")
-async def get_market_insight(user: Dict[str, Any] = Depends(get_current_user_unified)):
+async def get_market_insight(user: dict[str, Any] = Depends(get_current_user_unified)):
     """Get market insights for the authenticated agent.
 
     Requires:
@@ -144,7 +145,7 @@ async def get_market_insight(user: Dict[str, Any] = Depends(get_current_user_uni
         supply_level = "medium"
 
     # Extract hot skills
-    skill_counts: Dict[str, int] = {}
+    skill_counts: dict[str, int] = {}
     for agt in all_agents:
         skills = json.loads(agt.get('skills', '[]')) if isinstance(agt.get('skills'), str) else agt.get('skills', [])
         for skill in skills:

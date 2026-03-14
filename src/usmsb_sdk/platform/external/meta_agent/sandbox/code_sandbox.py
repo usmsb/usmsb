@@ -4,20 +4,16 @@
 提供安全的 Python 代码执行环境，实现多用户隔离的代码执行能力。
 """
 
+import ast
 import asyncio
 import io
 import logging
 import os
-import sys
 import tempfile
-import traceback
-from contextlib import redirect_stdout, redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-import ast
-import inspect
-import threading
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +37,8 @@ class SandboxResult:
     stdout: str = ""
     stderr: str = ""
     result: Any = None
-    error: Optional[str] = None
-    warnings: List[str] = field(default_factory=list)
+    error: str | None = None
+    warnings: list[str] = field(default_factory=list)
     execution_time: float = 0.0
 
 
@@ -66,7 +62,7 @@ class CodeSandbox:
     """
 
     # ========== 允许的内置函数白名单 ==========
-    ALLOWED_BUILTINS: Set[str] = {
+    ALLOWED_BUILTINS: set[str] = {
         "abs",
         "all",
         "any",
@@ -129,7 +125,7 @@ class CodeSandbox:
     }
 
     # ========== 允许导入的模块白名单 ==========
-    ALLOWED_MODULES: Set[str] = {
+    ALLOWED_MODULES: set[str] = {
         # 标准库安全模块
         "math",
         "random",
@@ -157,7 +153,7 @@ class CodeSandbox:
     }
 
     # ========== 危险模块黑名单（额外检查） ==========
-    DANGEROUS_MODULES: Set[str] = {
+    DANGEROUS_MODULES: set[str] = {
         "os",
         "sys",
         "subprocess",
@@ -219,7 +215,7 @@ class CodeSandbox:
     }
 
     # ========== 危险函数名黑名单 ==========
-    DANGEROUS_FUNCTIONS: Set[str] = {
+    DANGEROUS_FUNCTIONS: set[str] = {
         "__import__",
         "eval",
         "exec",
@@ -274,10 +270,10 @@ class CodeSandbox:
         self._ensure_sandbox_dir()
 
         # 导入的模块缓存
-        self._imported_modules: Dict[str, Any] = {}
+        self._imported_modules: dict[str, Any] = {}
 
         # 用户变量缓存（用于多次执行间保持状态）
-        self._user_globals: Dict[str, Any] = {}
+        self._user_globals: dict[str, Any] = {}
 
         # 预加载允许的模块
         self._preload_allowed_modules()
@@ -308,7 +304,7 @@ class CodeSandbox:
             except ImportError:
                 logger.debug(f"Module {module_name} not available for preloading")
 
-    def validate_code(self, code: str) -> List[str]:
+    def validate_code(self, code: str) -> list[str]:
         """
         验证代码，返回警告或错误列表
 
@@ -357,7 +353,7 @@ class CodeSandbox:
 
         return warnings
 
-    def _analyze_ast(self, tree: ast.AST) -> List[str]:
+    def _analyze_ast(self, tree: ast.AST) -> list[str]:
         """
         分析 AST 检测潜在危险操作
 
@@ -382,10 +378,10 @@ class CodeSandbox:
 class SandboxASTVisitor(ast.NodeVisitor):
     """AST 访问器，用于检测危险操作"""
 
-    def __init__(self, allowed_modules: Set[str], dangerous_functions: Set[str]):
+    def __init__(self, allowed_modules: set[str], dangerous_functions: set[str]):
         self.allowed_modules = allowed_modules
         self.dangerous_functions = dangerous_functions
-        self.warnings: List[str] = []
+        self.warnings: list[str] = []
         self.has_dangerous_operations = False
 
     def visit_Import(self, node: ast.Import) -> None:
@@ -427,7 +423,7 @@ class SandboxASTVisitor(ast.NodeVisitor):
             self.has_dangerous_operations = True
         self.generic_visit(node)
 
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         return self.warnings
 
 
@@ -437,7 +433,7 @@ class SafeBuiltins:
     # 使用 object.__getattribute__ 来避免递归
     __slots__ = ("_dict", "_allowed_modules")
 
-    def __init__(self, allowed_modules: Dict[str, Any]):
+    def __init__(self, allowed_modules: dict[str, Any]):
         # 使用 object.__setattr__ 避免触发 __setattr__
         object.__setattr__(self, "_allowed_modules", allowed_modules)
         object.__setattr__(self, "_dict", {})
@@ -464,7 +460,7 @@ class SafeBuiltins:
             return builtins.print
         else:
             # 对于不在白名单中的，抛出 AttributeError
-            allowed_list = sorted(list(_dict.keys()))
+            allowed_list = sorted(_dict.keys())
             raise AttributeError(
                 f"'{name}' is not allowed in the sandbox. Allowed builtins: {allowed_list}"
             )
@@ -518,7 +514,7 @@ def _blocked_function(name: str):
 
 # 继续 CodeSandbox 类的其他方法
 def execute_sandboxed_code(
-    code: str, safe_builtins: SafeBuiltins, globals_dict: Dict, imports_dict: Dict[str, Any]
+    code: str, safe_builtins: SafeBuiltins, globals_dict: dict, imports_dict: dict[str, Any]
 ) -> Any:
     """
     在隔离环境中执行代码
@@ -612,7 +608,7 @@ async def _execute_code(self, code: str, timeout: int) -> SandboxResult:
     if self.persist_globals:
         globals_dict = self._user_globals
     else:
-        globals_dict: Dict[str, Any] = {}
+        globals_dict: dict[str, Any] = {}
 
     # 捕获输出
     stdout_capture = io.StringIO()
@@ -622,7 +618,6 @@ async def _execute_code(self, code: str, timeout: int) -> SandboxResult:
         # 在独立线程中执行代码以支持超时
         loop = asyncio.get_event_loop()
 
-        local_vars = {}
 
         def run_code():
             with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
@@ -636,7 +631,7 @@ async def _execute_code(self, code: str, timeout: int) -> SandboxResult:
             await asyncio.wait_for(
                 loop.run_in_executor(None, lambda: run_code()), timeout=actual_timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Already caught in outer except block, re-raise to be handled there
             raise
 
@@ -660,7 +655,7 @@ async def _execute_code(self, code: str, timeout: int) -> SandboxResult:
 
         result.success = True
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         result.error = f"代码执行超时（{actual_timeout}秒）"
         result.stderr = stderr_capture.getvalue()
 
@@ -725,7 +720,6 @@ async def _run_command(
     """
     import asyncio
     import time
-    from typing import Dict, Any
 
     # 确保 timeout 是整数
     try:
@@ -769,7 +763,7 @@ async def _run_command(
 
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
             await process.wait()
             result.error = f"命令执行超时（{timeout}秒）"
@@ -812,7 +806,7 @@ async def _install_browser(self, browser: str = "chromium") -> SandboxResult:
 
     try:
         # 先安装 Playwright
-        install_playwright_cmd = f"npm install -g playwright"
+        install_playwright_cmd = "npm install -g playwright"
 
         process = await asyncio.create_subprocess_shell(
             install_playwright_cmd,
@@ -877,10 +871,10 @@ async def _start_jupyter(
         启动结果
     """
     import asyncio
-    import time
+    import platform
     import random
     import string
-    import platform
+    import time
 
     start_time = time.time()
     result = SandboxResult(success=False)
@@ -909,8 +903,8 @@ async def _start_jupyter(
         # 根据操作系统选择不同的后台启动方式
         if platform.system() == "Windows":
             # Windows: 使用 start 命令启动新窗口
-            import subprocess
             import shlex
+            import subprocess
 
             cmd_str = " ".join([shlex.quote(c) for c in cmd])
             # 使用 cmd /c start 启动新窗口
@@ -942,7 +936,7 @@ async def _start_jupyter(
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=5)
             result.stdout = stdout.decode("utf-8", errors="replace") if stdout else ""
             result.stderr = stderr.decode("utf-8", errors="replace") if stderr else ""
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # 超时是正常的，因为是后台启动
             pass
 

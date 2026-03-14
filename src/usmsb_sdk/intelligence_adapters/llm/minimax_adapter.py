@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -43,7 +43,7 @@ class MiniMaxAdapter(ILLMAdapter):
     # 默认使用 OpenAI 兼容端点
     OPENAI_COMPAT_BASE_URL = "https://api.minimaxi.com/v1"
 
-    def __init__(self, config: Optional[IntelligenceSourceConfig] = None):
+    def __init__(self, config: IntelligenceSourceConfig | None = None):
         """
         Initialize MiniMax adapter.
 
@@ -75,8 +75,8 @@ class MiniMaxAdapter(ILLMAdapter):
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
         self.base_url = config.extra_params.get("base_url", self.OPENAI_COMPAT_BASE_URL)
 
-        self._client: Optional[httpx.AsyncClient] = None
-        self._embedding_client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
+        self._embedding_client: httpx.AsyncClient | None = None
 
     async def initialize(self) -> bool:
         """Initialize the MiniMax client."""
@@ -143,12 +143,12 @@ class MiniMaxAdapter(ILLMAdapter):
 
     async def _raw_chat_request(
         self,
-        messages: List[Dict[str, Any]],
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        system: Optional[str] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+        messages: list[dict[str, Any]],
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """
         Make a raw chat request to MiniMax API.
 
@@ -273,7 +273,7 @@ class MiniMaxAdapter(ILLMAdapter):
         if last_error:
             raise last_error
 
-    def _extract_text_from_response(self, response: Dict[str, Any]) -> str:
+    def _extract_text_from_response(self, response: dict[str, Any]) -> str:
         """
         Extract text content from MiniMax response.
 
@@ -295,7 +295,7 @@ class MiniMaxAdapter(ILLMAdapter):
         return "".join(text_parts)
 
     async def generate_text(
-        self, prompt: str, context: Optional[Dict[str, Any]] = None, **kwargs
+        self, prompt: str, context: dict[str, Any] | None = None, **kwargs
     ) -> str:
         """
         Generate text from a prompt.
@@ -327,7 +327,7 @@ class MiniMaxAdapter(ILLMAdapter):
         self,
         system_prompt: str,
         user_prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs,
     ) -> str:
         """
@@ -377,7 +377,7 @@ class MiniMaxAdapter(ILLMAdapter):
 
     async def chat_with_messages(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         **kwargs,
     ) -> str:
         """
@@ -436,10 +436,10 @@ class MiniMaxAdapter(ILLMAdapter):
     async def understand_intent(
         self,
         text: str,
-        schema: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        schema: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Understand intent from text.
 
@@ -468,8 +468,8 @@ class MiniMaxAdapter(ILLMAdapter):
             return {"intent": "error", "error": str(e)}
 
     async def evaluate_quality(
-        self, text: str, criteria: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> Dict[str, Any]:
+        self, text: str, criteria: dict[str, Any] | None = None, **kwargs
+    ) -> dict[str, Any]:
         """
         Evaluate text quality.
 
@@ -492,7 +492,7 @@ class MiniMaxAdapter(ILLMAdapter):
             logger.error(f"MiniMax quality evaluation failed: {e}")
             return {"quality": "error", "error": str(e)}
 
-    async def summarize(self, text: str, max_length: Optional[int] = None, **kwargs) -> str:
+    async def summarize(self, text: str, max_length: int | None = None, **kwargs) -> str:
         """
         Summarize text.
 
@@ -543,7 +543,7 @@ class MiniMaxAdapter(ILLMAdapter):
         return await self.health_check()
 
     async def reason(
-        self, facts: List[str], query: str, context: Optional[Dict[str, Any]] = None, **kwargs
+        self, facts: list[str], query: str, context: dict[str, Any] | None = None, **kwargs
     ) -> str:
         """Perform reasoning over facts."""
         system_prompt = "你是一个推理助手。根据给定的事实进行推理并回答问题。"
@@ -560,8 +560,8 @@ class MiniMaxAdapter(ILLMAdapter):
             raise
 
     async def evaluate(
-        self, item: Any, criteria: str, context: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> Dict[str, Any]:
+        self, item: Any, criteria: str, context: dict[str, Any] | None = None, **kwargs
+    ) -> dict[str, Any]:
         """Evaluate an item against criteria."""
         system_prompt = "你是一个评估助手。根据标准评估给定的项目。"
         try:
@@ -576,8 +576,8 @@ class MiniMaxAdapter(ILLMAdapter):
             return {"error": str(e)}
 
     async def embed(
-        self, text: str, context: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> List[float]:
+        self, text: str, context: dict[str, Any] | None = None, **kwargs
+    ) -> list[float]:
         """
         Generate embeddings for text using MiniMax embedding API.
 
@@ -666,8 +666,8 @@ class MiniMaxAdapter(ILLMAdapter):
             raise
 
     async def embed_batch(
-        self, texts: List[str], context: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> List[List[float]]:
+        self, texts: list[str], context: dict[str, Any] | None = None, **kwargs
+    ) -> list[list[float]]:
         """
         Generate embeddings for multiple texts using MiniMax embedding API.
 
@@ -734,10 +734,10 @@ class MiniMaxAdapter(ILLMAdapter):
 
     async def chat_with_tools(
         self,
-        messages: List[Dict[str, Any]],
-        tools: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Chat with tools/skills support.
 
@@ -864,10 +864,9 @@ class MiniMaxAdapter(ILLMAdapter):
                 "error": str(e),
             }
 
-    def _parse_tool_calls_from_text(self, text_content: str) -> List[Dict[str, Any]]:
+    def _parse_tool_calls_from_text(self, text_content: str) -> list[dict[str, Any]]:
         """Parse tool calls from text content when LLM returns them as text."""
         import re
-        import xml.etree.ElementTree as ET
 
         print(f"🔍 [_parse_tool_calls_from_text] START, text_content={text_content[:300]}")
         tool_calls = []

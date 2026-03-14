@@ -8,20 +8,19 @@ This module provides a comprehensive skill system for agents:
 - Skill composition and chaining
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type, Union
 import json
 import logging
 import time
-import asyncio
-from pydantic import BaseModel, Field
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class SkillCategory(str, Enum):
+class SkillCategory(StrEnum):
     """Categories of agent skills."""
     ANALYSIS = "analysis"
     GENERATION = "generation"
@@ -35,7 +34,7 @@ class SkillCategory(str, Enum):
     EVALUATION = "evaluation"
 
 
-class SkillStatus(str, Enum):
+class SkillStatus(StrEnum):
     """Status of a skill."""
     ACTIVE = "active"
     DEPRECATED = "deprecated"
@@ -51,10 +50,10 @@ class SkillParameter:
     description: str
     required: bool = True
     default: Any = None
-    enum: Optional[List[str]] = None
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    pattern: Optional[str] = None  # Regex pattern for string validation
+    enum: list[str] | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    pattern: str | None = None  # Regex pattern for string validation
 
 
 @dataclass
@@ -63,7 +62,7 @@ class SkillOutput:
     name: str
     type: str
     description: str
-    example: Optional[Any] = None
+    example: Any | None = None
 
 
 @dataclass
@@ -73,7 +72,7 @@ class SkillMetadata:
     version: str
     description: str
     category: SkillCategory
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     author: str = "system"
     status: SkillStatus = SkillStatus.ACTIVE
     created_at: float = field(default_factory=time.time)
@@ -94,13 +93,17 @@ class Skill(ABC):
 
     def __init__(self, metadata: SkillMetadata):
         self.metadata = metadata
-        self.parameters: Dict[str, SkillParameter] = {}
-        self.outputs: Dict[str, SkillOutput] = {}
+        self.parameters: dict[str, SkillParameter] = {}
+        self.outputs: dict[str, SkillOutput] = {}
         self._execution_count = 0
         self._total_execution_time = 0.0
 
     @abstractmethod
-    async def execute(self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def execute(
+        self,
+        inputs: dict[str, Any],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Execute the skill with given inputs.
 
@@ -113,7 +116,7 @@ class Skill(ABC):
         """
         pass
 
-    def validate_inputs(self, inputs: Dict[str, Any]) -> List[str]:
+    def validate_inputs(self, inputs: dict[str, Any]) -> list[str]:
         """
         Validate input parameters.
 
@@ -135,7 +138,7 @@ class Skill(ABC):
 
         return errors
 
-    def _validate_single_param(self, name: str, param: SkillParameter, value: Any) -> Optional[str]:
+    def _validate_single_param(self, name: str, param: SkillParameter, value: Any) -> str | None:
         """Validate a single parameter value."""
         if value is None:
             if param.required:
@@ -175,7 +178,7 @@ class Skill(ABC):
 
         return None
 
-    def get_schema(self) -> Dict[str, Any]:
+    def get_schema(self) -> dict[str, Any]:
         """Get JSON schema for the skill."""
         return {
             "name": self.metadata.name,
@@ -210,11 +213,11 @@ class SkillRegistry:
     """
 
     def __init__(self):
-        self._skills: Dict[str, Skill] = {}
-        self._skill_by_category: Dict[SkillCategory, List[str]] = {
+        self._skills: dict[str, Skill] = {}
+        self._skill_by_category: dict[SkillCategory, list[str]] = {
             cat: [] for cat in SkillCategory
         }
-        self._skill_handlers: Dict[str, Callable] = {}
+        self._skill_handlers: dict[str, Callable] = {}
 
     def register(self, skill: Skill) -> None:
         """Register a skill."""
@@ -234,16 +237,16 @@ class SkillRegistry:
             return True
         return False
 
-    def get(self, skill_id: str) -> Optional[Skill]:
+    def get(self, skill_id: str) -> Skill | None:
         """Get a skill by ID."""
         return self._skills.get(skill_id)
 
     def list_skills(
         self,
-        category: Optional[SkillCategory] = None,
-        tags: Optional[List[str]] = None,
-        status: Optional[SkillStatus] = None,
-    ) -> List[Skill]:
+        category: SkillCategory | None = None,
+        tags: list[str] | None = None,
+        status: SkillStatus | None = None,
+    ) -> list[Skill]:
         """List skills with optional filters."""
         if category:
             skill_ids = self._skill_by_category.get(category, [])
@@ -260,7 +263,7 @@ class SkillRegistry:
 
         return skills
 
-    def search(self, query: str) -> List[Skill]:
+    def search(self, query: str) -> list[Skill]:
         """Search skills by name, description, or tags."""
         query_lower = query.lower()
         results = []
@@ -278,10 +281,10 @@ class SkillRegistry:
     async def execute(
         self,
         skill_id: str,
-        inputs: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
+        inputs: dict[str, Any],
+        context: dict[str, Any] | None = None,
         validate: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute a skill.
 
@@ -383,10 +386,14 @@ class TextAnalysisSkill(Skill):
             ),
         }
 
-    async def execute(self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def execute(
+        self,
+        inputs: dict[str, Any],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute text analysis."""
         # In a real implementation, this would call an NLP service
-        text = inputs["text"]
+        inputs["text"]
         analysis_type = inputs.get("analysis_type", "all")
 
         result = {}
@@ -452,7 +459,11 @@ class DataTransformationSkill(Skill):
             ),
         }
 
-    async def execute(self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def execute(
+        self,
+        inputs: dict[str, Any],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute data transformation."""
         data = inputs["data"]
         source_format = inputs["source_format"]
@@ -464,8 +475,8 @@ class DataTransformationSkill(Skill):
             result = yaml.dump(data, default_flow_style=False)
         elif source_format == "json" and target_format == "csv":
             # Flatten and convert to CSV
-            import io
             import csv
+            import io
             output = io.StringIO()
             if isinstance(data, list) and data:
                 writer = csv.DictWriter(output, fieldnames=data[0].keys())
@@ -517,7 +528,11 @@ class WebSearchSkill(Skill):
             ),
         }
 
-    async def execute(self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def execute(
+        self,
+        inputs: dict[str, Any],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute web search."""
         query = inputs["query"]
         max_results = inputs.get("max_results", 5)
@@ -580,16 +595,20 @@ class CodeExecutionSkill(Skill):
             ),
         }
 
-    async def execute(self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def execute(
+        self,
+        inputs: dict[str, Any],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Execute code in sandbox."""
         code = inputs["code"]
         timeout = inputs.get("timeout", 30)
 
         # WARNING: In production, use a proper sandboxed execution environment
         # This is a simplified example
+        import os
         import subprocess
         import tempfile
-        import os
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
             f.write(code)

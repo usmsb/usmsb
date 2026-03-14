@@ -5,10 +5,10 @@
 通过环境变量 VIBE_NETWORK 和 VIBE_RPC_URL 进行配置。
 """
 
-from enum import Enum
-from typing import Dict, Optional
-from pydantic import BaseModel
 import os
+from enum import Enum
+
+from pydantic import BaseModel
 
 
 class NetworkType(Enum):
@@ -24,13 +24,13 @@ class NetworkConfig(BaseModel):
     chain_id: int
     rpc_url: str
     explorer_url: str
-    contracts: Dict[str, str]
+    contracts: dict[str, str]
 
     model_config = {"frozen": True}
 
 
 # 预定义网络配置
-_NETWORKS: Dict[NetworkType, NetworkConfig] = {
+_NETWORKS: dict[NetworkType, NetworkConfig] = {
     NetworkType.TESTNET: NetworkConfig(
         name="Base Sepolia",
         chain_id=84532,
@@ -81,7 +81,7 @@ class BlockchainConfig:
     提供统一的区块链配置接口，支持多网络切换和RPC URL覆盖。
     """
 
-    def __init__(self, network: Optional[NetworkType] = None, rpc_url: Optional[str] = None):
+    def __init__(self, network: NetworkType | None = None, rpc_url: str | None = None):
         """
         初始化配置
 
@@ -131,11 +131,11 @@ class BlockchainConfig:
         return self.config.explorer_url
 
     @property
-    def contracts(self) -> Dict[str, str]:
+    def contracts(self) -> dict[str, str]:
         """获取合约地址字典"""
         return self.config.contracts
 
-    def get_contract_address(self, name: str) -> Optional[str]:
+    def get_contract_address(self, name: str) -> str | None:
         """
         获取指定合约的地址
 

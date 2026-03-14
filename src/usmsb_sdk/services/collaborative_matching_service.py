@@ -19,37 +19,34 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Goal, Resource, GoalStatus
 from usmsb_sdk.core.communication.agent_communication import (
     AgentAddress,
     AgentCommunicationManager,
-    Message,
     MessageType,
 )
+from usmsb_sdk.core.elements import Agent, Goal
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
 from usmsb_sdk.node.decentralized_node import DistributedServiceRegistry
 from usmsb_sdk.services.active_matching_service import (
     ActiveMatchingService,
-    Opportunity,
-    NegotiationSession,
-    NegotiationProposal,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class CollaborationMode(str, Enum):
+class CollaborationMode(StrEnum):
     """Mode of collaboration."""
     PARALLEL = "parallel"       # Agents work simultaneously
     SEQUENTIAL = "sequential"    # Agents work in sequence
     HYBRID = "hybrid"           # Mix of parallel and sequential
 
 
-class CollaborationStatus(str, Enum):
+class CollaborationStatus(StrEnum):
     """Status of collaboration session."""
     ANALYZING = "analyzing"
     ORGANIZING = "organizing"
@@ -59,7 +56,7 @@ class CollaborationStatus(str, Enum):
     FAILED = "failed"
 
 
-class RoleType(str, Enum):
+class RoleType(StrEnum):
     """Type of role in collaboration."""
     COORDINATOR = "coordinator"
     PRIMARY = "primary"
@@ -73,13 +70,13 @@ class CollaborationRole:
     """A role in a collaboration session."""
     role_id: str
     role_type: RoleType
-    required_skills: List[str]
-    assigned_agent_id: Optional[str] = None
-    assigned_agent_name: Optional[str] = None
+    required_skills: list[str]
+    assigned_agent_id: str | None = None
+    assigned_agent_name: str | None = None
     status: str = "pending"  # pending, assigned, executing, completed
-    contribution: Optional[Dict[str, Any]] = None
+    contribution: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role_id": self.role_id,
             "role_type": self.role_type.value,
@@ -98,12 +95,12 @@ class CollaborationPlan:
     goal_id: str
     goal_description: str
     mode: CollaborationMode
-    roles: List[CollaborationRole]
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)  # role_id -> dependent role_ids
+    roles: list[CollaborationRole]
+    dependencies: dict[str, list[str]] = field(default_factory=dict)  # role_id -> dependent role_ids
     estimated_duration: float = 0.0
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "plan_id": self.plan_id,
             "goal_id": self.goal_id,
@@ -123,14 +120,14 @@ class CollaborationSession:
     goal: Goal
     plan: CollaborationPlan
     status: CollaborationStatus
-    participants: List[str] = field(default_factory=list)
-    coordinator_id: Optional[str] = None
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    participants: list[str] = field(default_factory=list)
+    coordinator_id: str | None = None
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "goal": {"id": self.goal.id, "name": self.goal.name, "description": self.goal.description},
@@ -152,7 +149,7 @@ class ParticipantInvite:
     session_id: str
     role: CollaborationRole
     status: str = "pending"  # pending, accepted, rejected
-    response_message: Optional[str] = None
+    response_message: str | None = None
 
 
 class CollaborativeMatchingService:
@@ -185,15 +182,15 @@ class CollaborativeMatchingService:
         self.registry = registry
 
         # Active collaboration sessions
-        self._sessions: Dict[str, CollaborationSession] = {}
+        self._sessions: dict[str, CollaborationSession] = {}
 
         # Pending invitations
-        self._invitations: Dict[str, ParticipantInvite] = {}
+        self._invitations: dict[str, ParticipantInvite] = {}
 
         # Callbacks
-        self.on_session_started: Optional[Callable[[CollaborationSession], None]] = None
-        self.on_session_completed: Optional[Callable[[CollaborationSession], None]] = None
-        self.on_participant_joined: Optional[Callable[[str, str], None]] = None
+        self.on_session_started: Callable[[CollaborationSession], None] | None = None
+        self.on_session_completed: Callable[[CollaborationSession], None] | None = None
+        self.on_participant_joined: Callable[[str, str], None] | None = None
 
     async def analyze_collaboration_need(
         self,
@@ -276,7 +273,7 @@ class CollaborativeMatchingService:
                 return self._create_simple_plan(goal, required_skills)
             return None
 
-    def _create_simple_plan(self, goal: Goal, skills: List[str]) -> CollaborationPlan:
+    def _create_simple_plan(self, goal: Goal, skills: list[str]) -> CollaborationPlan:
         """Create a simple collaboration plan based on skills count."""
         plan_id = str(uuid.uuid4())
 
@@ -431,7 +428,7 @@ class CollaborativeMatchingService:
     async def execute_collaboration(
         self,
         session_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute a collaboration session.
 
@@ -473,7 +470,7 @@ class CollaborativeMatchingService:
     async def _execute_parallel(
         self,
         session: CollaborationSession,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute collaboration in parallel mode."""
         tasks = []
 
@@ -507,7 +504,7 @@ class CollaborativeMatchingService:
     async def _execute_sequential(
         self,
         session: CollaborationSession,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute collaboration in sequential mode."""
         contributions = {}
         previous_output = None
@@ -538,7 +535,7 @@ class CollaborativeMatchingService:
     async def _execute_hybrid(
         self,
         session: CollaborationSession,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute collaboration in hybrid mode (mix of parallel and sequential)."""
         # Group roles by dependency level
         contributions = {}
@@ -556,7 +553,7 @@ class CollaborativeMatchingService:
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for role, result in zip(independent_roles, results):
+            for role, result in zip(independent_roles, results, strict=False):
                 if isinstance(result, Exception):
                     contributions[role.role_id] = {"error": str(result)}
                 else:
@@ -585,7 +582,7 @@ class CollaborativeMatchingService:
         role: CollaborationRole,
         session: CollaborationSession,
         input_data: Any = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute a single role in collaboration."""
         if not role.assigned_agent_id:
             return {"error": "No agent assigned"}
@@ -621,8 +618,8 @@ class CollaborativeMatchingService:
 
     async def _integrate_results(
         self,
-        contributions: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        contributions: dict[str, Any],
+    ) -> dict[str, Any]:
         """Integrate results from multiple agents."""
         # Use LLM to integrate results
         integration_prompt = f"""
@@ -645,18 +642,18 @@ class CollaborativeMatchingService:
                 "outputs": list(contributions.values()),
             }
 
-    def get_session(self, session_id: str) -> Optional[CollaborationSession]:
+    def get_session(self, session_id: str) -> CollaborationSession | None:
         """Get a collaboration session by ID."""
         return self._sessions.get(session_id)
 
-    def get_active_sessions(self) -> List[CollaborationSession]:
+    def get_active_sessions(self) -> list[CollaborationSession]:
         """Get all active collaboration sessions."""
         return [
             s for s in self._sessions.values()
             if s.status in [CollaborationStatus.ORGANIZING, CollaborationStatus.EXECUTING]
         ]
 
-    def get_session_stats(self) -> Dict[str, Any]:
+    def get_session_stats(self) -> dict[str, Any]:
         """Get collaboration statistics."""
         total = len(self._sessions)
         completed = sum(1 for s in self._sessions.values() if s.status == CollaborationStatus.COMPLETED)

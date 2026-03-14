@@ -9,76 +9,71 @@ import dataclasses
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any, Optional
 from uuid import uuid4
 
-from .meta_agent_config import MetaAgentConfig
-from .core.perception import PerceptionService
+from .config.chat_config import ChatConfig
+from .context.manager import ContextManager, UserInfo
+from .core.background_processor import BackgroundTaskProcessor
 from .core.decision import DecisionService
 from .core.execution import ExecutionService
 from .core.interaction import InteractionService
 from .core.learning import LearningService
-from .llm.manager import LLMManager
-from .tools.registry import ToolRegistry, Tool
-from .skills.manager import SkillsManager
-from .context.manager import ContextManager, UserInfo
-from .memory.conversation_manager import ConversationManager
-from .memory.conversation import ParticipantType, MessageRole
-from .memory.memory_manager import MemoryManager, MemoryConfig
-from .memory.experience_db import ExperienceDB
-from .memory.smart_recall import IntelligentRecall
-from .memory.error_learning import ErrorDrivenLearning, AgentWithSelfHealing
-from .memory.guardian_daemon import GuardianDaemon, GuardianConfig
-from .knowledge.base import KnowledgeBase
-from .knowledge.vector_store import VectorKnowledgeBase
-from .wallet.manager import WalletManager
-from .goals.engine import GoalEngine
-from .evolution.engine import EvolutionEngine
-from .memory.memory_manager import MemoryManager, MemoryConfig
-
-# 新增：多用户隔离支持
-from .session.session_manager import SessionManager
-from .session.user_session import SessionConfig
-
-# 新增：敏感信息处理、意图识别、配置管理
-from .sensitive.registry import (
-    SensitiveInfoRegistry,
-    get_sensitive_info_registry,
-)
-from .intent.recognizer import IntentRecognizer, IntentType, Intent
-from .config.chat_config import ChatConfig
-
-# 新增：信息提取器
-from .info.extractor import InfoExtractor
-from .info.types import InfoNeed, InfoNeedType
-
-# 新增：权限管理
-from .permission import (
-    PermissionManager,
-    get_audit_logger,
-    AuditLogger,
-    AuditAction,
-    AuditLevel,
-)
-
-# 新增：ChatResult 和后台任务处理器
-# 设计初衷：见 models/chat_result.py 和 core/background_processor.py
-from .models.chat_result import ChatResult, ToolRetryInfo, BackgroundTaskContext
-from .core.background_processor import BackgroundTaskProcessor
+from .core.perception import PerceptionService
 
 # 新增：分步任务执行器
 # 设计初衷：见 models/task_plan.py 和 core/task_executor.py
 # 复杂任务拆分为小步骤，逐步执行，每步独立超时（60秒）
 from .core.task_executor import TaskExecutor
+from .evolution.engine import EvolutionEngine
+from .goals.engine import GoalEngine
+
+# 新增：信息提取器
+from .info.extractor import InfoExtractor
+from .intent.recognizer import IntentRecognizer
+from .knowledge.base import KnowledgeBase
+from .knowledge.vector_store import VectorKnowledgeBase
+from .llm.manager import LLMManager
+from .memory.conversation import MessageRole, ParticipantType
+from .memory.conversation_manager import ConversationManager
+from .memory.error_learning import ErrorDrivenLearning
+from .memory.experience_db import ExperienceDB
+from .memory.guardian_daemon import GuardianConfig, GuardianDaemon
+from .memory.memory_manager import MemoryConfig, MemoryManager
+from .memory.smart_recall import IntelligentRecall
+from .meta_agent_config import MetaAgentConfig
+
+# 新增：ChatResult 和后台任务处理器
+# 设计初衷：见 models/chat_result.py 和 core/background_processor.py
+from .models.chat_result import ChatResult
 from .models.task_plan import (
-    TaskComplexity,
-    TaskStatus,
     StepStatus,
+    TaskComplexity,
     TaskPlan,
+    TaskStatus,
     detect_task_complexity,
-    should_use_step_by_step,
-    should_confirm_plan,
 )
+
+# 新增：权限管理
+from .permission import (
+    AuditAction,
+    AuditLevel,
+    PermissionManager,
+    get_audit_logger,
+)
+
+# 新增：敏感信息处理、意图识别、配置管理
+from .sensitive.registry import (
+    get_sensitive_info_registry,
+)
+
+# 新增：多用户隔离支持
+from .session.session_manager import SessionManager
+from .session.user_session import SessionConfig
+from .skills.manager import SkillsManager
+from .tools.registry import Tool, ToolRegistry
+from .wallet.manager import WalletManager
 
 # 类型检查时导入（避免循环导入）
 if TYPE_CHECKING:
@@ -163,13 +158,13 @@ class MetaAgent:
     - 私有会话管理
     """
 
-    def __init__(self, config: Optional[MetaAgentConfig] = None):
+    def __init__(self, config: MetaAgentConfig | None = None):
         self.config = config or MetaAgentConfig()
         self.agent_id = f"meta_{uuid4().hex[:8]}"
 
         # ========== 调试日志缓冲区 ==========
         # 用于实时记录工具调用日志，供前端轮询查看
-        self._debug_logs: Dict[str, List[Dict]] = {}  # wallet_address -> logs
+        self._debug_logs: dict[str, list[dict]] = {}  # wallet_address -> logs
 
         # ========== 新增：多用户隔离支持 ==========
 
@@ -243,19 +238,19 @@ class MetaAgent:
         self.learning = LearningService(self.knowledge_base, self.context_manager)
 
         # 进化引擎
-        self.evolution_engine: Optional[EvolutionEngine] = None
+        self.evolution_engine: EvolutionEngine | None = None
 
         # ========== 智能召回系统 ==========
-        self.smart_recall: Optional[IntelligentRecall] = None
+        self.smart_recall: IntelligentRecall | None = None
 
         # ========== 错误驱动学习系统 ==========
-        self.error_learning: Optional[ErrorDrivenLearning] = None
+        self.error_learning: ErrorDrivenLearning | None = None
 
         # ========== 守护进程 ==========
-        self.guardian_daemon: Optional[GuardianDaemon] = None
+        self.guardian_daemon: GuardianDaemon | None = None
 
         # ========== 精准匹配服务 ==========
-        self.meta_agent_service: Optional[Any] = None  # MetaAgentService
+        self.meta_agent_service: Any | None = None  # MetaAgentService
 
         # ========== 新增：敏感信息处理、意图识别、配置管理 ==========
         # Chat 配置
@@ -281,11 +276,11 @@ class MetaAgent:
         # ========== 新增：分步任务执行器 ==========
         # 复杂任务（如创建网站）拆分为小步骤执行
         # 每步独立超时（60秒），支持断点续传
-        self.task_executor: Optional[TaskExecutor] = None
+        self.task_executor: TaskExecutor | None = None
 
         # 状态
         self._running = False
-        self._main_loop_task: Optional[asyncio.Task] = None
+        self._main_loop_task: asyncio.Task | None = None
 
     async def start(self):
         """启动 Meta Agent"""
@@ -515,18 +510,18 @@ class MetaAgent:
     async def _register_default_tools(self):
         """注册默认工具"""
         from .tools import (
-            platform,
-            monitor,
             blockchain,
-            ipfs,
             database,
-            ui,
-            governance,
             execution,
-            system,
-            web,
-            system_agents,
+            governance,
+            ipfs,
+            monitor,
+            platform,
             precise_matching,
+            system,
+            system_agents,
+            ui,
+            web,
         )
 
         await platform.register_tools(self.tool_registry)
@@ -603,7 +598,7 @@ class MetaAgent:
             },
         )
         self.tool_registry.register(search_knowledge_tool)
-        logger.info(f"Registered search_knowledge tool")
+        logger.info("Registered search_knowledge tool")
 
         logger.info(f"Registered {len(self.tool_registry.list_tools())} default tools")
 
@@ -719,7 +714,7 @@ class MetaAgent:
             file_path = os.path.join(project_root, file_name)
             if os.path.exists(file_path):
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         content = f.read()
                     knowledge_items.append(
                         {
@@ -753,7 +748,7 @@ class MetaAgent:
                     rel_path = os.path.relpath(file_path, project_root)
 
                     try:
-                        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        with open(file_path, encoding="utf-8", errors="ignore") as f:
                             content = f.read()
 
                         # 限制内容长度
@@ -784,7 +779,7 @@ class MetaAgent:
             config_path = os.path.join(project_root, config_file)
             if os.path.exists(config_path):
                 try:
-                    with open(config_path, "r", encoding="utf-8") as f:
+                    with open(config_path, encoding="utf-8") as f:
                         content = f.read()
                     knowledge_items.append(
                         {
@@ -889,7 +884,7 @@ class MetaAgent:
     async def chat(
         self,
         message: str,
-        wallet_address: Optional[str] = None,
+        wallet_address: str | None = None,
         participant_type: ParticipantType = ParticipantType.HUMAN,
         skip_complexity_detection: bool = False,
     ) -> str:
@@ -935,7 +930,7 @@ class MetaAgent:
                 role=MessageRole.USER,
                 content=message,
             )
-            logger.info(f"[CHAT] Saved user confirmation message to conversation")
+            logger.info("[CHAT] Saved user confirmation message to conversation")
 
             if self.task_executor:
                 logger.info(f"[CHAT] Looking for tasks for wallet: {wallet_address}")
@@ -1051,7 +1046,7 @@ class MetaAgent:
             # 根据复杂度决定处理路径
             if complexity == TaskComplexity.VERY_HIGH:
                 # VERY_HIGH: 超复杂任务，生成计划等待用户确认
-                logger.info(f"[CHAT][COMPLEXITY] 进入 VERY_HIGH 处理路径 - 生成计划等待确认")
+                logger.info("[CHAT][COMPLEXITY] 进入 VERY_HIGH 处理路径 - 生成计划等待确认")
                 if self.task_executor:
                     try:
                         plan = await self.task_executor.analyze_and_plan(
@@ -1069,7 +1064,7 @@ class MetaAgent:
                                 role=MessageRole.ASSISTANT,
                                 content=plan_summary,
                             )
-                            logger.info(f"[CHAT][COMPLEXITY] 返回计划等待用户确认")
+                            logger.info("[CHAT][COMPLEXITY] 返回计划等待用户确认")
                             return plan_summary
                         else:
                             logger.info(f"[CHAT][COMPLEXITY] 计划状态非AWAITING_CONFIRM: {plan.status.value}，继续执行")
@@ -1077,13 +1072,13 @@ class MetaAgent:
                         logger.error(f"[CHAT][COMPLEXITY] 计划生成失败: {e}", exc_info=True)
                         # 计划生成失败，降级到MEDIUM处理
                         complexity = TaskComplexity.MEDIUM
-                        logger.info(f"[CHAT][COMPLEXITY] 降级到 MEDIUM 处理")
+                        logger.info("[CHAT][COMPLEXITY] 降级到 MEDIUM 处理")
                 else:
-                    logger.warning(f"[CHAT][COMPLEXITY] task_executor未初始化，降级到MEDIUM处理")
+                    logger.warning("[CHAT][COMPLEXITY] task_executor未初始化，降级到MEDIUM处理")
                     complexity = TaskComplexity.MEDIUM
             elif complexity == TaskComplexity.HIGH:
                 # HIGH: 复杂任务，生成计划直接执行（不等待确认）
-                logger.info(f"[CHAT][COMPLEXITY] 进入 HIGH 处理路径 - 生成计划直接执行")
+                logger.info("[CHAT][COMPLEXITY] 进入 HIGH 处理路径 - 生成计划直接执行")
                 if self.task_executor:
                     try:
                         plan = await self.task_executor.analyze_and_plan(
@@ -1113,9 +1108,9 @@ class MetaAgent:
                         logger.error(f"[CHAT][COMPLEXITY] HIGH任务执行失败: {e}", exc_info=True)
                         # 执行失败，降级到MEDIUM处理
                         complexity = TaskComplexity.MEDIUM
-                        logger.info(f"[CHAT][COMPLEXITY] 降级到 MEDIUM 处理")
+                        logger.info("[CHAT][COMPLEXITY] 降级到 MEDIUM 处理")
                 else:
-                    logger.warning(f"[CHAT][COMPLEXITY] task_executor未初始化，降级到MEDIUM处理")
+                    logger.warning("[CHAT][COMPLEXITY] task_executor未初始化，降级到MEDIUM处理")
                     complexity = TaskComplexity.MEDIUM
             else:
                 logger.info(f"[CHAT][COMPLEXITY] 进入 {complexity.value} 处理路径 - 标准LLM调用")
@@ -1198,7 +1193,7 @@ class MetaAgent:
 
         # LOW 复杂度：直接调用 LLM，不使用工具
         if complexity == TaskComplexity.LOW:
-            logger.info(f"[CHAT][FLOW] LOW 复杂度 - 直接调用 LLM，不使用工具")
+            logger.info("[CHAT][FLOW] LOW 复杂度 - 直接调用 LLM，不使用工具")
 
             # 构建简单的消息列表
             simple_messages = [
@@ -1365,7 +1360,7 @@ class MetaAgent:
                 else:
                     # 没有工具结果，说明LLM没有执行任何工具
                     # 直接返回内容（即使是空的），不返回错误
-                    logger.warning(f"[CHAT][RESULT] 没有工具结果，不启动后台处理")
+                    logger.warning("[CHAT][RESULT] 没有工具结果，不启动后台处理")
                     if chat_result.content:
                         await self.conversation_manager.add_message(
                             conversation_id=conversation.id,
@@ -1404,12 +1399,12 @@ class MetaAgent:
     async def _legacy_background_task(
         self,
         conversation,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         llm_response: str,
         user_session,
-        wallet_address: Optional[str],
-        tools_schema: List[Dict],
-        skills_schema: List[Dict],
+        wallet_address: str | None,
+        tools_schema: list[dict],
+        skills_schema: list[dict],
         message: str,
         owner_id: str,
     ):
@@ -1424,7 +1419,7 @@ class MetaAgent:
         # 参见 core/background_processor.py
         pass
 
-    async def _extract_search_keywords(self, user_message: str) -> List[str]:
+    async def _extract_search_keywords(self, user_message: str) -> list[str]:
         """
         使用 LLM 智能提取搜索关键词
 
@@ -1476,7 +1471,7 @@ class MetaAgent:
         user_message: str,
         user_id: str,
         wallet_address: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         智能信息检索：进化式探索
 
@@ -1490,7 +1485,6 @@ class MetaAgent:
         if not self.llm_manager or not self.conversation_manager:
             return None
 
-        import json, re
 
         # Step 1: LLM 判断是否需要检索 + 需要什么信息
         need_retrieval, task_info = await self._analyze_user_task(user_message)
@@ -1522,7 +1516,7 @@ class MetaAgent:
                 verified_info = candidate
                 break
             else:
-                logger.info(f"Not correct, trying next...")
+                logger.info("Not correct, trying next...")
 
         # Step 4: 如果没找到，尝试扩大搜索范围
         if not verified_info:
@@ -1544,7 +1538,8 @@ class MetaAgent:
 
     async def _analyze_user_task(self, user_message: str) -> tuple:
         """分析用户任务，判断是否需要检索 + 需要什么信息"""
-        import json, re
+        import json
+        import re
 
         prompt = f"""分析用户消息，判断是否需要检索信息，以及需要什么信息。
 
@@ -1582,7 +1577,7 @@ class MetaAgent:
 
         return False, {}
 
-    async def _get_all_candidate_info(self, user_id: str) -> List[Dict]:
+    async def _get_all_candidate_info(self, user_id: str) -> list[dict]:
         """获取历史对话中的所有相关内容，让 LLM 判断哪些是需要的"""
         candidates = []
 
@@ -1632,7 +1627,7 @@ class MetaAgent:
         logger.info(f"Total candidate messages: {len(candidates)}")
         return candidates
 
-    def _extract_all_sensitive_values(self, content: str) -> List[str]:
+    def _extract_all_sensitive_values(self, content: str) -> list[str]:
         """提取所有可能的敏感信息值"""
         import re
 
@@ -1660,10 +1655,11 @@ class MetaAgent:
         return values
 
     async def _find_info_from_candidates(
-        self, candidates: List[Dict], task_info: Dict
-    ) -> Optional[str]:
+        self, candidates: list[dict], task_info: dict
+    ) -> str | None:
         """让 LLM 从所有候选消息中找出需要的信息"""
-        import json, re
+        import json
+        import re
 
         # 准备候选消息摘要
         candidate_summaries = []
@@ -1705,15 +1701,16 @@ class MetaAgent:
                     print(f"[FIND_INFO] Found: {info[:50]}")
                     return info
             else:
-                print(f"[FIND_INFO] No JSON found in response")
+                print("[FIND_INFO] No JSON found in response")
         except Exception as e:
             print(f"[FIND_INFO] Error: {e}")
 
         return None
 
-    async def _validate_info_with_llm(self, candidate: Dict, task_info: Dict) -> bool:
+    async def _validate_info_with_llm(self, candidate: dict, task_info: dict) -> bool:
         """用 LLM 判断这段历史消息是否包含用户当前需要的信息"""
-        import json, re
+        import json
+        import re
 
         candidate_content = candidate.get("content", "")[:500]
         candidate_role = candidate.get("role", "")
@@ -1778,9 +1775,10 @@ class MetaAgent:
 
         return False
 
-    async def _expand_search(self, user_id: str, task_info: Dict) -> List[Dict]:
+    async def _expand_search(self, user_id: str, task_info: dict) -> list[dict]:
         """扩大搜索范围"""
-        import json, re
+        import json
+        import re
 
         # 让 LLM 决定如何扩大搜索
         prompt = f"""需要扩大搜索来找到正确的信息。
@@ -1837,7 +1835,7 @@ class MetaAgent:
 
         return []
 
-    def _format_found_info(self, info: Dict) -> str:
+    def _format_found_info(self, info: dict) -> str:
         """格式化找到的信息"""
         content = info.get("content", "")
         # 提取关键信息
@@ -1849,7 +1847,7 @@ class MetaAgent:
 
 （已从历史记录中验证）"""
 
-    def _format_ask_user(self, task_info: Dict) -> str:
+    def _format_ask_user(self, task_info: dict) -> str:
         """格式化询问用户"""
         return f"""## 需要更多信息
 
@@ -1864,8 +1862,8 @@ class MetaAgent:
 3. 或者告诉我验证方法，我再尝试"""
 
     def _regex_match_sensitive_info(
-        self, messages: List[Dict], missing_info: List[Dict]
-    ) -> Optional[Dict]:
+        self, messages: list[dict], missing_info: list[dict]
+    ) -> dict | None:
         """用正则直接匹配敏感信息（不遗漏）"""
 
         # 定义敏感信息模式
@@ -1937,13 +1935,14 @@ class MetaAgent:
         return None
 
     async def _extract_specific_info_v2(
-        self, messages: List[Dict], missing_info: List[Dict]
-    ) -> Optional[Dict]:
+        self, messages: list[dict], missing_info: list[dict]
+    ) -> dict | None:
         """用 LLM 从相关消息中提取具体信息"""
         if not messages:
             return None
 
-        import json, re
+        import json
+        import re
 
         # 只取用户消息（更容易找到原始信息）
         user_msgs = [m for m in messages if m.get("role") == "user"]
@@ -1998,7 +1997,8 @@ class MetaAgent:
 
     async def _check_need_retrieval_v2(self, user_message: str) -> tuple:
         """判断是否需要检索（返回是否需要 + 上下文说明）"""
-        import json, re
+        import json
+        import re
 
         prompt = f"""准确判断用户消息是否需要从历史对话中检索信息。
 
@@ -2036,9 +2036,10 @@ class MetaAgent:
 
         return False, ""
 
-    async def _analyze_missing_info_v2(self, user_message: str) -> List[Dict]:
+    async def _analyze_missing_info_v2(self, user_message: str) -> list[dict]:
         """分析需要搜索的信息类型"""
-        import json, re
+        import json
+        import re
 
         prompt = f"""分析用户任务，返回需要搜索的信息类型。
 
@@ -2064,7 +2065,7 @@ class MetaAgent:
 
         return []
 
-    async def _get_all_messages(self, user_id: str, max_count: int = 100) -> List[Dict]:
+    async def _get_all_messages(self, user_id: str, max_count: int = 100) -> list[dict]:
         """获取用户所有对话消息 - 使用搜索方法直接获取相关消息"""
 
         # 使用搜索方法获取所有相关消息
@@ -2096,13 +2097,14 @@ class MetaAgent:
         return all_results[:max_count]
 
     async def _llm_find_relevant_messages(
-        self, messages: List[Dict], missing_info: List[Dict]
-    ) -> List[Dict]:
+        self, messages: list[dict], missing_info: list[dict]
+    ) -> list[dict]:
         """用 LLM 判断哪些消息包含需要的信息（全文检索，不依赖关键词）"""
         if not messages:
             return []
 
-        import json, re
+        import json
+        import re
 
         # 取最近的消息（更容易找到相关信息）
         recent_messages = messages[:30]
@@ -2156,13 +2158,14 @@ class MetaAgent:
         return []
 
     async def _extract_specific_info(
-        self, messages: List[Dict], missing_info: List[Dict]
-    ) -> Optional[Dict]:
+        self, messages: list[dict], missing_info: list[dict]
+    ) -> dict | None:
         """从相关消息中提取具体的敏感信息"""
         if not messages:
             return None
 
-        import json, re
+        import json
+        import re
 
         # 重点关注用户消息（role=user）
         user_messages = [m for m in messages if m.get("role") == "user"]
@@ -2238,7 +2241,8 @@ class MetaAgent:
 
         return None
 
-        import json, re
+        import json
+        import re
 
         # 提取消息内容
         contents = "\n---\n".join(
@@ -2283,7 +2287,7 @@ class MetaAgent:
 
         return None
 
-    def _format_found_info(self, info: Dict) -> str:
+    def _format_found_info(self, info: dict) -> str:
         """格式化找到的具体信息"""
         info_type = info.get("info_type", "未知")
         value = info.get("value", "")
@@ -2297,7 +2301,7 @@ class MetaAgent:
 
 （如有需要，我可以帮您使用这个信息完成任务）"""
 
-    def _format_partial_results(self, messages: List[Dict], missing_info: List[Dict]) -> str:
+    def _format_partial_results(self, messages: list[dict], missing_info: list[dict]) -> str:
         """格式化部分结果（找到相关消息但没有具体信息）"""
         info_descriptions = [info.get("description", "") for info in missing_info]
 
@@ -2317,7 +2321,8 @@ class MetaAgent:
 
     async def _check_need_retrieval(self, user_message: str) -> bool:
         """判断是否需要信息检索（触发条件）"""
-        import json, re
+        import json
+        import re
 
         prompt = f"""判断用户消息是否需要从历史对话中检索信息。
 
@@ -2354,9 +2359,10 @@ class MetaAgent:
 
         return False
 
-    async def _analyze_missing_info(self, user_message: str) -> List[Dict]:
+    async def _analyze_missing_info(self, user_message: str) -> list[dict]:
         """分析缺少什么信息，并生成详细的搜索提示"""
-        import json, re
+        import json
+        import re
 
         prompt = f"""分析用户任务，判断缺少什么关键信息，并生成详细的搜索提示。
 
@@ -2398,7 +2404,7 @@ class MetaAgent:
 
         return []
 
-    async def _full_text_search(self, user_id: str, missing_info: List[Dict]) -> List[Dict]:
+    async def _full_text_search(self, user_id: str, missing_info: list[dict]) -> list[dict]:
         """全文检索：直接搜索完整消息内容"""
         results = []
 
@@ -2421,7 +2427,7 @@ class MetaAgent:
 
         return unique_results
 
-    async def _search_user_messages(self, user_id: str, missing_info: List[Dict]) -> List[Dict]:
+    async def _search_user_messages(self, user_id: str, missing_info: list[dict]) -> list[dict]:
         """搜索用户原始提供的消息"""
         # 这个需要直接查询数据库，优先用户消息
         # 已经在 conversation_manager 中实现了按 role 排序
@@ -2448,8 +2454,8 @@ class MetaAgent:
         return unique_results
 
     async def _llm_assisted_search(
-        self, user_id: str, missing_info: List[Dict], round_num: int
-    ) -> List[Dict]:
+        self, user_id: str, missing_info: list[dict], round_num: int
+    ) -> list[dict]:
         """LLM 辅助的智能搜索"""
         # 生成更多搜索词
         prompt = f"""为以下信息类型生成更多搜索关键词。
@@ -2488,12 +2494,13 @@ class MetaAgent:
             logger.warning(f"LLM assisted search failed: {e}")
             return []
 
-    async def _validate_search_results(self, results: List[Dict], missing_info: List[Dict]) -> bool:
+    async def _validate_search_results(self, results: list[dict], missing_info: list[dict]) -> bool:
         """验证搜索结果是否有效"""
         if not results:
             return False
 
-        import json, re
+        import json
+        import re
 
         # 提取结果内容
         result_contents = "\n".join([r.get("content", "")[:500] for r in results[:3]])
@@ -2523,7 +2530,7 @@ class MetaAgent:
 
         return False
 
-    def _format_retrieval_results(self, results: List[Dict]) -> str:
+    def _format_retrieval_results(self, results: list[dict]) -> str:
         """格式化检索结果"""
         from datetime import datetime
 
@@ -2536,7 +2543,7 @@ class MetaAgent:
 
         return "\n".join(formatted)
 
-    def _format_continue_search_prompt(self, missing_info: List[Dict], max_rounds: int) -> str:
+    def _format_continue_search_prompt(self, missing_info: list[dict], max_rounds: int) -> str:
         """格式化询问是否继续搜索"""
         info_descriptions = [info.get("description", "") for info in missing_info]
 
@@ -2554,10 +2561,10 @@ class MetaAgent:
 
     async def _chat_with_llm(
         self,
-        messages: List[Dict[str, str]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        skills: Optional[List[Dict[str, Any]]] = None,
-        conversation_id: Optional[str] = None,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        skills: list[dict[str, Any]] | None = None,
+        conversation_id: str | None = None,
         user_session: Optional["UserSession"] = None,
     ) -> ChatResult:
         """
@@ -2620,8 +2627,8 @@ class MetaAgent:
         current_messages = list(messages)
 
         # === 状态追踪（关键改进：记录执行状态）===
-        executed_tools: List[str] = []
-        all_tool_results: List[Dict[str, Any]] = []
+        executed_tools: list[str] = []
+        all_tool_results: list[dict[str, Any]] = []
 
         while iteration < max_iterations:
             iteration += 1
@@ -2642,7 +2649,7 @@ class MetaAgent:
 
                 # 检查是否是第一次尝试失败，降级处理
                 if iteration == 1 and content and "失败" in content:
-                    logger.info(f"[DEBUG] Tool call failed, falling back to simple chat")
+                    logger.info("[DEBUG] Tool call failed, falling back to simple chat")
                     fallback_content = await self._call_llm_simple(current_messages)
                     return ChatResult(
                         content=fallback_content,
@@ -2773,7 +2780,7 @@ class MetaAgent:
         if not content:
             # 响应为空不一定是"匆忙结束"，可能是LLM调用失败
             # 返回 False，让上层处理这个异常情况
-            logger.warning(f"[DETECT_HASTY] 响应为空，返回False让上层处理")
+            logger.warning("[DETECT_HASTY] 响应为空，返回False让上层处理")
             return False, "响应为空"
 
         # 只匹配明确的中间状态模式
@@ -2796,14 +2803,14 @@ class MetaAgent:
 
         # 不再根据内容长度判断
         # 短回复（如"好的"、"明白了"）是正常的，不应该判定为匆忙结束
-        logger.info(f"[DETECT_HASTY] 未检测到中间状态，返回False（正常完成）")
+        logger.info("[DETECT_HASTY] 未检测到中间状态，返回False（正常完成）")
         return False, ""
 
     def _check_tool_needs_retry(
         self,
-        tool_calls: List[Dict[str, Any]],
-        tool_results: List[Dict[str, Any]],
-    ) -> Optional[Dict[str, Any]]:
+        tool_calls: list[dict[str, Any]],
+        tool_results: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
         """
         检查工具执行是否需要重试
 
@@ -2887,10 +2894,10 @@ class MetaAgent:
 
     def _build_anthropic_tool_messages(
         self,
-        llm_response: Dict[str, Any],
-        tool_calls: List[Dict[str, Any]],
-        tool_results: List[Dict[str, Any]],
-        current_messages: List[Dict[str, Any]],
+        llm_response: dict[str, Any],
+        tool_calls: list[dict[str, Any]],
+        tool_results: list[dict[str, Any]],
+        current_messages: list[dict[str, Any]],
     ) -> None:
         """
         构建 Anthropic API 格式的工具消息
@@ -2948,10 +2955,10 @@ class MetaAgent:
 
     def _build_openai_tool_messages(
         self,
-        llm_response: Dict[str, Any],
-        tool_calls: List[Dict[str, Any]],
-        tool_results: List[Dict[str, Any]],
-        current_messages: List[Dict[str, Any]],
+        llm_response: dict[str, Any],
+        tool_calls: list[dict[str, Any]],
+        tool_results: list[dict[str, Any]],
+        current_messages: list[dict[str, Any]],
     ) -> None:
         """构建 OpenAI API 格式的工具消息"""
         current_messages.append({
@@ -2969,9 +2976,9 @@ class MetaAgent:
 
     async def _check_needs_tools(
         self,
-        messages: List[Dict[str, str]],
-        tools: List[Dict[str, Any]],
-        skills: List[Dict[str, Any]],
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]],
+        skills: list[dict[str, Any]],
     ) -> bool:
         """检查是否需要工具调用"""
         all_tools = []
@@ -2999,7 +3006,7 @@ class MetaAgent:
 
         return False
 
-    async def _call_llm_simple(self, messages: List[Dict[str, str]]) -> str:
+    async def _call_llm_simple(self, messages: list[dict[str, str]]) -> str:
         """简单调用 LLM"""
         if self.llm_manager.provider == "minimax" and self.llm_manager._adapter:
             return await self.llm_manager._adapter.chat_with_messages(messages)
@@ -3013,8 +3020,8 @@ class MetaAgent:
             return f"我收到了你的消息：{last_user_msg[:50]}..."
 
     async def _call_llm_with_tools(
-        self, messages: List[Dict[str, str]], tools: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, messages: list[dict[str, str]], tools: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """调用 LLM 并传递工具"""
         print(f"🔍 [_call_llm_with_tools] START, tools={len(tools)}")
         logger.info(f"DEBUG _call_llm_with_tools called, tools count: {len(tools)}")
@@ -3050,8 +3057,8 @@ class MetaAgent:
             return {"content": "LLM 不可用（请配置 MINIMAX_API_KEY）", "tool_calls": []}
 
     async def _execute_tool_calls(
-        self, tool_calls: List[Dict[str, Any]], user_session: Optional["UserSession"] = None
-    ) -> List[Dict[str, Any]]:
+        self, tool_calls: list[dict[str, Any]], user_session: Optional["UserSession"] = None
+    ) -> list[dict[str, Any]]:
         """执行工具调用
 
         Args:
@@ -3215,7 +3222,7 @@ class MetaAgent:
 
         return results
 
-    async def _evaluate_result(self, result: Any) -> Dict[str, Any]:
+    async def _evaluate_result(self, result: Any) -> dict[str, Any]:
         """评估执行结果"""
         response_text = "执行完成"
         if isinstance(result, dict):
@@ -3241,7 +3248,7 @@ class MetaAgent:
         }
 
     async def execute_tool(
-        self, tool_name: str, wallet_address: Optional[str] = None, **kwargs
+        self, tool_name: str, wallet_address: str | None = None, **kwargs
     ) -> Any:
         """
         执行指定工具（改造后）
@@ -3261,7 +3268,7 @@ class MetaAgent:
         """
         # 如果提供 wallet_address，获取 UserSession 并传入
         if wallet_address:
-            user_session = await self.session_manager.get_or_create_session(wallet_address)
+            await self.session_manager.get_or_create_session(wallet_address)
             # TODO: 改造 ToolRegistry.execute 支持 session 参数
             # 当前保持兼容性，后续需要改造工具执行接口
             return await self.tool_registry.execute(tool_name, **kwargs)
@@ -3307,7 +3314,7 @@ class MetaAgent:
         user_session = await self.session_manager.get_or_create_session(wallet_address)
         return await user_session.migrate_to_this_node()
 
-    async def get_session_info(self, wallet_address: str) -> Optional[Dict]:
+    async def get_session_info(self, wallet_address: str) -> dict | None:
         """
         获取用户会话信息（新增方法）
 
@@ -3331,7 +3338,7 @@ class MetaAgent:
             "is_idle": user_session.is_idle(),
         }
 
-    async def search_knowledge(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    async def search_knowledge(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """
         搜索知识库
 
@@ -3353,12 +3360,12 @@ class MetaAgent:
             for r in results
         ]
 
-    async def get_knowledge_stats(self) -> Dict[str, Any]:
+    async def get_knowledge_stats(self) -> dict[str, Any]:
         """获取知识库统计"""
         return await self.vector_kb.get_stats()
 
     # ========== 调试日志方法 ==========
-    def add_debug_log(self, wallet_address: str, log_type: str, message: str, data: Dict = None):
+    def add_debug_log(self, wallet_address: str, log_type: str, message: str, data: dict = None):
         """添加调试日志
 
         Args:
@@ -3385,7 +3392,7 @@ class MetaAgent:
         if len(self._debug_logs[wallet_address]) > 100:
             self._debug_logs[wallet_address] = self._debug_logs[wallet_address][-100:]
 
-    def get_debug_logs(self, wallet_address: str, after_timestamp: float = 0) -> List[Dict]:
+    def get_debug_logs(self, wallet_address: str, after_timestamp: float = 0) -> list[dict]:
         """获取调试日志
 
         Args:
@@ -3403,7 +3410,7 @@ class MetaAgent:
         if wallet_address in self._debug_logs:
             self._debug_logs[wallet_address] = []
 
-    def get_available_tools(self) -> List[Dict[str, str]]:
+    def get_available_tools(self) -> list[dict[str, str]]:
         """获取可用工具列表"""
         return self.tool_registry.list_tools()
 
@@ -3415,7 +3422,7 @@ class MetaAgent:
         self,
         wallet_address: str,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """获取会话历史（仅限 owner 访问）"""
         conversation = await self.conversation_manager.get_or_create_conversation(
             owner_id=wallet_address,
@@ -3428,7 +3435,7 @@ class MetaAgent:
         )
         return [m.to_dict() for m in messages]
 
-    def get_evolution_stats(self) -> Dict[str, Any]:
+    def get_evolution_stats(self) -> dict[str, Any]:
         """获取进化统计"""
         if self.evolution_engine:
             return self.evolution_engine.get_evolution_stats()
@@ -3569,7 +3576,7 @@ class MetaAgent:
             logger.error(f"[CHAT] Plan execution failed: {e}")
             return f"❌ 执行失败: {str(e)}"
 
-    def get_task_plan(self, task_id: str) -> Optional[Dict[str, Any]]:
+    def get_task_plan(self, task_id: str) -> dict[str, Any] | None:
         """
         获取任务计划
 
@@ -3589,9 +3596,8 @@ class MetaAgent:
 
     async def _llm_judge_response_retry(
         self, response: str, attempt: int, max_retries: int
-    ) -> Dict:
+    ) -> dict:
         """LLM 返回后判断是否需要重试"""
-        import json
 
         prompt = f"""判断当前响应是否需要重试。
 
@@ -3625,8 +3631,8 @@ LLM 响应:
             return {"need_retry": False}
 
     async def _filter_tools_by_permission(
-        self, all_tools: List[Dict], wallet_address: Optional[str]
-    ) -> List[str]:
+        self, all_tools: list[dict], wallet_address: str | None
+    ) -> list[str]:
         """根据用户权限过滤可用工具
 
         Args:
@@ -3672,12 +3678,12 @@ LLM 响应:
 
     async def _llm_judge_tool_retry(
         self,
-        tool_results: List[Dict],
+        tool_results: list[dict],
         attempt: int,
         max_retries: int,
         user_question: str = "",
-        tool_calls: List[Dict] = None,
-    ) -> Dict:
+        tool_calls: list[dict] = None,
+    ) -> dict:
         """工具调用后判断是否需要重试"""
         import json
 
@@ -3760,7 +3766,7 @@ LLM 响应:
             logger.warning(f"LLM judge tool retry failed: {e}")
             return {"need_retry": False}
 
-    def _check_task_completion(self, result_text: str, tool_results: List[Dict] = None) -> Dict:
+    def _check_task_completion(self, result_text: str, tool_results: list[dict] = None) -> dict:
         """最终检查任务是否真正完成
 
         检查点：
@@ -3802,7 +3808,7 @@ LLM 响应:
 
         return {"is_complete": True, "reason": "检查通过"}
 
-    def _parse_json(self, response: str) -> Optional[Dict]:
+    def _parse_json(self, response: str) -> dict | None:
         import json
         import re
 
@@ -3821,7 +3827,7 @@ LLM 响应:
                     pass
         return None
 
-    def _parse_tool_calls(self, response: str) -> List[Dict]:
+    def _parse_tool_calls(self, response: str) -> list[dict]:
         """解析工具调用"""
         import re
 
@@ -4058,38 +4064,6 @@ LLM 响应:
                             {"id": f"call_{len(tool_calls)}", "name": tool_name, "arguments": args}
                         )
 
-                    # Match [TOOL_CALL] blocks with tool name and args
-                    for match in re.finditer(
-                        r"\[TOOL_CALL\]\s*\{[^}]*tool\s*=>\s*\"([^\"]+)\"[^}]*args\s*=>\s*\{([^}]+)\}\s*\}\s*\[/TOOL_CALL\]",
-                        normalized_response,
-                        re.IGNORECASE | re.DOTALL,
-                    ):
-                        tool_name = match.group(1)
-                        args_str = match.group(2)
-                        args = {}
-
-                        # Remove newlines from args_str
-                        args_str = args_str.replace("\n", " ").replace("\r", "")
-
-                        # Parse args: --key "value" or --key value or --key 'value'
-                        for arg_match in re.finditer(r'--(\w+)\s+"([^"]+)"', args_str):
-                            args[arg_match.group(1)] = arg_match.group(2)
-                        for arg_match in re.finditer(r"--(\w+)\s+'([^']+)'", args_str):
-                            args[arg_match.group(1)] = arg_match.group(2)
-                        for arg_match in re.finditer(r"--(\w+)\s+(\S+)", args_str):
-                            if arg_match.group(1) not in args:
-                                val = arg_match.group(2).strip()
-                                try:
-                                    if "." in val:
-                                        args[arg_match.group(1)] = float(val)
-                                    else:
-                                        args[arg_match.group(1)] = int(val)
-                                except:
-                                    args[arg_match.group(1)] = val
-                        tool_calls.append(
-                            {"id": f"call_{len(tool_calls)}", "name": tool_name, "arguments": args}
-                        )
-
                 if tool_calls:
                     logger.info(
                         f"Parsed {len(tool_calls)} tool calls from text: {[tc.get('name') for tc in tool_calls]}"
@@ -4099,7 +4073,7 @@ LLM 响应:
             logger.warning(f"Parse tool calls failed: {e}")
         return tool_calls
 
-    async def _execute_tool(self, tool_name: str, tool_args: Dict, user_session) -> Dict:
+    async def _execute_tool(self, tool_name: str, tool_args: dict, user_session) -> dict:
         """执行工具"""
         try:
             return await self.tool_registry.execute(tool_name, session=user_session, **tool_args)
@@ -4107,7 +4081,7 @@ LLM 响应:
             logger.error(f"Tool execution failed: {tool_name}, error: {e}")
             return {"success": False, "error": str(e)}
 
-    def _inject_extracted_info(self, messages: List, info_name: str, info_value: str) -> List:
+    def _inject_extracted_info(self, messages: list, info_name: str, info_value: str) -> list:
         """将提取到的信息注入到消息上下文"""
         injection = f"\n\n## 已获取的信息\n{info_name}: {info_value}\n"
         new_messages = []
@@ -4119,15 +4093,15 @@ LLM 响应:
                 new_messages.append({"role": "system", "content": injection})
         return new_messages
 
-    def _add_response_to_messages(self, messages: List, response: str) -> List:
+    def _add_response_to_messages(self, messages: list, response: str) -> list:
         """将 LLM 响应添加到消息列表"""
         messages = list(messages)
         messages.append({"role": "assistant", "content": response})
         return messages
 
     def _add_tool_results_to_messages(
-        self, messages: List, llm_response: str, tool_results: List[Dict]
-    ) -> List:
+        self, messages: list, llm_response: str, tool_results: list[dict]
+    ) -> list:
         """将工具结果添加到消息列表"""
         import json
 
@@ -4143,7 +4117,7 @@ LLM 响应:
             )
         return messages
 
-    def _format_tool_results(self, tool_results: List[Dict]) -> str:
+    def _format_tool_results(self, tool_results: list[dict]) -> str:
         """格式化工具结果"""
         import json
 
@@ -4155,7 +4129,7 @@ LLM 响应:
         return "\n\n".join(lines)
 
     async def _format_tool_results_with_llm(
-        self, tool_results: List[Dict], user_message: str, user_session
+        self, tool_results: list[dict], user_message: str, user_session
     ) -> str:
         """使用 LLM 将工具结果格式化为自然语言"""
         import json
@@ -4185,7 +4159,7 @@ LLM 响应:
             logger.warning(f"LLM formatting failed, using fallback: {e}")
             return self._format_tool_results(tool_results)
 
-    def _fix_tool_args(self, original_args: Dict, info_name: str, extracted_value: str) -> Dict:
+    def _fix_tool_args(self, original_args: dict, info_name: str, extracted_value: str) -> dict:
         """修复工具参数"""
         fixed_args = original_args.copy()
         param_mappings = {
@@ -4194,7 +4168,7 @@ LLM 响应:
             "url": ["url", "link", "href"],
         }
         info_name_lower = info_name.lower()
-        for standard_name, possible_names in param_mappings.items():
+        for _standard_name, possible_names in param_mappings.items():
             if any(n in info_name_lower for n in possible_names):
                 for param_name in possible_names:
                     if param_name in fixed_args:

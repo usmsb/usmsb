@@ -11,67 +11,63 @@
 """
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-from .config import (
-    NetworkType,
-    NetworkConfig,
-    BlockchainConfig,
-    get_default_config,
-)
-
-from .web3_client import (
-    Web3Client,
-)
-
-from .contracts import (
-    BaseContractClient,
-    TransactionError,
-    ContractError,
-    # 合约客户端
-    VIBETokenClient,
-    AgentWalletFactory,
-    AgentWalletClient,
-    AgentRegistryClient,
-    VIBStakingClient,
-    VIBIdentityClient,
-    VIBDividendClient,
-    VIBGovernanceClient,
-    VIBCollaborationClient,
-    JointOrderClient,
-    # 枚举和类型
-    StakeTier,
-    LockPeriod,
-    IdentityType,
-    ProposalType,
-    ProposalState,
-    VetoType,
-    PoolStatus,
-)
-
-from .key_management import (
-    AgentKeyManager,
-)
+import asyncio
+from typing import Any, Dict, Optional
 
 from .agent_manager import (
-    AgentManager,
     AgentCreationError,
+    AgentManager,
 )
-
+from .config import (
+    BlockchainConfig,
+    NetworkConfig,
+    NetworkType,
+    get_default_config,
+)
+from .contracts import (
+    AgentRegistryClient,
+    AgentWalletClient,
+    AgentWalletFactory,
+    BaseContractClient,
+    ContractError,
+    IdentityType,
+    JointOrderClient,
+    LockPeriod,
+    PoolStatus,
+    ProposalState,
+    ProposalType,
+    # 枚举和类型
+    StakeTier,
+    TransactionError,
+    VetoType,
+    VIBCollaborationClient,
+    VIBDividendClient,
+    # 合约客户端
+    VIBETokenClient,
+    VIBGovernanceClient,
+    VIBIdentityClient,
+    VIBStakingClient,
+)
 from .event_listener import (
+    AsyncEventCallback,
     BlockchainEventListener,
-    ParsedEvent,
+    EventCallback,
     EventFilter,
     EventFilterBuilder,
+    ParsedEvent,
     TypedEventListener,
     create_event_listener,
     filter_events,
-    EventCallback,
-    AsyncEventCallback,
 )
-
-from typing import Optional, Dict, Any
-import asyncio
+from .key_management import (
+    AgentKeyManager,
+)
+from .web3_client import (
+    Web3Client,
+)
 
 
 class VIBEBlockchainClient:
@@ -102,7 +98,7 @@ class VIBEBlockchainClient:
         >>> print(f"Balance: {balance} VIBE")
     """
 
-    def __init__(self, config: Optional[BlockchainConfig] = None):
+    def __init__(self, config: BlockchainConfig | None = None):
         """
         初始化统一区块链客户端
 
@@ -110,18 +106,18 @@ class VIBEBlockchainClient:
             config: 区块链配置（如不指定则使用默认配置）
         """
         self.config = config or BlockchainConfig()
-        self._web3_client: Optional[Web3Client] = None
-        self._token_client: Optional[VIBETokenClient] = None
-        self._registry_client: Optional[AgentRegistryClient] = None
-        self._identity_client: Optional[VIBIdentityClient] = None
-        self._staking_client: Optional[VIBStakingClient] = None
-        self._wallet_factory: Optional[AgentWalletFactory] = None
-        self._dividend_client: Optional[VIBDividendClient] = None
-        self._governance_client: Optional[VIBGovernanceClient] = None
-        self._collaboration_client: Optional[VIBCollaborationClient] = None
-        self._joint_order_client: Optional[JointOrderClient] = None
-        self._agent_manager: Optional[AgentManager] = None
-        self._key_manager: Optional[AgentKeyManager] = None
+        self._web3_client: Web3Client | None = None
+        self._token_client: VIBETokenClient | None = None
+        self._registry_client: AgentRegistryClient | None = None
+        self._identity_client: VIBIdentityClient | None = None
+        self._staking_client: VIBStakingClient | None = None
+        self._wallet_factory: AgentWalletFactory | None = None
+        self._dividend_client: VIBDividendClient | None = None
+        self._governance_client: VIBGovernanceClient | None = None
+        self._collaboration_client: VIBCollaborationClient | None = None
+        self._joint_order_client: JointOrderClient | None = None
+        self._agent_manager: AgentManager | None = None
+        self._key_manager: AgentKeyManager | None = None
 
     @property
     def web3(self) -> Web3Client:
@@ -134,8 +130,8 @@ class VIBEBlockchainClient:
     def token(self) -> VIBETokenClient:
         """获取VIBE代币客户端"""
         if self._token_client is None:
-            from .contracts.vibe_token import VIBETokenClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.vibe_token import VIBETokenClient
 
             self._token_client = VIBETokenClient(
                 web3_client=self.web3,
@@ -149,8 +145,8 @@ class VIBEBlockchainClient:
     def registry(self) -> AgentRegistryClient:
         """获取Agent注册表客户端"""
         if self._registry_client is None:
-            from .contracts.agent_registry import AgentRegistryClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.agent_registry import AgentRegistryClient
 
             self._registry_client = AgentRegistryClient(
                 web3_client=self.web3,
@@ -164,8 +160,8 @@ class VIBEBlockchainClient:
     def identity(self) -> VIBIdentityClient:
         """获取VIB身份客户端"""
         if self._identity_client is None:
-            from .contracts.vib_identity import VIBIdentityClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.vib_identity import VIBIdentityClient
 
             self._identity_client = VIBIdentityClient(
                 web3_client=self.web3,
@@ -179,8 +175,8 @@ class VIBEBlockchainClient:
     def staking(self) -> VIBStakingClient:
         """获取质押客户端"""
         if self._staking_client is None:
-            from .contracts.vib_staking import VIBStakingClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.vib_staking import VIBStakingClient
 
             self._staking_client = VIBStakingClient(
                 web3_client=self.web3,
@@ -194,8 +190,8 @@ class VIBEBlockchainClient:
     def wallet_factory(self) -> AgentWalletFactory:
         """获取钱包工厂"""
         if self._wallet_factory is None:
-            from .contracts.agent_wallet import AgentWalletFactory
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.agent_wallet import AgentWalletFactory
 
             abi, bytecode = load_abi_and_bytecode("AgentWallet")
             self._wallet_factory = AgentWalletFactory(
@@ -211,8 +207,8 @@ class VIBEBlockchainClient:
     def dividend(self) -> VIBDividendClient:
         """获取分红客户端"""
         if self._dividend_client is None:
-            from .contracts.vib_dividend import VIBDividendClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.vib_dividend import VIBDividendClient
 
             self._dividend_client = VIBDividendClient(
                 web3_client=self.web3,
@@ -226,8 +222,8 @@ class VIBEBlockchainClient:
     def governance(self) -> VIBGovernanceClient:
         """获取治理客户端"""
         if self._governance_client is None:
-            from .contracts.vib_governance import VIBGovernanceClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.vib_governance import VIBGovernanceClient
 
             self._governance_client = VIBGovernanceClient(
                 web3_client=self.web3,
@@ -241,8 +237,8 @@ class VIBEBlockchainClient:
     def collaboration(self) -> VIBCollaborationClient:
         """获取协作客户端"""
         if self._collaboration_client is None:
-            from .contracts.vib_collaboration import VIBCollaborationClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.vib_collaboration import VIBCollaborationClient
 
             self._collaboration_client = VIBCollaborationClient(
                 web3_client=self.web3,
@@ -256,8 +252,8 @@ class VIBEBlockchainClient:
     def joint_order(self) -> JointOrderClient:
         """获取联合订单客户端"""
         if self._joint_order_client is None:
-            from .contracts.joint_order import JointOrderClient
             from .contracts.abi_loader import load_abi_and_bytecode
+            from .contracts.joint_order import JointOrderClient
 
             self._joint_order_client = JointOrderClient(
                 web3_client=self.web3,
@@ -284,9 +280,10 @@ class VIBEBlockchainClient:
     @property
     def event_listener(self) -> BlockchainEventListener:
         """获取事件监听器"""
-        from .event_listener import BlockchainEventListener
-        from .contracts.abi_loader import load_abi_and_bytecode
         from web3 import Web3
+
+        from .contracts.abi_loader import load_abi_and_bytecode
+        from .event_listener import BlockchainEventListener
 
         if not hasattr(self, '_event_listener') or self._event_listener is None:
             web3 = Web3(Web3.HTTPProvider(self.config.rpc_url))
@@ -323,8 +320,8 @@ class VIBEBlockchainClient:
         Returns:
             AgentWalletClient实例
         """
-        from .contracts.agent_wallet import AgentWalletClient
         from .contracts.abi_loader import load_abi_and_bytecode
+        from .contracts.agent_wallet import AgentWalletClient
 
         return AgentWalletClient(
             web3_client=self.web3,
@@ -333,7 +330,7 @@ class VIBEBlockchainClient:
             abi=load_abi_and_bytecode("AgentWallet")[0],
         )
 
-    async def check_can_create_agent(self, owner: str) -> Dict[str, Any]:
+    async def check_can_create_agent(self, owner: str) -> dict[str, Any]:
         """
         检查Owner是否可以创建新Agent
 
@@ -360,7 +357,7 @@ class VIBEBlockchainClient:
         self,
         agent_address: str,
         wallet_address: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取Agent完整状态
 
@@ -392,7 +389,7 @@ class VIBEBlockchainClient:
         agent_address: str = None,
         agent_private_key: str = None,
         encryption_key: str = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         创建新Agent
 
@@ -432,7 +429,7 @@ class VIBEBlockchainClient:
             encryption_key=encryption_key,
         )
 
-    def test_connection(self) -> Dict[str, Any]:
+    def test_connection(self) -> dict[str, Any]:
         """
         测试区块链连接
 

@@ -15,7 +15,7 @@ ChatResult - LLM 调用结果数据结构
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -34,10 +34,10 @@ class ChatResult:
     """LLM 生成的最终回复内容"""
 
     # === 执行追踪 ===
-    executed_tools: List[str] = field(default_factory=list)
+    executed_tools: list[str] = field(default_factory=list)
     """已执行的工具名称列表，用于避免后台任务重复执行"""
 
-    tool_results: List[Dict[str, Any]] = field(default_factory=list)
+    tool_results: list[dict[str, Any]] = field(default_factory=list)
     """所有工具的执行结果，包含成功和失败的"""
 
     iterations_used: int = 0
@@ -74,7 +74,7 @@ class ChatResult:
     解决：从历史记录中找到正确参数，修正后重新执行
     """
 
-    retry_info: Optional[Dict[str, Any]] = None
+    retry_info: dict[str, Any] | None = None
     """
     重试所需信息
 
@@ -99,7 +99,7 @@ class ChatResult:
     解决：传入"继续处理"的提示，让 LLM 完成任务
     """
 
-    continuation_context: Optional[Dict[str, Any]] = None
+    continuation_context: dict[str, Any] | None = None
     """
     继续处理所需的上下文
 
@@ -111,13 +111,13 @@ class ChatResult:
     """
 
     # === 错误信息 ===
-    error: Optional[str] = None
+    error: str | None = None
     """如果发生错误，记录错误信息"""
 
-    error_type: Optional[str] = None
+    error_type: str | None = None
     """错误类型：timeout, rate_limit, api_error, tool_error 等"""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典，用于日志和序列化"""
         return {
             "content": self.content[:200] + "..." if len(self.content) > 200 else self.content,
@@ -143,10 +143,10 @@ class ToolRetryInfo:
     tool_name: str
     """需要重试的工具名称"""
 
-    original_args: Dict[str, Any]
+    original_args: dict[str, Any]
     """原始调用参数"""
 
-    missing_param: Optional[str] = None
+    missing_param: str | None = None
     """缺失或错误的参数名"""
 
     info_type: str = "other"
@@ -165,7 +165,7 @@ class ToolRetryInfo:
     error_message: str = ""
     """原始错误信息"""
 
-    search_keywords: List[str] = field(default_factory=list)
+    search_keywords: list[str] = field(default_factory=list)
     """用于搜索历史记录的关键词"""
 
 
@@ -184,14 +184,14 @@ class BackgroundTaskContext:
     """用户原始消息"""
 
     # 已完成的处理
-    executed_tools: List[str]
+    executed_tools: list[str]
     """已执行的工具列表，后台任务应避免重复执行"""
 
-    tool_results: List[Dict[str, Any]]
+    tool_results: list[dict[str, Any]]
     """工具执行结果"""
 
     # 当前状态
-    current_messages: List[Dict[str, str]]
+    current_messages: list[dict[str, str]]
     """当前的对话消息列表"""
 
     # 处理类型
@@ -205,7 +205,7 @@ class BackgroundTaskContext:
     """
 
     # 重试信息（仅 tool_retry 类型使用）
-    retry_info: Optional[ToolRetryInfo] = None
+    retry_info: ToolRetryInfo | None = None
 
     # 最大重试次数
     max_retries: int = 3

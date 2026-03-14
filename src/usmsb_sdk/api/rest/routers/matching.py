@@ -15,23 +15,29 @@ Hybrid Matching:
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Depends, Body
+from fastapi import APIRouter, Depends, HTTPException
 
 from usmsb_sdk.api.database import (
-    get_db,
     get_agent as db_get_agent,
-    get_all_agents as db_get_all_agents,
-    search_demands as db_search_demands,
 )
-from usmsb_sdk.api.rest.schemas.matching import (
-    NegotiationRequest,
-    ProposalRequest,
+from usmsb_sdk.api.database import (
+    get_all_agents as db_get_all_agents,
+)
+from usmsb_sdk.api.database import (
+    get_db,
+)
+from usmsb_sdk.api.database import (
+    search_demands as db_search_demands,
 )
 from usmsb_sdk.api.rest.schemas.demand import (
     SearchDemandsRequest,
     SearchSuppliersRequest,
+)
+from usmsb_sdk.api.rest.schemas.matching import (
+    NegotiationRequest,
+    ProposalRequest,
 )
 from usmsb_sdk.api.rest.services.utils import safe_json_loads
 from usmsb_sdk.api.rest.unified_auth import (
@@ -40,7 +46,6 @@ from usmsb_sdk.api.rest.unified_auth import (
 )
 from usmsb_sdk.services.hybrid_matching_service import (
     HybridMatchingService,
-    get_hybrid_matching_service,
     init_hybrid_matching_service,
 )
 
@@ -51,10 +56,10 @@ router = APIRouter(prefix="/matching", tags=["Active Matching"])
 _matching_engine = None
 
 # Hybrid matching service instance
-_hybrid_matching_service: Optional[HybridMatchingService] = None
+_hybrid_matching_service: HybridMatchingService | None = None
 
 # In-memory storage for matching (in production, use database)
-negotiations_store: Dict[str, Any] = {}
+negotiations_store: dict[str, Any] = {}
 
 
 def set_matching_engine(engine):
@@ -74,7 +79,7 @@ async def get_matching_service() -> HybridMatchingService:
 @router.post("/search-demands")
 async def search_demands(
     request: SearchDemandsRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Search for demands that match the agent's capabilities.
 
@@ -184,7 +189,7 @@ async def search_demands(
 @router.post("/search-suppliers")
 async def search_suppliers(
     request: SearchSuppliersRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Search for suppliers that match the agent's requirements.
 
@@ -278,7 +283,7 @@ async def search_suppliers(
                 agent_ids.add(svc_agent_id)
 
         # Load all agents in one query
-        agents_by_id: Dict[str, Any] = {}
+        agents_by_id: dict[str, Any] = {}
         if agent_ids:
             placeholders = ','.join(['?' for _ in agent_ids])
             cursor.execute(f'SELECT * FROM agents WHERE agent_id IN ({placeholders})', list(agent_ids))
@@ -359,7 +364,7 @@ async def search_suppliers(
 @router.post("/negotiate")
 async def initiate_negotiation(
     request: NegotiationRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Initiate a negotiation with another agent.
 
@@ -386,7 +391,7 @@ async def initiate_negotiation(
 
 @router.get("/negotiations")
 async def get_negotiations(
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Get all negotiations for the authenticated agent.
 
@@ -405,7 +410,7 @@ async def get_negotiations(
 async def submit_proposal(
     session_id: str,
     proposal: ProposalRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Submit a proposal in a negotiation.
 
@@ -439,7 +444,7 @@ async def submit_proposal(
 @router.post("/negotiations/{session_id}/accept")
 async def accept_negotiation(
     session_id: str,
-    user: Dict[str, Any] = Depends(require_stake_unified(100))
+    user: dict[str, Any] = Depends(require_stake_unified(100))
 ):
     """Accept a negotiation and finalize the terms.
 
@@ -484,7 +489,7 @@ async def accept_negotiation(
 @router.post("/negotiations/{session_id}/reject")
 async def reject_negotiation(
     session_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Reject a negotiation.
 
@@ -518,7 +523,7 @@ async def reject_negotiation(
 
 @router.get("/opportunities")
 async def get_opportunities(
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Get all opportunities for the authenticated agent.
 
@@ -526,14 +531,14 @@ async def get_opportunities(
         - X-API-Key header
         - X-Agent-ID header
     """
-    agent_id = user.get('agent_id') or user.get('user_id')
+    user.get('agent_id') or user.get('user_id')
     # In production, filter by agent_id
     return []
 
 
 @router.get("/stats")
 async def get_matching_stats(
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Get matching statistics for the authenticated agent.
 

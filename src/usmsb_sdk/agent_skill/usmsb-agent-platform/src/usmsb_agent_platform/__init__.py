@@ -18,29 +18,28 @@ Features:
 
 from .platform import AgentPlatform
 from .registration import (
-    RegistrationClient,
-    RegistrationResult,
+    APIKeyInfo,
     BindingRequestResult,
     BindingStatus,
-    APIKeyInfo,
+    RegistrationClient,
+    RegistrationResult,
 )
 from .types import (
     # Enums
     ActionType,
-    StakeTier,
     ErrorCode,
-
+    ExperienceGene,
+    HeartbeatStatus,
+    Intent,
+    PlatformResult,
+    ReputationInfo,
+    RetryConfig,
+    RewardInfo,
     # Data classes
     StakeInfo,
-    WalletInfo,
-    ReputationInfo,
-    RewardInfo,
-    ExperienceGene,
-    Intent,
     StakeRequirement,
-    RetryConfig,
-    PlatformResult,
-    HeartbeatStatus,
+    StakeTier,
+    WalletInfo,
 )
 
 __version__ = "1.1.0"

@@ -9,11 +9,10 @@ import asyncio
 import logging
 import time
 import uuid
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
-
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +31,10 @@ class ExternalAgentResponse:
     call_id: str = ""
     agent_id: str = ""
     success: bool = False
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    result: Any | None = None
+    error: str | None = None
     status: ExternalAgentStatus = ExternalAgentStatus.ONLINE
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -45,11 +44,11 @@ class SkillDefinition:
     name: str
     description: str = ""
     category: str = "general"
-    input_schema: Dict[str, Any] = field(default_factory=dict)
-    output_schema: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_id": self.skill_id,
             "name": self.name,
@@ -61,7 +60,7 @@ class SkillDefinition:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SkillDefinition":
+    def from_dict(cls, data: dict[str, Any]) -> "SkillDefinition":
         return cls(
             skill_id=data.get("skill_id", str(uuid.uuid4())),
             name=data.get("name", ""),
@@ -87,7 +86,7 @@ class ProtocolHandler(ABC):
         pass
 
     @abstractmethod
-    async def call_skill(self, skill_name: str, params: Dict[str, Any]) -> ExternalAgentResponse:
+    async def call_skill(self, skill_name: str, params: dict[str, Any]) -> ExternalAgentResponse:
         """Call a skill on the remote agent."""
         pass
 
@@ -106,7 +105,7 @@ class ProtocolConfig:
     keep_alive: bool = True
     keep_alive_interval: float = 30.0
     max_message_size: int = 10 * 1024 * 1024  # 10MB
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -114,12 +113,12 @@ class ProtocolMessage:
     """Base message structure for protocol communication."""
     message_id: str
     message_type: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
-    headers: Dict[str, str] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "message_type": self.message_type,
@@ -130,7 +129,7 @@ class ProtocolMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ProtocolMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "ProtocolMessage":
         return cls(
             message_id=data.get("message_id", str(uuid.uuid4())),
             message_type=data.get("message_type", "unknown"),
@@ -148,11 +147,11 @@ class ProtocolResponse:
     request_id: str
     success: bool
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "request_id": self.request_id,
@@ -164,7 +163,7 @@ class ProtocolResponse:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ProtocolResponse":
+    def from_dict(cls, data: dict[str, Any]) -> "ProtocolResponse":
         return cls(
             message_id=data.get("message_id", str(uuid.uuid4())),
             request_id=data.get("request_id", ""),
@@ -181,14 +180,14 @@ class ConnectionInfo:
     """Information about a protocol connection."""
     endpoint: str
     connected: bool = False
-    connected_at: Optional[float] = None
-    last_activity: Optional[float] = None
+    connected_at: float | None = None
+    last_activity: float | None = None
     bytes_sent: int = 0
     bytes_received: int = 0
     messages_sent: int = 0
     messages_received: int = 0
     errors: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseProtocolHandler(ProtocolHandler):
@@ -203,7 +202,7 @@ class BaseProtocolHandler(ProtocolHandler):
     - Logging
     """
 
-    def __init__(self, config: Optional[ProtocolConfig] = None):
+    def __init__(self, config: ProtocolConfig | None = None):
         """
         Initialize the base protocol handler.
 
@@ -211,10 +210,10 @@ class BaseProtocolHandler(ProtocolHandler):
             config: Protocol configuration. If None, uses defaults.
         """
         self._config = config or ProtocolConfig()
-        self._connection_info: Optional[ConnectionInfo] = None
-        self._pending_requests: Dict[str, asyncio.Future] = {}
-        self._message_handlers: Dict[str, callable] = {}
-        self._keep_alive_task: Optional[asyncio.Task] = None
+        self._connection_info: ConnectionInfo | None = None
+        self._pending_requests: dict[str, asyncio.Future] = {}
+        self._message_handlers: dict[str, callable] = {}
+        self._keep_alive_task: asyncio.Task | None = None
 
         logger.debug(f"{self.__class__.__name__} initialized with config: {self._config}")
 
@@ -224,12 +223,12 @@ class BaseProtocolHandler(ProtocolHandler):
         return self._connection_info is not None and self._connection_info.connected
 
     @property
-    def endpoint(self) -> Optional[str]:
+    def endpoint(self) -> str | None:
         """Get the current endpoint."""
         return self._connection_info.endpoint if self._connection_info else None
 
     @property
-    def connection_info(self) -> Optional[ConnectionInfo]:
+    def connection_info(self) -> ConnectionInfo | None:
         """Get connection information."""
         return self._connection_info
 
@@ -282,7 +281,7 @@ class BaseProtocolHandler(ProtocolHandler):
         self._stop_keep_alive()
 
         # Cancel pending requests
-        for request_id, future in self._pending_requests.items():
+        for _request_id, future in self._pending_requests.items():
             if not future.done():
                 future.cancel()
         self._pending_requests.clear()
@@ -299,7 +298,7 @@ class BaseProtocolHandler(ProtocolHandler):
     async def call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float = 60.0,
     ) -> ExternalAgentResponse:
         """
@@ -360,7 +359,7 @@ class BaseProtocolHandler(ProtocolHandler):
                 metadata={"execution_time": execution_time},
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 f"{self.__class__.__name__} skill '{skill_name}' timed out"
             )
@@ -385,7 +384,7 @@ class BaseProtocolHandler(ProtocolHandler):
                 error=str(e),
             )
 
-    async def discover_skills(self) -> List[SkillDefinition]:
+    async def discover_skills(self) -> list[SkillDefinition]:
         """
         Discover available skills from the agent.
 
@@ -460,7 +459,7 @@ class BaseProtocolHandler(ProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -477,7 +476,7 @@ class BaseProtocolHandler(ProtocolHandler):
         pass
 
     @abstractmethod
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Perform protocol-specific skill discovery.
 
@@ -524,7 +523,7 @@ class BaseProtocolHandler(ProtocolHandler):
                     operation(),
                     timeout=timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 raise  # Don't retry on timeout
             except Exception as e:
                 last_error = e
@@ -594,7 +593,7 @@ class BaseProtocolHandler(ProtocolHandler):
         if message_type in self._message_handlers:
             del self._message_handlers[message_type]
 
-    async def _handle_message(self, message: ProtocolMessage) -> Optional[ProtocolResponse]:
+    async def _handle_message(self, message: ProtocolMessage) -> ProtocolResponse | None:
         """
         Handle an incoming message.
 
@@ -620,7 +619,7 @@ class BaseProtocolHandler(ProtocolHandler):
 
         return None
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get handler statistics.
 

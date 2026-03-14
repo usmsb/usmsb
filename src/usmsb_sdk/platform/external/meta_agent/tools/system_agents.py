@@ -3,7 +3,7 @@ System Agents Tools - 将 system_agents 包装为 meta_agent 的工具
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from .registry import Tool
 
@@ -83,67 +83,67 @@ def _get_logger_agent():
 # ==================== 工具函数 ====================
 
 
-async def recommend_agents(params: Dict[str, Any]) -> Dict[str, Any]:
+async def recommend_agents(params: dict[str, Any]) -> dict[str, Any]:
     """根据任务描述推荐合适的 agent"""
     agent = _get_recommender_agent()
     return await agent.execute_skill("recommend", params)
 
 
-async def search_agents(params: Dict[str, Any]) -> Dict[str, Any]:
+async def search_agents(params: dict[str, Any]) -> dict[str, Any]:
     """按条件搜索 agent"""
     agent = _get_recommender_agent()
     return await agent.execute_skill("search", params)
 
 
-async def rate_agent(params: Dict[str, Any]) -> Dict[str, Any]:
+async def rate_agent(params: dict[str, Any]) -> dict[str, Any]:
     """给 agent 评分"""
     agent = _get_recommender_agent()
     return await agent.execute_skill("rate", params)
 
 
-async def get_recommendation_history(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_recommendation_history(params: dict[str, Any]) -> dict[str, Any]:
     """获取推荐历史"""
     agent = _get_recommender_agent()
     return await agent.execute_skill("get_history", params)
 
 
-async def route_message(params: Dict[str, Any]) -> Dict[str, Any]:
+async def route_message(params: dict[str, Any]) -> dict[str, Any]:
     """路由消息到目标"""
     agent = _get_router_agent()
     return await agent.execute_skill("route", params)
 
 
-async def get_load_balance_status(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_load_balance_status(params: dict[str, Any]) -> dict[str, Any]:
     """获取负载均衡状态"""
     agent = _get_router_agent()
     return await agent.execute_skill("balance", params)
 
 
-async def get_route_info(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_route_info(params: dict[str, Any]) -> dict[str, Any]:
     """获取路由信息"""
     agent = _get_router_agent()
     return await agent.execute_skill("get_routes", params)
 
 
-async def get_system_health(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_system_health(params: dict[str, Any]) -> dict[str, Any]:
     """获取系统健康状态"""
     agent = _get_monitor_agent()
     return await agent.execute_skill("health_check", params)
 
 
-async def get_system_metrics(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_system_metrics(params: dict[str, Any]) -> dict[str, Any]:
     """获取系统指标"""
     agent = _get_monitor_agent()
     return await agent.execute_skill("get_metrics", params)
 
 
-async def get_alerts(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_alerts(params: dict[str, Any]) -> dict[str, Any]:
     """获取告警列表"""
     agent = _get_monitor_agent()
     return await agent.execute_skill("get_alerts", params)
 
 
-async def query_logs(params: Dict[str, Any]) -> Dict[str, Any]:
+async def query_logs(params: dict[str, Any]) -> dict[str, Any]:
     """查询日志"""
     agent = _get_logger_agent()
     return await agent.execute_skill("query", params)
@@ -156,37 +156,37 @@ def get_system_agents_tools():
     """获取 system agents 工具列表"""
 
     # 注意：handler 需要是 async 函数，或者使用 async wrapper
-    async def recommend_agents_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def recommend_agents_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await recommend_agents(params)
 
-    async def search_agents_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def search_agents_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await search_agents(params)
 
-    async def rate_agent_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def rate_agent_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await rate_agent(params)
 
-    async def get_recommendation_history_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_recommendation_history_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_recommendation_history(params)
 
-    async def route_message_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def route_message_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await route_message(params)
 
-    async def get_load_balance_status_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_load_balance_status_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_load_balance_status(params)
 
-    async def get_route_info_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_route_info_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_route_info(params)
 
-    async def get_system_health_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_system_health_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_system_health(params)
 
-    async def get_system_metrics_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_system_metrics_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_system_metrics(params)
 
-    async def get_alerts_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_alerts_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_alerts(params)
 
-    async def query_logs_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def query_logs_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await query_logs(params)
 
     return [

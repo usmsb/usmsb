@@ -12,22 +12,16 @@ HTTP Protocol Features:
 """
 
 import asyncio
-import json
 import logging
 import time
-import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 # Import from base_handler to avoid circular import
 from usmsb_sdk.platform.external.protocol.base_handler import (
     BaseProtocolHandler,
-    ProtocolConfig,
-    ProtocolMessage,
-    ProtocolResponse,
-    ConnectionInfo,
     ExternalAgentStatus,
-    ExternalAgentResponse,
+    ProtocolConfig,
     SkillDefinition,
 )
 
@@ -60,12 +54,12 @@ class HTTPRequest:
     """HTTP request structure."""
     method: str
     path: str
-    headers: Dict[str, str] = field(default_factory=dict)
-    params: Dict[str, str] = field(default_factory=dict)
-    body: Optional[Dict[str, Any]] = None
+    headers: dict[str, str] = field(default_factory=dict)
+    params: dict[str, str] = field(default_factory=dict)
+    body: dict[str, Any] | None = None
     timeout: float = 60.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "method": self.method,
             "path": self.path,
@@ -80,7 +74,7 @@ class HTTPRequest:
 class HTTPResponse:
     """HTTP response structure."""
     status_code: int
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
     body: Any = None
     elapsed: float = 0.0
 
@@ -88,7 +82,7 @@ class HTTPResponse:
     def is_success(self) -> bool:
         return 200 <= self.status_code < 300
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status_code": self.status_code,
             "headers": self.headers,
@@ -104,7 +98,7 @@ class HTTPSkillEndpoint:
     path: str
     method: str = "POST"
     timeout: float = 60.0
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 class HTTPProtocolHandler(BaseProtocolHandler):
@@ -124,9 +118,9 @@ class HTTPProtocolHandler(BaseProtocolHandler):
 
     def __init__(
         self,
-        config: Optional[ProtocolConfig] = None,
-        endpoint_config: Optional[HTTPEndpointConfig] = None,
-        auth_config: Optional[HTTPAuthConfig] = None,
+        config: ProtocolConfig | None = None,
+        endpoint_config: HTTPEndpointConfig | None = None,
+        auth_config: HTTPAuthConfig | None = None,
     ):
         """
         Initialize the HTTP protocol handler.
@@ -139,8 +133,8 @@ class HTTPProtocolHandler(BaseProtocolHandler):
         super().__init__(config)
         self._endpoint_config = endpoint_config or HTTPEndpointConfig()
         self._auth_config = auth_config or HTTPAuthConfig()
-        self._skill_endpoints: Dict[str, HTTPSkillEndpoint] = {}
-        self._http_client: Optional[Any] = None
+        self._skill_endpoints: dict[str, HTTPSkillEndpoint] = {}
+        self._http_client: Any | None = None
 
         logger.info("HTTPProtocolHandler initialized")
 
@@ -164,7 +158,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
             }
 
             # Verify connection by calling health endpoint
-            health_url = f"{endpoint.rstrip('/')}{self._endpoint_config.health_path}"
+            f"{endpoint.rstrip('/')}{self._endpoint_config.health_path}"
 
             # Simulated health check
             await asyncio.sleep(0.1)
@@ -187,7 +181,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -231,7 +225,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
             error_msg = response.body.get("error", f"HTTP {response.status_code}")
             raise Exception(error_msg)
 
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Discover skills via HTTP.
 
@@ -319,7 +313,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
         full_url = f"{base_url}{request.path}"
 
         # Build headers with authentication
-        headers = self._build_headers(request.headers)
+        self._build_headers(request.headers)
 
         logger.debug(f"HTTP {request.method} {full_url}")
 
@@ -345,7 +339,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
                 elapsed=elapsed,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"HTTP request timeout: {full_url}")
             raise
 
@@ -353,7 +347,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
             logger.error(f"HTTP request error: {e}")
             raise
 
-    def _build_headers(self, extra_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def _build_headers(self, extra_headers: dict[str, str] | None = None) -> dict[str, str]:
         """
         Build HTTP headers with authentication.
 
@@ -388,7 +382,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
 
         return headers
 
-    async def _simulate_response(self, request: HTTPRequest) -> Dict[str, Any]:
+    async def _simulate_response(self, request: HTTPRequest) -> dict[str, Any]:
         """
         Simulate HTTP response for testing.
 
@@ -429,7 +423,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
         path: str,
         method: str = "POST",
         timeout: float = 60.0,
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         """
         Register a custom endpoint for a skill.
@@ -461,7 +455,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
         if skill_name in self._skill_endpoints:
             del self._skill_endpoints[skill_name]
 
-    def get_skill_endpoint(self, skill_name: str) -> Optional[HTTPSkillEndpoint]:
+    def get_skill_endpoint(self, skill_name: str) -> HTTPSkillEndpoint | None:
         """
         Get the endpoint configuration for a skill.
 
@@ -475,7 +469,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
 
     # ========== Utility Methods ==========
 
-    async def get(self, path: str, params: Optional[Dict[str, str]] = None) -> HTTPResponse:
+    async def get(self, path: str, params: dict[str, str] | None = None) -> HTTPResponse:
         """
         Make a GET request.
 
@@ -492,7 +486,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
     async def post(
         self,
         path: str,
-        body: Optional[Dict[str, Any]] = None,
+        body: dict[str, Any] | None = None,
     ) -> HTTPResponse:
         """
         Make a POST request.
@@ -510,7 +504,7 @@ class HTTPProtocolHandler(BaseProtocolHandler):
     async def put(
         self,
         path: str,
-        body: Optional[Dict[str, Any]] = None,
+        body: dict[str, Any] | None = None,
     ) -> HTTPResponse:
         """
         Make a PUT request.

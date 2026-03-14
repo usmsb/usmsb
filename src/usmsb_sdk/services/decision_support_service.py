@@ -10,9 +10,9 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Goal, Resource, Risk, Rule, Information
+from usmsb_sdk.core.elements import Agent, Goal, Information, Resource, Risk, Rule
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
 
 logger = logging.getLogger(__name__)
@@ -46,11 +46,11 @@ class DecisionOption:
     name: str
     description: str
     expected_outcome: str
-    resource_requirements: Dict[str, float] = field(default_factory=dict)
+    resource_requirements: dict[str, float] = field(default_factory=dict)
     risk_level: float = 0.0
     estimated_value: float = 0.0
-    constraints: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    constraints: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -60,32 +60,32 @@ class DecisionCriteria:
     description: str
     weight: float = 1.0
     is_cost: bool = False  # True if lower is better
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
 
 
 @dataclass
 class DecisionContext:
     """Context for decision making."""
     agent: Agent
-    goals: List[Goal]
-    resources: List[Resource]
-    risks: List[Risk]
-    rules: List[Rule]
-    information: List[Information]
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    preferences: Dict[str, float] = field(default_factory=dict)
+    goals: list[Goal]
+    resources: list[Resource]
+    risks: list[Risk]
+    rules: list[Rule]
+    information: list[Information]
+    constraints: dict[str, Any] = field(default_factory=dict)
+    preferences: dict[str, float] = field(default_factory=dict)
     time_horizon: int = 1
 
 
 @dataclass
 class DecisionAnalysis:
     """Result of decision analysis."""
-    option_scores: Dict[str, Dict[str, float]]
-    weighted_scores: Dict[str, float]
-    rankings: List[Tuple[str, float]]
-    sensitivity_analysis: Dict[str, Any]
-    tradeoffs: List[Dict[str, Any]]
+    option_scores: dict[str, dict[str, float]]
+    weighted_scores: dict[str, float]
+    rankings: list[tuple[str, float]]
+    sensitivity_analysis: dict[str, Any]
+    tradeoffs: list[dict[str, Any]]
     confidence: float
     reasoning: str
 
@@ -94,12 +94,12 @@ class DecisionAnalysis:
 class DecisionRecommendation:
     """Final decision recommendation."""
     recommended_option: DecisionOption
-    alternatives: List[DecisionOption]
+    alternatives: list[DecisionOption]
     analysis: DecisionAnalysis
     rationale: str
     expected_outcome: str
-    risk_assessment: Dict[str, Any]
-    implementation_steps: List[str]
+    risk_assessment: dict[str, Any]
+    implementation_steps: list[str]
     confidence: float
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
@@ -119,7 +119,7 @@ class DecisionSupportService:
     def __init__(
         self,
         llm_adapter: ILLMAdapter,
-        default_criteria: Optional[List[DecisionCriteria]] = None,
+        default_criteria: list[DecisionCriteria] | None = None,
     ):
         """
         Initialize the Decision Support Service.
@@ -130,9 +130,9 @@ class DecisionSupportService:
         """
         self.llm = llm_adapter
         self.default_criteria = default_criteria or self._get_default_criteria()
-        self._decision_history: List[Dict[str, Any]] = []
+        self._decision_history: list[dict[str, Any]] = []
 
-    def _get_default_criteria(self) -> List[DecisionCriteria]:
+    def _get_default_criteria(self) -> list[DecisionCriteria]:
         """Get default decision criteria."""
         return [
             DecisionCriteria(
@@ -169,9 +169,9 @@ class DecisionSupportService:
 
     async def analyze_decision(
         self,
-        options: List[DecisionOption],
+        options: list[DecisionOption],
         context: DecisionContext,
-        criteria: Optional[List[DecisionCriteria]] = None,
+        criteria: list[DecisionCriteria] | None = None,
     ) -> DecisionAnalysis:
         """
         Analyze decision options using MCDA.
@@ -188,7 +188,7 @@ class DecisionSupportService:
             criteria = self.default_criteria
 
         # Evaluate each option against each criterion
-        option_scores: Dict[str, Dict[str, float]] = {}
+        option_scores: dict[str, dict[str, float]] = {}
 
         for option in options:
             option_scores[option.id] = await self._evaluate_option(
@@ -236,9 +236,9 @@ class DecisionSupportService:
 
     async def recommend(
         self,
-        options: List[DecisionOption],
+        options: list[DecisionOption],
         context: DecisionContext,
-        criteria: Optional[List[DecisionCriteria]] = None,
+        criteria: list[DecisionCriteria] | None = None,
         decision_type: DecisionType = DecisionType.SINGLE_CHOICE,
     ) -> DecisionRecommendation:
         """
@@ -306,9 +306,9 @@ class DecisionSupportService:
 
     async def compare_options(
         self,
-        options: List[DecisionOption],
+        options: list[DecisionOption],
         context: DecisionContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Compare multiple decision options side by side.
 
@@ -386,8 +386,8 @@ class DecisionSupportService:
         self,
         base_option: DecisionOption,
         context: DecisionContext,
-        scenarios: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        scenarios: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Perform what-if analysis on different scenarios.
 
@@ -442,8 +442,8 @@ class DecisionSupportService:
         self,
         option: DecisionOption,
         context: DecisionContext,
-        criteria: List[DecisionCriteria],
-    ) -> Dict[str, float]:
+        criteria: list[DecisionCriteria],
+    ) -> dict[str, float]:
         """Evaluate an option against all criteria."""
         scores = {}
 
@@ -504,9 +504,9 @@ Respond with only a single float number representing the score."""
 
     def _normalize_scores(
         self,
-        option_scores: Dict[str, Dict[str, float]],
-        criteria: List[DecisionCriteria],
-    ) -> Dict[str, Dict[str, float]]:
+        option_scores: dict[str, dict[str, float]],
+        criteria: list[DecisionCriteria],
+    ) -> dict[str, dict[str, float]]:
         """Normalize scores to [0, 1] range."""
         normalized = {}
 
@@ -541,9 +541,9 @@ Respond with only a single float number representing the score."""
 
     def _calculate_weighted_scores(
         self,
-        normalized_scores: Dict[str, Dict[str, float]],
-        criteria: List[DecisionCriteria],
-    ) -> Dict[str, float]:
+        normalized_scores: dict[str, dict[str, float]],
+        criteria: list[DecisionCriteria],
+    ) -> dict[str, float]:
         """Calculate weighted scores for each option."""
         total_weight = sum(c.weight for c in criteria)
         weighted = {}
@@ -558,11 +558,11 @@ Respond with only a single float number representing the score."""
 
     async def _sensitivity_analysis(
         self,
-        options: List[DecisionOption],
+        options: list[DecisionOption],
         context: DecisionContext,
-        criteria: List[DecisionCriteria],
-        current_rankings: Dict[str, float],
-    ) -> Dict[str, Any]:
+        criteria: list[DecisionCriteria],
+        current_rankings: dict[str, float],
+    ) -> dict[str, Any]:
         """Perform sensitivity analysis on criteria weights."""
         sensitivity = {
             "critical_criteria": [],
@@ -580,7 +580,7 @@ Respond with only a single float number representing the score."""
                 criterion.weight = max(0.1, original_weight + delta)
 
                 # Recalculate rankings
-                temp_scores = await self._evaluate_option(
+                await self._evaluate_option(
                     options[0], context, criteria
                 ) if options else {}
 
@@ -594,10 +594,10 @@ Respond with only a single float number representing the score."""
 
     def _identify_tradeoffs(
         self,
-        option_scores: Dict[str, Dict[str, float]],
-        criteria: List[DecisionCriteria],
-        rankings: List[Tuple[str, float]],
-    ) -> List[Dict[str, Any]]:
+        option_scores: dict[str, dict[str, float]],
+        criteria: list[DecisionCriteria],
+        rankings: list[tuple[str, float]],
+    ) -> list[dict[str, Any]]:
         """Identify tradeoffs between options."""
         tradeoffs = []
 
@@ -626,8 +626,8 @@ Respond with only a single float number representing the score."""
 
     def _calculate_confidence(
         self,
-        option_scores: Dict[str, Dict[str, float]],
-        rankings: List[Tuple[str, float]],
+        option_scores: dict[str, dict[str, float]],
+        rankings: list[tuple[str, float]],
     ) -> float:
         """Calculate overall confidence in the recommendation."""
         if len(rankings) < 2:
@@ -643,10 +643,10 @@ Respond with only a single float number representing the score."""
 
     async def _generate_analysis_reasoning(
         self,
-        options: List[DecisionOption],
-        rankings: List[Tuple[str, float]],
-        option_scores: Dict[str, Dict[str, float]],
-        criteria: List[DecisionCriteria],
+        options: list[DecisionOption],
+        rankings: list[tuple[str, float]],
+        option_scores: dict[str, dict[str, float]],
+        criteria: list[DecisionCriteria],
         context: DecisionContext,
     ) -> str:
         """Generate human-readable reasoning for the analysis."""
@@ -678,7 +678,7 @@ Provide a brief (2-3 sentences) explanation of why the top option was recommende
     async def _generate_rationale(
         self,
         recommended: DecisionOption,
-        alternatives: List[DecisionOption],
+        alternatives: list[DecisionOption],
         analysis: DecisionAnalysis,
         context: DecisionContext,
     ) -> str:
@@ -744,7 +744,7 @@ Provide a brief prediction (1-2 sentences) of the likely outcome."""
         self,
         option: DecisionOption,
         context: DecisionContext,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Assess risks associated with the recommended option."""
         prompt = f"""Assess the risks of implementing this decision.
 
@@ -780,7 +780,7 @@ Provide a risk assessment in JSON format with keys:
         self,
         option: DecisionOption,
         context: DecisionContext,
-    ) -> List[str]:
+    ) -> list[str]:
         """Generate implementation steps for the recommended option."""
         prompt = f"""Generate implementation steps for this decision.
 
@@ -810,7 +810,7 @@ Provide 3-7 implementation steps as a JSON list of strings."""
             logger.error(f"Failed to generate implementation steps: {e}")
             return ["Execute according to plan"]
 
-    def get_decision_history(self) -> List[Dict[str, Any]]:
+    def get_decision_history(self) -> list[dict[str, Any]]:
         """Get the history of decisions made."""
         return self._decision_history.copy()
 

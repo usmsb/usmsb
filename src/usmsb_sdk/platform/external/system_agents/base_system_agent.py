@@ -11,21 +11,19 @@ Features:
     - Resource access control
 """
 
+import asyncio
+import logging
 from abc import abstractmethod
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
-import asyncio
-import logging
+from typing import Any
 
-from usmsb_sdk.agent_sdk.base_agent import BaseAgent, AgentState
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
     CapabilityDefinition,
-    SkillDefinition,
-    SkillParameter,
 )
-from usmsb_sdk.agent_sdk.communication import Message, MessageType, Session
+from usmsb_sdk.agent_sdk.base_agent import BaseAgent
+from usmsb_sdk.agent_sdk.communication import Message, Session
 
 
 class SystemAgentPermission(Enum):
@@ -54,10 +52,10 @@ class SystemAgentConfig:
     def __init__(
         self,
         permission_level: SystemAgentPermission = SystemAgentPermission.READ_ONLY,
-        allowed_resources: Optional[Set[str]] = None,
+        allowed_resources: set[str] | None = None,
         rate_limit: int = 1000,
         audit_enabled: bool = True,
-        audit_log_path: Optional[str] = None,
+        audit_log_path: str | None = None,
     ):
         """
         Initialize system agent configuration.
@@ -75,7 +73,7 @@ class SystemAgentConfig:
         self.audit_enabled = audit_enabled
         self.audit_log_path = audit_log_path
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary"""
         return {
             "permission_level": self.permission_level.value,
@@ -129,7 +127,7 @@ class BaseSystemAgent(BaseAgent):
     def __init__(
         self,
         config: AgentConfig,
-        system_config: Optional[SystemAgentConfig] = None,
+        system_config: SystemAgentConfig | None = None,
     ):
         """
         Initialize the system agent.
@@ -154,7 +152,7 @@ class BaseSystemAgent(BaseAgent):
         }
 
         # Audit log
-        self._audit_log: List[Dict[str, Any]] = []
+        self._audit_log: list[dict[str, Any]] = []
         self._audit_lock = asyncio.Lock()
 
         # Register system capabilities
@@ -267,7 +265,7 @@ class BaseSystemAgent(BaseAgent):
     async def audit_operation(
         self,
         operation: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         success: bool = True,
     ) -> None:
         """
@@ -308,8 +306,8 @@ class BaseSystemAgent(BaseAgent):
     async def get_audit_log(
         self,
         limit: int = 100,
-        operation_filter: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        operation_filter: str | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get audit log entries.
 
@@ -331,7 +329,7 @@ class BaseSystemAgent(BaseAgent):
     # ==================== System Metrics ====================
 
     @property
-    def system_metrics(self) -> Dict[str, Any]:
+    def system_metrics(self) -> dict[str, Any]:
         """Get system-level metrics"""
         return {
             **self._system_metrics,
@@ -382,8 +380,8 @@ class BaseSystemAgent(BaseAgent):
 
     @abstractmethod
     async def handle_message(
-        self, message: Message, session: Optional[Session] = None
-    ) -> Optional[Message]:
+        self, message: Message, session: Session | None = None
+    ) -> Message | None:
         """
         Handle incoming messages.
 
@@ -397,7 +395,7 @@ class BaseSystemAgent(BaseAgent):
         pass
 
     @abstractmethod
-    async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_skill(self, skill_name: str, params: dict[str, Any]) -> Any:
         """
         Execute a skill by name.
 
@@ -424,7 +422,7 @@ class BaseSystemAgent(BaseAgent):
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert system agent info to dictionary"""
         base_dict = super().to_dict()
         base_dict.update(

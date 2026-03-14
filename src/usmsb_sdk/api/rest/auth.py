@@ -6,44 +6,41 @@ Supports SIWE (Sign-In with Ethereum) authentication flow:
 2. Sign message with wallet
 3. Verify signature and create session
 """
+import hashlib
+import json
 import os
 import secrets
 import uuid
-import json
-import hashlib
 from datetime import datetime, timedelta
-from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.database import (
+    create_agent_wallet,
     create_nonce,
-    get_valid_nonce,
-    delete_nonce,
+    create_or_update_profile,
     create_session,
-    get_session_by_token,
+    create_user,
+    delete_agent_wallet,
+    delete_nonce,
     delete_session,
     delete_sessions_by_address,
-    create_user,
+    get_agent_wallet,
+    get_agent_wallets_by_owner,
+    get_db,
+    get_session_by_token,
+    get_user_balance_info,
     get_user_by_address,
-    update_user_stake,
+    get_valid_nonce,
+    update_agent_balance,
+    update_agent_daily_spent,
+    update_agent_limits,
+    update_agent_stake,
+    update_stake_status,
     update_user_agent,
     update_user_balance,
-    update_stake_status,
-    get_user_balance_info,
-    create_or_update_profile,
-    get_db,
-    create_agent_wallet,
-    get_agent_wallet,
-    get_agent_wallet_by_address,
-    get_agent_wallets_by_owner,
-    update_agent_balance,
-    update_agent_stake,
-    update_agent_limits,
-    update_agent_daily_spent,
-    register_agent_in_registry,
-    delete_agent_wallet,
+    update_user_stake,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -51,7 +48,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 # Configuration
 JWT_SECRET = os.environ.get("JWT_SECRET")
 if not JWT_SECRET:
-    raise EnvironmentError("JWT_SECRET environment variable is required")
+    raise OSError("JWT_SECRET environment variable is required")
 SESSION_DURATION_HOURS = 24 * 7  # 7 days
 NONCE_EXPIRY_SECONDS = 300  # 5 minutes
 
@@ -79,11 +76,11 @@ class VerifyResponse(BaseModel):
 
 class SessionResponse(BaseModel):
     valid: bool
-    agentId: Optional[str] = None
-    address: Optional[str] = None
-    did: Optional[str] = None
-    stake: Optional[float] = None
-    reputation: Optional[float] = None
+    agentId: str | None = None
+    address: str | None = None
+    did: str | None = None
+    stake: float | None = None
+    reputation: float | None = None
 
 
 class StakeRequest(BaseModel):
@@ -124,11 +121,11 @@ class BalanceResponse(BaseModel):
     lockedAmount: float
     totalBalance: float
     stakeStatus: str
-    unlockAvailableAt: Optional[int] = None
+    unlockAvailableAt: int | None = None
 
 
 class UnstakeRequest(BaseModel):
-    amount: Optional[float] = None  # None = unstake all
+    amount: float | None = None  # None = unstake all
 
 
 class UnstakeResponse(BaseModel):
@@ -196,7 +193,7 @@ class AgentWalletInfoResponse(BaseModel):
 
 
 class AgentWalletListResponse(BaseModel):
-    wallets: List[AgentWalletInfoResponse]
+    wallets: list[AgentWalletInfoResponse]
 
 
 class AgentLimitsRequest(BaseModel):
@@ -215,7 +212,7 @@ def generate_access_token(session_id: str, address: str) -> str:
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-def extract_address_from_message(message: str) -> Optional[str]:
+def extract_address_from_message(message: str) -> str | None:
     """Extract address from SIWE message"""
     for line in message.split('\n'):
         if line.startswith('0x'):
@@ -223,7 +220,7 @@ def extract_address_from_message(message: str) -> Optional[str]:
     return None
 
 
-def extract_nonce_from_message(message: str) -> Optional[str]:
+def extract_nonce_from_message(message: str) -> str | None:
     """Extract nonce from SIWE message"""
     for line in message.split('\n'):
         if 'nonce:' in line.lower():
@@ -231,7 +228,7 @@ def extract_nonce_from_message(message: str) -> Optional[str]:
     return None
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+async def get_current_user(authorization: str | None = Header(None)) -> dict:
     """Dependency to get current user from access token"""
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -587,7 +584,6 @@ async def create_user_profile(
     """Create or update user profile"""
     # Create agent for this user if not exists
     agent_id = user.get('agent_id')
-    wallet_address = None
     if not agent_id:
         agent_id = f"agent-{user['id']}"
         # Create agent in agents table
@@ -639,12 +635,11 @@ async def create_user_profile(
 
         try:
             create_agent_wallet(wallet_data)
-            wallet_address = agent_wallet_address
-        except Exception as e:
+        except Exception:
             # 如果创建失败（如已存在），尝试获取已存在的钱包
             existing_wallet = get_agent_wallet(agent_id)
             if existing_wallet:
-                wallet_address = existing_wallet.get('wallet_address')
+                existing_wallet.get('wallet_address')
 
     # Create/update profile
     create_or_update_profile({
