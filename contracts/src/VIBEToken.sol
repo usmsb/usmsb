@@ -702,8 +702,12 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
             // 分红池 - STK-006修复: 转账后通知分红合约更新累计
             if (dividendAmount > 0 && dividendContract != address(0)) {
                 super._update(from, dividendContract, dividendAmount);
-                // 通知分红合约更新分红累计
-                IVIBDividend(dividendContract).notifyDividendReceived(dividendAmount);
+                // 通知分红合约更新分红累计（用try-catch防止外部调用失败）
+                try IVIBDividend(dividendContract).notifyDividendReceived(dividendAmount) {
+                    // 成功
+                } catch {
+                    // 分红合约通知失败，不影响主转账
+                }
             }
 
             // 生态基金
