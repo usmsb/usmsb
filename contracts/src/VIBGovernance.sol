@@ -60,7 +60,8 @@ contract VIBGovernance is
     uint256 public constant COMMUNITY_WEIGHT_RATIO = 10;
     uint256 public constant MIN_STAKE_REQUIREMENT = 100 * 10**18;
     uint256 public constant MIN_TOTAL_FOR_CAPS = 1000 * 10**18;
-    uint256 public constant VOTE_POWER_CACHE_DURATION = 30 minutes;
+    // Medium #3 修复: 投票权缓存时间从30分钟减少到5分钟
+    uint256 public constant VOTE_POWER_CACHE_DURATION = 5 minutes;
     uint256 public constant GENERAL_PASS_RATE = 5000;
     uint256 public constant PARAMETER_PASS_RATE = 6000;
     uint256 public constant UPGRADE_PASS_RATE = 7500;

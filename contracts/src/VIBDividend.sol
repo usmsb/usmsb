@@ -139,14 +139,15 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @dev 内部函数：更新分红累计
+     * @dev Medium #7 修复: 添加除零检查
      */
     function _updateDividendAccumulation(uint256 amount) internal {
-        // 更新全局分红（按当前质押量计算每代币分红）
+        // Medium #7 修复: 检查 totalStaked 是否为0
         uint256 totalStaked = _getTotalStaked();
-        if (totalStaked > 0) {
-            // 修复: 正确更新 dividendPerTokenStored
-            dividendPerTokenStored += (amount * PRECISION) / totalStaked;
-        }
+        require(totalStaked > 0, "VIBDividend: no stakers, cannot distribute dividend");
+        
+        // 更新全局分红（按当前质押量计算每代币分红）
+        dividendPerTokenStored += (amount * PRECISION) / totalStaked;
 
         dividendBalance += amount;
     }

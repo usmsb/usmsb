@@ -38,6 +38,7 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
         uint256 totalEarnings;            // 累计收益
         uint256 distributedEarnings;      // 已分发收益
         uint256 createdAt;                // 创建时间
+        uint256 lastValuationTime;        // Medium #10 修复: 最后估值时间
         bool isFragmented;                // 是否已碎片化
         bool isTradable;                  // 是否可交易
         bool isRedeemed;                  // 是否已赎回
@@ -190,6 +191,7 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
             totalEarnings: 0,
             distributedEarnings: 0,
             createdAt: block.timestamp,
+            lastValuationTime: block.timestamp, // Medium #10 修复
             isFragmented: true,
             isTradable: true,
             isRedeemed: false,
@@ -228,6 +230,7 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
      * @notice 购买碎片
      * @param assetId 资产ID
      * @param shareAmount 购买数量
+     * @dev Medium #10 修复: 添加估值过期检查
      */
     function purchaseShares(
         bytes32 assetId,
@@ -243,6 +246,12 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
 
         require(asset.isTradable, "AssetVault: not tradable");
         require(shareAmount > 0, "AssetVault: zero amount");
+        
+        // Medium #10 修复: 检查估值是否过期（超过30天需重新估值）
+        require(
+            block.timestamp - asset.lastValuationTime <= 30 days,
+            "AssetVault: valuation expired, please update"
+        );
 
         uint256 availableShares = asset.totalShares - asset.sharesSold;
         require(shareAmount <= availableShares, "AssetVault: insufficient shares");
@@ -492,6 +501,23 @@ contract AssetVault is ERC20, Ownable, ReentrancyGuard, Pausable, IERC721Receive
     function setFeeCollector(address _feeCollector) external onlyOwner {
         require(_feeCollector != address(0), "AssetVault: invalid address");
         feeCollector = _feeCollector;
+    }
+
+    /**
+     * @notice Medium #10 修复: 更新资产估值
+     * @param assetId 资产ID
+     * @param newSharePrice 新的碎片价格
+     */
+    function updateAssetValuation(bytes32 assetId, uint256 newSharePrice) 
+        external 
+        onlyOwner 
+        assetExists(assetId) 
+        assetNotRedeemed(assetId)
+    {
+        require(newSharePrice > 0, "AssetVault: zero price");
+        AssetInfo storage asset = assets[assetId];
+        asset.sharePrice = newSharePrice;
+        asset.lastValuationTime = block.timestamp;
     }
 
     function pause() external onlyOwner {

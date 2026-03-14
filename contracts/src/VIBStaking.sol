@@ -145,6 +145,20 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
     /// @notice APY 调整冷却期（秒）
     uint256 public constant APY_ADJUSTMENT_COOLDOWN = 1 hours;
 
+    // ========== 安全修复: TWAP 验证和价格变化限制 ==========
+
+    /// @notice 单次 APY 调整最大幅度（百分比）
+    uint256 public constant MAX_APY_CHANGE_PER_UPDATE = 2; // 2%
+
+    /// @notice 价格变化验证窗口（秒）
+    uint256 public constant PRICE_VERIFY_WINDOW = 1 hours;
+
+    /// @notice 最大单次价格变化幅度（超出则拒绝更新）
+    uint256 public constant MAX_PRICE_CHANGE_PERCENT = 10; // 10%
+
+    /// @notice 上次验证价格
+    uint256 public lastVerifiedPrice;
+
     /// @notice 质押总金额
     uint256 public totalStaked;
 
@@ -557,7 +571,11 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 更新价格并调整 APY（反死螺旋机制）
-     * @dev 安全修复: 只有活跃质押者才能调用，防止价格操纵攻击
+     * @dev 安全修复:
+     *      1. 只有活跃质押者才能调用，防止价格操纵攻击
+     *      2. 添加 TWAP 验证，确保价格变化合理
+     *      3. 限制单次 APY 调整幅度不超过 2%
+     *      4. 拒绝异常价格变化（单次超过10%）
      */
     function updatePriceAndAdjustAPY() external {
         if (priceOracle == address(0)) revert VIBEErrors.OracleNotSet();
@@ -580,6 +598,26 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         uint256 currentPrice = IPriceOracle(priceOracle).getPrice();
         if (currentPrice == 0) revert VIBEErrors.InvalidPrice();
 
+        // ========== 安全修复: TWAP 验证 ==========
+        // 如果有上次验证价格，检查价格变化是否在合理范围内
+        if (lastVerifiedPrice > 0) {
+            uint256 priceDiff;
+            if (currentPrice > lastVerifiedPrice) {
+                priceDiff = ((currentPrice - lastVerifiedPrice) * 100) / lastVerifiedPrice;
+            } else {
+                priceDiff = ((lastVerifiedPrice - currentPrice) * 100) / lastVerifiedPrice;
+            }
+
+            // 如果价格变化超过 MAX_PRICE_CHANGE_PERCENT，可能是价格操纵
+            // 拒绝此次更新，保护协议安全
+            if (priceDiff > MAX_PRICE_CHANGE_PERCENT) {
+                revert VIBEErrors.InvalidPrice();
+            }
+        }
+
+        // 更新验证价格
+        lastVerifiedPrice = currentPrice;
+
         // 更新价格历史（使用循环缓冲区，O(1)复杂度）
         priceHistoryBuffer[priceHistoryIndex] = currentPrice;
         priceHistoryIndex = (priceHistoryIndex + 1) % MAX_PRICE_HISTORY;
@@ -593,7 +631,7 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         // 计算价格变化百分比
         int256 priceChangePercent = _calculatePriceChangePercent(currentPrice);
 
-        // 根据价格变化调整 APY
+        // 根据价格变化调整 APY（带幅度限制）
         _adjustAPYBasedOnPrice(currentPrice, priceChangePercent);
 
         // ========== Keeper 激励 ==========
@@ -685,6 +723,19 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         }
         if (newAPY < MIN_APY) {
             newAPY = MIN_APY;
+        }
+
+        // ========== 安全修复: 限制单次 APY 调整幅度 ==========
+        // 单次调整不超过 2%，防止价格操纵导致 APY 剧烈波动
+        if (newAPY > oldAPY + MAX_APY_CHANGE_PER_UPDATE) {
+            newAPY = oldAPY + MAX_APY_CHANGE_PER_UPDATE;
+        } else if (newAPY + MAX_APY_CHANGE_PER_UPDATE < oldAPY) {
+            // 确保 newAPY 不会下溢
+            if (oldAPY >= MAX_APY_CHANGE_PER_UPDATE) {
+                newAPY = oldAPY - MAX_APY_CHANGE_PER_UPDATE;
+            } else {
+                newAPY = MIN_APY;
+            }
         }
 
         // 更新 APY
@@ -1036,16 +1087,24 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
      * @notice 计算每代币奖励
      * @param timeElapsed 经过的秒数
      * @return 每代币奖励
+     * @dev Medium #2 修复: 提高精度，先乘后除避免舍入误差
      */
     function _calculateRewardPerToken(uint256 timeElapsed) internal view returns (uint256) {
+        if (totalStaked == 0) {
+            return 0;
+        }
+        
+        // Medium #2 修复: 提高精度，先乘后除避免舍入误差
         // 基础年化奖励 = 总质押 * APY / 100
+        // 使用更高精度计算: (总质押 * APY * PRECISION) / 100
+        uint256 annualRewardWithPrecision = (totalStaked * currentAPY * REWARD_PRECISION) / 100;
+        
         // 实际奖励 = 基础奖励 * 时间比例
+        // 使用更高精度: (年化奖励 * 时间) / 年秒数
+        uint256 timeRewardWithPrecision = (annualRewardWithPrecision * timeElapsed) / SECONDS_PER_YEAR;
+        
         // 每代币奖励 = 实际奖励 / 总质押
-
-        uint256 annualReward = (totalStaked * currentAPY) / 100;
-        uint256 timeReward = (annualReward * timeElapsed) / SECONDS_PER_YEAR;
-
-        return (timeReward * REWARD_PRECISION) / totalStaked;
+        return timeRewardWithPrecision / totalStaked;
     }
 
     /**

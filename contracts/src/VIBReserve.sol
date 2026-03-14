@@ -320,6 +320,7 @@ contract VIBReserve is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 执行补充
+     * @dev Medium #8 修复: 添加最小储备检查，防止储备耗尽
      */
     function _executeRefill(
         PoolType poolType,
@@ -327,6 +328,13 @@ contract VIBReserve is Ownable, ReentrancyGuard, Pausable {
         uint256 amount,
         bool isAutomatic
     ) internal {
+        // Medium #8 修复: 检查补充后是否低于最小储备
+        uint256 currentBalance = vibeToken.balanceOf(address(this));
+        uint256 minReserve = (totalFundsReceived * MIN_RESERVE_RATIO) / PRECISION;
+        uint256 balanceAfterRefill = currentBalance - amount;
+        
+        require(balanceAfterRefill >= minReserve, "VIBReserve: would breach minimum reserve");
+        
         vibeToken.safeTransfer(poolAddress, amount);
 
         totalRefilled += amount;

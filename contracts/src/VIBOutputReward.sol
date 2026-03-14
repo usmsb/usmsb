@@ -79,6 +79,23 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
     /// @notice 已授权的评估者（预言机/自动化系统）
     mapping(address => bool) public authorizedEvaluators;
 
+    // ========== 安全修复: 评估者权限控制 ==========
+
+    /// @notice 评估者每日评估上限（防止滥用）
+    uint256 public constant MAX_EVALUATIONS_PER_DAY = 100;
+
+    /// @notice 评估者每日评估计数
+    mapping(address => mapping(uint256 => uint256)) public evaluatorDailyCount;
+
+    /// @notice 单个评估者最大奖励权限
+    uint256 public constant MAX_SINGLE_REWARD_AUTHORITY = 5000 * 10**18; // 5000 VIBE
+
+    /// @notice 评估者已授权总奖励
+    mapping(address => uint256) public evaluatorTotalAuthorized;
+
+    /// @notice 评估者最大授权总额度
+    uint256 public constant MAX_EVALUATOR_TOTAL_AUTHORITY = 100000 * 10**18; // 100,000 VIBE
+
     /// @notice 产出记录
     mapping(bytes32 => OutputRecord) public outputRecords;
 
@@ -225,6 +242,7 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice 评估产出并计算奖励（由授权评估者调用）
      * @dev 完全去中心化：评估者可以是预言机、自动化测试系统等
+     *      安全修复: 添加评估限制，防止单个评估者权限过大
      * @param outputId 产出ID
      * @param quality 质量评分（5000-30000，精度10000）
      * @param complexity 复杂度评分（5000-20000）
@@ -248,6 +266,15 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         require(novelty >= MIN_NOVELTY && novelty <= MAX_NOVELTY, "VIBOutputReward: invalid novelty");
         require(efficiency >= MIN_EFFICIENCY && efficiency <= MAX_EFFICIENCY, "VIBOutputReward: invalid efficiency");
 
+        // ========== 安全修复: 评估限制 ==========
+        // 1. 每日评估次数限制
+        uint256 dayIndex = block.timestamp / 1 days;
+        require(
+            evaluatorDailyCount[msg.sender][dayIndex] < MAX_EVALUATIONS_PER_DAY,
+            "VIBOutputReward: daily evaluation limit reached"
+        );
+        evaluatorDailyCount[msg.sender][dayIndex]++;
+
         // 存储因子
         record.qualityFactor = quality;
         record.complexityFactor = complexity;
@@ -266,6 +293,19 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         (uint256 minReward, uint256 maxReward) = _getRewardRange(record.outputType);
         if (finalReward < minReward) finalReward = minReward;
         if (finalReward > maxReward) finalReward = maxReward;
+
+        // 2. 单次奖励上限
+        require(
+            finalReward <= MAX_SINGLE_REWARD_AUTHORITY,
+            "VIBOutputReward: reward exceeds single authority limit"
+        );
+
+        // 3. 评估者累计授权额度限制
+        require(
+            evaluatorTotalAuthorized[msg.sender] + finalReward <= MAX_EVALUATOR_TOTAL_AUTHORITY,
+            "VIBOutputReward: evaluator total authority exceeded"
+        );
+        evaluatorTotalAuthorized[msg.sender] += finalReward;
 
         record.finalReward = finalReward;
 

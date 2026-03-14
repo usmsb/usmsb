@@ -491,15 +491,25 @@ contract VIBVesting is Ownable, ReentrancyGuard {
         emit EmergencyWithdrawInitiated(to, withdrawEffectiveTime);
     }
 
+    /// @notice 安全修复: 紧急提取单次最大受益人数
+    uint256 public constant MAX_EMERGENCY_CHECK_COUNT = 50;
+
     /**
      * @notice 确认紧急提取（在延迟期过后）
      * @dev 只能提取未归属的代币，已归属但未领取的代币受保护
+     *      安全修复: 限制单次检查的受益人数量，防止 Gas 耗尽
      */
     function confirmEmergencyWithdraw() external onlyOwner {
         require(pendingWithdrawRecipient != address(0), "VIBVesting: no pending withdraw");
         require(
             block.timestamp >= withdrawEffectiveTime,
             "VIBVesting: withdraw not yet effective"
+        );
+
+        // 安全修复: 限制受益人数量，防止 Gas 耗尽
+        require(
+            beneficiaryList.length <= MAX_EMERGENCY_CHECK_COUNT,
+            "VIBVesting: too many beneficiaries, use batch withdraw"
         );
 
         address recipient = pendingWithdrawRecipient;

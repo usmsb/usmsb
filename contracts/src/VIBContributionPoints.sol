@@ -160,6 +160,11 @@ contract VIBContributionPoints is Initializable, OwnableUpgradeable, PausableUpg
                 uint256 age = windowStart - entry.timestamp;
                 if (age < PRODUCTION_WINDOW * 2) {
                     uint256 decayRate = (age * 100) / (PRODUCTION_WINDOW * 2);
+                    // Medium #12 修复: 确保衰减率不超过100，避免负数
+                    if (decayRate >= 100) {
+                        // 超过100%衰减，不计入
+                        continue;
+                    }
                     uint256 remainingPoints = (entry.points * (100 - decayRate)) / 100;
                     effectivePoints += remainingPoints;
                 }

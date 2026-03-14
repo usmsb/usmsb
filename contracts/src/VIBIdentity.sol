@@ -75,6 +75,22 @@ contract VIBIdentity is ERC721, ERC721URIStorage, Ownable, Pausable, ReentrancyG
     /// @notice 名称是否已被使用
     mapping(string => bool) public nameUsed;
 
+    /// @notice Medium #13 修复: 防女巫机制 - 注册冷却期
+    uint256 public constant REGISTRATION_COOLDOWN = 1 days;
+    
+    /// @notice 上次注册时间
+    mapping(address => uint256) public lastRegistrationTime;
+    
+    /// @notice Medium #13 修复: 防女巫修饰符
+    modifier cooldownPassed() {
+        require(
+            lastRegistrationTime[msg.sender] == 0 || 
+            block.timestamp >= lastRegistrationTime[msg.sender] + REGISTRATION_COOLDOWN,
+            "VIBIdentity: registration cooldown not passed"
+        );
+        _;
+    }
+
     // ========== AI-004修复: Agent数量限制追踪 ==========
 
     /// @notice VIBStaking合约地址
@@ -358,6 +374,7 @@ contract VIBIdentity is ERC721, ERC721URIStorage, Ownable, Pausable, ReentrancyG
         external
         payable
         nonReentrant
+        cooldownPassed
         nameAvailable(name)
         whenNotPaused
         returns (uint256 tokenId)
@@ -389,6 +406,7 @@ contract VIBIdentity is ERC721, ERC721URIStorage, Ownable, Pausable, ReentrancyG
     )
         external
         nonReentrant
+        cooldownPassed
         nameAvailable(name)
         whenNotPaused
         returns (uint256 tokenId)
@@ -682,6 +700,9 @@ contract VIBIdentity is ERC721, ERC721URIStorage, Ownable, Pausable, ReentrancyG
         addressToTokenId[owner] = tokenId;
         nameUsed[name] = true;
         isRegistered[owner] = true;
+        
+        // Medium #13 修复: 更新最后注册时间（防女巫）
+        lastRegistrationTime[owner] = block.timestamp;
 
         emit IdentityRegistered(tokenId, owner, identityType, name, metadata);
 

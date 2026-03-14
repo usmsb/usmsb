@@ -52,6 +52,9 @@ contract AirdropDistributor is Ownable, ReentrancyGuard, Pausable {
     /// @notice 已领取的用户
     mapping(address => bool) public claimed;
 
+    /// @notice Medium #4 修复: 重放保护 - 记录已使用的Merkle叶子
+    mapping(bytes32 => bool) public usedLeafHashes;
+
     /// @notice 总领取量
     uint256 public totalClaimed;
 
@@ -104,17 +107,23 @@ contract AirdropDistributor is Ownable, ReentrancyGuard, Pausable {
      * @notice 领取空投
      * @param amount 分配数量
      * @param proof Merkle 证明
+     * @dev Medium #4 修复: 添加重放保护
      */
     function claim(uint256 amount, bytes32[] calldata proof) external nonReentrant whenNotPaused {
         require(startTime > 0, "Airdrop not started");
         require(block.timestamp <= endTime, "Airdrop ended");
         require(!claimed[msg.sender], "Already claimed");
 
+        // Medium #4 修复: 计算叶子哈希并检查是否已使用
+        bytes32 leafHash = keccak256(abi.encodePacked(msg.sender, amount));
+        require(!usedLeafHashes[leafHash], "Leaf already used");
+
         // 验证 Merkle 证明
         require(_verifyProof(msg.sender, amount, proof), "Invalid proof");
 
-        // 标记已领取
+        // 标记已领取（双重保护）
         claimed[msg.sender] = true;
+        usedLeafHashes[leafHash] = true;
 
         // 计算可领取数量
         (uint256 userAmount, uint256 fundAmount) = _calculateClaimAmount(amount);
