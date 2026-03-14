@@ -27,14 +27,13 @@ contract EmissionController is Ownable, ReentrancyGuard {
     uint256 public constant PRECISION = 10000;
 
     // 分配比例（白皮书4.2.3节 - 对激励池63%的分配）
-    // 63%激励池再分配: 45%质押 + 30%生态 + 15%治理 + 10%储备 = 100%
-    // 产出激励13%从治理比例中调整（原治理15% -> 2%，产出13%）
-    uint256 public constant STAKING_RATIO = 4500;     // 45% - 质押激励
-    uint256 public constant ECOSYSTEM_RATIO = 3000;  // 30% - 生态激励 (节点/开发者/建设者)
+    // 63%激励池再分配: 40%质押 + 25%生态 + 13%产出 + 12%治理 + 10%储备 = 100%
+    uint256 public constant STAKING_RATIO = 4000;     // 40% - 质押激励
+    uint256 public constant ECOSYSTEM_RATIO = 2500;   // 25% - 生态激励 (节点/开发者/建设者)
     uint256 public constant OUTPUT_RATIO = 1300;      // 13% - 产出激励
-    uint256 public constant GOVERNANCE_RATIO = 200;  // 2% - 治理激励
-    uint256 public constant RESERVE_RATIO = 1000;    // 10% - 储备基金
-    // 总和: 4500 + 3000 + 1300 + 200 + 1000 = 10000 (100%)
+    uint256 public constant GOVERNANCE_RATIO = 1200;  // 12% - 治理激励
+    uint256 public constant RESERVE_RATIO = 1000;     // 10% - 储备基金
+    // 总和: 4000 + 2500 + 1300 + 1200 + 1000 = 10000 (100%)
 
     // 释放周期（5年线性释放）
     uint256 public constant RELEASE_PERIOD = 5 * 365 days;
