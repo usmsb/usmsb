@@ -5,15 +5,13 @@ Manages negotiation sessions between agents.
 Supports proposal/counter-proposal workflows.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +37,14 @@ class ProposalType(Enum):
 class NegotiationTerms:
     """Terms for a negotiation proposal"""
     price: float
-    delivery_time: Optional[datetime] = None
+    delivery_time: datetime | None = None
     delivery_description: str = ""
-    quality_guarantees: Dict[str, Any] = field(default_factory=dict)
+    quality_guarantees: dict[str, Any] = field(default_factory=dict)
     payment_terms: str = "escrow"  # upfront, escrow, milestone
-    milestones: List[Dict[str, Any]] = field(default_factory=list)
-    additional_conditions: Dict[str, Any] = field(default_factory=dict)
+    milestones: list[dict[str, Any]] = field(default_factory=list)
+    additional_conditions: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "price": self.price,
             "delivery_time": self.delivery_time.isoformat() if self.delivery_time else None,
@@ -58,7 +56,7 @@ class NegotiationTerms:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "NegotiationTerms":
+    def from_dict(cls, data: dict[str, Any]) -> "NegotiationTerms":
         delivery_time = None
         if data.get("delivery_time"):
             if isinstance(data["delivery_time"], str):
@@ -80,13 +78,13 @@ class NegotiationTerms:
 @dataclass
 class NegotiationContext:
     """Context for a negotiation"""
-    demand_id: Optional[str]
-    service_id: Optional[str]
+    demand_id: str | None
+    service_id: str | None
     task_description: str
-    initial_terms: Optional[NegotiationTerms]
-    constraints: Dict[str, Any]
+    initial_terms: NegotiationTerms | None
+    constraints: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "demand_id": self.demand_id,
             "service_id": self.service_id,
@@ -103,11 +101,11 @@ class NegotiationRound:
     proposer_id: str
     terms: NegotiationTerms
     response: str  # pending, accepted, counter, rejected
-    responded_at: Optional[datetime]
+    responded_at: datetime | None
     notes: str = ""
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "NegotiationRound":
+    def from_dict(cls, data: dict[str, Any]) -> "NegotiationRound":
         return cls(
             round_number=data.get("round_number", 0),
             proposer_id=data.get("proposer_id", ""),
@@ -126,10 +124,10 @@ class NegotiationSession:
     counterpart_id: str
     context: NegotiationContext
     status: str
-    rounds: List[NegotiationRound]
-    final_terms: Optional[NegotiationTerms]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    rounds: list[NegotiationRound]
+    final_terms: NegotiationTerms | None
+    created_at: datetime | None
+    updated_at: datetime | None
 
     @property
     def current_round(self) -> int:
@@ -144,7 +142,7 @@ class NegotiationSession:
         return last_round.response == "counter"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "NegotiationSession":
+    def from_dict(cls, data: dict[str, Any]) -> "NegotiationSession":
         context_data = data.get("context", {})
         if isinstance(context_data, str):
             import json
@@ -183,7 +181,7 @@ class NegotiationSession:
 class ProposalResult:
     """Result of a proposal submission"""
     success: bool
-    session: Optional[NegotiationSession]
+    session: NegotiationSession | None
     message: str
 
 
@@ -202,14 +200,14 @@ class NegotiationManager:
         self,
         platform_client: PlatformClient,
         agent_id: str,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
         self.agent_id = agent_id
         self.logger = logger or logging.getLogger(__name__)
 
         # Active sessions cache
-        self._sessions: Dict[str, NegotiationSession] = {}
+        self._sessions: dict[str, NegotiationSession] = {}
 
     # ==================== Session Management ====================
 
@@ -217,7 +215,7 @@ class NegotiationManager:
         self,
         counterpart_id: str,
         context: NegotiationContext,
-    ) -> Union[NegotiationSession, None]:
+    ) -> NegotiationSession | None:
         """
         Initiate a negotiation with another agent.
 
@@ -242,7 +240,7 @@ class NegotiationManager:
         self.logger.error(f"Failed to initiate negotiation: {response.error}")
         return None
 
-    async def get_session(self, session_id: str) -> Optional[NegotiationSession]:
+    async def get_session(self, session_id: str) -> NegotiationSession | None:
         """Get a negotiation session by ID"""
         if session_id in self._sessions:
             return self._sessions[session_id]
@@ -256,7 +254,7 @@ class NegotiationManager:
 
         return None
 
-    async def list_active(self) -> List[NegotiationSession]:
+    async def list_active(self) -> list[NegotiationSession]:
         """List all active negotiations for this agent"""
         response = await self._platform.get_negotiations()
 
@@ -390,7 +388,7 @@ class NegotiationManager:
 
     # ==================== History ====================
 
-    async def get_history(self, session_id: str) -> List[NegotiationRound]:
+    async def get_history(self, session_id: str) -> list[NegotiationRound]:
         """Get negotiation history for a session"""
         session = await self.get_session(session_id)
         if session:
@@ -402,7 +400,7 @@ class NegotiationManager:
     async def suggest_terms(
         self,
         session_id: str,
-    ) -> Optional[NegotiationTerms]:
+    ) -> NegotiationTerms | None:
         """
         Get suggested terms based on negotiation context.
         Uses learning/optimization data if available.
@@ -473,9 +471,9 @@ class NegotiationManager:
         counterpart_id: str,
         task_description: str,
         initial_terms: NegotiationTerms,
-        demand_id: Optional[str] = None,
-        service_id: Optional[str] = None,
-    ) -> Union[NegotiationSession, None]:
+        demand_id: str | None = None,
+        service_id: str | None = None,
+    ) -> NegotiationSession | None:
         """
         Convenience method to start a negotiation.
 

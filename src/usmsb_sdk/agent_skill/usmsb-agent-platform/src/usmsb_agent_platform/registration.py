@@ -6,9 +6,8 @@ import hashlib
 import secrets
 import time
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
-import aiohttp
 
+import aiohttp
 
 # Configuration constants
 AGENT_ID_PREFIX = "agent-"
@@ -31,7 +30,7 @@ def generate_agent_id() -> str:
     return f"{AGENT_ID_PREFIX}{random_bytes[:AGENT_ID_LENGTH]}"
 
 
-def generate_api_key(agent_id: str, timestamp: Optional[int] = None) -> str:
+def generate_api_key(agent_id: str, timestamp: int | None = None) -> str:
     """
     Generate an API Key for an Agent.
 
@@ -46,7 +45,7 @@ def generate_api_key(agent_id: str, timestamp: Optional[int] = None) -> str:
     return f"{API_KEY_PREFIX}{hash_val}_{timestamp}"
 
 
-def generate_binding_code() -> Tuple[str, int]:
+def generate_binding_code() -> tuple[str, int]:
     """
     Generate a binding code for Owner binding.
 
@@ -67,12 +66,12 @@ def hash_api_key(api_key: str) -> str:
 class RegistrationResult:
     """Result of Agent registration."""
     success: bool
-    agent_id: Optional[str] = None
-    api_key: Optional[str] = None
+    agent_id: str | None = None
+    api_key: str | None = None
     level: int = 0
     message: str = ""
-    error: Optional[str] = None
-    code: Optional[str] = None
+    error: str | None = None
+    code: str | None = None
 
     def to_dict(self) -> dict:
         d = {"success": self.success, "level": self.level}
@@ -93,13 +92,13 @@ class RegistrationResult:
 class BindingRequestResult:
     """Result of binding request."""
     success: bool
-    binding_code: Optional[str] = None
-    binding_url: Optional[str] = None
-    expires_at: Optional[int] = None
-    expires_in: Optional[int] = None
+    binding_code: str | None = None
+    binding_url: str | None = None
+    expires_at: int | None = None
+    expires_in: int | None = None
     message: str = ""
-    error: Optional[str] = None
-    code: Optional[str] = None
+    error: str | None = None
+    code: str | None = None
 
     def to_dict(self) -> dict:
         d = {"success": self.success}
@@ -124,10 +123,10 @@ class BindingRequestResult:
 class BindingStatus:
     """Agent binding status."""
     bound: bool
-    owner_wallet: Optional[str] = None
-    stake_tier: Optional[str] = None
-    stake_amount: Optional[int] = None
-    bound_at: Optional[int] = None
+    owner_wallet: str | None = None
+    stake_tier: str | None = None
+    stake_amount: int | None = None
+    bound_at: int | None = None
 
     def to_dict(self) -> dict:
         d = {"bound": self.bound}
@@ -149,7 +148,7 @@ class APIKeyInfo:
     name: str
     created_at: int
     expires_at: int
-    last_used_at: Optional[int] = None
+    last_used_at: int | None = None
     revoked: bool = False
 
     def to_dict(self) -> dict:
@@ -170,7 +169,7 @@ class RegistrationClient:
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -185,7 +184,7 @@ class RegistrationClient:
         self,
         name: str,
         description: str = "",
-        capabilities: Optional[List[str]] = None
+        capabilities: list[str] | None = None
     ) -> RegistrationResult:
         """
         Register a new Agent (self-registration, no Owner required).

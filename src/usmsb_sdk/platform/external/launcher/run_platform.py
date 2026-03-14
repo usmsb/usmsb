@@ -12,19 +12,18 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from usmsb_sdk.platform.external.launcher.platform_launcher import PlatformLauncher
 from usmsb_sdk.platform.external.launcher.config_wizard import ConfigWizard
+from usmsb_sdk.platform.external.launcher.platform_launcher import PlatformLauncher
 from usmsb_sdk.platform.external.launcher.status_monitor import StatusMonitor
 
 
 def setup_logging(
     level: str = "INFO",
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 ) -> None:
     """
@@ -223,7 +222,7 @@ def main() -> int:
 
         try:
             import yaml
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
 
             wizard = ConfigWizard()

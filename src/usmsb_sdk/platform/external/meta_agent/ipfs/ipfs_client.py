@@ -8,13 +8,13 @@ automatic failover, and encryption.
 import asyncio
 import json
 import logging
-from typing import Dict, List, Optional, Any, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import aiohttp
 
 from .encryption import Encryption
-
 
 logger = logging.getLogger(__name__)
 
@@ -32,29 +32,29 @@ class IPFSGatewayConfig:
 class IPFSUploadResult:
     """Result of an IPFS upload operation."""
     success: bool
-    cid: Optional[str] = None
+    cid: str | None = None
     size: int = 0
-    gateway_used: Optional[str] = None
-    error: Optional[str] = None
+    gateway_used: str | None = None
+    error: str | None = None
 
 
 @dataclass
 class IPFSDownloadResult:
     """Result of an IPFS download operation."""
     success: bool
-    data: Optional[bytes] = None
+    data: bytes | None = None
     size: int = 0
-    gateway_used: Optional[str] = None
-    error: Optional[str] = None
+    gateway_used: str | None = None
+    error: str | None = None
 
 
 @dataclass
 class UserDataPackage:
     """User data package for IPFS storage."""
-    metadata: Dict[str, Any]
-    profile: Optional[bytes] = None  # Encrypted profile data
-    knowledge: Optional[bytes] = None  # Encrypted knowledge data
-    checksum: Optional[str] = None
+    metadata: dict[str, Any]
+    profile: bytes | None = None  # Encrypted profile data
+    knowledge: bytes | None = None  # Encrypted knowledge data
+    checksum: str | None = None
 
 
 class IPFSClient:
@@ -89,8 +89,8 @@ class IPFSClient:
 
     def __init__(
         self,
-        gateways: Optional[List[str]] = None,
-        encryption_key: Optional[bytes] = None,
+        gateways: list[str] | None = None,
+        encryption_key: bytes | None = None,
         timeout: int = 30
     ):
         """
@@ -101,11 +101,11 @@ class IPFSClient:
             encryption_key: Optional pre-derived encryption key (32 bytes)
             timeout: Default timeout for requests (seconds)
         """
-        self.gateways: List[str] = gateways or self.DEFAULT_GATEWAYS
+        self.gateways: list[str] = gateways or self.DEFAULT_GATEWAYS
         self.encryption_key = encryption_key
         self._current_gateway_index = 0
         self.timeout = timeout
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
         logger.info(f"IPFS Client initialized with {len(self.gateways)} gateways")
 
@@ -129,7 +129,7 @@ class IPFSClient:
         url = self.gateways[self._current_gateway_index]
         return IPFSGatewayConfig(url=url, timeout=self.timeout)
 
-    def _switch_gateway(self) -> Optional[str]:
+    def _switch_gateway(self) -> str | None:
         """
         Switch to the next available gateway.
 
@@ -197,7 +197,7 @@ class IPFSClient:
     async def upload_user_data(
         self,
         wallet_address: str,
-        data: Dict,
+        data: dict,
         encrypt: bool = True
     ) -> IPFSUploadResult:
         """
@@ -282,9 +282,9 @@ class IPFSClient:
     async def download_user_data(
         self,
         wallet_address: str,
-        cid: Optional[str] = None,
+        cid: str | None = None,
         decrypt: bool = True
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """
         Download user data from IPFS with optional decryption.
 
@@ -340,7 +340,7 @@ class IPFSClient:
             logger.error(f"Failed to download user data for {wallet_address} from CID {cid}: {e}")
             return None
 
-    async def get_user_cid(self, wallet_address: str) -> Optional[str]:
+    async def get_user_cid(self, wallet_address: str) -> str | None:
         """
         Get the CID for user data.
 

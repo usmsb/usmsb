@@ -12,11 +12,11 @@ import asyncio
 import hashlib
 import json
 import os
-import aiofiles
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Optional, Dict, List
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import aiofiles
 
 
 @dataclass
@@ -32,7 +32,7 @@ class AuditConfig:
     hash_user_id: bool = True              # 用户ID哈希处理
 
     # 审计事件
-    audit_events: List[str] = field(default_factory=lambda: [
+    audit_events: list[str] = field(default_factory=lambda: [
         # 会话事件
         "session_created",
         "session_closed",
@@ -71,7 +71,7 @@ class AuditLogger:
     4. 不可篡改（追加写入）
     """
 
-    def __init__(self, config: Optional[AuditConfig] = None, log_dir: str = "/data/system"):
+    def __init__(self, config: AuditConfig | None = None, log_dir: str = "/data/system"):
         """
         初始化审计日志记录器
 
@@ -97,7 +97,7 @@ class AuditLogger:
         self,
         event: str,
         wallet_address: str,
-        details: Optional[Dict] = None,
+        details: dict | None = None,
         result: str = "success"
     ):
         """
@@ -118,7 +118,7 @@ class AuditLogger:
 
         # 构建日志条目
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "event": event,
             "user_hash": user_hash,
             "result": result,
@@ -145,7 +145,7 @@ class AuditLogger:
             f"usmsb:{wallet_address}".encode()
         ).hexdigest()[:16]
 
-    async def _write_log(self, entry: Dict):
+    async def _write_log(self, entry: dict):
         """
         写入日志（追加模式）
 
@@ -167,7 +167,7 @@ class AuditLogger:
         start_time: float = None,
         end_time: float = None,
         limit: int = 100
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         查询审计日志
 
@@ -184,7 +184,7 @@ class AuditLogger:
         results = []
 
         try:
-            async with aiofiles.open(self.log_file, mode='r', encoding='utf-8') as f:
+            async with aiofiles.open(self.log_file, encoding='utf-8') as f:
                 async for line in f:
                     line = line.strip()
                     if not line:
@@ -232,14 +232,14 @@ class AuditLogger:
 
         将超过归档天数的日志移动到归档目录
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(days=self.config.archive_after_days)
+        cutoff_time = datetime.now(UTC) - timedelta(days=self.config.archive_after_days)
         archived_count = 0
 
         temp_file = self.log_file.with_suffix('.tmp')
 
         try:
             # 分离旧日志和新日志
-            async with aiofiles.open(self.log_file, mode='r', encoding='utf-8') as f:
+            async with aiofiles.open(self.log_file, encoding='utf-8') as f:
                 async with aiofiles.open(temp_file, mode='w', encoding='utf-8') as new_f:
                     async with aiofiles.open(
                         self.archive_dir / f"audit_{datetime.now().strftime('%Y%m%d')}.log",
@@ -302,7 +302,7 @@ class AuditLogger:
 
         return deleted_count
 
-    async def get_log_stats(self) -> Dict:
+    async def get_log_stats(self) -> dict:
         """
         获取日志统计信息
 
@@ -322,7 +322,7 @@ class AuditLogger:
                 stats["log_file_size"] = self.log_file.stat().st_size
 
             # 统计日志条目
-            async with aiofiles.open(self.log_file, mode='r', encoding='utf-8') as f:
+            async with aiofiles.open(self.log_file, encoding='utf-8') as f:
                 async for line in f:
                     line = line.strip()
                     if not line:
@@ -351,7 +351,7 @@ class AuditLogger:
         self,
         user_hash: str,
         hours: int = 24
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         查询用户活动日志
 
@@ -362,7 +362,7 @@ class AuditLogger:
         Returns:
             用户活动日志列表
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start_time = (now - timedelta(hours=hours)).timestamp()
         end_time = now.timestamp()
 
@@ -373,7 +373,7 @@ class AuditLogger:
             limit=1000
         )
 
-    async def get_security_events(self, hours: int = 24) -> List[Dict]:
+    async def get_security_events(self, hours: int = 24) -> list[dict]:
         """
         获取安全事件日志
 
@@ -383,7 +383,7 @@ class AuditLogger:
         Returns:
             安全事件日志列表
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start_time = (now - timedelta(hours=hours)).timestamp()
         security_events = [
             "auth_failed",

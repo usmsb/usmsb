@@ -1,10 +1,9 @@
 import logging
-from typing import List, Dict, Optional
 
-from .types import InfoNeed, InfoNeedType
-from .intent_analyzer import IntentAnalyzer
 from .candidate_search import CandidateSearch
+from .intent_analyzer import IntentAnalyzer
 from .llm_extractor import LLMExtractor
+from .types import InfoNeed
 from .validator import Validator
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ class InfoExtractor:
         self.llm_extractor = LLMExtractor(llm_manager)
         self.validator = Validator(tool_registry, llm_manager)
 
-    async def extract(self, info_needs: List[InfoNeed], user_id: str) -> Dict[str, str]:
+    async def extract(self, info_needs: list[InfoNeed], user_id: str) -> dict[str, str]:
         logger.info(
             f"[INFO_EXTRACT] extract called, needs count={len(info_needs)}, user_id={user_id}"
         )

@@ -7,43 +7,37 @@ Provides SQLite-based persistent storage for structured data including:
 - Transaction records
 """
 
-import asyncio
-import json
 import logging
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any
 
 from sqlalchemy import (
-    Boolean,
+    JSON,
     DateTime,
     Float,
     Integer,
     String,
     Text,
-    JSON,
-    create_engine,
+    and_,
+    delete,
+    func,
+    or_,
     select,
     update,
-    delete,
-    and_,
-    or_,
-    func,
 )
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from usmsb_sdk.platform.external.storage.base_storage import (
-    DataLocation,
     DataExistsError,
+    DataLocation,
     DataNotFoundError,
+    StorageError,
     StorageInterface,
     StorageResult,
     StorageType,
-    StorageError,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +55,15 @@ class AgentRegistryModel(StorageBase):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     agent_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     protocol: Mapped[str] = mapped_column(String(50), default="a2a")
-    endpoint: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    capabilities: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    attributes: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    capabilities: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(50), default="offline", index=True)
     registered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_seen: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    extra_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -92,15 +86,15 @@ class SessionStateModel(StorageBase):
     session_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     agent_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     state: Mapped[str] = mapped_column(String(50), default="active", index=True)
-    context: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    conversation_history: Mapped[List[Dict[str, Any]]] = mapped_column(JSON, default=list)
-    variables: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    conversation_history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    variables: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    extra_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "agent_id": self.agent_id,
@@ -121,20 +115,20 @@ class TransactionRecordModel(StorageBase):
 
     transaction_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     from_agent: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    to_agent: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    to_agent: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     transaction_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     amount: Mapped[float] = mapped_column(Float, default=0.0)
-    unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(50), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="pending", index=True)
-    payload: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    signature: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    signature: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    block_height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    extra_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    block_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "transaction_id": self.transaction_id,
             "from_agent": self.from_agent,
@@ -158,12 +152,12 @@ class KeyValueModel(StorageBase):
     __tablename__ = "key_value_store"
 
     key: Mapped[str] = mapped_column(String(255), primary_key=True)
-    value: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    value: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     namespace: Mapped[str] = mapped_column(String(100), default="default", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    extra_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class AgentRegistryManager:
@@ -178,10 +172,10 @@ class AgentRegistryManager:
         name: str,
         agent_type: str,
         protocol: str = "a2a",
-        endpoint: Optional[str] = None,
-        capabilities: Optional[Dict] = None,
-        attributes: Optional[Dict] = None,
-        metadata: Optional[Dict] = None,
+        endpoint: str | None = None,
+        capabilities: dict | None = None,
+        attributes: dict | None = None,
+        metadata: dict | None = None,
     ) -> AgentRegistryModel:
         """Register a new agent."""
         agent = AgentRegistryModel(
@@ -200,14 +194,14 @@ class AgentRegistryManager:
         await self.session.refresh(agent)
         return agent
 
-    async def get(self, agent_id: str) -> Optional[AgentRegistryModel]:
+    async def get(self, agent_id: str) -> AgentRegistryModel | None:
         """Get agent by ID."""
         result = await self.session.execute(
             select(AgentRegistryModel).where(AgentRegistryModel.id == agent_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_name(self, name: str) -> Optional[AgentRegistryModel]:
+    async def get_by_name(self, name: str) -> AgentRegistryModel | None:
         """Get agent by name."""
         result = await self.session.execute(
             select(AgentRegistryModel).where(AgentRegistryModel.name == name)
@@ -217,9 +211,9 @@ class AgentRegistryManager:
     async def list_by_type(
         self,
         agent_type: str,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 100,
-    ) -> List[AgentRegistryModel]:
+    ) -> list[AgentRegistryModel]:
         """List agents by type."""
         query = select(AgentRegistryModel).where(AgentRegistryModel.agent_type == agent_type)
         if status:
@@ -232,7 +226,7 @@ class AgentRegistryManager:
         self,
         status: str,
         limit: int = 100,
-    ) -> List[AgentRegistryModel]:
+    ) -> list[AgentRegistryModel]:
         """List agents by status."""
         result = await self.session.execute(
             select(AgentRegistryModel)
@@ -245,7 +239,7 @@ class AgentRegistryManager:
         self,
         agent_id: str,
         status: str,
-    ) -> Optional[AgentRegistryModel]:
+    ) -> AgentRegistryModel | None:
         """Update agent status."""
         agent = await self.get(agent_id)
         if agent:
@@ -269,7 +263,7 @@ class AgentRegistryManager:
         self,
         query: str,
         limit: int = 100,
-    ) -> List[AgentRegistryModel]:
+    ) -> list[AgentRegistryModel]:
         """Search agents by name or capabilities."""
         result = await self.session.execute(
             select(AgentRegistryModel)
@@ -297,10 +291,10 @@ class SessionStateManager:
         self,
         session_id: str,
         agent_id: str,
-        context: Optional[Dict] = None,
-        variables: Optional[Dict] = None,
-        ttl_seconds: Optional[int] = None,
-        metadata: Optional[Dict] = None,
+        context: dict | None = None,
+        variables: dict | None = None,
+        ttl_seconds: int | None = None,
+        metadata: dict | None = None,
     ) -> SessionStateModel:
         """Create a new session."""
         expires_at = None
@@ -320,7 +314,7 @@ class SessionStateManager:
         await self.session.refresh(session_state)
         return session_state
 
-    async def get(self, session_id: str) -> Optional[SessionStateModel]:
+    async def get(self, session_id: str) -> SessionStateModel | None:
         """Get session by ID."""
         result = await self.session.execute(
             select(SessionStateModel).where(SessionStateModel.session_id == session_id)
@@ -330,9 +324,9 @@ class SessionStateManager:
     async def get_by_agent(
         self,
         agent_id: str,
-        state: Optional[str] = None,
+        state: str | None = None,
         limit: int = 100,
-    ) -> List[SessionStateModel]:
+    ) -> list[SessionStateModel]:
         """Get sessions by agent."""
         query = select(SessionStateModel).where(SessionStateModel.agent_id == agent_id)
         if state:
@@ -344,9 +338,9 @@ class SessionStateManager:
     async def update_context(
         self,
         session_id: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         merge: bool = True,
-    ) -> Optional[SessionStateModel]:
+    ) -> SessionStateModel | None:
         """Update session context."""
         session = await self.get(session_id)
         if session:
@@ -364,8 +358,8 @@ class SessionStateManager:
         session_id: str,
         role: str,
         content: str,
-        metadata: Optional[Dict] = None,
-    ) -> Optional[SessionStateModel]:
+        metadata: dict | None = None,
+    ) -> SessionStateModel | None:
         """Add a message to conversation history."""
         session = await self.get(session_id)
         if session:
@@ -385,9 +379,9 @@ class SessionStateManager:
     async def update_variables(
         self,
         session_id: str,
-        variables: Dict[str, Any],
+        variables: dict[str, Any],
         merge: bool = True,
-    ) -> Optional[SessionStateModel]:
+    ) -> SessionStateModel | None:
         """Update session variables."""
         session = await self.get(session_id)
         if session:
@@ -404,7 +398,7 @@ class SessionStateManager:
         self,
         session_id: str,
         state: str,
-    ) -> Optional[SessionStateModel]:
+    ) -> SessionStateModel | None:
         """Set session state."""
         session = await self.get(session_id)
         if session:
@@ -447,13 +441,13 @@ class TransactionRecordManager:
         transaction_id: str,
         from_agent: str,
         transaction_type: str,
-        to_agent: Optional[str] = None,
-        resource_type: Optional[str] = None,
+        to_agent: str | None = None,
+        resource_type: str | None = None,
         amount: float = 0.0,
-        unit: Optional[str] = None,
-        payload: Optional[Dict] = None,
-        signature: Optional[str] = None,
-        metadata: Optional[Dict] = None,
+        unit: str | None = None,
+        payload: dict | None = None,
+        signature: str | None = None,
+        metadata: dict | None = None,
     ) -> TransactionRecordModel:
         """Create a new transaction record."""
         transaction = TransactionRecordModel(
@@ -474,7 +468,7 @@ class TransactionRecordManager:
         await self.session.refresh(transaction)
         return transaction
 
-    async def get(self, transaction_id: str) -> Optional[TransactionRecordModel]:
+    async def get(self, transaction_id: str) -> TransactionRecordModel | None:
         """Get transaction by ID."""
         result = await self.session.execute(
             select(TransactionRecordModel).where(
@@ -488,9 +482,9 @@ class TransactionRecordManager:
         agent_id: str,
         as_sender: bool = True,
         as_receiver: bool = True,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 100,
-    ) -> List[TransactionRecordModel]:
+    ) -> list[TransactionRecordModel]:
         """Get transactions by agent."""
         conditions = []
         if as_sender and as_receiver:
@@ -517,8 +511,8 @@ class TransactionRecordManager:
         self,
         transaction_id: str,
         status: str,
-        block_height: Optional[int] = None,
-    ) -> Optional[TransactionRecordModel]:
+        block_height: int | None = None,
+    ) -> TransactionRecordModel | None:
         """Update transaction status."""
         transaction = await self.get(transaction_id)
         if transaction:
@@ -531,7 +525,7 @@ class TransactionRecordManager:
             await self.session.refresh(transaction)
         return transaction
 
-    async def get_pending(self, limit: int = 100) -> List[TransactionRecordModel]:
+    async def get_pending(self, limit: int = 100) -> list[TransactionRecordModel]:
         """Get all pending transactions."""
         result = await self.session.execute(
             select(TransactionRecordModel)
@@ -545,7 +539,7 @@ class TransactionRecordManager:
         self,
         transaction_type: str,
         limit: int = 100,
-    ) -> List[TransactionRecordModel]:
+    ) -> list[TransactionRecordModel]:
         """Get transactions by type."""
         result = await self.session.execute(
             select(TransactionRecordModel)
@@ -598,7 +592,7 @@ class TransactionRecordManager:
         return result.rowcount > 0
 
 
-class SQLiteStorage(StorageInterface[Dict[str, Any]]):
+class SQLiteStorage(StorageInterface[dict[str, Any]]):
     """
     SQLite-based storage implementation.
 
@@ -611,7 +605,7 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
 
     def __init__(
         self,
-        database_path: Union[str, Path],
+        database_path: str | Path,
         echo: bool = False,
     ):
         """
@@ -679,8 +673,8 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
     async def store(
         self,
         key: str,
-        data: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
         overwrite: bool = False,
     ) -> StorageResult:
         """Store data in key-value store."""
@@ -798,10 +792,10 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
 
     async def list_keys(
         self,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[str]:
+    ) -> list[str]:
         """List keys in store."""
         try:
             async with self._get_session() as session:
@@ -815,7 +809,7 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
             logger.error(f"Error listing keys: {e}")
             return []
 
-    async def get_metadata(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, key: str) -> dict[str, Any] | None:
         """Get metadata for a key."""
         try:
             async with self._get_session() as session:
@@ -830,7 +824,7 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
     async def update_metadata(
         self,
         key: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         merge: bool = True,
     ) -> StorageResult:
         """Update metadata for a key."""
@@ -880,9 +874,9 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
     async def store_with_ttl(
         self,
         key: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         ttl_seconds: int,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> StorageResult:
         """Store data with time-to-live."""
         try:
@@ -946,7 +940,7 @@ class SQLiteStorage(StorageInterface[Dict[str, Any]]):
             logger.error(f"Error cleaning up expired entries: {e}")
             return 0
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         try:
             async with self._get_session() as session:

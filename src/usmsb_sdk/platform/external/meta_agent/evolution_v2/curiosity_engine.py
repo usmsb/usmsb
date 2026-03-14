@@ -4,20 +4,16 @@
 主动探索未知领域，驱动自主学习
 """
 
-import asyncio
-import json
 import logging
 import random
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Any
 
 from .models import (
     ExplorationResult,
-    LearningGoal,
     GoalPriority,
-    KnowledgeUnit,
+    LearningGoal,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,10 +26,10 @@ class CuriosityDomain:
     name: str
     description: str
     exploration_depth: float = 0.0
-    known_concepts: List[str] = field(default_factory=list)
-    unknown_concepts: List[str] = field(default_factory=list)
+    known_concepts: list[str] = field(default_factory=list)
+    unknown_concepts: list[str] = field(default_factory=list)
     interest_level: float = 0.5
-    last_explored: Optional[float] = None
+    last_explored: float | None = None
 
 
 @dataclass
@@ -45,7 +41,7 @@ class ExplorationPath:
     expected_novelty: float
     expected_usefulness: float
     difficulty: float
-    prerequisites: List[str] = field(default_factory=list)
+    prerequisites: list[str] = field(default_factory=list)
 
 
 class CuriosityEngine:
@@ -78,9 +74,9 @@ class CuriosityEngine:
         self.knowledge = knowledge_base
         self.capability_assessor = capability_assessor
 
-        self._domains: Dict[str, CuriosityDomain] = {}
-        self._exploration_history: List[ExplorationResult] = []
-        self._novelty_cache: Dict[str, float] = {}
+        self._domains: dict[str, CuriosityDomain] = {}
+        self._exploration_history: list[ExplorationResult] = []
+        self._novelty_cache: dict[str, float] = {}
 
         self._curiosity_level: float = 0.7
         self._exploration_budget: int = 10
@@ -280,7 +276,7 @@ class CuriosityEngine:
         self,
         domain: CuriosityDomain,
         concept: str,
-    ) -> List[str]:
+    ) -> list[str]:
         """识别前置知识"""
         prerequisites = []
 
@@ -304,7 +300,7 @@ class CuriosityEngine:
     async def _execute_exploration(
         self,
         path: ExplorationPath,
-    ) -> List[str]:
+    ) -> list[str]:
         """执行探索"""
         discoveries = []
 
@@ -339,8 +335,8 @@ class CuriosityEngine:
 
     async def _generate_potential_goals(
         self,
-        discoveries: List[str],
-    ) -> List[str]:
+        discoveries: list[str],
+    ) -> list[str]:
         """从发现中生成潜在目标"""
         goals = []
 
@@ -355,8 +351,8 @@ class CuriosityEngine:
 
     async def _generate_questions(
         self,
-        discoveries: List[str],
-    ) -> List[str]:
+        discoveries: list[str],
+    ) -> list[str]:
         """生成探索问题"""
         questions = []
 
@@ -396,7 +392,7 @@ class CuriosityEngine:
         if result.novelty_score > 0.7:
             domain.interest_level = min(1.0, domain.interest_level + 0.1)
 
-    async def identify_knowledge_gaps(self) -> List[Dict[str, Any]]:
+    async def identify_knowledge_gaps(self) -> list[dict[str, Any]]:
         """
         识别知识缺口
 
@@ -433,7 +429,7 @@ class CuriosityEngine:
 
         return sorted(gaps, key=lambda g: g["severity"], reverse=True)
 
-    def _find_related_domain(self, capability_name: str) -> Optional[CuriosityDomain]:
+    def _find_related_domain(self, capability_name: str) -> CuriosityDomain | None:
         """找到与能力相关的领域"""
         domain_keywords = {
             "推理": ["推理与规划"],
@@ -458,7 +454,7 @@ class CuriosityEngine:
     async def generate_exploration_goals(
         self,
         count: int = 3,
-    ) -> List[LearningGoal]:
+    ) -> list[LearningGoal]:
         """
         生成探索目标
 
@@ -536,7 +532,7 @@ class CuriosityEngine:
         elif performance < 0.5:
             self._curiosity_level = max(0.3, self._curiosity_level - 0.05)
 
-    def get_curiosity_stats(self) -> Dict[str, Any]:
+    def get_curiosity_stats(self) -> dict[str, Any]:
         """获取好奇心统计"""
         return {
             "curiosity_level": self._curiosity_level,

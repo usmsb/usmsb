@@ -6,7 +6,7 @@ from environment variables, files, and programmatic sources.
 """
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class LLMConfig(BaseSettings):
     """LLM provider configuration."""
     provider: str = Field(default="openai", description="LLM provider name")
-    api_key: Optional[str] = Field(default=None, description="API key for the provider")
+    api_key: str | None = Field(default=None, description="API key for the provider")
     model: str = Field(default="gpt-4-turbo-preview", description="Model name")
     embedding_model: str = Field(default="text-embedding-3-small", description="Embedding model")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Generation temperature")
@@ -41,7 +41,7 @@ class APIConfig(BaseSettings):
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8000, ge=1, le=65535, description="Server port")
     debug: bool = Field(default=False, description="Enable debug mode")
-    cors_origins: List[str] = Field(default=["*"], description="Allowed CORS origins")
+    cors_origins: list[str] = Field(default=["*"], description="Allowed CORS origins")
     api_key_header: str = Field(default="X-API-Key", description="API key header name")
 
 
@@ -49,7 +49,7 @@ class LoggingConfig(BaseSettings):
     """Logging configuration."""
     level: str = Field(default="INFO", description="Log level")
     format: str = Field(default="json", description="Log format (json or text)")
-    file: Optional[str] = Field(default=None, description="Log file path")
+    file: str | None = Field(default=None, description="Log file path")
 
 
 class Settings(BaseSettings):
@@ -72,50 +72,62 @@ class Settings(BaseSettings):
     environment: str = Field(default="development", description="Environment name")
 
     # Authentication / Security settings
-    jwt_secret: Optional[str] = Field(default=None, alias="JWT_SECRET", description="JWT secret key")
-    session_secret: Optional[str] = Field(default=None, alias="SESSION_SECRET", description="Session secret")
-    nonce_expiry_seconds: int = Field(default=300, alias="NONCE_EXPIRY_SECONDS", description="Nonce expiry in seconds")
-    session_duration_hours: int = Field(default=168, alias="SESSION_DURATION_HOURS", description="Session duration in hours")
+    jwt_secret: str | None = Field(default=None, alias="JWT_SECRET", description="JWT secret key")
+    session_secret: str | None = Field(
+        default=None, alias="SESSION_SECRET", description="Session secret"
+    )
+    nonce_expiry_seconds: int = Field(
+        default=300, alias="NONCE_EXPIRY_SECONDS", description="Nonce expiry in seconds"
+    )
+    session_duration_hours: int = Field(
+        default=168,
+        alias="SESSION_DURATION_HOURS",
+        description="Session duration in hours",
+    )
 
     # CORS settings
-    allowed_origins: Optional[str] = Field(default=None, alias="ALLOWED_ORIGINS", description="Allowed CORS origins")
+    allowed_origins: str | None = Field(
+        default=None, alias="ALLOWED_ORIGINS", description="Allowed CORS origins"
+    )
 
     # Blockchain settings
-    eth_rpc_url: Optional[str] = Field(default=None, alias="ETH_RPC_URL", description="Ethereum RPC URL")
+    eth_rpc_url: str | None = Field(
+        default=None, alias="ETH_RPC_URL", description="Ethereum RPC URL"
+    )
     chain_id: int = Field(default=1, alias="CHAIN_ID", description="Blockchain chain ID")
 
     # Server settings (direct aliases for common env vars)
-    host: Optional[str] = Field(default=None, alias="HOST", description="Server host")
-    port: Optional[int] = Field(default=None, alias="PORT", description="Server port")
-    debug: Optional[bool] = Field(default=None, alias="DEBUG", description="Enable debug mode")
+    host: str | None = Field(default=None, alias="HOST", description="Server host")
+    port: int | None = Field(default=None, alias="PORT", description="Server port")
+    debug: bool | None = Field(default=None, alias="DEBUG", description="Enable debug mode")
 
     # LLM configuration
     llm: LLMConfig = Field(default_factory=LLMConfig)
 
     # OpenAI specific (for backward compatibility)
-    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4-turbo-preview", alias="OPENAI_MODEL")
 
     # Google specific
-    google_api_key: Optional[str] = Field(default=None, alias="GOOGLE_API_KEY")
+    google_api_key: str | None = Field(default=None, alias="GOOGLE_API_KEY")
     gemini_model: str = Field(default="gemini-pro", alias="GEMINI_MODEL")
 
     # Database
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    database_url: Optional[str] = Field(default=None, alias="DATABASE_URL")
+    database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
     # Redis
     redis: RedisConfig = Field(default_factory=RedisConfig)
-    redis_url: Optional[str] = Field(default=None, alias="REDIS_URL")
+    redis_url: str | None = Field(default=None, alias="REDIS_URL")
 
     # API
     api: APIConfig = Field(default_factory=APIConfig)
-    api_host: Optional[str] = Field(default=None, alias="API_HOST")
-    api_port: Optional[int] = Field(default=None, alias="API_PORT")
+    api_host: str | None = Field(default=None, alias="API_HOST")
+    api_port: int | None = Field(default=None, alias="API_PORT")
 
     # Logging
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    log_level: Optional[str] = Field(default=None, alias="LOG_LEVEL")
+    log_level: str | None = Field(default=None, alias="LOG_LEVEL")
 
     @field_validator("llm", mode="before")
     @classmethod
@@ -160,7 +172,7 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:

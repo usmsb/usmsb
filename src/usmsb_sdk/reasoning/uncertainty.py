@@ -4,11 +4,11 @@ Uncertainty Management Module
 不确定性量化与管理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
 import math
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class ProbabilityDistribution:
     """概率分布"""
 
     variable: str
-    values: Dict[Any, float]
+    values: dict[Any, float]
 
     def __post_init__(self):
         total = sum(self.values.values())
@@ -28,7 +28,7 @@ class ProbabilityDistribution:
     def get_probability(self, value: Any) -> float:
         return self.values.get(value, 0.0)
 
-    def get_most_likely(self) -> Tuple[Any, float]:
+    def get_most_likely(self) -> tuple[Any, float]:
         if not self.values:
             return None, 0.0
         best = max(self.values.items(), key=lambda x: x[1])
@@ -65,7 +65,7 @@ class FuzzySet:
     """模糊集合"""
 
     variable: str
-    membership: Dict[Any, float]
+    membership: dict[Any, float]
 
     def __post_init__(self):
         self.membership = {k: max(0.0, min(1.0, v)) for k, v in self.membership.items()}
@@ -73,7 +73,7 @@ class FuzzySet:
     def get_membership(self, value: Any) -> float:
         return self.membership.get(value, 0.0)
 
-    def alpha_cut(self, alpha: float) -> Set[Any]:
+    def alpha_cut(self, alpha: float) -> set[Any]:
         return {k for k, v in self.membership.items() if v >= alpha}
 
     def union(self, other: "FuzzySet") -> "FuzzySet":
@@ -118,29 +118,29 @@ class FuzzySet:
 class DempsterShafer:
     """Dempster-Shafer证据理论"""
 
-    frame: Set[str]
-    mass_functions: Dict[frozenset, float] = field(default_factory=dict)
+    frame: set[str]
+    mass_functions: dict[frozenset, float] = field(default_factory=dict)
 
-    def add_mass(self, subset: Set[str], mass: float) -> None:
+    def add_mass(self, subset: set[str], mass: float) -> None:
         key = frozenset(subset)
         self.mass_functions[key] = self.mass_functions.get(key, 0) + mass
 
-    def belief(self, subset: Set[str]) -> float:
+    def belief(self, subset: set[str]) -> float:
         target = frozenset(subset)
         return sum(mass for key, mass in self.mass_functions.items() if key <= target)
 
-    def plausibility(self, subset: Set[str]) -> float:
+    def plausibility(self, subset: set[str]) -> float:
         target = frozenset(subset)
         return sum(mass for key, mass in self.mass_functions.items() if key & target)
 
-    def belief_interval(self, subset: Set[str]) -> Tuple[float, float]:
+    def belief_interval(self, subset: set[str]) -> tuple[float, float]:
         return self.belief(subset), self.plausibility(subset)
 
     def combine(self, other: "DempsterShafer") -> "DempsterShafer":
         combined = DempsterShafer(frame=self.frame | other.frame)
 
         conflict = 0.0
-        intermediate: Dict[frozenset, float] = defaultdict(float)
+        intermediate: dict[frozenset, float] = defaultdict(float)
 
         for key1, mass1 in self.mass_functions.items():
             for key2, mass2 in other.mass_functions.items():
@@ -158,7 +158,7 @@ class DempsterShafer:
 
         return combined
 
-    def get_most_plausible(self) -> Tuple[str, float]:
+    def get_most_plausible(self) -> tuple[str, float]:
         if not self.frame:
             return "", 0.0
 
@@ -171,26 +171,26 @@ class BayesianNode:
     """贝叶斯网络节点"""
 
     name: str
-    states: List[str]
-    parents: List[str] = field(default_factory=list)
-    cpt: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    states: list[str]
+    parents: list[str] = field(default_factory=list)
+    cpt: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
 class BayesianNetwork:
     """贝叶斯网络"""
 
     def __init__(self):
-        self.nodes: Dict[str, BayesianNode] = {}
-        self.evidence: Dict[str, str] = {}
+        self.nodes: dict[str, BayesianNode] = {}
+        self.evidence: dict[str, str] = {}
 
-    def add_node(self, name: str, states: List[str], parents: Optional[List[str]] = None) -> None:
+    def add_node(self, name: str, states: list[str], parents: list[str] | None = None) -> None:
         self.nodes[name] = BayesianNode(
             name=name,
             states=states,
             parents=parents or [],
         )
 
-    def set_cpt(self, node_name: str, cpt: Dict[str, Dict[str, float]]) -> None:
+    def set_cpt(self, node_name: str, cpt: dict[str, dict[str, float]]) -> None:
         if node_name in self.nodes:
             self.nodes[node_name].cpt = cpt
 
@@ -198,7 +198,7 @@ class BayesianNetwork:
         if node_name in self.nodes:
             self.evidence[node_name] = state
 
-    def query(self, query_node: str) -> Dict[str, float]:
+    def query(self, query_node: str) -> dict[str, float]:
         if query_node not in self.nodes:
             return {}
 
@@ -212,7 +212,7 @@ class BayesianNetwork:
                 return node.cpt.get("prior", {s: 1.0 / len(node.states) for s in node.states})
             return {s: 1.0 / len(node.states) for s in node.states}
 
-        result = {s: 0.0 for s in node.states}
+        result = dict.fromkeys(node.states, 0.0)
 
         for parent_state_key, probs in node.cpt.items():
             parent_states = parent_state_key.split(",")
@@ -239,24 +239,24 @@ class UncertaintyManager:
     """不确定性管理器"""
 
     def __init__(self):
-        self._probability_dists: Dict[str, ProbabilityDistribution] = {}
-        self._fuzzy_sets: Dict[str, FuzzySet] = {}
-        self._dempster_shafer: Dict[str, DempsterShafer] = {}
-        self._bayesian_networks: Dict[str, BayesianNetwork] = {}
+        self._probability_dists: dict[str, ProbabilityDistribution] = {}
+        self._fuzzy_sets: dict[str, FuzzySet] = {}
+        self._dempster_shafer: dict[str, DempsterShafer] = {}
+        self._bayesian_networks: dict[str, BayesianNetwork] = {}
 
     def create_probability_distribution(
-        self, variable: str, values: Dict[Any, float]
+        self, variable: str, values: dict[Any, float]
     ) -> ProbabilityDistribution:
         dist = ProbabilityDistribution(variable=variable, values=values)
         self._probability_dists[variable] = dist
         return dist
 
-    def create_fuzzy_set(self, variable: str, membership: Dict[Any, float]) -> FuzzySet:
+    def create_fuzzy_set(self, variable: str, membership: dict[Any, float]) -> FuzzySet:
         fs = FuzzySet(variable=variable, membership=membership)
         self._fuzzy_sets[variable] = fs
         return fs
 
-    def create_dempster_shafer(self, name: str, frame: Set[str]) -> DempsterShafer:
+    def create_dempster_shafer(self, name: str, frame: set[str]) -> DempsterShafer:
         ds = DempsterShafer(frame=frame)
         self._dempster_shafer[name] = ds
         return ds
@@ -266,22 +266,22 @@ class UncertaintyManager:
         self._bayesian_networks[name] = bn
         return bn
 
-    def get_probability_distribution(self, variable: str) -> Optional[ProbabilityDistribution]:
+    def get_probability_distribution(self, variable: str) -> ProbabilityDistribution | None:
         return self._probability_dists.get(variable)
 
-    def get_fuzzy_set(self, variable: str) -> Optional[FuzzySet]:
+    def get_fuzzy_set(self, variable: str) -> FuzzySet | None:
         return self._fuzzy_sets.get(variable)
 
     def combine_evidence(
-        self, sources: List[Tuple[str, float, Dict[Any, float]]], method: str = "weighted_average"
-    ) -> Dict[Any, float]:
+        self, sources: list[tuple[str, float, dict[Any, float]]], method: str = "weighted_average"
+    ) -> dict[Any, float]:
         if not sources:
             return {}
 
-        combined: Dict[Any, float] = defaultdict(float)
+        combined: dict[Any, float] = defaultdict(float)
         total_weight = 0.0
 
-        for source_name, confidence, values in sources:
+        for _source_name, confidence, values in sources:
             weight = confidence
             total_weight += weight
 
@@ -294,17 +294,17 @@ class UncertaintyManager:
         return dict(combined)
 
     def propagate_uncertainty(
-        self, input_uncertainty: Dict[str, Any], propagation_function: callable
-    ) -> Dict[str, Any]:
+        self, input_uncertainty: dict[str, Any], propagation_function: callable
+    ) -> dict[str, Any]:
         return propagation_function(input_uncertainty)
 
-    def measure_total_uncertainty(self, distribution: Dict[Any, float]) -> float:
+    def measure_total_uncertainty(self, distribution: dict[Any, float]) -> float:
         if not distribution:
             return 1.0
 
         return -sum(p * math.log2(p) if p > 0 else 0 for p in distribution.values())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "probability_distributions": {
                 k: {"variable": v.variable, "values": v.values}

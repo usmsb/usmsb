@@ -1,8 +1,7 @@
 import json
 import logging
-from typing import Optional
 
-from .types import RetrievalIntent, ExtractedInfo, ValidationResult
+from .types import ExtractedInfo, RetrievalIntent, ValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +82,7 @@ class Validator:
         except Exception as e:
             return ValidationResult(is_valid=False, method="llm", error=str(e))
 
-    def _parse_json(self, response: str) -> Optional[dict]:
+    def _parse_json(self, response: str) -> dict | None:
         try:
             if "```json" in response:
                 response = response.split("```json")[1].split("```")[0]

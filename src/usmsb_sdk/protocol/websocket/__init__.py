@@ -19,17 +19,15 @@ Usage:
 from usmsb_sdk.protocol.websocket.client import (
     WebSocketClient,
     WebSocketConfig,
-    WebSocketMessage,
     WebSocketEvent,
+    WebSocketMessage,
     WebSocketSubscription,
 )
-
 from usmsb_sdk.protocol.websocket.server import (
+    WebSocketConnection,
     WebSocketServer,
     WebSocketServerConfig,
-    WebSocketConnection,
 )
-
 
 __all__ = [
     # Client

@@ -10,7 +10,7 @@ Precise Matching Tools - 精准匹配工具
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .registry import Tool
 
@@ -35,7 +35,7 @@ def set_meta_agent_service(service):
 # ==================== 工具函数 ====================
 
 
-async def interview_agent(params: Dict[str, Any]) -> Dict[str, Any]:
+async def interview_agent(params: dict[str, Any]) -> dict[str, Any]:
     """
     面试式对话，深入了解 Agent
 
@@ -84,7 +84,7 @@ async def interview_agent(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def send_agent_message(params: Dict[str, Any]) -> Dict[str, Any]:
+async def send_agent_message(params: dict[str, Any]) -> dict[str, Any]:
     """
     向 Agent 发送消息（Meta Agent 响应）
 
@@ -126,7 +126,7 @@ async def send_agent_message(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def receive_agent_showcase(params: Dict[str, Any]) -> Dict[str, Any]:
+async def receive_agent_showcase(params: dict[str, Any]) -> dict[str, Any]:
     """
     接收 Agent 主动展示
 
@@ -175,7 +175,7 @@ async def receive_agent_showcase(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def get_agent_profile(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_agent_profile(params: dict[str, Any]) -> dict[str, Any]:
     """
     获取 Agent 能力画像
 
@@ -225,7 +225,7 @@ async def get_agent_profile(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def recommend_agents_for_demand(params: Dict[str, Any]) -> Dict[str, Any]:
+async def recommend_agents_for_demand(params: dict[str, Any]) -> dict[str, Any]:
     """
     为需求推荐最佳 Agent
 
@@ -274,7 +274,7 @@ async def recommend_agents_for_demand(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def match_by_gene_capsule(params: Dict[str, Any]) -> Dict[str, Any]:
+async def match_by_gene_capsule(params: dict[str, Any]) -> dict[str, Any]:
     """
     基于基因胶囊匹配 Agent
 
@@ -331,7 +331,7 @@ async def match_by_gene_capsule(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def generate_recommendation_explanation(params: Dict[str, Any]) -> Dict[str, Any]:
+async def generate_recommendation_explanation(params: dict[str, Any]) -> dict[str, Any]:
     """
     生成推荐解释
 
@@ -406,7 +406,7 @@ async def generate_recommendation_explanation(params: Dict[str, Any]) -> Dict[st
         return {"success": False, "error": str(e)}
 
 
-async def proactively_notify_opportunity(params: Dict[str, Any]) -> Dict[str, Any]:
+async def proactively_notify_opportunity(params: dict[str, Any]) -> dict[str, Any]:
     """
     主动通知 Agent 商业机会
 
@@ -467,7 +467,7 @@ async def proactively_notify_opportunity(params: Dict[str, Any]) -> Dict[str, An
         return {"success": False, "error": str(e)}
 
 
-async def consult_agent(params: Dict[str, Any]) -> Dict[str, Any]:
+async def consult_agent(params: dict[str, Any]) -> dict[str, Any]:
     """
     为 Agent 提供咨询服务
 
@@ -509,7 +509,7 @@ async def consult_agent(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def get_all_agent_profiles(params: Dict[str, Any]) -> Dict[str, Any]:
+async def get_all_agent_profiles(params: dict[str, Any]) -> dict[str, Any]:
     """
     获取所有 Agent 画像
 
@@ -541,7 +541,7 @@ async def get_all_agent_profiles(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def scan_opportunities(params: Dict[str, Any]) -> Dict[str, Any]:
+async def scan_opportunities(params: dict[str, Any]) -> dict[str, Any]:
     """
     扫描平台上的机会
 
@@ -572,7 +572,7 @@ async def scan_opportunities(params: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def auto_match_and_notify(params: Dict[str, Any]) -> Dict[str, Any]:
+async def auto_match_and_notify(params: dict[str, Any]) -> dict[str, Any]:
     """
     自动匹配并通知
 
@@ -608,40 +608,40 @@ async def auto_match_and_notify(params: Dict[str, Any]) -> Dict[str, Any]:
 def get_precise_matching_tools():
     """获取精准匹配工具列表"""
 
-    async def interview_agent_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def interview_agent_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await interview_agent(params)
 
-    async def send_agent_message_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def send_agent_message_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await send_agent_message(params)
 
-    async def receive_agent_showcase_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def receive_agent_showcase_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await receive_agent_showcase(params)
 
-    async def get_agent_profile_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_agent_profile_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_agent_profile(params)
 
-    async def recommend_agents_for_demand_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def recommend_agents_for_demand_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await recommend_agents_for_demand(params)
 
-    async def match_by_gene_capsule_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def match_by_gene_capsule_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await match_by_gene_capsule(params)
 
-    async def generate_recommendation_explanation_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def generate_recommendation_explanation_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await generate_recommendation_explanation(params)
 
-    async def proactively_notify_opportunity_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def proactively_notify_opportunity_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await proactively_notify_opportunity(params)
 
-    async def consult_agent_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def consult_agent_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await consult_agent(params)
 
-    async def get_all_agent_profiles_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def get_all_agent_profiles_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await get_all_agent_profiles(params)
 
-    async def scan_opportunities_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def scan_opportunities_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await scan_opportunities(params)
 
-    async def auto_match_and_notify_wrapper(params: Dict[str, Any]) -> Dict[str, Any]:
+    async def auto_match_and_notify_wrapper(params: dict[str, Any]) -> dict[str, Any]:
         return await auto_match_and_notify(params)
 
     return [

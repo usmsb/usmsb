@@ -10,13 +10,12 @@ Authentication: Supports both Bearer token and API Key authentication.
 
 import time
 import uuid
-from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from usmsb_sdk.api.database import get_db
-from usmsb_sdk.api.rest.unified_auth import get_current_user_unified, ErrorCode
+from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 
 router = APIRouter(prefix="/reputation", tags=["Reputation"])
 
@@ -42,7 +41,7 @@ class ReputationEvent(BaseModel):
     event_type: str
     change: float
     reason: str
-    related_id: Optional[str] = None
+    related_id: str | None = None
 
 
 class ReputationHistoryResponse(BaseModel):
@@ -50,7 +49,7 @@ class ReputationHistoryResponse(BaseModel):
     success: bool = True
     agent_id: str
     current_score: float
-    history: List[ReputationEvent]
+    history: list[ReputationEvent]
     total_events: int
 
 
@@ -151,7 +150,7 @@ def get_or_create_reputation(agent_id: str) -> dict:
         }
 
 
-def get_reputation_events(agent_id: str, limit: int = 50, offset: int = 0) -> List[dict]:
+def get_reputation_events(agent_id: str, limit: int = 50, offset: int = 0) -> list[dict]:
     """Get reputation events for agent."""
     ensure_reputation_tables()
 

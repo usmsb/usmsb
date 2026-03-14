@@ -4,17 +4,17 @@ Commonsense Reasoning Engine
 常识推理引擎：物理常识、社会常识推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
+from dataclasses import dataclass, field
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
+    ReasoningType,
     UncertaintyMeasure,
     UncertaintyType,
 )
@@ -31,7 +31,7 @@ class CommonsenseRule:
     condition: str
     conclusion: str
     confidence: float
-    exceptions: List[str] = field(default_factory=list)
+    exceptions: list[str] = field(default_factory=list)
 
 
 class CommonsenseEngine(BaseReasoningEngine):
@@ -47,14 +47,14 @@ class CommonsenseEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._rules: Dict[str, CommonsenseRule] = {}
-        self._concept_properties: Dict[str, Dict[str, Any]] = {}
-        self._physical_rules: List[Dict[str, Any]] = []
-        self._social_rules: List[Dict[str, Any]] = []
+        self._rules: dict[str, CommonsenseRule] = {}
+        self._concept_properties: dict[str, dict[str, Any]] = {}
+        self._physical_rules: list[dict[str, Any]] = []
+        self._social_rules: list[dict[str, Any]] = []
         self._initialize_commonsense()
 
     @property
@@ -160,7 +160,7 @@ class CommonsenseEngine(BaseReasoningEngine):
     def add_rule(self, rule: CommonsenseRule) -> None:
         self._rules[rule.rule_id] = rule
 
-    def _match_rule(self, situation: str, rules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _match_rule(self, situation: str, rules: list[dict[str, Any]]) -> list[dict[str, Any]]:
         matches = []
         situation_lower = situation.lower()
 
@@ -180,8 +180,8 @@ class CommonsenseEngine(BaseReasoningEngine):
         return matches
 
     def _infer_properties(
-        self, concept: str, property_name: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, concept: str, property_name: str | None = None
+    ) -> dict[str, Any]:
         if concept not in self._concept_properties:
             return {"found": False, "concept": concept}
 
@@ -199,18 +199,18 @@ class CommonsenseEngine(BaseReasoningEngine):
 
         return {"found": True, "concept": concept, "properties": props}
 
-    def _check_exception(self, rule: CommonsenseRule, context: Dict[str, Any]) -> bool:
+    def _check_exception(self, rule: CommonsenseRule, context: dict[str, Any]) -> bool:
         for exception in rule.exceptions:
             if exception in str(context):
                 return True
         return False
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         if not premises:
             return self._create_result(
@@ -301,7 +301,7 @@ class CommonsenseEngine(BaseReasoningEngine):
                         alternatives=[m["rule"]["effect"] for m in matches[1:3]],
                         explanations=[
                             f"应用社会常识规则: {rule['rule']}",
-                            f"注意: 社会常识存在文化差异",
+                            "注意: 社会常识存在文化差异",
                         ],
                     )
                 else:
@@ -433,7 +433,7 @@ class CommonsenseEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         for step in reasoning_result.reasoning_chain:
@@ -443,5 +443,5 @@ class CommonsenseEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         return ConfidenceScore(value=0.7, evidence_count=1)

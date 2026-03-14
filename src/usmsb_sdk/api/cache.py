@@ -17,23 +17,24 @@
         cache_manager.set(cache_key, result, ttl=60)
 """
 
-import time
 import hashlib
 import json
-from typing import Any, Callable, Optional, Dict
+import time
+from collections.abc import Callable
 from functools import wraps
 from threading import Lock
+from typing import Any
 
 
 class TTLCache:
     """简单的TTL缓存实现"""
 
     def __init__(self, default_ttl: int = 60):
-        self._cache: Dict[str, tuple] = {}
+        self._cache: dict[str, tuple] = {}
         self._lock = Lock()
         self.default_ttl = default_ttl
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """获取缓存，如果过期返回None"""
         with self._lock:
             if key in self._cache:
@@ -44,7 +45,7 @@ class TTLCache:
                 del self._cache[key]
             return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None):
+    def set(self, key: str, value: Any, ttl: int | None = None):
         """设置缓存"""
         with self._lock:
             ttl = ttl or self.default_ttl
@@ -68,7 +69,7 @@ class TTLCache:
         with self._lock:
             self._cache.clear()
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         with self._lock:
             now = time.time()
@@ -113,7 +114,7 @@ class CacheManager:
         cache = self.get_cache(prefix)
         cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取所有缓存的统计信息"""
         return {
             "agents": self.agents.stats(),
@@ -183,17 +184,17 @@ def cached(ttl: int = 60, prefix: str = "default"):
 
 
 # 便捷函数
-def get_cached(prefix: str, key: str) -> Optional[Any]:
+def get_cached(prefix: str, key: str) -> Any | None:
     """获取缓存值"""
     return cache_manager.get_cache(prefix).get(key)
 
 
-def set_cached(prefix: str, key: str, value: Any, ttl: Optional[int] = None):
+def set_cached(prefix: str, key: str, value: Any, ttl: int | None = None):
     """设置缓存值"""
     cache_manager.get_cache(prefix).set(key, value, ttl=ttl)
 
 
-def invalidate_cache(prefix: str, key: Optional[str] = None):
+def invalidate_cache(prefix: str, key: str | None = None):
     """失效缓存"""
     cache = cache_manager.get_cache(prefix)
     if key:

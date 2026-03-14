@@ -5,18 +5,17 @@ Provides REST API for intelligent pricing calculations.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from usmsb_sdk.api.rest.auth import get_current_user
 from usmsb_sdk.services.dynamic_pricing_service import (
-    DynamicPricingService,
     PricingStrategy,
     ServiceCategory,
     get_dynamic_pricing_service,
 )
-from usmsb_sdk.api.rest.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +28,20 @@ class PriceCalculationRequest(BaseModel):
     base_price: float = Field(..., gt=0, description="Base reference price")
     service_type: str = Field(..., description="Type of service")
     supplier_id: str = Field(..., description="Service provider ID")
-    demander_id: Optional[str] = Field(None, description="Service requester ID")
+    demander_id: str | None = Field(None, description="Service requester ID")
     supplier_reputation: float = Field(0.5, ge=0, le=1, description="Supplier reputation score")
     demander_urgency: float = Field(0, ge=0, le=1, description="Request urgency (0-1)")
     service_category: str = Field("general", description="Service category")
     strategy: str = Field("dynamic", description="Pricing strategy")
-    context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+    context: dict[str, Any] | None = Field(None, description="Additional context")
 
 
 class ServiceStatsUpdateRequest(BaseModel):
     """Request to update service statistics."""
 
-    suppliers: Optional[int] = None
-    demanders: Optional[int] = None
-    listings: Optional[int] = None
+    suppliers: int | None = None
+    demanders: int | None = None
+    listings: int | None = None
 
 
 class TransactionRecordRequest(BaseModel):

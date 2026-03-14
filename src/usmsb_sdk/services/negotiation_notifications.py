@@ -12,10 +12,11 @@ Provides real-time notifications for:
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -59,14 +60,14 @@ class NegotiationNotification:
     notification_type: NotificationType
     negotiation_id: str
     recipient_id: str
-    sender_id: Optional[str] = None
+    sender_id: str | None = None
     title: str = ""
     message: str = ""
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
     read: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "notification_id": self.notification_id,
             "notification_type": self.notification_type.value,
@@ -94,26 +95,26 @@ class NegotiationNotificationManager:
 
     def __init__(
         self,
-        ws_manager: Optional[Any] = None,
+        ws_manager: Any | None = None,
         persistence_enabled: bool = True,
     ):
         self.ws_manager = ws_manager
         self.persistence_enabled = persistence_enabled
 
         # Active WebSocket connections: agent_id -> set of connection_ids
-        self._connections: Dict[str, Set[str]] = {}
+        self._connections: dict[str, set[str]] = {}
 
         # Notification subscriptions: agent_id -> set of notification types
-        self._subscriptions: Dict[str, Set[NotificationType]] = {}
+        self._subscriptions: dict[str, set[NotificationType]] = {}
 
         # Pending notifications for offline users
-        self._pending_notifications: Dict[str, List[NegotiationNotification]] = {}
+        self._pending_notifications: dict[str, list[NegotiationNotification]] = {}
 
         # Notification callbacks
-        self._callbacks: Dict[str, Callable] = {}
+        self._callbacks: dict[str, Callable] = {}
 
         # Rate limiting: agent_id -> list of notification timestamps
-        self._rate_limits: Dict[str, List[datetime]] = {}
+        self._rate_limits: dict[str, list[datetime]] = {}
         self._rate_limit_window = 60  # seconds
         self._rate_limit_max = 30  # max notifications per window
 
@@ -164,7 +165,7 @@ class NegotiationNotificationManager:
     async def subscribe(
         self,
         agent_id: str,
-        notification_types: Optional[List[NotificationType]] = None,
+        notification_types: list[NotificationType] | None = None,
     ) -> None:
         """Subscribe an agent to specific notification types"""
         async with self._lock:
@@ -179,7 +180,7 @@ class NegotiationNotificationManager:
     async def unsubscribe(
         self,
         agent_id: str,
-        notification_types: List[NotificationType],
+        notification_types: list[NotificationType],
     ) -> None:
         """Unsubscribe from specific notification types"""
         async with self._lock:
@@ -203,10 +204,10 @@ class NegotiationNotificationManager:
         notification_type: NotificationType,
         negotiation_id: str,
         recipient_id: str,
-        sender_id: Optional[str] = None,
+        sender_id: str | None = None,
         title: str = "",
         message: str = "",
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
     ) -> NegotiationNotification:
         """
         Send a notification to an agent.
@@ -250,13 +251,13 @@ class NegotiationNotificationManager:
     async def broadcast_to_negotiation(
         self,
         negotiation_id: str,
-        participant_ids: List[str],
+        participant_ids: list[str],
         notification_type: NotificationType,
         title: str,
         message: str,
-        data: Optional[Dict[str, Any]] = None,
-        sender_id: Optional[str] = None,
-    ) -> List[NegotiationNotification]:
+        data: dict[str, Any] | None = None,
+        sender_id: str | None = None,
+    ) -> list[NegotiationNotification]:
         """Broadcast notification to all negotiation participants"""
         notifications = []
 
@@ -282,8 +283,8 @@ class NegotiationNotificationManager:
         negotiation_id: str,
         demand_agent_id: str,
         supply_agent_id: str,
-        demand_info: Dict[str, Any],
-    ) -> List[NegotiationNotification]:
+        demand_info: dict[str, Any],
+    ) -> list[NegotiationNotification]:
         """Notify both parties about new negotiation"""
         notifications = []
 
@@ -294,7 +295,7 @@ class NegotiationNotificationManager:
             recipient_id=supply_agent_id,
             sender_id=demand_agent_id,
             title="New Pre-Match Negotiation",
-            message=f"You have received a new negotiation request",
+            message="You have received a new negotiation request",
             data={"demand_info": demand_info},
         ))
 
@@ -409,7 +410,7 @@ class NegotiationNotificationManager:
         negotiation_id: str,
         proposer_id: str,
         recipient_id: str,
-        terms: Dict[str, Any],
+        terms: dict[str, Any],
     ) -> NegotiationNotification:
         """Notify about terms proposal"""
         return await self.send_notification(
@@ -425,9 +426,9 @@ class NegotiationNotificationManager:
     async def notify_terms_agreed(
         self,
         negotiation_id: str,
-        participant_ids: List[str],
-        terms: Dict[str, Any],
-    ) -> List[NegotiationNotification]:
+        participant_ids: list[str],
+        terms: dict[str, Any],
+    ) -> list[NegotiationNotification]:
         """Notify both parties about agreed terms"""
         return await self.broadcast_to_negotiation(
             negotiation_id=negotiation_id,
@@ -458,8 +459,8 @@ class NegotiationNotificationManager:
     async def notify_match_confirmed(
         self,
         negotiation_id: str,
-        participant_ids: List[str],
-    ) -> List[NegotiationNotification]:
+        participant_ids: list[str],
+    ) -> list[NegotiationNotification]:
         """Notify both parties that match is confirmed"""
         return await self.broadcast_to_negotiation(
             negotiation_id=negotiation_id,
@@ -494,8 +495,8 @@ class NegotiationNotificationManager:
     async def notify_negotiation_expired(
         self,
         negotiation_id: str,
-        participant_ids: List[str],
-    ) -> List[NegotiationNotification]:
+        participant_ids: list[str],
+    ) -> list[NegotiationNotification]:
         """Notify both parties about expired negotiation"""
         return await self.broadcast_to_negotiation(
             negotiation_id=negotiation_id,
@@ -512,7 +513,7 @@ class NegotiationNotificationManager:
         self,
         agent_id: str,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get pending notifications for an agent"""
         async with self._lock:
             if agent_id not in self._pending_notifications:

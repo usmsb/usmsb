@@ -10,7 +10,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from ..llm.manager import LLMManager
@@ -37,7 +37,7 @@ class Intent:
 
     type: IntentType
     confidence: float
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     reasoning: str = ""
 
     def is_tool_call(self) -> bool:
@@ -70,7 +70,7 @@ class IntentResult:
     """意图识别结果"""
 
     success: bool
-    intent: Optional[Intent] = None
+    intent: Intent | None = None
     error: str = ""
     raw_response: str = ""
 
@@ -90,9 +90,9 @@ class IntentRecognizer:
     ):
         self.llm_manager = llm_manager
         self.use_cache = use_cache
-        self._intent_cache: Dict[str, Intent] = {}
+        self._intent_cache: dict[str, Intent] = {}
 
-    async def recognize(self, message: str, context: Optional[Dict[str, Any]] = None) -> Intent:
+    async def recognize(self, message: str, context: dict[str, Any] | None = None) -> Intent:
         """
         识别用户消息的意图
 
@@ -137,7 +137,7 @@ class IntentRecognizer:
     async def _llm_based_recognition(
         self,
         message: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Intent:
         """
         使用 LLM 识别意图
@@ -289,6 +289,6 @@ Respond only with the JSON object, no other text."""
         """清除意图缓存"""
         self._intent_cache.clear()
 
-    def get_supported_intents(self) -> List[str]:
+    def get_supported_intents(self) -> list[str]:
         """获取支持的意图类型列表"""
         return [intent.value for intent in IntentType]

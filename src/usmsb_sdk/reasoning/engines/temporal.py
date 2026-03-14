@@ -4,27 +4,25 @@ Temporal Reasoning Engine
 时间推理引擎：时序、持续时间、频率推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
-    UncertaintyMeasure,
-    UncertaintyType,
+    ReasoningType,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class TemporalRelation(str, Enum):
+class TemporalRelation(StrEnum):
     """时序关系 (Allen's Interval Algebra)"""
 
     BEFORE = "before"
@@ -47,9 +45,9 @@ class TimeInterval:
     """时间区间"""
 
     interval_id: str
-    start: Optional[datetime] = None
-    end: Optional[datetime] = None
-    duration: Optional[timedelta] = None
+    start: datetime | None = None
+    end: datetime | None = None
+    duration: timedelta | None = None
     description: str = ""
 
     def __post_init__(self):
@@ -64,10 +62,10 @@ class TemporalEvent:
     """时序事件"""
 
     event_id: str
-    timestamp: Optional[datetime] = None
-    interval: Optional[TimeInterval] = None
+    timestamp: datetime | None = None
+    interval: TimeInterval | None = None
     event_type: str = ""
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
 
 class TemporalEngine(BaseReasoningEngine):
@@ -83,13 +81,13 @@ class TemporalEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._intervals: Dict[str, TimeInterval] = {}
-        self._events: Dict[str, TemporalEvent] = {}
-        self._temporal_constraints: List[Tuple[str, str, TemporalRelation]] = []
+        self._intervals: dict[str, TimeInterval] = {}
+        self._events: dict[str, TemporalEvent] = {}
+        self._temporal_constraints: list[tuple[str, str, TemporalRelation]] = []
 
     @property
     def engine_type(self) -> ReasoningType:
@@ -108,7 +106,7 @@ class TemporalEngine(BaseReasoningEngine):
 
     def _determine_relation(
         self, interval1: TimeInterval, interval2: TimeInterval
-    ) -> Tuple[TemporalRelation, float]:
+    ) -> tuple[TemporalRelation, float]:
         if not interval1.start or not interval2.start:
             return TemporalRelation.EQUALS, 0.0
 
@@ -158,7 +156,7 @@ class TemporalEngine(BaseReasoningEngine):
 
         return TemporalRelation.EQUALS, 0.5
 
-    def _calculate_duration(self, interval: TimeInterval) -> Tuple[Optional[timedelta], str]:
+    def _calculate_duration(self, interval: TimeInterval) -> tuple[timedelta | None, str]:
         if interval.duration:
             return interval.duration, "已知持续时间"
 
@@ -167,7 +165,7 @@ class TemporalEngine(BaseReasoningEngine):
 
         return None, "无法计算"
 
-    def _infer_order(self, events: List[TemporalEvent]) -> List[Dict[str, Any]]:
+    def _infer_order(self, events: list[TemporalEvent]) -> list[dict[str, Any]]:
         ordered = []
 
         for event in events:
@@ -194,7 +192,7 @@ class TemporalEngine(BaseReasoningEngine):
 
         return ordered
 
-    def _analyze_frequency(self, events: List[TemporalEvent]) -> Dict[str, Any]:
+    def _analyze_frequency(self, events: list[TemporalEvent]) -> dict[str, Any]:
         if not events:
             return {"frequency": 0, "interval": None}
 
@@ -225,11 +223,11 @@ class TemporalEngine(BaseReasoningEngine):
         }
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         if not premises:
             return self._create_result(
@@ -267,7 +265,7 @@ class TemporalEngine(BaseReasoningEngine):
                         confidence=ConfidenceScore(value=confidence),
                         reasoning_chain=reasoning_chain,
                         explanations=[
-                            f"使用Allen区间代数确定时序关系",
+                            "使用Allen区间代数确定时序关系",
                             f"关系类型: {relation.value}",
                         ],
                     )
@@ -286,7 +284,7 @@ class TemporalEngine(BaseReasoningEngine):
                     duration, method = self._calculate_duration(interval)
 
                     if duration:
-                        hours = duration.total_seconds() / 3600
+                        duration.total_seconds() / 3600
 
                         step = self._create_step(
                             step_type=ReasoningType.TEMPORAL,
@@ -394,7 +392,7 @@ class TemporalEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         for step in reasoning_result.reasoning_chain:
@@ -404,5 +402,5 @@ class TemporalEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         return ConfidenceScore(value=0.8)

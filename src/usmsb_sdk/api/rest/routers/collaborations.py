@@ -11,21 +11,23 @@ Stake Requirements:
 
 import json
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from usmsb_sdk.api.database import (
     create_collaboration as db_create_collaboration,
-    get_collaborations as db_get_collaborations,
+)
+from usmsb_sdk.api.database import (
     get_collaboration as db_get_collaboration,
+)
+from usmsb_sdk.api.database import (
+    get_collaborations as db_get_collaborations,
 )
 from usmsb_sdk.api.rest.schemas.collaboration import CollaborationCreateRequest
 from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
-    get_optional_user_unified,
     require_stake_unified,
-    verify_agent_access,
 )
 
 router = APIRouter(prefix="/collaborations", tags=["Collaborations"])
@@ -34,7 +36,7 @@ router = APIRouter(prefix="/collaborations", tags=["Collaborations"])
 @router.post("")
 async def create_collaboration_endpoint(
     request: CollaborationCreateRequest,
-    user: Dict[str, Any] = Depends(require_stake_unified(100))
+    user: dict[str, Any] = Depends(require_stake_unified(100))
 ):
     """Create a new collaboration session.
 
@@ -93,7 +95,7 @@ async def create_collaboration_endpoint(
 
 
 @router.get("")
-async def get_collaborations_endpoint(status: Optional[str] = Query(None)):
+async def get_collaborations_endpoint(status: str | None = Query(None)):
     """Get all collaboration sessions."""
     sessions = db_get_collaborations()
 
@@ -137,7 +139,7 @@ async def get_collaboration_endpoint(session_id: str):
 @router.post("/{session_id}/execute")
 async def execute_collaboration(
     session_id: str,
-    user: Dict[str, Any] = Depends(require_stake_unified(100))
+    user: dict[str, Any] = Depends(require_stake_unified(100))
 ):
     """Execute a collaboration session.
 
@@ -181,7 +183,7 @@ async def get_collaboration_stats():
 @router.post("/{session_id}/join")
 async def join_collaboration(
     session_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Join a collaboration session.
 
@@ -233,7 +235,7 @@ async def join_collaboration(
 async def submit_contribution(
     session_id: str,
     contribution: dict = Body(...),
-    user: Dict[str, Any] = Depends(require_stake_unified(100))
+    user: dict[str, Any] = Depends(require_stake_unified(100))
 ):
     """Submit contribution to a collaboration session.
 
@@ -288,7 +290,7 @@ async def submit_contribution(
 @router.post("/{session_id}/complete")
 async def complete_collaboration(
     session_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Complete a collaboration session.
 

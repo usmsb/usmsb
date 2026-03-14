@@ -5,29 +5,23 @@
 """
 
 import asyncio
-import json
 import logging
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any
 
+from .capability_assessor import CapabilityAssessor
+from .curiosity_engine import CuriosityEngine
+from .goal_generator import GoalGenerator
+from .knowledge_solidifier import KnowledgeSolidifier
+from .meta_learner import LearningContext, MetaLearner
 from .models import (
+    CapabilityTransfer,
     EvolutionPhase,
     EvolutionState,
     LearningGoal,
     SelfReflection,
-    CapabilityTransfer,
-    KnowledgeUnit,
-    KnowledgeState,
 )
-
-from .meta_learner import MetaLearner, LearningContext
-from .capability_assessor import CapabilityAssessor
-from .knowledge_solidifier import KnowledgeSolidifier
-from .curiosity_engine import CuriosityEngine
 from .self_optimizer import SelfOptimizer
-from .goal_generator import GoalGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +45,7 @@ class SelfEvolutionEngine:
         self,
         llm_manager=None,
         knowledge_base=None,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
     ):
         self.llm = llm_manager
         self.knowledge = knowledge_base
@@ -75,11 +69,11 @@ class SelfEvolutionEngine:
         )
 
         self._running = False
-        self._evolution_task: Optional[asyncio.Task] = None
+        self._evolution_task: asyncio.Task | None = None
         self._evolution_interval = self.config.get("evolution_interval", 300)
 
-        self._performance_history: List[float] = []
-        self._transfer_records: List[CapabilityTransfer] = []
+        self._performance_history: list[float] = []
+        self._transfer_records: list[CapabilityTransfer] = []
 
         self._initialized = False
 
@@ -191,7 +185,7 @@ class SelfEvolutionEngine:
             return 0.0
         return sum(c.score for c in caps.values()) / len(caps)
 
-    async def autonomous_learning(self) -> Dict[str, Any]:
+    async def autonomous_learning(self) -> dict[str, Any]:
         """
         自主学习
 
@@ -223,7 +217,7 @@ class SelfEvolutionEngine:
 
         return result
 
-    async def _pursue_goal(self, goal: LearningGoal) -> Dict[str, Any]:
+    async def _pursue_goal(self, goal: LearningGoal) -> dict[str, Any]:
         """追求学习目标"""
         result = {"knowledge": [], "improvements": []}
 
@@ -277,7 +271,7 @@ class SelfEvolutionEngine:
 
         return reflection
 
-    async def consolidate_knowledge(self) -> Dict[str, Any]:
+    async def consolidate_knowledge(self) -> dict[str, Any]:
         """
         知识固化
 
@@ -296,7 +290,7 @@ class SelfEvolutionEngine:
 
         return result
 
-    async def optimize_self(self) -> Dict[str, Any]:
+    async def optimize_self(self) -> dict[str, Any]:
         """
         自我优化
 
@@ -380,8 +374,8 @@ class SelfEvolutionEngine:
 
     async def learn_from_interaction(
         self,
-        interaction_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        interaction_data: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         从交互中学习
 
@@ -406,7 +400,7 @@ class SelfEvolutionEngine:
             if isinstance(message, dict):
                 content = message.get("content", "")
                 if content and len(content) > 20:
-                    kid = await self._knowledge_solidifier.add_knowledge(
+                    await self._knowledge_solidifier.add_knowledge(
                         content=content,
                         source="interaction",
                         metadata={"task_type": task_type, "success": success},
@@ -424,7 +418,7 @@ class SelfEvolutionEngine:
 
         return result
 
-    def _find_related_capabilities(self, task_type: str) -> List[str]:
+    def _find_related_capabilities(self, task_type: str) -> list[str]:
         """找到与任务类型相关的能力"""
         mapping = {
             "coding": ["code_generation", "debugging", "problem_solving"],
@@ -436,7 +430,7 @@ class SelfEvolutionEngine:
 
         return mapping.get(task_type, ["reasoning", "learning"])
 
-    def _record_evolution(self, record: Dict[str, Any]):
+    def _record_evolution(self, record: dict[str, Any]):
         """记录进化历史"""
         self._state.evolution_history.append(record)
         if len(self._state.evolution_history) > 100:
@@ -451,7 +445,7 @@ class SelfEvolutionEngine:
         """获取进化状态"""
         return self._state
 
-    def get_comprehensive_report(self) -> Dict[str, Any]:
+    def get_comprehensive_report(self) -> dict[str, Any]:
         """获取综合报告"""
         return {
             "evolution_state": {
@@ -478,7 +472,7 @@ class SelfEvolutionEngine:
 async def create_evolution_engine(
     llm_manager=None,
     knowledge_base=None,
-    config: Optional[Dict[str, Any]] = None,
+    config: dict[str, Any] | None = None,
 ) -> SelfEvolutionEngine:
     """创建并初始化进化引擎"""
     engine = SelfEvolutionEngine(

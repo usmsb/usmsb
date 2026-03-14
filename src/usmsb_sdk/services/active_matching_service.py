@@ -14,30 +14,29 @@ Key Features:
 4. Both-side Initiative: Both supply and demand sides can initiate
 """
 
-import asyncio
 import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Goal, Resource
 from usmsb_sdk.core.communication.agent_communication import (
     AgentAddress,
     AgentCommunicationManager,
     Message,
     MessageType,
 )
+from usmsb_sdk.core.elements import Agent, Goal, Resource
 from usmsb_sdk.intelligence_adapters.base import ILLMAdapter
-from usmsb_sdk.node.decentralized_node import DistributedServiceRegistry, ServiceEndpoint, ServiceType
+from usmsb_sdk.node.decentralized_node import DistributedServiceRegistry, ServiceType
 
 logger = logging.getLogger(__name__)
 
 
-class SearchStrategy(str, Enum):
+class SearchStrategy(StrEnum):
     """Strategy for proactive search."""
     ACTIVE_BROADCAST = "active_broadcast"       # Broadcast to network
     TARGETED_SEARCH = "targeted_search"         # Search specific targets
@@ -45,14 +44,14 @@ class SearchStrategy(str, Enum):
     NETWORK_EXPLORATION = "network_exploration" # Explore network
 
 
-class NegotiationStrategy(str, Enum):
+class NegotiationStrategy(StrEnum):
     """Strategy for negotiation."""
     AGGRESSIVE = "aggressive"     # Maximize own benefit
     BALANCED = "balanced"         # Win-win approach
     CONSERVATIVE = "conservative" # Prioritize deal closure
 
 
-class NegotiationStatus(str, Enum):
+class NegotiationStatus(StrEnum):
     """Status of negotiation."""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -61,7 +60,7 @@ class NegotiationStatus(str, Enum):
     TIMEOUT = "timeout"
 
 
-class OpportunityStatus(str, Enum):
+class OpportunityStatus(StrEnum):
     """Status of an opportunity."""
     DISCOVERED = "discovered"
     CONTACTED = "contacted"
@@ -79,10 +78,10 @@ class MatchScore:
     price_match: float
     reputation_match: float
     time_match: float
-    suggested_price_range: Dict[str, float] = field(default_factory=dict)
+    suggested_price_range: dict[str, float] = field(default_factory=dict)
     reasoning: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "overall": self.overall,
             "capability_match": self.capability_match,
@@ -101,13 +100,13 @@ class Opportunity:
     counterpart_agent_id: str
     counterpart_name: str
     opportunity_type: str  # "supply" or "demand"
-    details: Dict[str, Any]
+    details: dict[str, Any]
     match_score: MatchScore
     status: OpportunityStatus = OpportunityStatus.DISCOVERED
     created_at: float = field(default_factory=time.time)
-    negotiation_session_id: Optional[str] = None
+    negotiation_session_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "opportunity_id": self.opportunity_id,
             "counterpart_agent_id": self.counterpart_agent_id,
@@ -128,9 +127,9 @@ class NegotiationProposal:
     delivery_time: str
     payment_terms: str
     quality_guarantee: str = ""
-    additional_terms: Dict[str, Any] = field(default_factory=dict)
+    additional_terms: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "price": self.price,
             "delivery_time": self.delivery_time,
@@ -140,7 +139,7 @@ class NegotiationProposal:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "NegotiationProposal":
+    def from_dict(cls, data: dict[str, Any]) -> "NegotiationProposal":
         return cls(
             price=data.get("price", 0.0),
             delivery_time=data.get("delivery_time", ""),
@@ -157,10 +156,10 @@ class NegotiationRound:
     proposer_id: str
     proposal: NegotiationProposal
     response: str  # "accepted", "rejected", "counter"
-    counter_proposal: Optional[NegotiationProposal] = None
+    counter_proposal: NegotiationProposal | None = None
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "round_number": self.round_number,
             "proposer_id": self.proposer_id,
@@ -177,14 +176,14 @@ class NegotiationSession:
     session_id: str
     initiator_id: str
     counterpart_id: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
     status: NegotiationStatus = NegotiationStatus.PENDING
-    rounds: List[NegotiationRound] = field(default_factory=list)
-    final_terms: Optional[Dict[str, Any]] = None
+    rounds: list[NegotiationRound] = field(default_factory=list)
+    final_terms: dict[str, Any] | None = None
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "initiator_id": self.initiator_id,
@@ -203,10 +202,10 @@ class NegotiationResult:
     """Result of a negotiation."""
     success: bool
     session_id: str
-    final_terms: Optional[Dict[str, Any]] = None
+    final_terms: dict[str, Any] | None = None
     reason: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "success": self.success,
             "session_id": self.session_id,
@@ -247,21 +246,21 @@ class ActiveMatchingService:
         self.registry = platform_registry
 
         # Active searches tracking
-        self._active_searches: Dict[str, Dict[str, Any]] = {}
+        self._active_searches: dict[str, dict[str, Any]] = {}
 
         # Negotiations tracking
-        self._negotiations: Dict[str, NegotiationSession] = {}
+        self._negotiations: dict[str, NegotiationSession] = {}
 
         # Opportunities discovered
-        self._opportunities: Dict[str, Opportunity] = {}
+        self._opportunities: dict[str, Opportunity] = {}
 
         # Match history for learning
-        self._match_history: List[Dict[str, Any]] = []
+        self._match_history: list[dict[str, Any]] = []
 
         # Callbacks
-        self.on_opportunity_discovered: Optional[Callable[[Opportunity], None]] = None
-        self.on_negotiation_update: Optional[Callable[[NegotiationSession], None]] = None
-        self.on_match_completed: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.on_opportunity_discovered: Callable[[Opportunity], None] | None = None
+        self.on_negotiation_update: Callable[[NegotiationSession], None] | None = None
+        self.on_match_completed: Callable[[dict[str, Any]], None] | None = None
 
         # Start message handlers
         self._setup_message_handlers()
@@ -279,7 +278,7 @@ class ActiveMatchingService:
         resource: Resource,
         search_strategy: SearchStrategy = SearchStrategy.ACTIVE_BROADCAST,
         max_results: int = 10,
-    ) -> List[Opportunity]:
+    ) -> list[Opportunity]:
         """
         Supplier actively searches for matching demands.
 
@@ -373,7 +372,7 @@ class ActiveMatchingService:
         self,
         supplier: Agent,
         resource: Resource,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for demand services in the registry."""
         demands = []
 
@@ -437,7 +436,7 @@ class ActiveMatchingService:
         goal: Goal,
         search_strategy: SearchStrategy = SearchStrategy.ACTIVE_BROADCAST,
         max_results: int = 10,
-    ) -> List[Opportunity]:
+    ) -> list[Opportunity]:
         """
         Demander actively searches for matching suppliers.
 
@@ -529,7 +528,7 @@ class ActiveMatchingService:
         self,
         demander: Agent,
         goal: Goal,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for supplier services in the registry."""
         suppliers = []
 
@@ -597,7 +596,7 @@ class ActiveMatchingService:
         self,
         initiator: Agent,
         counterpart_id: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> NegotiationSession:
         """
         Initiate a negotiation session.
@@ -845,7 +844,7 @@ Generate your next negotiation proposal. Consider:
     async def _calculate_match_score(
         self,
         supply: Resource,
-        demand: Dict[str, Any],
+        demand: dict[str, Any],
         supplier: Agent,
     ) -> MatchScore:
         """Calculate match score between supply and demand."""
@@ -907,7 +906,7 @@ Evaluate the match between this supply and demand:
     async def _calculate_demand_match_score(
         self,
         goal: Goal,
-        supplier: Dict[str, Any],
+        supplier: dict[str, Any],
         demander: Agent,
     ) -> MatchScore:
         """Calculate match score between demand and supplier."""
@@ -969,13 +968,13 @@ Evaluate the match between this demand and supplier:
 
     # ========== Message Handlers ==========
 
-    async def handle_supply_available(self, message: Message) -> Optional[Dict[str, Any]]:
+    async def handle_supply_available(self, message: Message) -> dict[str, Any] | None:
         """Handle incoming supply available broadcast."""
         # This could be used by demanders to discover suppliers
         logger.debug(f"Received supply available from {message.content.get('agent_id')}")
         return None
 
-    async def handle_demand_seeking(self, message: Message) -> Optional[Dict[str, Any]]:
+    async def handle_demand_seeking(self, message: Message) -> dict[str, Any] | None:
         """Handle incoming demand seeking broadcast."""
         # This could be used by suppliers to discover demanders
         logger.debug(f"Received demand seeking from {message.content.get('agent_id')}")
@@ -985,7 +984,7 @@ Evaluate the match between this demand and supplier:
         self,
         message: Message,
         agent: Agent,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle incoming negotiation invitation."""
         content = message.content
         session_id = content.get("session_id")
@@ -1011,7 +1010,7 @@ Evaluate the match between this demand and supplier:
         message: Message,
         agent: Agent,
         auto_respond: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Handle incoming negotiation proposal."""
         content = message.content
         session_id = content.get("session_id")
@@ -1039,7 +1038,7 @@ Evaluate the match between this demand and supplier:
         agent: Agent,
         session: NegotiationSession,
         proposal: NegotiationProposal,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Use LLM to evaluate a proposal and generate response."""
         prompt = f"""
 Evaluate this negotiation proposal and decide your response:
@@ -1098,15 +1097,15 @@ Evaluate this negotiation proposal and decide your response:
 
     # ========== Utility Methods ==========
 
-    def get_opportunity(self, opportunity_id: str) -> Optional[Opportunity]:
+    def get_opportunity(self, opportunity_id: str) -> Opportunity | None:
         """Get an opportunity by ID."""
         return self._opportunities.get(opportunity_id)
 
-    def get_negotiation(self, session_id: str) -> Optional[NegotiationSession]:
+    def get_negotiation(self, session_id: str) -> NegotiationSession | None:
         """Get a negotiation session by ID."""
         return self._negotiations.get(session_id)
 
-    def get_active_searches(self) -> List[Dict[str, Any]]:
+    def get_active_searches(self) -> list[dict[str, Any]]:
         """Get all active searches."""
         return [
             {**s, "search_id": sid}
@@ -1114,7 +1113,7 @@ Evaluate this negotiation proposal and decide your response:
             if s["status"] == "active"
         ]
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get service statistics."""
         return {
             "total_searches": len(self._active_searches),

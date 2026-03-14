@@ -17,9 +17,7 @@ Skills:
 
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
-import asyncio
-import logging
+from typing import Any
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
@@ -62,7 +60,7 @@ class Alert:
         message: str,
         severity: AlertSeverity,
         source: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.alert_id = alert_id
         self.title = title
@@ -72,11 +70,11 @@ class Alert:
         self.metadata = metadata or {}
         self.created_at = datetime.now()
         self.acknowledged = False
-        self.acknowledged_by: Optional[str] = None
+        self.acknowledged_by: str | None = None
         self.resolved = False
-        self.resolved_at: Optional[datetime] = None
+        self.resolved_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert alert to dictionary"""
         return {
             "alert_id": self.alert_id,
@@ -99,8 +97,8 @@ class ThresholdConfig:
     def __init__(
         self,
         metric_name: str,
-        warning_threshold: Optional[float] = None,
-        critical_threshold: Optional[float] = None,
+        warning_threshold: float | None = None,
+        critical_threshold: float | None = None,
         comparison: str = "greater",  # "greater", "less", "equal"
         enabled: bool = True,
     ):
@@ -110,7 +108,7 @@ class ThresholdConfig:
         self.comparison = comparison
         self.enabled = enabled
 
-    def check(self, value: float) -> Optional[AlertSeverity]:
+    def check(self, value: float) -> AlertSeverity | None:
         """Check if value exceeds thresholds"""
         if not self.enabled:
             return None
@@ -128,7 +126,7 @@ class ThresholdConfig:
 
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "metric_name": self.metric_name,
@@ -176,17 +174,17 @@ class MonitorAgent(BaseSystemAgent):
     def __init__(
         self,
         config: AgentConfig,
-        system_config: Optional[SystemAgentConfig] = None,
+        system_config: SystemAgentConfig | None = None,
     ):
         """Initialize the monitor agent"""
         super().__init__(config, system_config)
 
         # Monitoring data
-        self._node_health: Dict[str, Dict[str, Any]] = {}
-        self._agent_health: Dict[str, Dict[str, Any]] = {}
-        self._metrics_history: Dict[str, List[Dict[str, Any]]] = {}
-        self._alerts: Dict[str, Alert] = {}
-        self._thresholds: Dict[str, ThresholdConfig] = {}
+        self._node_health: dict[str, dict[str, Any]] = {}
+        self._agent_health: dict[str, dict[str, Any]] = {}
+        self._metrics_history: dict[str, list[dict[str, Any]]] = {}
+        self._alerts: dict[str, Alert] = {}
+        self._thresholds: dict[str, ThresholdConfig] = {}
 
         # Alert counter for unique IDs
         self._alert_counter = 0
@@ -380,8 +378,8 @@ class MonitorAgent(BaseSystemAgent):
     async def handle_message(
         self,
         message: Message,
-        session: Optional[Session] = None
-    ) -> Optional[Message]:
+        session: Session | None = None
+    ) -> Message | None:
         """Handle incoming messages"""
         await self.audit_operation("message_received", {
             "message_type": message.type.value if hasattr(message.type, 'value') else str(message.type),
@@ -412,7 +410,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return None
 
-    async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_skill(self, skill_name: str, params: dict[str, Any]) -> Any:
         """Execute monitoring skills"""
         await self.audit_operation("skill_execution", {
             "skill": skill_name,
@@ -437,11 +435,11 @@ class MonitorAgent(BaseSystemAgent):
 
     # ==================== Skill Implementations ====================
 
-    async def _skill_health_check(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_health_check(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute health_check skill"""
         target = params.get("target", "all")
         target_type = params.get("target_type", "all")
-        detailed = params.get("detailed", False)
+        params.get("detailed", False)
 
         result = {
             "timestamp": datetime.now().isoformat(),
@@ -483,7 +481,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return result
 
-    async def _skill_get_metrics(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_get_metrics(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute get_metrics skill"""
         metric_name = params.get("metric_name", "all")
         time_range = params.get("time_range", 60)
@@ -533,7 +531,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return result
 
-    async def _skill_get_alerts(self, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _skill_get_alerts(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         """Execute get_alerts skill"""
         severity = params.get("severity", "all")
         status = params.get("status", "active")
@@ -558,7 +556,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return [a.to_dict() for a in alerts]
 
-    async def _skill_set_threshold(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _skill_set_threshold(self, params: dict[str, Any]) -> dict[str, Any]:
         """Execute set_threshold skill"""
         self.require_permission(SystemAgentPermission.CONFIGURE)
 
@@ -599,7 +597,7 @@ class MonitorAgent(BaseSystemAgent):
 
     # ==================== Internal Methods ====================
 
-    async def _check_node_health(self, node_id: str) -> Dict[str, Any]:
+    async def _check_node_health(self, node_id: str) -> dict[str, Any]:
         """Check health of a specific node"""
         if node_id not in self._node_health:
             return {"status": "unknown", "message": "Node not monitored"}
@@ -615,7 +613,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return health_data
 
-    async def _check_agent_health(self, agent_id: str) -> Dict[str, Any]:
+    async def _check_agent_health(self, agent_id: str) -> dict[str, Any]:
         """Check health of a specific agent"""
         if agent_id not in self._agent_health:
             return {"status": "unknown", "message": "Agent not monitored"}
@@ -631,7 +629,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return health_data
 
-    async def _process_health_report(self, report: Dict[str, Any]) -> None:
+    async def _process_health_report(self, report: dict[str, Any]) -> None:
         """Process incoming health report"""
         source_type = report.get("source_type")
         source_id = report.get("source_id")
@@ -647,7 +645,7 @@ class MonitorAgent(BaseSystemAgent):
         # Check thresholds and generate alerts
         await self._check_thresholds(source_type, source_id, health_data)
 
-    async def _process_metrics_report(self, report: Dict[str, Any]) -> None:
+    async def _process_metrics_report(self, report: dict[str, Any]) -> None:
         """Process incoming metrics report"""
         source_id = report.get("source_id")
         metrics = report.get("metrics", {})
@@ -674,7 +672,7 @@ class MonitorAgent(BaseSystemAgent):
         self,
         source_type: str,
         source_id: str,
-        health_data: Dict[str, Any]
+        health_data: dict[str, Any]
     ) -> None:
         """Check health data against thresholds"""
         # Check common health metrics
@@ -717,7 +715,7 @@ class MonitorAgent(BaseSystemAgent):
         message: str,
         severity: AlertSeverity,
         source: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Alert:
         """Create a new alert"""
         self._alert_counter += 1
@@ -778,7 +776,7 @@ class MonitorAgent(BaseSystemAgent):
 
         return True
 
-    def get_monitored_targets(self) -> Dict[str, List[str]]:
+    def get_monitored_targets(self) -> dict[str, list[str]]:
         """Get list of monitored nodes and agents"""
         return {
             "nodes": list(self._node_health.keys()),

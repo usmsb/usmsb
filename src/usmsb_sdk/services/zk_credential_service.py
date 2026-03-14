@@ -6,18 +6,18 @@ Implements zero-knowledge proof generation and verification for privacy-preservi
 
 import asyncio
 import hashlib
-import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class CredentialType(str, Enum):
+class CredentialType(StrEnum):
     """Credential types."""
 
     IDENTITY = "identity"
@@ -27,7 +27,7 @@ class CredentialType(str, Enum):
     TRUSTED_NODE = "trusted_node"
 
 
-class CredentialStatus(str, Enum):
+class CredentialStatus(StrEnum):
     """Credential status."""
 
     ACTIVE = "active"
@@ -40,12 +40,12 @@ class CredentialStatus(str, Enum):
 class ZKProof:
     """Zero-knowledge proof structure."""
 
-    a: Tuple[int, int]
-    b: Tuple[Tuple[int, int], Tuple[int, int]]
-    c: Tuple[int, int]
-    public_inputs: List[int]
+    a: tuple[int, int]
+    b: tuple[tuple[int, int], tuple[int, int]]
+    c: tuple[int, int]
+    public_inputs: list[int]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "a": list(self.a),
             "b": [list(self.b[0]), list(self.b[1])],
@@ -67,10 +67,10 @@ class Credential:
     nullifier_hash: str
     status: CredentialStatus
     score: float
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     created_at: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "credentialId": self.credential_id,
             "holder": self.holder,
@@ -95,7 +95,7 @@ class PrivateInputs:
     no_slash: bool
     secret: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "reputation": self.reputation,
             "stake": self.stake,
@@ -117,22 +117,22 @@ class ZKCredentialService:
     def __init__(
         self,
         web3_provider=None,
-        contract_address: Optional[str] = None,
+        contract_address: str | None = None,
         reputation_service=None,
     ):
         self.web3 = web3_provider
         self.contract_address = contract_address
         self.reputation = reputation_service
 
-        self._credentials: Dict[str, Credential] = {}
-        self._holder_credentials: Dict[str, List[str]] = {}
-        self._nullifiers: Dict[str, bool] = {}
+        self._credentials: dict[str, Credential] = {}
+        self._holder_credentials: dict[str, list[str]] = {}
+        self._nullifiers: dict[str, bool] = {}
 
         self._running = False
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
 
-        self.on_credential_issued: Optional[Callable[[Credential], None]] = None
-        self.on_credential_verified: Optional[Callable[[str, bool], None]] = None
+        self.on_credential_issued: Callable[[Credential], None] | None = None
+        self.on_credential_verified: Callable[[str, bool], None] | None = None
 
     async def start(self) -> None:
         self._running = True
@@ -148,8 +148,8 @@ class ZKCredentialService:
         self,
         credential_type: CredentialType,
         private_inputs: PrivateInputs,
-        thresholds: Dict[str, float],
-    ) -> Optional[ZKProof]:
+        thresholds: dict[str, float],
+    ) -> ZKProof | None:
         """
         Generate a zero-knowledge proof.
 
@@ -192,8 +192,8 @@ class ZKCredentialService:
         valid_duration: float,
         proof: ZKProof,
         score: float,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Credential]:
+        metadata: dict[str, Any] | None = None,
+    ) -> Credential | None:
         """Issue a credential based on verified proof."""
         if valid_duration < self.MIN_CREDENTIAL_DURATION:
             return None
@@ -286,7 +286,7 @@ class ZKCredentialService:
 
         return True
 
-    def get_credential(self, credential_id: str) -> Optional[Credential]:
+    def get_credential(self, credential_id: str) -> Credential | None:
         return self._credentials.get(credential_id)
 
     def is_credential_valid(self, credential_id: str) -> bool:
@@ -309,8 +309,8 @@ class ZKCredentialService:
     def get_holder_credentials(
         self,
         holder: str,
-        credential_type: Optional[CredentialType] = None,
-    ) -> List[Credential]:
+        credential_type: CredentialType | None = None,
+    ) -> list[Credential]:
         """Get all credentials for a holder."""
         cred_ids = self._holder_credentials.get(holder, [])
         credentials = [self._credentials[cid] for cid in cred_ids if cid in self._credentials]
@@ -321,7 +321,7 @@ class ZKCredentialService:
         return credentials
 
 
-_zk_credential_service: Optional[ZKCredentialService] = None
+_zk_credential_service: ZKCredentialService | None = None
 
 
 async def get_zk_credential_service() -> ZKCredentialService:

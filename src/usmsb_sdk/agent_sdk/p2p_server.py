@@ -15,9 +15,9 @@ import logging
 import socket
 import time
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from usmsb_sdk.agent_sdk.base_agent import BaseAgent
@@ -32,7 +32,7 @@ class PeerInfo:
     address: str
     port: int
     name: str = ""
-    capabilities: List[str] = None
+    capabilities: list[str] = None
     last_seen: float = 0.0
     latency: float = 0.0
 
@@ -40,7 +40,7 @@ class PeerInfo:
         if self.capabilities is None:
             self.capabilities = []
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "peer_id": self.peer_id,
             "address": self.address,
@@ -62,8 +62,8 @@ class DHT:
 
     def __init__(self, local_id: str):
         self.local_id = local_id
-        self._data: Dict[str, Any] = {}
-        self._peers: Dict[str, PeerInfo] = {}
+        self._data: dict[str, Any] = {}
+        self._peers: dict[str, PeerInfo] = {}
 
     def store(self, key: str, value: Any) -> None:
         """Store a value in the DHT"""
@@ -73,7 +73,7 @@ class DHT:
             "owner": self.local_id,
         }
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get a value from the DHT"""
         entry = self._data.get(key)
         if entry:
@@ -89,14 +89,14 @@ class DHT:
         """Unregister a peer"""
         self._peers.pop(peer_id, None)
 
-    def find_peers(self, capability: str = None) -> List[PeerInfo]:
+    def find_peers(self, capability: str = None) -> list[PeerInfo]:
         """Find peers, optionally filtered by capability"""
         peers = list(self._peers.values())
         if capability:
             peers = [p for p in peers if capability in p.capabilities]
         return peers
 
-    def get_peer(self, peer_id: str) -> Optional[PeerInfo]:
+    def get_peer(self, peer_id: str) -> PeerInfo | None:
         """Get a specific peer"""
         return self._peers.get(peer_id)
 
@@ -130,7 +130,7 @@ class P2PServer:
         agent: "BaseAgent",
         host: str = "0.0.0.0",
         port: int = 9001,
-        bootstrap_peers: List[Tuple[str, int]] = None,
+        bootstrap_peers: list[tuple[str, int]] = None,
     ):
         """
         Initialize P2P Server
@@ -153,12 +153,12 @@ class P2PServer:
         self.dht = DHT(self.peer_id)
 
         # Server state
-        self._server: Optional[asyncio.Server] = None
+        self._server: asyncio.Server | None = None
         self._running = False
-        self._connections: Dict[str, asyncio.StreamWriter] = {}
+        self._connections: dict[str, asyncio.StreamWriter] = {}
 
         # Message handlers
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable] = {}
         self._register_default_handlers()
 
         logger.info(f"P2PServer created for {agent.name} (peer_id: {self.peer_id[:8]}...)")
@@ -223,7 +223,7 @@ class P2PServer:
         self._running = False
 
         # Close all connections
-        for peer_id, writer in self._connections.items():
+        for _peer_id, writer in self._connections.items():
             writer.close()
             try:
                 await writer.wait_closed()
@@ -293,7 +293,7 @@ class P2PServer:
 
     async def _process_message(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Process incoming P2P message"""
@@ -318,7 +318,7 @@ class P2PServer:
 
     async def _handle_ping(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Handle ping message"""
@@ -332,7 +332,7 @@ class P2PServer:
 
     async def _handle_pong(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Handle pong message"""
@@ -347,7 +347,7 @@ class P2PServer:
 
     async def _handle_discover(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Handle peer discovery request"""
@@ -363,7 +363,7 @@ class P2PServer:
 
     async def _handle_message(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Handle generic P2P message"""
@@ -393,7 +393,7 @@ class P2PServer:
 
     async def _handle_heartbeat(
         self,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Handle heartbeat message"""
@@ -414,7 +414,7 @@ class P2PServer:
     async def _send_message(
         self,
         writer: asyncio.StreamWriter,
-        message: Dict[str, Any]
+        message: dict[str, Any]
     ) -> None:
         """Send a message through a connection"""
         try:
@@ -428,9 +428,9 @@ class P2PServer:
     async def send_to_peer(
         self,
         peer_id: str,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         timeout: float = 30.0
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Send a message to a specific peer
 
@@ -474,7 +474,7 @@ class P2PServer:
         self,
         capability: str = None,
         timeout: float = 10.0
-    ) -> List[PeerInfo]:
+    ) -> list[PeerInfo]:
         """
         Discover peers in the network
 
@@ -494,7 +494,7 @@ class P2PServer:
             "capability": capability,
         }
 
-        for peer_id, writer in list(self._connections.items()):
+        for _peer_id, writer in list(self._connections.items()):
             try:
                 await self._send_message(writer, discover_msg)
             except:
@@ -577,7 +577,7 @@ class P2PServer:
             except Exception as e:
                 logger.debug(f"Peer maintenance error: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get P2P server statistics"""
         return {
             "peer_id": self.peer_id,
@@ -593,7 +593,7 @@ class P2PServer:
 async def run_agent_with_p2p(
     agent: "BaseAgent",
     p2p_port: int = 9001,
-    bootstrap_peers: List[Tuple[str, int]] = None,
+    bootstrap_peers: list[tuple[str, int]] = None,
 ) -> None:
     """
     Run Agent with P2P server

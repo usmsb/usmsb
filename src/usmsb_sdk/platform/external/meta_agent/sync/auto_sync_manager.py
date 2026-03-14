@@ -8,7 +8,6 @@ AutoSyncManager - 自动同步管理器
 """
 
 import asyncio
-from typing import Dict, Optional
 from dataclasses import dataclass
 
 
@@ -39,7 +38,7 @@ class SyncStatus:
     last_sync_time: float
     pending_data_size: int
     is_syncing: bool
-    sync_type: Optional[str]
+    sync_type: str | None
 
 
 class AutoSyncManager:
@@ -55,9 +54,9 @@ class AutoSyncManager:
     # ========== 属性 ==========
 
     config: SyncConfig
-    _pending_syncs: Dict[str, asyncio.Task]  # wallet:sync_type -> task
-    _last_sync_time: Dict[str, float]         # wallet -> timestamp
-    _sync_lock: Dict[str, asyncio.Lock]        # wallet -> lock
+    _pending_syncs: dict[str, asyncio.Task]  # wallet:sync_type -> task
+    _last_sync_time: dict[str, float]         # wallet -> timestamp
+    _sync_lock: dict[str, asyncio.Lock]        # wallet -> lock
     _running: bool
 
     # ========== 核心方法 ==========

@@ -9,20 +9,20 @@ This module provides adapters for different knowledge base systems:
 These adapters enable RAG (Retrieval-Augmented Generation) capabilities.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
-import asyncio
+import hashlib
 import json
 import logging
 import time
-import hashlib
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class KnowledgeSourceType(str, Enum):
+class KnowledgeSourceType(StrEnum):
     """Types of knowledge sources."""
     VECTOR_DB = "vector_db"
     GRAPH_DB = "graph_db"
@@ -35,8 +35,8 @@ class KnowledgeEntry:
     """A single knowledge entry."""
     entry_id: str
     content: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    embedding: Optional[List[float]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    embedding: list[float] | None = None
     score: float = 0.0
     source: str = ""
 
@@ -45,10 +45,10 @@ class KnowledgeEntry:
 class KnowledgeQueryResult:
     """Result of a knowledge query."""
     query: str
-    entries: List[KnowledgeEntry] = field(default_factory=list)
+    entries: list[KnowledgeEntry] = field(default_factory=list)
     total_count: int = 0
     query_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class IKnowledgeBaseAdapter(ABC):
@@ -59,7 +59,7 @@ class IKnowledgeBaseAdapter(ABC):
     """
 
     @abstractmethod
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize the knowledge base connection."""
         pass
 
@@ -77,7 +77,7 @@ class IKnowledgeBaseAdapter(ABC):
     async def query_knowledge(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> KnowledgeQueryResult:
         """
@@ -97,9 +97,9 @@ class IKnowledgeBaseAdapter(ABC):
     async def retrieve_facts(
         self,
         entity: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Retrieve facts about an entity.
 
@@ -117,7 +117,7 @@ class IKnowledgeBaseAdapter(ABC):
     async def add_knowledge(
         self,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -142,8 +142,8 @@ class IKnowledgeBaseAdapter(ABC):
     async def update_knowledge(
         self,
         entry_id: str,
-        content: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Update knowledge entry."""
         pass
@@ -162,8 +162,8 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     def __init__(
         self,
         db_type: str = "chroma",
-        embedding_function: Optional[callable] = None,
-        llm_adapter: Optional[Any] = None,
+        embedding_function: callable | None = None,
+        llm_adapter: Any | None = None,
     ):
         """
         Initialize Vector DB adapter.
@@ -181,10 +181,10 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         self._initialized = False
 
         # In-memory fallback
-        self._memory_store: Dict[str, Dict[str, Any]] = {}
-        self._memory_embeddings: Dict[str, List[float]] = {}
+        self._memory_store: dict[str, dict[str, Any]] = {}
+        self._memory_embeddings: dict[str, list[float]] = {}
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize the vector database connection."""
         try:
             if self.db_type == "chroma":
@@ -205,7 +205,7 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
             logger.error(f"Failed to initialize vector DB: {e}")
             return False
 
-    async def _init_chroma(self, config: Dict[str, Any]) -> bool:
+    async def _init_chroma(self, config: dict[str, Any]) -> bool:
         """Initialize ChromaDB."""
         try:
             import chromadb
@@ -230,7 +230,7 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
             logger.error(f"ChromaDB init error: {e}")
             return False
 
-    async def _init_pinecone(self, config: Dict[str, Any]) -> bool:
+    async def _init_pinecone(self, config: dict[str, Any]) -> bool:
         """Initialize Pinecone."""
         try:
             import pinecone
@@ -264,7 +264,7 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
             logger.error(f"Pinecone init error: {e}")
             return False
 
-    async def _init_weaviate(self, config: Dict[str, Any]) -> bool:
+    async def _init_weaviate(self, config: dict[str, Any]) -> bool:
         """Initialize Weaviate."""
         try:
             import weaviate
@@ -295,10 +295,17 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
             logger.error(f"Weaviate init error: {e}")
             return False
 
-    async def _init_milvus(self, config: Dict[str, Any]) -> bool:
+    async def _init_milvus(self, config: dict[str, Any]) -> bool:
         """Initialize Milvus."""
         try:
-            from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
+            from pymilvus import (
+                Collection,
+                CollectionSchema,
+                DataType,
+                FieldSchema,
+                connections,
+                utility,
+            )
 
             host = config.get("host", "localhost")
             port = config.get("port", "19530")
@@ -338,7 +345,7 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         """Check availability."""
         return self._initialized
 
-    async def _get_embedding(self, text: str) -> List[float]:
+    async def _get_embedding(self, text: str) -> list[float]:
         """Get embedding for text."""
         if self.embedding_function:
             return self.embedding_function(text)
@@ -356,7 +363,7 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def query_knowledge(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         top_k: int = 5,
         min_score: float = 0.0,
         **kwargs
@@ -420,10 +427,10 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
 
     async def _memory_search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int,
         min_score: float
-    ) -> List[KnowledgeEntry]:
+    ) -> list[KnowledgeEntry]:
         """Search in-memory store."""
         results = []
 
@@ -444,12 +451,12 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         results.sort(key=lambda x: x.score, reverse=True)
         return results[:top_k]
 
-    def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(self, a: list[float], b: list[float]) -> float:
         """Calculate cosine similarity."""
         if not a or not b or len(a) != len(b):
             return 0.0
 
-        dot_product = sum(x * y for x, y in zip(a, b))
+        dot_product = sum(x * y for x, y in zip(a, b, strict=False))
         norm_a = sum(x ** 2 for x in a) ** 0.5
         norm_b = sum(x ** 2 for x in b) ** 0.5
 
@@ -461,10 +468,10 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def retrieve_facts(
         self,
         entity: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         top_k: int = 5,
         **kwargs
-    ) -> List[str]:
+    ) -> list[str]:
         """Retrieve facts about an entity."""
         result = await self.query_knowledge(
             query=f"facts about {entity}",
@@ -477,8 +484,8 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def add_knowledge(
         self,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        entry_id: Optional[str] = None,
+        metadata: dict[str, Any] | None = None,
+        entry_id: str | None = None,
         **kwargs
     ) -> str:
         """Add knowledge to the vector database."""
@@ -532,8 +539,8 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def update_knowledge(
         self,
         entry_id: str,
-        content: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Update knowledge entry."""
         try:
@@ -549,8 +556,8 @@ class VectorDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
 
     async def batch_add(
         self,
-        entries: List[Dict[str, Any]]
-    ) -> List[str]:
+        entries: list[dict[str, Any]]
+    ) -> list[str]:
         """Add multiple entries at once."""
         entry_ids = []
         for entry in entries:
@@ -584,10 +591,10 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         self._initialized = False
 
         # In-memory fallback
-        self._nodes: Dict[str, Dict[str, Any]] = {}
-        self._edges: List[Dict[str, Any]] = []
+        self._nodes: dict[str, dict[str, Any]] = {}
+        self._edges: list[dict[str, Any]] = []
 
-    async def initialize(self, config: Dict[str, Any]) -> bool:
+    async def initialize(self, config: dict[str, Any]) -> bool:
         """Initialize the graph database connection."""
         try:
             if self.db_type == "neo4j":
@@ -603,7 +610,7 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
             logger.error(f"Failed to initialize graph DB: {e}")
             return False
 
-    async def _init_neo4j(self, config: Dict[str, Any]) -> bool:
+    async def _init_neo4j(self, config: dict[str, Any]) -> bool:
         """Initialize Neo4j."""
         try:
             from neo4j import GraphDatabase
@@ -629,7 +636,7 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
             logger.error(f"Neo4j init error: {e}")
             return False
 
-    async def _init_arangodb(self, config: Dict[str, Any]) -> bool:
+    async def _init_arangodb(self, config: dict[str, Any]) -> bool:
         """Initialize ArangoDB."""
         try:
             from arango import ArangoClient
@@ -667,7 +674,7 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def query_knowledge(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> KnowledgeQueryResult:
         """Query the graph database."""
@@ -695,9 +702,9 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def _query_neo4j(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[KnowledgeEntry]:
+    ) -> list[KnowledgeEntry]:
         """Query Neo4j."""
         entries = []
 
@@ -725,9 +732,9 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def _query_arangodb(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[KnowledgeEntry]:
+    ) -> list[KnowledgeEntry]:
         """Query ArangoDB."""
         entries = []
 
@@ -754,9 +761,9 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def _query_memory(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[KnowledgeEntry]:
+    ) -> list[KnowledgeEntry]:
         """Query in-memory store."""
         entries = []
         query_lower = query.lower()
@@ -775,9 +782,9 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def retrieve_facts(
         self,
         entity: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[str]:
+    ) -> list[str]:
         """Retrieve facts about an entity from the graph."""
         facts = []
 
@@ -817,8 +824,8 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def add_knowledge(
         self,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        entry_id: Optional[str] = None,
+        metadata: dict[str, Any] | None = None,
+        entry_id: str | None = None,
         entity_type: str = "Knowledge",
         **kwargs
     ) -> str:
@@ -891,8 +898,8 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
     async def update_knowledge(
         self,
         entry_id: str,
-        content: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Update knowledge node."""
         try:
@@ -931,7 +938,7 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         source_id: str,
         target_id: str,
         relation_type: str,
-        properties: Optional[Dict[str, Any]] = None,
+        properties: dict[str, Any] | None = None,
     ) -> bool:
         """Add a relationship between two nodes."""
         try:
@@ -975,7 +982,7 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         start_id: str,
         end_id: str,
         max_depth: int = 3,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find path between two nodes."""
         paths = []
 
@@ -1011,7 +1018,7 @@ class GraphDBKnowledgeBaseAdapter(IKnowledgeBaseAdapter):
         start_id: str,
         end_id: str,
         max_depth: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find path in memory store using BFS."""
         # Build adjacency list
         adj = defaultdict(list)

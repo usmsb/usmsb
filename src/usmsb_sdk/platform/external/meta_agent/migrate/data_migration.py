@@ -4,17 +4,16 @@ Data Migration Module
 Provides data migration functionality for moving user data between IPFS and local storage.
 """
 
-import asyncio
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..session.user_session import UserSession
-    from ..ipfs.ipfs_client import IPFSClient
 
 
 logger = logging.getLogger(__name__)
@@ -29,9 +28,9 @@ class MigrationProgress:
     bytes_processed: int = 0
     total_bytes: int = 0
     message: str = ""
-    error: Optional[str] = None
+    error: str | None = None
     start_time: float = field(default_factory=time.time)
-    end_time: Optional[float] = None
+    end_time: float | None = None
 
     @property
     def percentage(self) -> float:
@@ -58,11 +57,11 @@ class MigrationProgress:
 class MigrationResult:
     """Result of a migration operation."""
     success: bool
-    cid: Optional[str] = None
+    cid: str | None = None
     items_imported: int = 0
     items_exported: int = 0
     bytes_transferred: int = 0
-    error: Optional[str] = None
+    error: str | None = None
     verification_passed: bool = False
 
 
@@ -132,7 +131,7 @@ class DataMigration:
             self._progress.message = message
         self._notify_progress()
 
-    def _complete_stage(self, success: bool = True, error: Optional[str] = None) -> None:
+    def _complete_stage(self, success: bool = True, error: str | None = None) -> None:
         """Complete current migration stage."""
         self._progress.end_time = time.time()
         if error:
@@ -270,7 +269,7 @@ class DataMigration:
             # Update primary node record
             meta_file = Path(f"/data/users/{self.session.wallet_address}/meta.json")
             if meta_file.exists():
-                with open(meta_file, 'r') as f:
+                with open(meta_file) as f:
                     meta_data = json.load(f)
                 meta_data["primary_node"] = self.session.node_id
                 meta_data["last_sync"] = time.time()
@@ -467,7 +466,7 @@ class DataMigration:
             logger.error(f"Migration verification failed: {e}")
             return False
 
-    async def _verify_upload(self, cid: str, original_data: Dict) -> bool:
+    async def _verify_upload(self, cid: str, original_data: dict) -> bool:
         """
         Verify that uploaded data can be retrieved correctly.
 

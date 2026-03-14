@@ -4,26 +4,27 @@ Reasoning Chain Manager
 推理链管理与执行
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Callable
+import asyncio
 import logging
 import time
-import asyncio
-from enum import Enum
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
+from usmsb_sdk.reasoning.base import ReasoningChain
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IReasoningEngine,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
+    ReasoningType,
 )
-from usmsb_sdk.reasoning.base import ReasoningChain
 
 logger = logging.getLogger(__name__)
 
 
-class ChainStatus(str, Enum):
+class ChainStatus(StrEnum):
     """推理链状态"""
 
     PENDING = "pending"
@@ -39,12 +40,12 @@ class ChainExecutionResult:
 
     chain_id: str
     status: ChainStatus
-    results: List[ReasoningResult]
+    results: list[ReasoningResult]
     final_conclusion: Any
     overall_confidence: ConfidenceScore
     execution_time: float
     steps_executed: int
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -53,11 +54,11 @@ class ChainNode:
 
     node_id: str
     engine_type: ReasoningType
-    input_sources: List[str]
-    premises: List[Any]
-    condition: Optional[Callable] = None
-    next_nodes: List[str] = field(default_factory=list)
-    result: Optional[ReasoningResult] = None
+    input_sources: list[str]
+    premises: list[Any]
+    condition: Callable | None = None
+    next_nodes: list[str] = field(default_factory=list)
+    result: ReasoningResult | None = None
 
 
 class ReasoningChainManager:
@@ -72,15 +73,15 @@ class ReasoningChainManager:
     """
 
     def __init__(self):
-        self._engines: Dict[ReasoningType, IReasoningEngine] = {}
-        self._chains: Dict[str, ReasoningChain] = {}
-        self._chain_nodes: Dict[str, Dict[str, ChainNode]] = {}
-        self._execution_history: List[ChainExecutionResult] = []
+        self._engines: dict[ReasoningType, IReasoningEngine] = {}
+        self._chains: dict[str, ReasoningChain] = {}
+        self._chain_nodes: dict[str, dict[str, ChainNode]] = {}
+        self._execution_history: list[ChainExecutionResult] = []
 
     def register_engine(self, reasoning_type: ReasoningType, engine: IReasoningEngine) -> None:
         self._engines[reasoning_type] = engine
 
-    def create_chain(self, chain_id: Optional[str] = None) -> str:
+    def create_chain(self, chain_id: str | None = None) -> str:
         chain_id = chain_id or f"chain_{time.time():.0f}"
         self._chains[chain_id] = ReasoningChain(chain_id=chain_id)
         self._chain_nodes[chain_id] = {}
@@ -98,7 +99,7 @@ class ReasoningChainManager:
 
         self._chains[chain_id].add_step(step)
 
-    def build_sequential_chain(self, steps: List[Tuple[ReasoningType, List[Any]]]) -> str:
+    def build_sequential_chain(self, steps: list[tuple[ReasoningType, list[Any]]]) -> str:
         chain_id = self.create_chain()
 
         for i, (engine_type, premises) in enumerate(steps):
@@ -117,7 +118,7 @@ class ReasoningChainManager:
         return chain_id
 
     def build_parallel_chain(
-        self, parallel_steps: List[List[Tuple[ReasoningType, List[Any]]]]
+        self, parallel_steps: list[list[tuple[ReasoningType, list[Any]]]]
     ) -> str:
         chain_id = self.create_chain()
 
@@ -156,7 +157,7 @@ class ReasoningChainManager:
         return chain_id
 
     async def execute_chain(
-        self, chain_id: str, initial_premises: Optional[List[Any]] = None
+        self, chain_id: str, initial_premises: list[Any] | None = None
     ) -> ChainExecutionResult:
         start_time = time.time()
 
@@ -173,8 +174,8 @@ class ReasoningChainManager:
             )
 
         nodes = self._chain_nodes[chain_id]
-        results: List[ReasoningResult] = []
-        errors: List[str] = []
+        results: list[ReasoningResult] = []
+        errors: list[str] = []
         executed_count = 0
 
         try:
@@ -238,7 +239,7 @@ class ReasoningChainManager:
         return execution_result
 
     async def execute_parallel(
-        self, chain_id: str, initial_premises: Optional[List[Any]] = None
+        self, chain_id: str, initial_premises: list[Any] | None = None
     ) -> ChainExecutionResult:
         start_time = time.time()
 
@@ -255,8 +256,8 @@ class ReasoningChainManager:
             )
 
         nodes = self._chain_nodes[chain_id]
-        results: List[ReasoningResult] = []
-        errors: List[str] = []
+        results: list[ReasoningResult] = []
+        errors: list[str] = []
 
         branches = self._identify_branches(nodes)
 
@@ -291,7 +292,7 @@ class ReasoningChainManager:
         return execution_result
 
     async def _execute_branch(
-        self, branch_nodes: List[ChainNode], premises: List[Any]
+        self, branch_nodes: list[ChainNode], premises: list[Any]
     ) -> ReasoningResult:
         current_premises = premises
         result = None
@@ -307,7 +308,7 @@ class ReasoningChainManager:
 
         return result
 
-    def _determine_execution_order(self, nodes: Dict[str, ChainNode]) -> List[str]:
+    def _determine_execution_order(self, nodes: dict[str, ChainNode]) -> list[str]:
         ordered = []
         visited = set()
 
@@ -327,7 +328,7 @@ class ReasoningChainManager:
 
         return ordered
 
-    def _identify_branches(self, nodes: Dict[str, ChainNode]) -> List[List[ChainNode]]:
+    def _identify_branches(self, nodes: dict[str, ChainNode]) -> list[list[ChainNode]]:
         branches = []
         current_branch = []
 
@@ -350,7 +351,7 @@ class ReasoningChainManager:
 
         return branches
 
-    def _merge_results(self, results: List[ReasoningResult]) -> Any:
+    def _merge_results(self, results: list[ReasoningResult]) -> Any:
         if not results:
             return None
 
@@ -370,7 +371,7 @@ class ReasoningChainManager:
 
         return {"merged_conclusions": conclusions}
 
-    def _calculate_overall_confidence(self, results: List[ReasoningResult]) -> ConfidenceScore:
+    def _calculate_overall_confidence(self, results: list[ReasoningResult]) -> ConfidenceScore:
         if not results:
             return ConfidenceScore(value=0.0)
 
@@ -388,13 +389,13 @@ class ReasoningChainManager:
             evidence_count=sum(r.confidence.evidence_count for r in results),
         )
 
-    def get_chain(self, chain_id: str) -> Optional[ReasoningChain]:
+    def get_chain(self, chain_id: str) -> ReasoningChain | None:
         return self._chains.get(chain_id)
 
-    def get_execution_history(self) -> List[ChainExecutionResult]:
+    def get_execution_history(self) -> list[ChainExecutionResult]:
         return self._execution_history.copy()
 
-    def validate_chain(self, chain_id: str) -> Tuple[bool, List[str]]:
+    def validate_chain(self, chain_id: str) -> tuple[bool, list[str]]:
         errors = []
 
         if chain_id not in self._chain_nodes:
@@ -418,7 +419,7 @@ class ReasoningChainManager:
 
         return len(errors) == 0, errors
 
-    def optimize_chain(self, chain_id: str) -> Dict[str, Any]:
+    def optimize_chain(self, chain_id: str) -> dict[str, Any]:
         if chain_id not in self._chain_nodes:
             return {"error": f"推理链 {chain_id} 不存在"}
 

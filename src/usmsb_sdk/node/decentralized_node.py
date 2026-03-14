@@ -16,23 +16,22 @@ Key components:
 - Distributed state management
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
 import asyncio
 import hashlib
 import json
 import logging
+import socket
 import time
 import uuid
-import socket
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class NodeStatus(str, Enum):
+class NodeStatus(StrEnum):
     """Status of a node in the network."""
     INITIALIZING = "initializing"
     ACTIVE = "active"
@@ -41,7 +40,7 @@ class NodeStatus(str, Enum):
     OFFLINE = "offline"
 
 
-class ServiceType(str, Enum):
+class ServiceType(StrEnum):
     """Types of services a node can provide."""
     LLM_INFERENCE = "llm_inference"
     AGENT_HOSTING = "agent_hosting"
@@ -64,9 +63,9 @@ class NodeIdentity:
     created_at: float = field(default_factory=time.time)
     reputation: float = 1.0
     stake: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "public_key": self.public_key,
@@ -86,7 +85,7 @@ class ServiceEndpoint:
     service_type: ServiceType
     provider_node: str
     endpoint: str
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     load: float = 0.0
     max_capacity: float = 100.0
     cost_per_request: float = 0.001
@@ -94,13 +93,13 @@ class ServiceEndpoint:
     uptime: float = 1.0
     registered_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_available(self) -> bool:
         """Check if service is available."""
         return self.load < self.max_capacity and self.uptime > 0.9
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "service_id": self.service_id,
             "service_type": self.service_type.value,
@@ -123,7 +122,7 @@ class ServiceRequest:
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     service_type: ServiceType = ServiceType.LLM_INFERENCE
     requester_node: str = ""
-    payload: Dict[str, Any] = field(default_factory=dict)
+    payload: dict[str, Any] = field(default_factory=dict)
     max_cost: float = 1.0
     priority: int = 0
     created_at: float = field(default_factory=time.time)
@@ -137,7 +136,7 @@ class ServiceResponse:
     provider_node: str = ""
     success: bool = False
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     cost: float = 0.0
     latency: float = 0.0
     timestamp: float = field(default_factory=time.time)
@@ -156,12 +155,12 @@ class DistributedServiceRegistry:
 
     def __init__(self, node_id: str):
         self.node_id = node_id
-        self._services: Dict[str, ServiceEndpoint] = {}
-        self._nodes: Dict[str, NodeIdentity] = {}
-        self._service_by_type: Dict[ServiceType, Set[str]] = {
+        self._services: dict[str, ServiceEndpoint] = {}
+        self._nodes: dict[str, NodeIdentity] = {}
+        self._service_by_type: dict[ServiceType, set[str]] = {
             st: set() for st in ServiceType
         }
-        self._gossip_task: Optional[asyncio.Task] = None
+        self._gossip_task: asyncio.Task | None = None
         self._running = False
 
     async def start(self) -> None:
@@ -192,11 +191,11 @@ class DistributedServiceRegistry:
 
     async def discover_services(
         self,
-        service_type: Optional[ServiceType] = None,
-        capabilities: Optional[List[str]] = None,
+        service_type: ServiceType | None = None,
+        capabilities: list[str] | None = None,
         min_reputation: float = 0.0,
-        max_cost: Optional[float] = None,
-    ) -> List[ServiceEndpoint]:
+        max_cost: float | None = None,
+    ) -> list[ServiceEndpoint]:
         """Discover available services."""
         candidates = []
 
@@ -253,11 +252,11 @@ class DistributedServiceRegistry:
         """Register a node."""
         self._nodes[node.node_id] = node
 
-    async def get_node(self, node_id: str) -> Optional[NodeIdentity]:
+    async def get_node(self, node_id: str) -> NodeIdentity | None:
         """Get node by ID."""
         return self._nodes.get(node_id)
 
-    async def get_registry_state(self) -> Dict[str, Any]:
+    async def get_registry_state(self) -> dict[str, Any]:
         """Get current registry state for gossip."""
         return {
             "services": {sid: s.to_dict() for sid, s in self._services.items()},
@@ -265,7 +264,7 @@ class DistributedServiceRegistry:
             "timestamp": time.time(),
         }
 
-    async def merge_registry_state(self, state: Dict[str, Any]) -> None:
+    async def merge_registry_state(self, state: dict[str, Any]) -> None:
         """Merge received registry state (gossip)."""
         # Merge services
         for sid, s_data in state.get("services", {}).items():
@@ -286,7 +285,7 @@ class DistributedServiceRegistry:
                 await self.register_service(service)
 
         # Merge nodes
-        for nid, n_data in state.get("nodes", {}).items():
+        for _nid, n_data in state.get("nodes", {}).items():
             node = NodeIdentity(
                 node_id=n_data["node_id"],
                 public_key=n_data["public_key"],
@@ -323,7 +322,7 @@ class P2PNode:
     - Participates in distributed consensus
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
         self.node_id = self._generate_node_id()
         self.status = NodeStatus.INITIALIZING
@@ -341,18 +340,18 @@ class P2PNode:
         self.registry = DistributedServiceRegistry(self.node_id)
 
         # Local services
-        self._local_services: Dict[str, ServiceEndpoint] = {}
-        self._service_handlers: Dict[str, Callable] = {}
+        self._local_services: dict[str, ServiceEndpoint] = {}
+        self._service_handlers: dict[str, Callable] = {}
 
         # Peer management
-        self._peers: Dict[str, NodeIdentity] = {}
-        self._bootstrap_peers: List[str] = self.config.get("bootstrap_peers", [])
+        self._peers: dict[str, NodeIdentity] = {}
+        self._bootstrap_peers: list[str] = self.config.get("bootstrap_peers", [])
 
         # Client capabilities
-        self._pending_requests: Dict[str, asyncio.Future] = {}
+        self._pending_requests: dict[str, asyncio.Future] = {}
 
         # Server
-        self._server: Optional[asyncio.Server] = None
+        self._server: asyncio.Server | None = None
         self._running = False
 
     def _generate_node_id(self) -> str:
@@ -447,7 +446,7 @@ class P2PNode:
         except Exception as e:
             logger.error(f"Error handling connection: {e}")
 
-    async def _handle_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle incoming message."""
         msg_type = message.get("type")
 
@@ -466,7 +465,7 @@ class P2PNode:
         else:
             return {"type": "error", "message": f"Unknown message type: {msg_type}"}
 
-    async def _handle_service_request(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_service_request(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle service request."""
         service_id = message.get("service_id")
         request_id = message.get("request_id")
@@ -582,11 +581,11 @@ class P2PNode:
     async def register_service(
         self,
         service_type: ServiceType,
-        capabilities: List[str],
+        capabilities: list[str],
         endpoint: str,
         cost_per_request: float = 0.001,
         max_capacity: float = 100.0,
-        handler: Optional[Callable] = None,
+        handler: Callable | None = None,
     ) -> ServiceEndpoint:
         """Register a service provided by this node."""
         service_id = f"{self.node_id}_{service_type.value}"
@@ -611,9 +610,9 @@ class P2PNode:
 
     async def discover_services(
         self,
-        service_type: Optional[ServiceType] = None,
-        capabilities: Optional[List[str]] = None,
-    ) -> List[ServiceEndpoint]:
+        service_type: ServiceType | None = None,
+        capabilities: list[str] | None = None,
+    ) -> list[ServiceEndpoint]:
         """Discover services in the network."""
         return await self.registry.discover_services(
             service_type=service_type,
@@ -623,7 +622,7 @@ class P2PNode:
     async def request_service(
         self,
         service_type: ServiceType,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         max_cost: float = 1.0,
         timeout: float = 30.0,
     ) -> ServiceResponse:
@@ -684,7 +683,7 @@ class P2PNode:
                 latency=response_data.get("latency", 0),
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ServiceResponse(
                 request_id=request.request_id,
                 success=False,
@@ -697,7 +696,7 @@ class P2PNode:
                 error=str(e),
             )
 
-    async def get_node_info(self) -> Dict[str, Any]:
+    async def get_node_info(self) -> dict[str, Any]:
         """Get information about this node."""
         return {
             "node_id": self.node_id,
@@ -720,7 +719,7 @@ class DecentralizedPlatform:
     - Blockchain integration
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
         self.node = P2PNode(self.config)
 
@@ -741,9 +740,9 @@ class DecentralizedPlatform:
         await self.node.stop()
         logger.info("Decentralized Platform stopped")
 
-    async def register_llm_service(self, adapter: Any, capabilities: List[str]) -> None:
+    async def register_llm_service(self, adapter: Any, capabilities: list[str]) -> None:
         """Register LLM inference service."""
-        async def llm_handler(payload: Dict[str, Any]) -> Dict[str, Any]:
+        async def llm_handler(payload: dict[str, Any]) -> dict[str, Any]:
             method = payload.get("method", "generate")
             if method == "generate":
                 return {"text": await adapter.generate_text(payload.get("prompt", ""))}
@@ -759,7 +758,7 @@ class DecentralizedPlatform:
             handler=llm_handler,
         )
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get platform status."""
         return {
             "node": await self.node.get_node_info(),

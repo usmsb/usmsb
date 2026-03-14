@@ -17,10 +17,11 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import AsyncIterator, Callable
 from concurrent import futures
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union, TypeVar
+from enum import Enum, StrEnum
+from typing import Any, TypeVar
 
 # Import grpc conditionally to handle environments without grpc installed
 try:
@@ -35,11 +36,8 @@ except ImportError:
 # Import from base_handler to avoid circular import
 from usmsb_sdk.platform.external.protocol.base_handler import (
     BaseProtocolHandler,
-    ProtocolConfig,
-    ProtocolMessage,
-    ProtocolResponse,
     ExternalAgentStatus,
-    ExternalAgentResponse,
+    ProtocolConfig,
     SkillDefinition,
 )
 
@@ -69,7 +67,7 @@ class gRPCErrorCode(int, Enum):
     UNAUTHENTICATED = 16
 
 
-class LoadBalancingStrategy(str, Enum):
+class LoadBalancingStrategy(StrEnum):
     """Load balancing strategies for gRPC connections."""
     ROUND_ROBIN = "round_robin"
     PICK_FIRST = "pick_first"
@@ -82,7 +80,7 @@ class gRPCConfig:
     """gRPC-specific configuration."""
     use_ssl: bool = False
     verify_ssl: bool = True
-    ssl_cert_path: Optional[str] = None
+    ssl_cert_path: str | None = None
     max_message_length: int = 4 * 1024 * 1024  # 4MB
     max_receive_message_length: int = 4 * 1024 * 1024  # 4MB
     keep_alive_time: float = 30.0
@@ -90,11 +88,11 @@ class gRPCConfig:
     keep_alive_permit_without_calls: bool = True
     enable_compression: bool = False
     compression_algorithm: str = "gzip"  # gzip, deflate
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
     load_balancing_strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN
     enable_health_check: bool = True
     health_check_interval: float = 60.0
-    channel_options: Dict[str, Any] = field(default_factory=dict)
+    channel_options: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -116,12 +114,12 @@ class gRPCMethod:
 class gRPCRequest:
     """gRPC request structure."""
     method: str
-    message: Dict[str, Any]
-    metadata: Dict[str, str] = field(default_factory=dict)
+    message: dict[str, Any]
+    metadata: dict[str, str] = field(default_factory=dict)
     timeout: float = 60.0
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "method": self.method,
             "message": self.message,
@@ -137,13 +135,13 @@ class gRPCResponse:
     request_id: str
     success: bool
     message: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     code: int = 0
     details: str = ""
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
     elapsed: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "success": self.success,
@@ -161,7 +159,7 @@ class gRPCServiceDefinition:
     """gRPC service definition."""
     name: str
     package: str
-    methods: List[gRPCMethod] = field(default_factory=list)
+    methods: list[gRPCMethod] = field(default_factory=list)
     description: str = ""
 
     def to_skill_definition(self, method: gRPCMethod) -> SkillDefinition:
@@ -253,11 +251,11 @@ class ConnectionPool:
 
     def __init__(self, config: gRPCConfig):
         self._config = config
-        self._endpoints: Dict[str, ConnectionEndpoint] = {}
-        self._channels: Dict[str, Any] = {}
+        self._endpoints: dict[str, ConnectionEndpoint] = {}
+        self._channels: dict[str, Any] = {}
         self._lock = asyncio.Lock()
         self._current_index = 0
-        self._health_check_task: Optional[asyncio.Task] = None
+        self._health_check_task: asyncio.Task | None = None
 
     async def add_endpoint(self, address: str, weight: float = 1.0) -> None:
         """Add an endpoint to the pool."""
@@ -310,7 +308,7 @@ class ConnectionPool:
         logger.debug(f"Created gRPC channel for {address}")
         return channel
 
-    def _build_channel_options(self) -> List[tuple]:
+    def _build_channel_options(self) -> list[tuple]:
         """Build gRPC channel options."""
         options = [
             ('grpc.max_send_message_length', self._config.max_message_length),
@@ -347,7 +345,7 @@ class ConnectionPool:
         else:
             return grpc.ssl_channel_credentials()
 
-    async def select_endpoint(self) -> Optional[ConnectionEndpoint]:
+    async def select_endpoint(self) -> ConnectionEndpoint | None:
         """Select an endpoint based on load balancing strategy."""
         async with self._lock:
             healthy_endpoints = [
@@ -374,7 +372,7 @@ class ConnectionPool:
             else:  # PICK_FIRST
                 return healthy_endpoints[0]
 
-    def get_endpoints(self) -> List[ConnectionEndpoint]:
+    def get_endpoints(self) -> list[ConnectionEndpoint]:
         """Get all endpoints."""
         return list(self._endpoints.values())
 
@@ -472,8 +470,8 @@ class gRPCProtocolHandler(BaseProtocolHandler):
 
     def __init__(
         self,
-        config: Optional[ProtocolConfig] = None,
-        grpc_config: Optional[gRPCConfig] = None,
+        config: ProtocolConfig | None = None,
+        grpc_config: gRPCConfig | None = None,
     ):
         """
         Initialize the gRPC protocol handler.
@@ -484,13 +482,13 @@ class gRPCProtocolHandler(BaseProtocolHandler):
         """
         super().__init__(config)
         self._grpc_config = grpc_config or gRPCConfig()
-        self._channel: Optional[Any] = None
-        self._connection_pool: Optional[ConnectionPool] = None
-        self._stubs: Dict[str, Any] = {}
-        self._services: Dict[str, gRPCServiceDefinition] = {}
-        self._method_cache: Dict[str, gRPCMethod] = {}
-        self._server: Optional[Any] = None
-        self._server_handlers: Dict[str, Callable] = {}
+        self._channel: Any | None = None
+        self._connection_pool: ConnectionPool | None = None
+        self._stubs: dict[str, Any] = {}
+        self._services: dict[str, gRPCServiceDefinition] = {}
+        self._method_cache: dict[str, gRPCMethod] = {}
+        self._server: Any | None = None
+        self._server_handlers: dict[str, Callable] = {}
 
         # Initialize connection pool if using load balancing
         if self._grpc_config.load_balancing_strategy != LoadBalancingStrategy.PICK_FIRST:
@@ -569,7 +567,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
 
         return channel
 
-    def _build_channel_options(self) -> List[tuple]:
+    def _build_channel_options(self) -> list[tuple]:
         """Build gRPC channel options."""
         options = [
             ('grpc.max_send_message_length', self._grpc_config.max_message_length),
@@ -624,7 +622,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -679,12 +677,12 @@ class gRPCProtocolHandler(BaseProtocolHandler):
                     details=response.details,
                 )
 
-        except Exception as e:
+        except Exception:
             if endpoint_address and self._connection_pool:
                 await self._connection_pool.record_call_end(endpoint_address, False)
             raise
 
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Discover skills (gRPC methods) from the server.
 
@@ -729,7 +727,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
             if not GRPC_AVAILABLE:
                 return True
 
-            channel = await self._connection_pool.get_channel(address)
+            await self._connection_pool.get_channel(address)
             # Simple connectivity check
             # In production, use the health checking service
             await asyncio.sleep(0.05)
@@ -900,7 +898,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
                 metadata = list(request.metadata.items())
 
                 # Create deadline
-                deadline = time.time() + request.timeout
+                time.time() + request.timeout
 
                 # Make the call
                 method = self._channel.unary_unary(request.method)
@@ -938,7 +936,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
                     elapsed=elapsed,
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             elapsed = time.time() - start_time
             return gRPCResponse(
                 request_id=request.request_id,
@@ -965,9 +963,9 @@ class gRPCProtocolHandler(BaseProtocolHandler):
     async def execute_server_streaming(
         self,
         method: str,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         timeout: float = 60.0,
-        metadata: Optional[Dict[str, str]] = None,
+        metadata: dict[str, str] | None = None,
     ) -> AsyncIterator[gRPCResponse]:
         """
         Execute a server-streaming gRPC call.
@@ -1029,9 +1027,9 @@ class gRPCProtocolHandler(BaseProtocolHandler):
     async def execute_client_streaming(
         self,
         method: str,
-        messages: AsyncIterator[Dict[str, Any]],
+        messages: AsyncIterator[dict[str, Any]],
         timeout: float = 60.0,
-        metadata: Optional[Dict[str, str]] = None,
+        metadata: dict[str, str] | None = None,
     ) -> gRPCResponse:
         """
         Execute a client-streaming gRPC call.
@@ -1076,7 +1074,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
             else:
                 # Mock implementation
                 message_count = 0
-                async for msg in messages:
+                async for _msg in messages:
                     message_count += 1
 
                 elapsed = time.time() - start_time
@@ -1101,9 +1099,9 @@ class gRPCProtocolHandler(BaseProtocolHandler):
     async def execute_bidirectional_streaming(
         self,
         method: str,
-        messages: AsyncIterator[Dict[str, Any]],
+        messages: AsyncIterator[dict[str, Any]],
         timeout: float = 60.0,
-        metadata: Optional[Dict[str, str]] = None,
+        metadata: dict[str, str] | None = None,
     ) -> AsyncIterator[gRPCResponse]:
         """
         Execute a bidirectional streaming gRPC call.
@@ -1320,7 +1318,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
 
             del self._services[service_name]
 
-    def get_service(self, service_name: str) -> Optional[gRPCServiceDefinition]:
+    def get_service(self, service_name: str) -> gRPCServiceDefinition | None:
         """
         Get a service definition by name.
 
@@ -1332,7 +1330,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
         """
         return self._services.get(service_name)
 
-    def get_method(self, service_name: str, method_name: str) -> Optional[gRPCMethod]:
+    def get_method(self, service_name: str, method_name: str) -> gRPCMethod | None:
         """
         Get a method definition.
 
@@ -1357,7 +1355,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
         """
         self._grpc_config.metadata[key] = value
 
-    def get_metadata(self) -> Dict[str, str]:
+    def get_metadata(self) -> dict[str, str]:
         """Get current metadata."""
         return dict(self._grpc_config.metadata)
 
@@ -1377,11 +1375,11 @@ class gRPCProtocolHandler(BaseProtocolHandler):
         except Exception as e:
             logger.warning(f"gRPC keep-alive error: {e}")
 
-    def get_services(self) -> List[gRPCServiceDefinition]:
+    def get_services(self) -> list[gRPCServiceDefinition]:
         """Get list of registered services."""
         return list(self._services.values())
 
-    def get_grpc_stats(self) -> Dict[str, Any]:
+    def get_grpc_stats(self) -> dict[str, Any]:
         """Get gRPC statistics."""
         stats = {
             "grpc_available": GRPC_AVAILABLE,
@@ -1410,7 +1408,7 @@ class gRPCProtocolHandler(BaseProtocolHandler):
 
         return stats
 
-    def get_endpoint_stats(self) -> List[Dict[str, Any]]:
+    def get_endpoint_stats(self) -> list[dict[str, Any]]:
         """Get statistics for all endpoints."""
         if not self._connection_pool:
             return []
@@ -1442,7 +1440,7 @@ class ProtoMessageBuilder:
     """
 
     @staticmethod
-    def dict_to_message(data: Dict[str, Any], message_class: Any) -> Any:
+    def dict_to_message(data: dict[str, Any], message_class: Any) -> Any:
         """
         Convert a dictionary to a proto message.
 
@@ -1465,7 +1463,7 @@ class ProtoMessageBuilder:
         return message
 
     @staticmethod
-    def message_to_dict(message: Any) -> Dict[str, Any]:
+    def message_to_dict(message: Any) -> dict[str, Any]:
         """
         Convert a proto message to a dictionary.
 
@@ -1497,7 +1495,7 @@ def create_grpc_handler(
     endpoint: str,
     use_ssl: bool = False,
     timeout: float = 60.0,
-    metadata: Optional[Dict[str, str]] = None,
+    metadata: dict[str, str] | None = None,
 ) -> gRPCProtocolHandler:
     """
     Create and connect a gRPC handler.
@@ -1527,9 +1525,9 @@ async def call_grpc_method(
     endpoint: str,
     service: str,
     method: str,
-    arguments: Dict[str, Any],
+    arguments: dict[str, Any],
     timeout: float = 60.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Convenience function to make a single gRPC call.
 

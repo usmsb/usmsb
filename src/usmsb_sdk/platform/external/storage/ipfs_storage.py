@@ -12,22 +12,18 @@ import asyncio
 import hashlib
 import json
 import logging
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Union
 
 from usmsb_sdk.platform.external.storage.base_storage import (
     DataLocation,
-    DataNotFoundError,
+    StorageError,
     StorageInterface,
     StorageResult,
     StorageType,
-    StorageError,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +82,7 @@ class ShardInfo:
     size: int
     checksum: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "index": self.index,
             "cid": self.cid,
@@ -95,7 +91,7 @@ class ShardInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ShardInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "ShardInfo":
         return cls(
             index=data["index"],
             cid=data["cid"],
@@ -111,10 +107,10 @@ class ShardedDataInfo:
     total_shards: int
     total_size: int
     original_checksum: str
-    shards: List[ShardInfo]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    shards: list[ShardInfo]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "original_cid": self.original_cid,
             "total_shards": self.total_shards,
@@ -125,7 +121,7 @@ class ShardedDataInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ShardedDataInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "ShardedDataInfo":
         return cls(
             original_cid=data["original_cid"],
             total_shards=data["total_shards"],
@@ -156,7 +152,7 @@ class DataShardingManager:
         """Calculate SHA-256 checksum of data."""
         return hashlib.sha256(data).hexdigest()
 
-    def shard(self, data: bytes) -> List[Tuple[int, bytes]]:
+    def shard(self, data: bytes) -> list[tuple[int, bytes]]:
         """
         Split data into shards.
 
@@ -178,7 +174,7 @@ class DataShardingManager:
 
         return shards
 
-    def reassemble(self, shards: List[Tuple[int, bytes]]) -> bytes:
+    def reassemble(self, shards: list[tuple[int, bytes]]) -> bytes:
         """
         Reassemble data from shards.
 
@@ -197,10 +193,10 @@ class DataShardingManager:
     def create_manifest(
         self,
         original_data: bytes,
-        shard_cids: List[str],
-        shard_sizes: List[int],
-        shard_checksums: List[str],
-    ) -> Dict[str, Any]:
+        shard_cids: list[str],
+        shard_sizes: list[int],
+        shard_checksums: list[str],
+    ) -> dict[str, Any]:
         """
         Create a manifest for sharded data.
 
@@ -220,7 +216,7 @@ class DataShardingManager:
                 size=size,
                 checksum=checksum,
             )
-            for i, (cid, size, checksum) in enumerate(zip(shard_cids, shard_sizes, shard_checksums))
+            for i, (cid, size, checksum) in enumerate(zip(shard_cids, shard_sizes, shard_checksums, strict=False))
         ]
 
         return ShardedDataInfo(
@@ -232,7 +228,7 @@ class DataShardingManager:
         ).to_dict()
 
 
-class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
+class IPFSStorage(StorageInterface[Union[dict, list, str, bytes]]):
     """
     IPFS-based storage implementation.
 
@@ -245,7 +241,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
 
     def __init__(
         self,
-        config: Optional[IPFSConnectionConfig] = None,
+        config: IPFSConnectionConfig | None = None,
         shard_threshold: int = 10 * 1024 * 1024,  # 10MB
     ):
         """
@@ -260,7 +256,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
         self.sharding_manager = DataShardingManager(self.config.chunk_size)
         self._client = None
         self._connected = False
-        self._cid_cache: Dict[str, Any] = {}
+        self._cid_cache: dict[str, Any] = {}
 
     async def initialize(self) -> bool:
         """Initialize the storage backend."""
@@ -429,7 +425,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
 
         raise StorageError(f"Failed to download data from IPFS: {cid}")
 
-    async def _upload_sharded(self, data: bytes) -> Tuple[str, Dict[str, Any]]:
+    async def _upload_sharded(self, data: bytes) -> tuple[str, dict[str, Any]]:
         """
         Upload large data as shards.
 
@@ -465,7 +461,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
 
         return manifest_cid, manifest
 
-    async def _download_sharded(self, manifest: Dict[str, Any]) -> bytes:
+    async def _download_sharded(self, manifest: dict[str, Any]) -> bytes:
         """
         Download and reassemble sharded data.
 
@@ -483,7 +479,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
 
         return self.sharding_manager.reassemble(shards)
 
-    def _serialize(self, data: Union[Dict, List, str, bytes]) -> bytes:
+    def _serialize(self, data: dict | list | str | bytes) -> bytes:
         """Serialize data to bytes."""
         if isinstance(data, bytes):
             return data
@@ -491,7 +487,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
             return data.encode('utf-8')
         return json.dumps(data, ensure_ascii=False, default=str).encode('utf-8')
 
-    def _deserialize(self, data: bytes) -> Union[Dict, List, str]:
+    def _deserialize(self, data: bytes) -> dict | list | str:
         """Deserialize bytes to data."""
         try:
             text = data.decode('utf-8')
@@ -505,8 +501,8 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
     async def store(
         self,
         key: str,
-        data: Union[Dict, List, str, bytes],
-        metadata: Optional[Dict[str, Any]] = None,
+        data: dict | list | str | bytes,
+        metadata: dict[str, Any] | None = None,
         overwrite: bool = False,
     ) -> StorageResult:
         """Store data to IPFS."""
@@ -673,17 +669,17 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
 
     async def list_keys(
         self,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[str]:
+    ) -> list[str]:
         """List cached keys."""
         keys = list(self._cid_cache.keys())
         if prefix:
             keys = [k for k in keys if k.startswith(prefix)]
         return keys[offset:offset + limit]
 
-    async def get_metadata(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, key: str) -> dict[str, Any] | None:
         """Get metadata for a key."""
         if key in self._cid_cache:
             return self._cid_cache[key].get("location", {}).metadata
@@ -692,7 +688,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
     async def update_metadata(
         self,
         key: str,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         merge: bool = True,
     ) -> StorageResult:
         """Update metadata for a key."""
@@ -764,7 +760,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
             logger.error(f"Failed to unpin {cid}: {e}")
             return False
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get storage statistics."""
         stats = {
             "storage_type": self.storage_type.value,
@@ -789,7 +785,7 @@ class IPFSStorage(StorageInterface[Union[Dict, List, str, bytes]]):
 
         return stats
 
-    async def resolve_cid(self, key: str) -> Optional[str]:
+    async def resolve_cid(self, key: str) -> str | None:
         """
         Resolve a key to its CID.
 

@@ -18,8 +18,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class TaskProgressRecord:
     completed_steps: int
     created_at: datetime
     updated_at: datetime
-    plan_data: Dict[str, Any] = field(default_factory=dict)
+    plan_data: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -47,10 +46,10 @@ class StepResultRecord:
     step_id: str
     step_name: str
     status: str
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    result_data: Optional[Dict[str, Any]]
-    error_message: Optional[str]
+    started_at: datetime | None
+    completed_at: datetime | None
+    result_data: dict[str, Any] | None
+    error_message: str | None
 
 
 class TaskProgressStore:
@@ -157,7 +156,7 @@ class TaskProgressStore:
             logger.error(f"[TaskProgressStore] Failed to save task: {e}")
             return False
 
-    def get_task(self, task_id: str) -> Optional[TaskProgressRecord]:
+    def get_task(self, task_id: str) -> TaskProgressRecord | None:
         """获取任务进度"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -196,9 +195,9 @@ class TaskProgressStore:
     def get_tasks_by_wallet(
         self,
         wallet_address: str,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 20,
-    ) -> List[TaskProgressRecord]:
+    ) -> list[TaskProgressRecord]:
         """获取钱包地址的所有任务"""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -301,7 +300,7 @@ class TaskProgressStore:
             logger.error(f"[TaskProgressStore] Failed to save step result: {e}")
             return False
 
-    def get_step_results(self, task_id: str) -> List[StepResultRecord]:
+    def get_step_results(self, task_id: str) -> list[StepResultRecord]:
         """获取任务的所有步骤结果"""
         try:
             conn = sqlite3.connect(self.db_path)

@@ -8,22 +8,20 @@ skills, availability, preferences, and performance history.
 import logging
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from enum import StrEnum
+from typing import Any
 
 from usmsb_sdk.platform.human.adapter import (
     AssignedTask,
     HumanAgentAdapter,
     HumanAgentProfile,
     HumanAgentStatus,
-    Skill,
-    TaskStatus,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class MatchingStrategy(str, Enum):
+class MatchingStrategy(StrEnum):
     """Strategy for talent matching."""
     BEST_MATCH = "best_match"  # Highest skill match
     FASTEST = "fastest"  # Most available/quick
@@ -35,14 +33,14 @@ class MatchingStrategy(str, Enum):
 @dataclass
 class MatchingCriteria:
     """Criteria for talent matching."""
-    required_skills: List[str] = field(default_factory=list)
+    required_skills: list[str] = field(default_factory=list)
     min_skill_level: int = 1
     min_rating: float = 0.0
-    max_hourly_rate: Optional[float] = None
-    required_specializations: List[str] = field(default_factory=list)
-    preferred_languages: List[str] = field(default_factory=list)
-    timezone_preference: Optional[str] = None
-    exclude_agent_ids: List[str] = field(default_factory=list)
+    max_hourly_rate: float | None = None
+    required_specializations: list[str] = field(default_factory=list)
+    preferred_languages: list[str] = field(default_factory=list)
+    timezone_preference: str | None = None
+    exclude_agent_ids: list[str] = field(default_factory=list)
     must_be_available: bool = True
 
 
@@ -56,7 +54,7 @@ class MatchingResult:
     rating_score: float
     cost_score: float
     specializations_match: bool
-    reasons: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -86,7 +84,7 @@ class TalentMatchingService:
     def __init__(
         self,
         human_adapter: HumanAgentAdapter,
-        config: Optional[MatchingConfig] = None,
+        config: MatchingConfig | None = None,
     ):
         """
         Initialize the Talent Matching Service.
@@ -99,13 +97,13 @@ class TalentMatchingService:
         self.config = config or MatchingConfig()
 
         # Match history for learning
-        self._match_history: List[Dict[str, Any]] = []
+        self._match_history: list[dict[str, Any]] = []
 
     def find_matches(
         self,
         criteria: MatchingCriteria,
-        strategy: Optional[MatchingStrategy] = None,
-    ) -> List[MatchingResult]:
+        strategy: MatchingStrategy | None = None,
+    ) -> list[MatchingResult]:
         """
         Find matching agents for given criteria.
 
@@ -133,7 +131,7 @@ class TalentMatchingService:
 
         return results[:self.config.max_results]
 
-    def _filter_candidates(self, criteria: MatchingCriteria) -> List[HumanAgentProfile]:
+    def _filter_candidates(self, criteria: MatchingCriteria) -> list[HumanAgentProfile]:
         """Filter candidates based on hard criteria."""
         candidates = []
 
@@ -291,8 +289,8 @@ class TalentMatchingService:
     def match_task(
         self,
         task: AssignedTask,
-        strategy: Optional[MatchingStrategy] = None,
-    ) -> Optional[MatchingResult]:
+        strategy: MatchingStrategy | None = None,
+    ) -> MatchingResult | None:
         """
         Find best match for a specific task.
 
@@ -314,8 +312,8 @@ class TalentMatchingService:
     def auto_assign(
         self,
         task: AssignedTask,
-        threshold: Optional[float] = None,
-    ) -> Optional[str]:
+        threshold: float | None = None,
+    ) -> str | None:
         """
         Auto-assign a task if a good match is found.
 
@@ -342,7 +340,7 @@ class TalentMatchingService:
         self,
         task: AssignedTask,
         count: int = 3,
-    ) -> List[Tuple[HumanAgentProfile, MatchingResult]]:
+    ) -> list[tuple[HumanAgentProfile, MatchingResult]]:
         """
         Get recommendations for a task.
 
@@ -373,8 +371,8 @@ class TalentMatchingService:
         task_id: str,
         agent_id: str,
         success: bool,
-        rating: Optional[float] = None,
-        feedback: Optional[str] = None,
+        rating: float | None = None,
+        feedback: str | None = None,
     ) -> None:
         """
         Record the outcome of a match for learning.
@@ -405,7 +403,7 @@ class TalentMatchingService:
                 for skill in profile.skills:
                     skill.last_used = time.time()
 
-    def get_match_statistics(self) -> Dict[str, Any]:
+    def get_match_statistics(self) -> dict[str, Any]:
         """Get matching statistics."""
         if not self._match_history:
             return {"total_matches": 0}
@@ -419,5 +417,5 @@ class TalentMatchingService:
             "successful_matches": successful,
             "success_rate": successful / total,
             "average_rating": sum(ratings) / len(ratings) if ratings else None,
-            "unique_agents_matched": len(set(r["agent_id"] for r in self._match_history)),
+            "unique_agents_matched": len({r["agent_id"] for r in self._match_history}),
         }

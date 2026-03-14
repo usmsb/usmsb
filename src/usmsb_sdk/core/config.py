@@ -28,7 +28,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class NetworkConfig:
     websocket_port: int = 8765
     grpc_port: int = 50051
     bind_address: str = "0.0.0.0"
-    external_address: Optional[str] = None
+    external_address: str | None = None
     connection_timeout: float = 30.0
     request_timeout: float = 60.0
     max_connections: int = 100
@@ -88,13 +88,13 @@ class AuthConfig:
         token_expiry: Token expiry time in seconds
         require_auth: Whether authentication is required
     """
-    api_key: Optional[str] = None
-    wallet_address: Optional[str] = None
+    api_key: str | None = None
+    wallet_address: str | None = None
     stake_amount: float = 100.0
-    jwt_secret: Optional[str] = None
+    jwt_secret: str | None = None
     token_expiry: int = 3600  # 1 hour
     require_auth: bool = True
-    trusted_agents: List[str] = field(default_factory=list)
+    trusted_agents: list[str] = field(default_factory=list)
 
     def is_configured(self) -> bool:
         """Check if authentication is configured."""
@@ -142,7 +142,7 @@ class LoggingConfig:
     """
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    file: Optional[str] = None
+    file: str | None = None
     max_size: int = 10 * 1024 * 1024  # 10 MB
     backup_count: int = 5
 
@@ -174,12 +174,12 @@ class AgentConfig:
     description: str = ""
     version: str = "1.0.0"
     agent_type: str = "generic"
-    protocols: List[str] = field(default_factory=lambda: ["http"])
+    protocols: list[str] = field(default_factory=lambda: ["http"])
     auto_register: bool = True
     heartbeat_interval: int = 30
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "agent_id": self.agent_id,
@@ -213,7 +213,7 @@ class PlatformConfig:
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
-    cors_origins: List[str] = field(default_factory=lambda: ["*"])
+    cors_origins: list[str] = field(default_factory=lambda: ["*"])
     workers: int = 1
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     auth: AuthConfig = field(default_factory=AuthConfig)
@@ -225,7 +225,7 @@ class PlatformConfig:
         """Get platform base URL."""
         return f"http://{self.host}:{self.port}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "host": self.host,
@@ -257,7 +257,7 @@ class PlatformConfig:
         }
 
 
-def load_config(config_path: Union[str, Path]) -> PlatformConfig:
+def load_config(config_path: str | Path) -> PlatformConfig:
     """
     Load configuration from a file.
 
@@ -346,7 +346,7 @@ def load_config_from_env(prefix: str = "USMSB_") -> PlatformConfig:
     return config
 
 
-def _dict_to_config(data: Dict[str, Any]) -> PlatformConfig:
+def _dict_to_config(data: dict[str, Any]) -> PlatformConfig:
     """Convert dictionary to PlatformConfig."""
     # Extract nested configs
     network_data = data.get("network", {})

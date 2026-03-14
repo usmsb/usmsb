@@ -16,17 +16,15 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
 # Import from base_handler to avoid circular import
 from usmsb_sdk.platform.external.protocol.base_handler import (
     BaseProtocolHandler,
-    ProtocolConfig,
-    ProtocolMessage,
-    ProtocolResponse,
     ExternalAgentStatus,
-    ExternalAgentResponse,
+    ProtocolConfig,
     SkillDefinition,
 )
 
@@ -40,19 +38,19 @@ class WebSocketConfig:
     ping_timeout: float = 10.0
     max_size: int = 10 * 1024 * 1024  # 10MB
     compression: bool = False
-    subprotocols: List[str] = field(default_factory=list)
-    headers: Dict[str, str] = field(default_factory=dict)
+    subprotocols: list[str] = field(default_factory=list)
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
 class WebSocketMessage:
     """WebSocket message structure."""
     type: str  # text, binary, ping, pong, close
-    data: Union[str, bytes]
+    data: str | bytes
     message_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.type,
             "data": self.data if isinstance(self.data, str) else "<binary>",
@@ -65,11 +63,11 @@ class WebSocketMessage:
 class WebSocketEvent:
     """WebSocket event structure."""
     event_type: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "event_type": self.event_type,
             "payload": self.payload,
@@ -107,8 +105,8 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
 
     def __init__(
         self,
-        config: Optional[ProtocolConfig] = None,
-        ws_config: Optional[WebSocketConfig] = None,
+        config: ProtocolConfig | None = None,
+        ws_config: WebSocketConfig | None = None,
     ):
         """
         Initialize the WebSocket protocol handler.
@@ -119,10 +117,10 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
         """
         super().__init__(config)
         self._ws_config = ws_config or WebSocketConfig()
-        self._websocket: Optional[Any] = None
-        self._subscriptions: Dict[str, WebSocketSubscription] = {}
-        self._event_handlers: Dict[str, Callable] = {}
-        self._receive_task: Optional[asyncio.Task] = None
+        self._websocket: Any | None = None
+        self._subscriptions: dict[str, WebSocketSubscription] = {}
+        self._event_handlers: dict[str, Callable] = {}
+        self._receive_task: asyncio.Task | None = None
         self._reconnect_attempts: int = 0
         self._max_reconnect_attempts: int = 5
 
@@ -204,7 +202,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
     async def _do_call_skill(
         self,
         skill_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float,
     ) -> Any:
         """
@@ -251,7 +249,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
             if request_id in self._pending_requests:
                 del self._pending_requests[request_id]
 
-    async def _do_discover_skills(self) -> List[SkillDefinition]:
+    async def _do_discover_skills(self) -> list[SkillDefinition]:
         """
         Discover skills via WebSocket.
 
@@ -276,7 +274,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
             skills_data = response.get("skills", [])
             return [SkillDefinition.from_dict(s) for s in skills_data]
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("WebSocket skill discovery timeout")
             return []
         finally:
@@ -311,7 +309,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
     async def _send_event(
         self,
         event_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
     ) -> None:
         """
         Send an event via WebSocket.
@@ -342,7 +340,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
 
     async def _send_message(
         self,
-        data: Union[str, bytes, Dict[str, Any]],
+        data: str | bytes | dict[str, Any],
     ) -> None:
         """
         Send a raw message via WebSocket.
@@ -426,7 +424,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
     async def _dispatch_to_subscriptions(
         self,
         event_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
     ) -> None:
         """
         Dispatch event to active subscriptions.
@@ -444,25 +442,25 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
 
     # ========== Event Handlers ==========
 
-    async def _handle_skill_response(self, payload: Dict[str, Any]) -> None:
+    async def _handle_skill_response(self, payload: dict[str, Any]) -> None:
         """Handle skill response event."""
-        logger.debug(f"WebSocket received skill response")
+        logger.debug("WebSocket received skill response")
 
-    async def _handle_discover_response(self, payload: Dict[str, Any]) -> None:
+    async def _handle_discover_response(self, payload: dict[str, Any]) -> None:
         """Handle discover response event."""
-        logger.debug(f"WebSocket received discover response")
+        logger.debug("WebSocket received discover response")
 
-    async def _handle_status_update(self, payload: Dict[str, Any]) -> None:
+    async def _handle_status_update(self, payload: dict[str, Any]) -> None:
         """Handle status update event."""
         status = payload.get("status", "unknown")
         logger.info(f"WebSocket status update: {status}")
 
-    async def _handle_error_event(self, payload: Dict[str, Any]) -> None:
+    async def _handle_error_event(self, payload: dict[str, Any]) -> None:
         """Handle error event."""
         error = payload.get("error", "Unknown error")
         logger.error(f"WebSocket error event: {error}")
 
-    async def _handle_pong_event(self, payload: Dict[str, Any]) -> None:
+    async def _handle_pong_event(self, payload: dict[str, Any]) -> None:
         """Handle pong event."""
         logger.debug("WebSocket received pong")
 
@@ -524,7 +522,7 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
     async def broadcast_to_peers(
         self,
         event_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
     ) -> None:
         """
         Broadcast an event (if supported by server).
@@ -538,11 +536,11 @@ class WebSocketProtocolHandler(BaseProtocolHandler):
             "payload": payload,
         })
 
-    def get_subscriptions(self) -> List[WebSocketSubscription]:
+    def get_subscriptions(self) -> list[WebSocketSubscription]:
         """Get list of active subscriptions."""
         return list(self._subscriptions.values())
 
-    def get_ws_stats(self) -> Dict[str, Any]:
+    def get_ws_stats(self) -> dict[str, Any]:
         """Get WebSocket statistics."""
         return {
             "connected": self._websocket is not None,

@@ -10,10 +10,10 @@ __author__ = "USMSB Team"
 # Workspace module
 from usmsb_sdk.meta_agent.workspace import (
     DirectoryType,
-    FileOperationError,
     FileInfo,
-    QuotaExceededError,
+    FileOperationError,
     PathValidationError,
+    QuotaExceededError,
     UserWorkspace,
     WorkspaceConfig,
     WorkspaceError,

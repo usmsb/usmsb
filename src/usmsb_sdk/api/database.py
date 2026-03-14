@@ -1,12 +1,12 @@
 """
 SQLite Database setup for AI Civilization Platform
 """
-import sqlite3
 import json
 import os
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
+from typing import Any
 
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'civilization.db')
 
@@ -492,7 +492,7 @@ def init_db():
 
 # ==================== Unified Agent Operations ====================
 
-def create_agent(agent_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_agent(agent_data: dict[str, Any]) -> dict[str, Any]:
     """Create a new agent (unified - uses agent_id as primary key)
 
     Args:
@@ -568,7 +568,7 @@ def create_agent(agent_data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def get_agent(agent_id: str) -> Optional[Dict[str, Any]]:
+def get_agent(agent_id: str) -> dict[str, Any] | None:
     """Get agent by ID (unified)"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -597,7 +597,7 @@ def set_agent_offline(agent_id: str) -> bool:
         return cursor.rowcount > 0
 
 
-def get_all_agents(agent_type: str = None, status: str = None, protocol: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+def get_all_agents(agent_type: str = None, status: str = None, protocol: str = None, limit: int = 100) -> list[dict[str, Any]]:
     """Get all agents with optional filtering"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -650,7 +650,7 @@ def update_agent_stake(agent_id: str, amount: float) -> bool:
         return cursor.rowcount > 0
 
 
-def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> Optional[Dict]:
+def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> dict | None:
     """Update agent balance"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -721,7 +721,7 @@ AUTO_UNREGISTER_GRACE_PERIOD = 24 * 60 * 60  # 24 hours default (86400 seconds)
 AUTO_UNREGISTER_CHECK_INTERVAL = 60 * 60  # Check every hour (3600 seconds)
 
 
-def auto_unregister_inactive_agents(grace_period_seconds: int = None) -> Dict[str, int]:
+def auto_unregister_inactive_agents(grace_period_seconds: int = None) -> dict[str, int]:
     """Auto-unregister agents that have been offline too long without wallet binding.
 
     Rules:
@@ -815,7 +815,7 @@ delete_ai_agent = delete_agent
 
 # ==================== Agent Wallet Operations ====================
 
-def get_agent_wallet(agent_id: str) -> Optional[Dict[str, Any]]:
+def get_agent_wallet(agent_id: str) -> dict[str, Any] | None:
     """Get agent wallet by agent_id. Returns None if not bound."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -832,7 +832,7 @@ def has_wallet_binding(agent_id: str) -> bool:
 
 # ==================== Service Operations ====================
 
-def create_service(service_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_service(service_data: dict[str, Any]) -> dict[str, Any]:
     """Create a service"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -859,7 +859,7 @@ def create_service(service_data: Dict[str, Any]) -> Dict[str, Any]:
         service_data['id'] = service_id
         return service_data
 
-def get_services_by_agent(agent_id: str) -> List[Dict[str, Any]]:
+def get_services_by_agent(agent_id: str) -> list[dict[str, Any]]:
     """Get services by agent"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -869,7 +869,7 @@ def get_services_by_agent(agent_id: str) -> List[Dict[str, Any]]:
 
 # ==================== Environment Operations ====================
 
-def create_environment(env_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_environment(env_data: dict[str, Any]) -> dict[str, Any]:
     """Create environment"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -886,7 +886,7 @@ def create_environment(env_data: Dict[str, Any]) -> Dict[str, Any]:
         ))
         return env_data
 
-def get_environment(env_id: str) -> Optional[Dict[str, Any]]:
+def get_environment(env_id: str) -> dict[str, Any] | None:
     """Get environment by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -896,7 +896,7 @@ def get_environment(env_id: str) -> Optional[Dict[str, Any]]:
             return dict(row)
         return None
 
-def get_all_environments(limit: int = 100) -> List[Dict[str, Any]]:
+def get_all_environments(limit: int = 100) -> list[dict[str, Any]]:
     """Get all environments"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -906,7 +906,7 @@ def get_all_environments(limit: int = 100) -> List[Dict[str, Any]]:
 
 # ==================== Demand/Supply Operations ====================
 
-def create_demand(demand_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_demand(demand_data: dict[str, Any]) -> dict[str, Any]:
     """Create a demand"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -957,7 +957,7 @@ SKILL_SYNONYMS = {
     'frontend': ['前端开发', 'react', 'vue', 'javascript'],
     'backend': ['后端开发', 'python', 'java', 'api'],
 }
-def expand_capabilities(capabilities: List[str]) -> List[str]:
+def expand_capabilities(capabilities: list[str]) -> list[str]:
     """Expand capabilities to include synonyms and related skills."""
     expanded = set(capabilities)
     for cap in capabilities:
@@ -973,7 +973,7 @@ def expand_capabilities(capabilities: List[str]) -> List[str]:
     return list(expanded)
 
 
-def search_demands(capabilities: List[str] = None, budget_min: float = None, budget_max: float = None) -> List[Dict[str, Any]]:
+def search_demands(capabilities: list[str] = None, budget_min: float = None, budget_max: float = None) -> list[dict[str, Any]]:
     """Search demands - returns all active demands within budget range.
 
     Semantic matching is handled by HybridMatchingService which uses
@@ -1002,7 +1002,7 @@ def search_demands(capabilities: List[str] = None, budget_min: float = None, bud
 
 # ==================== Opportunity Operations ====================
 
-def create_opportunity(opp_data: Dict) -> Dict:
+def create_opportunity(opp_data: dict) -> dict:
     """Create opportunity"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1023,7 +1023,7 @@ def create_opportunity(opp_data: Dict) -> Dict:
         opp_data['id'] = opp_id
         return opp_data
 
-def get_all_opportunities() -> List[Dict]:
+def get_all_opportunities() -> list[dict]:
     """Get all opportunities"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1033,7 +1033,7 @@ def get_all_opportunities() -> List[Dict]:
 
 # ==================== Negotiation Operations ====================
 
-def create_negotiation(neg_data: Dict) -> Dict:
+def create_negotiation(neg_data: dict) -> dict:
     """Create negotiation"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1056,14 +1056,14 @@ def create_negotiation(neg_data: Dict) -> Dict:
         neg_data['session_id'] = session_id
         return neg_data
 
-def get_negotiations() -> List[Dict]:
+def get_negotiations() -> list[dict]:
     """Get all negotiations"""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM negotiations')
         return [dict(row) for row in cursor.fetchall()]
 
-def get_negotiation(session_id: str) -> Optional[Dict]:
+def get_negotiation(session_id: str) -> dict | None:
     """Get negotiation by session ID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1076,7 +1076,7 @@ def get_negotiation(session_id: str) -> Optional[Dict]:
 
 # ==================== Workflow Operations ====================
 
-def create_workflow(workflow_data: Dict) -> Dict:
+def create_workflow(workflow_data: dict) -> dict:
     """Create workflow"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1096,14 +1096,14 @@ def create_workflow(workflow_data: Dict) -> Dict:
         ))
         return workflow_data
 
-def get_workflows() -> List[Dict]:
+def get_workflows() -> list[dict]:
     """Get all workflows"""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM workflows')
         return [dict(row) for row in cursor.fetchall()]
 
-def get_workflow(workflow_id: str) -> Optional[Dict]:
+def get_workflow(workflow_id: str) -> dict | None:
     """Get workflow by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1116,7 +1116,7 @@ def get_workflow(workflow_id: str) -> Optional[Dict]:
 
 # ==================== Collaboration Operations ====================
 
-def create_collaboration(collab_data: Dict) -> Dict:
+def create_collaboration(collab_data: dict) -> dict:
     """Create collaboration"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1137,14 +1137,14 @@ def create_collaboration(collab_data: Dict) -> Dict:
         collab_data['session_id'] = session_id
         return collab_data
 
-def get_collaborations() -> List[Dict]:
+def get_collaborations() -> list[dict]:
     """Get all collaborations"""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM collaborations')
         return [dict(row) for row in cursor.fetchall()]
 
-def get_collaboration(session_id: str) -> Optional[Dict]:
+def get_collaboration(session_id: str) -> dict | None:
     """Get collaboration by session ID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1157,7 +1157,7 @@ def get_collaboration(session_id: str) -> Optional[Dict]:
 
 # ==================== Proposal Operations ====================
 
-def create_proposal(proposal_data: Dict) -> Dict:
+def create_proposal(proposal_data: dict) -> dict:
     """Create governance proposal"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1179,7 +1179,7 @@ def create_proposal(proposal_data: Dict) -> Dict:
         proposal_data['id'] = proposal_id
         return proposal_data
 
-def get_proposals() -> List[Dict]:
+def get_proposals() -> list[dict]:
     """Get all proposals"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1209,7 +1209,7 @@ def vote_proposal(proposal_id: str, voter_id: str, vote: int) -> bool:
 
 # ==================== Learning Operations ====================
 
-def save_learning_insight(agent_id: str, insights: Dict) -> Dict:
+def save_learning_insight(agent_id: str, insights: dict) -> dict:
     """Save learning insights"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1230,7 +1230,7 @@ def save_learning_insight(agent_id: str, insights: Dict) -> Dict:
 
         return {'id': insight_id, 'agent_id': agent_id}
 
-def get_learning_insights(agent_id: str) -> List[Dict]:
+def get_learning_insights(agent_id: str) -> list[dict]:
     """Get learning insights"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1240,7 +1240,7 @@ def get_learning_insights(agent_id: str) -> List[Dict]:
 
 # ==================== User Profile Operations ====================
 
-def create_or_update_profile(profile_data: Dict) -> Dict:
+def create_or_update_profile(profile_data: dict) -> dict:
     """Create or update user profile"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1269,7 +1269,7 @@ def create_or_update_profile(profile_data: Dict) -> Dict:
         profile_data['id'] = user_id
         return profile_data
 
-def get_profile(user_id: str) -> Optional[Dict]:
+def get_profile(user_id: str) -> dict | None:
     """Get user profile"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1282,7 +1282,7 @@ def get_profile(user_id: str) -> Optional[Dict]:
 
 # ==================== Metrics ====================
 
-def get_metrics() -> Dict:
+def get_metrics() -> dict:
     """Get system metrics"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1341,7 +1341,7 @@ def get_metrics() -> Dict:
 
 # ==================== Auth Operations ====================
 
-def create_nonce(address: str, nonce: str, expires_in_seconds: int = 300) -> Dict:
+def create_nonce(address: str, nonce: str, expires_in_seconds: int = 300) -> dict:
     """Create a nonce for SIWE authentication"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1363,7 +1363,7 @@ def create_nonce(address: str, nonce: str, expires_in_seconds: int = 300) -> Dic
             'expires_at': expires_at,
         }
 
-def get_valid_nonce(address: str, nonce: str) -> Optional[Dict]:
+def get_valid_nonce(address: str, nonce: str) -> dict | None:
     """Get and validate a nonce"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1386,7 +1386,7 @@ def delete_nonce(nonce_id: str) -> bool:
         cursor.execute('DELETE FROM auth_nonces WHERE id = ?', (nonce_id,))
         return cursor.rowcount > 0
 
-def create_session(session_data: Dict) -> Dict:
+def create_session(session_data: dict) -> dict:
     """Create a new session"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1408,7 +1408,7 @@ def create_session(session_data: Dict) -> Dict:
 
         return session_data
 
-def get_session(session_id: str) -> Optional[Dict]:
+def get_session(session_id: str) -> dict | None:
     """Get session by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1424,7 +1424,7 @@ def get_session(session_id: str) -> Optional[Dict]:
             return dict(row)
         return None
 
-def get_session_by_token(access_token: str) -> Optional[Dict]:
+def get_session_by_token(access_token: str) -> dict | None:
     """Get session by access token"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1458,7 +1458,7 @@ def delete_sessions_by_address(address: str) -> bool:
         cursor.execute('DELETE FROM auth_sessions WHERE address = ?', (address.lower(),))
         return cursor.rowcount > 0
 
-def create_user(user_data: Dict) -> Dict:
+def create_user(user_data: dict) -> dict:
     """Create or get user by wallet address.
 
     Also creates a corresponding human_agent entry in the agents table.
@@ -1538,7 +1538,7 @@ def create_user(user_data: Dict) -> Dict:
             'unlock_available_at': None,
         }
 
-def get_user_by_address(address: str) -> Optional[Dict]:
+def get_user_by_address(address: str) -> dict | None:
     """Get user by wallet address"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1548,7 +1548,7 @@ def get_user_by_address(address: str) -> Optional[Dict]:
             return dict(row)
         return None
 
-def get_user_by_did(did: str) -> Optional[Dict]:
+def get_user_by_did(did: str) -> dict | None:
     """Get user by DID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1558,7 +1558,7 @@ def get_user_by_did(did: str) -> Optional[Dict]:
             return dict(row)
         return None
 
-def update_user_stake(user_id: str, stake_amount: float) -> Dict:
+def update_user_stake(user_id: str, stake_amount: float) -> dict:
     """Update user stake and reputation"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1594,7 +1594,7 @@ def update_user_agent(user_id: str, agent_id: str) -> bool:
         return cursor.rowcount > 0
 
 
-def update_user_balance(user_id: str, amount: float, deduct: bool = False) -> Optional[Dict]:
+def update_user_balance(user_id: str, amount: float, deduct: bool = False) -> dict | None:
     """Update user's VIBE balance (deduct or add)"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1635,7 +1635,7 @@ def update_stake_status(user_id: str, status: str, locked_stake: float = 0, unlo
         return cursor.rowcount > 0
 
 
-def get_user_balance_info(user_id: str) -> Optional[Dict]:
+def get_user_balance_info(user_id: str) -> dict | None:
     """Get user's balance information"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1663,7 +1663,7 @@ class TransactionStatus:
     REFUNDED = "refunded"
 
 
-def create_transaction(tx_data: Dict) -> Dict:
+def create_transaction(tx_data: dict) -> dict:
     """Create a new transaction"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1698,7 +1698,7 @@ def create_transaction(tx_data: Dict) -> Dict:
         return tx_data
 
 
-def get_transaction(tx_id: str) -> Optional[Dict]:
+def get_transaction(tx_id: str) -> dict | None:
     """Get transaction by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1709,7 +1709,7 @@ def get_transaction(tx_id: str) -> Optional[Dict]:
         return None
 
 
-def get_transactions_by_user(user_id: str, role: str = None, status: str = None, limit: int = 50) -> List[Dict]:
+def get_transactions_by_user(user_id: str, role: str = None, status: str = None, limit: int = 50) -> list[dict]:
     """Get transactions for a user (as buyer or seller)"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1728,7 +1728,7 @@ def get_transactions_by_user(user_id: str, role: str = None, status: str = None,
         return [dict(row) for row in cursor.fetchall()]
 
 
-def get_all_transactions(limit: int = 100) -> List[Dict]:
+def get_all_transactions(limit: int = 100) -> list[dict]:
     """Get all transactions"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1736,7 +1736,7 @@ def get_all_transactions(limit: int = 100) -> List[Dict]:
         return [dict(row) for row in cursor.fetchall()]
 
 
-def update_transaction_status(tx_id: str, status: str, extra_data: Dict = None) -> Optional[Dict]:
+def update_transaction_status(tx_id: str, status: str, extra_data: dict = None) -> dict | None:
     """Update transaction status"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1799,7 +1799,7 @@ def update_transaction_status(tx_id: str, status: str, extra_data: Dict = None) 
         return None
 
 
-def get_transaction_stats(user_id: str = None) -> Dict:
+def get_transaction_stats(user_id: str = None) -> dict:
     """Get transaction statistics"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1833,7 +1833,7 @@ def get_transaction_stats(user_id: str = None) -> Dict:
 
 # ==================== Agent Wallet Operations ====================
 
-def create_agent_wallet(wallet_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_agent_wallet(wallet_data: dict[str, Any]) -> dict[str, Any]:
     """Create a new agent wallet"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1869,7 +1869,7 @@ def create_agent_wallet(wallet_data: Dict[str, Any]) -> Dict[str, Any]:
         return wallet_data
 
 
-def get_agent_wallet(agent_id: str) -> Optional[Dict]:
+def get_agent_wallet(agent_id: str) -> dict | None:
     """Get agent wallet by agent_id"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1878,7 +1878,7 @@ def get_agent_wallet(agent_id: str) -> Optional[Dict]:
         return dict(row) if row else None
 
 
-def get_agent_wallet_by_address(wallet_address: str) -> Optional[Dict]:
+def get_agent_wallet_by_address(wallet_address: str) -> dict | None:
     """Get agent wallet by wallet address"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1887,7 +1887,7 @@ def get_agent_wallet_by_address(wallet_address: str) -> Optional[Dict]:
         return dict(row) if row else None
 
 
-def get_agent_wallets_by_owner(owner_id: str) -> List[Dict]:
+def get_agent_wallets_by_owner(owner_id: str) -> list[dict]:
     """Get all agent wallets for an owner"""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -2015,7 +2015,7 @@ def delete_agent_wallet(agent_id: str) -> bool:
 
 # ==================== API Key Operations ====================
 
-def create_api_key(api_key_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_api_key(api_key_data: dict[str, Any]) -> dict[str, Any]:
     """Create a new API key for an agent.
 
     Args:
@@ -2062,7 +2062,7 @@ def create_api_key(api_key_data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def get_api_key_by_hash(key_hash: str) -> Optional[Dict[str, Any]]:
+def get_api_key_by_hash(key_hash: str) -> dict[str, Any] | None:
     """Get API key by its hash."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -2074,7 +2074,7 @@ def get_api_key_by_hash(key_hash: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
 
 
-def get_api_keys_by_agent(agent_id: str) -> List[Dict[str, Any]]:
+def get_api_keys_by_agent(agent_id: str) -> list[dict[str, Any]]:
     """Get all active API keys for an agent."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -2088,7 +2088,7 @@ def get_api_keys_by_agent(agent_id: str) -> List[Dict[str, Any]]:
         return [dict(row) for row in cursor.fetchall()]
 
 
-def get_api_key_by_id(key_id: str) -> Optional[Dict[str, Any]]:
+def get_api_key_by_id(key_id: str) -> dict[str, Any] | None:
     """Get API key by ID."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -2154,7 +2154,7 @@ def delete_api_keys_for_agent(agent_id: str) -> bool:
 
 # ==================== Binding Request Operations ====================
 
-def create_binding_request(binding_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_binding_request(binding_data: dict[str, Any]) -> dict[str, Any]:
     """Create a new binding request.
 
     Args:
@@ -2203,7 +2203,7 @@ def create_binding_request(binding_data: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
-def get_binding_request_by_code(binding_code: str) -> Optional[Dict[str, Any]]:
+def get_binding_request_by_code(binding_code: str) -> dict[str, Any] | None:
     """Get binding request by code."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -2212,7 +2212,7 @@ def get_binding_request_by_code(binding_code: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
 
 
-def get_binding_request_by_agent(agent_id: str) -> Optional[Dict[str, Any]]:
+def get_binding_request_by_agent(agent_id: str) -> dict[str, Any] | None:
     """Get the latest pending binding request for an agent."""
     with get_db() as conn:
         cursor = conn.cursor()
@@ -2226,7 +2226,7 @@ def get_binding_request_by_agent(agent_id: str) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
 
 
-def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount: float) -> Optional[Dict[str, Any]]:
+def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount: float) -> dict[str, Any] | None:
     """Complete a binding request.
 
     This is called when the owner confirms binding and stakes tokens.
@@ -2302,7 +2302,7 @@ def cancel_binding_request(binding_code: str) -> bool:
     """Cancel a binding request."""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = datetime.now().timestamp()
+        datetime.now().timestamp()
 
         cursor.execute('''
             UPDATE agent_binding_requests SET status = 'cancelled' WHERE binding_code = ?
@@ -2347,7 +2347,7 @@ def update_agent_binding_status(agent_id: str, status: str, owner_wallet: str = 
         return cursor.rowcount > 0
 
 
-def get_agent_binding_info(agent_id: str) -> Optional[Dict[str, Any]]:
+def get_agent_binding_info(agent_id: str) -> dict[str, Any] | None:
     """Get agent's binding information including wallet and stake."""
     with get_db() as conn:
         cursor = conn.cursor()

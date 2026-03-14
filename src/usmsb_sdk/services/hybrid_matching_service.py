@@ -9,15 +9,12 @@ Hybrid Matching Service - 混合智能匹配服务
 - 用户查询 → 向量化 → 向量召回Top-K候选 → LLM重排序 → 返回结果
 """
 
-import asyncio
+import hashlib
 import json
 import logging
 import math
-import os
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
-import hashlib
+from typing import Any
 
 # Load environment variables from .env file
 try:
@@ -35,7 +32,7 @@ class MatchCandidate:
     id: str
     name: str
     agent_id: str
-    capabilities: List[str]
+    capabilities: list[str]
     description: str
     price: float = 0.0
     reputation: float = 0.5
@@ -43,8 +40,8 @@ class MatchCandidate:
     vector_score: float = 0.0
     llm_score: float = 0.0
     final_score: float = 0.0
-    match_reasons: List[str] = field(default_factory=list)
-    embedding: Optional[List[float]] = None
+    match_reasons: list[str] = field(default_factory=list)
+    embedding: list[float] | None = None
 
 
 @dataclass
@@ -53,7 +50,7 @@ class MatchResult:
     candidate: MatchCandidate
     score: float
     explanation: str
-    match_reasons: List[str]
+    match_reasons: list[str]
 
 
 class HybridEmbeddingService:
@@ -70,7 +67,7 @@ class HybridEmbeddingService:
         self.vector_dim = vector_dim
         self._use_api = llm_adapter is not None and hasattr(llm_adapter, "embed")
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """生成文本向量"""
         if self._use_api:
             try:
@@ -80,7 +77,7 @@ class HybridEmbeddingService:
 
         return self._embed_local(text)
 
-    def _embed_local(self, text: str) -> List[float]:
+    def _embed_local(self, text: str) -> list[float]:
         """
         本地生成简单向量（降级方案）
         基于 hash 和文本特征
@@ -106,7 +103,7 @@ class HybridEmbeddingService:
 
         return vector
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """批量生成向量"""
         if self._use_api and hasattr(self.llm_adapter, 'embed_batch'):
             try:
@@ -139,14 +136,14 @@ class HybridMatchingService:
         self.final_top_k = final_top_k
 
         # 缓存
-        self._embedding_cache: Dict[str, List[float]] = {}
+        self._embedding_cache: dict[str, list[float]] = {}
 
-    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
         """计算余弦相似度"""
         if len(vec1) != len(vec2):
             return 0.0
 
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=False))
         norm1 = math.sqrt(sum(a * a for a in vec1))
         norm2 = math.sqrt(sum(b * b for b in vec2))
 
@@ -155,7 +152,7 @@ class HybridMatchingService:
 
         return dot_product / (norm1 * norm2)
 
-    async def _get_embedding(self, text: str) -> List[float]:
+    async def _get_embedding(self, text: str) -> list[float]:
         """获取嵌入向量（带缓存）"""
         cache_key = hashlib.md5(text.encode()).hexdigest()
         if cache_key in self._embedding_cache:
@@ -167,11 +164,11 @@ class HybridMatchingService:
 
     async def match_supply_to_demands(
         self,
-        supply: Dict[str, Any],
-        demands: List[Dict[str, Any]],
+        supply: dict[str, Any],
+        demands: list[dict[str, Any]],
         min_score: float = 0.3,
         max_results: int = 10,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """
         匹配供给到需求
 
@@ -225,11 +222,11 @@ class HybridMatchingService:
 
     async def match_demand_to_supplies(
         self,
-        demand: Dict[str, Any],
-        supplies: List[Dict[str, Any]],
+        demand: dict[str, Any],
+        supplies: list[dict[str, Any]],
         min_score: float = 0.3,
         max_results: int = 10,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """
         匹配需求到供给
 
@@ -284,7 +281,7 @@ class HybridMatchingService:
 
         return results
 
-    def _build_supply_text(self, supply: Dict[str, Any]) -> str:
+    def _build_supply_text(self, supply: dict[str, Any]) -> str:
         """构建供给方文本"""
         parts = []
 
@@ -301,7 +298,7 @@ class HybridMatchingService:
 
         return " | ".join(parts)
 
-    def _build_demand_text(self, demand: Dict[str, Any]) -> str:
+    def _build_demand_text(self, demand: dict[str, Any]) -> str:
         """构建需求文本"""
         parts = []
 
@@ -324,10 +321,10 @@ class HybridMatchingService:
 
     async def _llm_rerank_supply_to_demands(
         self,
-        supply: Dict[str, Any],
-        candidates: List[MatchCandidate],
+        supply: dict[str, Any],
+        candidates: list[MatchCandidate],
         max_results: int,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """LLM重排序：供给方匹配需求"""
 
         if not self.llm_adapter:
@@ -428,10 +425,10 @@ class HybridMatchingService:
 
     async def _llm_rerank_demand_to_supplies(
         self,
-        demand: Dict[str, Any],
-        candidates: List[MatchCandidate],
+        demand: dict[str, Any],
+        candidates: list[MatchCandidate],
         max_results: int,
-    ) -> List[MatchResult]:
+    ) -> list[MatchResult]:
         """LLM重排序：需求方匹配供给"""
 
         if not self.llm_adapter:
@@ -533,7 +530,7 @@ class HybridMatchingService:
 
 
 # 全局实例
-_hybrid_matching_service: Optional[HybridMatchingService] = None
+_hybrid_matching_service: HybridMatchingService | None = None
 
 
 def get_hybrid_matching_service() -> HybridMatchingService:
@@ -543,9 +540,13 @@ def get_hybrid_matching_service() -> HybridMatchingService:
         # 延迟初始化，尝试获取LLM适配器
         llm_adapter = None
         try:
-            from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
-            from usmsb_sdk.intelligence_adapters.base import IntelligenceSourceConfig, IntelligenceSourceType
             import os
+
+            from usmsb_sdk.intelligence_adapters.base import (
+                IntelligenceSourceConfig,
+                IntelligenceSourceType,
+            )
+            from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
 
             api_key = os.getenv("MINIMAX_API_KEY")
             if api_key:
@@ -575,9 +576,13 @@ async def init_hybrid_matching_service():
 
     llm_adapter = None
     try:
-        from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
-        from usmsb_sdk.intelligence_adapters.base import IntelligenceSourceConfig, IntelligenceSourceType
         import os
+
+        from usmsb_sdk.intelligence_adapters.base import (
+            IntelligenceSourceConfig,
+            IntelligenceSourceType,
+        )
+        from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
 
         api_key = os.getenv("MINIMAX_API_KEY")
         if api_key:

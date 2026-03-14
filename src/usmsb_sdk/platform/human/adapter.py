@@ -8,17 +8,15 @@ Supports human-in-the-loop workflows, task assignment, and collaboration.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-
-from usmsb_sdk.core.elements import Agent, AgentType, Goal, Resource
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class HumanAgentStatus(str, Enum):
+class HumanAgentStatus(StrEnum):
     """Status of a human agent."""
     AVAILABLE = "available"
     BUSY = "busy"
@@ -26,7 +24,7 @@ class HumanAgentStatus(str, Enum):
     AWAY = "away"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """Status of an assigned task."""
     PENDING = "pending"
     ACCEPTED = "accepted"
@@ -41,9 +39,9 @@ class Skill:
     """A skill possessed by a human agent."""
     name: str
     level: int = 1  # 1-5 scale
-    certifications: List[str] = field(default_factory=list)
+    certifications: list[str] = field(default_factory=list)
     experience_years: float = 0.0
-    last_used: Optional[float] = None
+    last_used: float | None = None
 
 
 @dataclass
@@ -52,19 +50,19 @@ class HumanAgentProfile:
     agent_id: str
     user_id: str
     name: str
-    email: Optional[str] = None
+    email: str | None = None
     status: HumanAgentStatus = HumanAgentStatus.OFFLINE
-    skills: List[Skill] = field(default_factory=list)
-    specializations: List[str] = field(default_factory=list)
+    skills: list[Skill] = field(default_factory=list)
+    specializations: list[str] = field(default_factory=list)
     rating: float = 5.0
     completed_tasks: int = 0
-    availability_hours: Dict[str, str] = field(default_factory=dict)  # day -> hours
+    availability_hours: dict[str, str] = field(default_factory=dict)  # day -> hours
     hourly_rate: float = 0.0
     timezone: str = "UTC"
-    languages: List[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=lambda: time.time())
-    last_active: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_active: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def has_skill(self, skill_name: str, min_level: int = 1) -> bool:
         """Check if agent has a skill at minimum level."""
@@ -91,18 +89,18 @@ class AssignedTask:
     assigned_by: str  # agent_id or system
     status: TaskStatus = TaskStatus.PENDING
     priority: int = 0
-    required_skills: List[str] = field(default_factory=list)
-    deadline: Optional[float] = None
+    required_skills: list[str] = field(default_factory=list)
+    deadline: float | None = None
     estimated_duration_minutes: int = 60
-    actual_duration_minutes: Optional[int] = None
+    actual_duration_minutes: int | None = None
     reward: float = 0.0
     created_at: float = field(default_factory=lambda: time.time())
-    accepted_at: Optional[float] = None
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    result: Optional[Any] = None
-    feedback: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    accepted_at: float | None = None
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: Any | None = None
+    feedback: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class HumanAgentAdapter:
@@ -119,22 +117,22 @@ class HumanAgentAdapter:
 
     def __init__(self):
         """Initialize the Human Agent Adapter."""
-        self._profiles: Dict[str, HumanAgentProfile] = {}
-        self._tasks: Dict[str, AssignedTask] = {}
-        self._pending_tasks: Dict[str, List[str]] = {}  # agent_id -> task_ids
-        self._callbacks: Dict[str, Callable] = {}
+        self._profiles: dict[str, HumanAgentProfile] = {}
+        self._tasks: dict[str, AssignedTask] = {}
+        self._pending_tasks: dict[str, list[str]] = {}  # agent_id -> task_ids
+        self._callbacks: dict[str, Callable] = {}
 
     def register_human_agent(
         self,
         user_id: str,
         name: str,
-        email: Optional[str] = None,
-        skills: Optional[List[Skill]] = None,
-        specializations: Optional[List[str]] = None,
+        email: str | None = None,
+        skills: list[Skill] | None = None,
+        specializations: list[str] | None = None,
         hourly_rate: float = 0.0,
         timezone: str = "UTC",
-        languages: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        languages: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> HumanAgentProfile:
         """
         Register a new human agent.
@@ -176,11 +174,11 @@ class HumanAgentAdapter:
         logger.info(f"Human agent registered: {name} (ID: {agent_id})")
         return profile
 
-    def get_profile(self, agent_id: str) -> Optional[HumanAgentProfile]:
+    def get_profile(self, agent_id: str) -> HumanAgentProfile | None:
         """Get human agent profile."""
         return self._profiles.get(agent_id)
 
-    def get_profile_by_user(self, user_id: str) -> Optional[HumanAgentProfile]:
+    def get_profile_by_user(self, user_id: str) -> HumanAgentProfile | None:
         """Get profile by external user ID."""
         for profile in self._profiles.values():
             if profile.user_id == user_id:
@@ -237,12 +235,12 @@ class HumanAgentAdapter:
         title: str,
         description: str,
         assigned_by: str,
-        required_skills: Optional[List[str]] = None,
+        required_skills: list[str] | None = None,
         priority: int = 0,
-        deadline: Optional[float] = None,
+        deadline: float | None = None,
         estimated_duration_minutes: int = 60,
         reward: float = 0.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AssignedTask:
         """
         Assign a task to a human agent.
@@ -303,7 +301,7 @@ class HumanAgentAdapter:
         logger.info(f"Task {task_id} accepted")
         return True
 
-    def reject_task(self, task_id: str, reason: Optional[str] = None) -> bool:
+    def reject_task(self, task_id: str, reason: str | None = None) -> bool:
         """Reject a pending task."""
         task = self._tasks.get(task_id)
         if not task or task.status != TaskStatus.PENDING:
@@ -341,7 +339,7 @@ class HumanAgentAdapter:
         self,
         task_id: str,
         result: Any,
-        feedback: Optional[str] = None,
+        feedback: str | None = None,
     ) -> bool:
         """Complete a task with result."""
         task = self._tasks.get(task_id)
@@ -370,20 +368,20 @@ class HumanAgentAdapter:
         logger.info(f"Task {task_id} completed")
         return True
 
-    def get_task(self, task_id: str) -> Optional[AssignedTask]:
+    def get_task(self, task_id: str) -> AssignedTask | None:
         """Get task by ID."""
         return self._tasks.get(task_id)
 
-    def get_pending_tasks(self, agent_id: str) -> List[AssignedTask]:
+    def get_pending_tasks(self, agent_id: str) -> list[AssignedTask]:
         """Get pending tasks for an agent."""
         task_ids = self._pending_tasks.get(agent_id, [])
         return [self._tasks[tid] for tid in task_ids if tid in self._tasks]
 
     def get_tasks_by_status(
         self,
-        agent_id: Optional[str] = None,
-        status: Optional[TaskStatus] = None,
-    ) -> List[AssignedTask]:
+        agent_id: str | None = None,
+        status: TaskStatus | None = None,
+    ) -> list[AssignedTask]:
         """Get tasks filtered by status."""
         tasks = list(self._tasks.values())
 
@@ -399,7 +397,7 @@ class HumanAgentAdapter:
         self,
         task_id: str,
         rating: float,
-        feedback: Optional[str] = None,
+        feedback: str | None = None,
     ) -> bool:
         """
         Rate a completed task.
@@ -444,11 +442,11 @@ class HumanAgentAdapter:
 
     def search_agents(
         self,
-        skills: Optional[List[str]] = None,
-        status: Optional[HumanAgentStatus] = None,
-        min_rating: Optional[float] = None,
-        specialization: Optional[str] = None,
-    ) -> List[HumanAgentProfile]:
+        skills: list[str] | None = None,
+        status: HumanAgentStatus | None = None,
+        min_rating: float | None = None,
+        specialization: str | None = None,
+    ) -> list[HumanAgentProfile]:
         """
         Search for human agents.
 
@@ -478,7 +476,7 @@ class HumanAgentAdapter:
 
         return results
 
-    def get_adapter_stats(self) -> Dict[str, Any]:
+    def get_adapter_stats(self) -> dict[str, Any]:
         """Get adapter statistics."""
         total_agents = len(self._profiles)
         available_agents = sum(

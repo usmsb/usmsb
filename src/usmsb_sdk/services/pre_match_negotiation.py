@@ -9,18 +9,17 @@ Provides:
 - Match confirmation/decline
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, String, Text
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session, relationship
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 Base = declarative_base()
@@ -55,12 +54,12 @@ class ClarificationQA:
     question_id: str
     question: str
     asker_id: str  # demand_agent or supply_agent
-    answer: Optional[str] = None
-    answerer_id: Optional[str] = None
+    answer: str | None = None
+    answerer_id: str | None = None
     asked_at: datetime = field(default_factory=datetime.now)
-    answered_at: Optional[datetime] = None
+    answered_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "question_id": self.question_id,
             "question": self.question,
@@ -79,13 +78,13 @@ class VerificationRequest:
     capability: str
     verification_type: VerificationType
     request_detail: str
-    response: Optional[str] = None
-    response_attachments: List[str] = field(default_factory=list)
+    response: str | None = None
+    response_attachments: list[str] = field(default_factory=list)
     status: str = "pending"  # pending, submitted, verified, failed
     created_at: datetime = field(default_factory=datetime.now)
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "capability": self.capability,
@@ -102,13 +101,13 @@ class VerificationRequest:
 @dataclass
 class ScopeConfirmation:
     """Scope confirmation details"""
-    deliverables: List[str] = field(default_factory=list)
-    timeline: Optional[str] = None
-    milestones: List[Dict[str, Any]] = field(default_factory=list)
-    exclusions: List[str] = field(default_factory=list)
-    assumptions: List[str] = field(default_factory=list)
+    deliverables: list[str] = field(default_factory=list)
+    timeline: str | None = None
+    milestones: list[dict[str, Any]] = field(default_factory=list)
+    exclusions: list[str] = field(default_factory=list)
+    assumptions: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "deliverables": self.deliverables,
             "timeline": self.timeline,
@@ -121,12 +120,12 @@ class ScopeConfirmation:
 @dataclass
 class GeneCapsuleMatch:
     """Gene capsule match result for negotiation"""
-    matched_experiences: List[Dict[str, Any]] = field(default_factory=list)
+    matched_experiences: list[dict[str, Any]] = field(default_factory=list)
     relevance_score: float = 0.0
     verified_count: int = 0
     total_experience_value: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "matched_experiences": self.matched_experiences,
             "relevance_score": self.relevance_score,
@@ -194,25 +193,25 @@ class PreMatchNegotiationService:
 
     def __init__(
         self,
-        db_session: Optional[Session] = None,
-        gene_capsule_service: Optional[Any] = None,
-        logger: Optional[logging.Logger] = None,
+        db_session: Session | None = None,
+        gene_capsule_service: Any | None = None,
+        logger: logging.Logger | None = None,
     ):
         self.db = db_session
         self.gene_capsule_service = gene_capsule_service
         self.logger = logger or logging.getLogger(__name__)
 
         # In-memory cache for active negotiations
-        self._active_negotiations: Dict[str, Dict] = {}
+        self._active_negotiations: dict[str, dict] = {}
 
     async def initiate(
         self,
         demand_agent_id: str,
         supply_agent_id: str,
         demand_id: str,
-        initial_message: Optional[str] = None,
+        initial_message: str | None = None,
         expiration_hours: int = DEFAULT_EXPIRATION_HOURS,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Initiate a pre-match negotiation.
 
@@ -257,7 +256,7 @@ class PreMatchNegotiationService:
             "gene_capsule_match": gene_capsule_match,
         }
 
-    async def get_negotiation(self, negotiation_id: str) -> Optional[Dict[str, Any]]:
+    async def get_negotiation(self, negotiation_id: str) -> dict[str, Any] | None:
         """Get negotiation details"""
         negotiation = self.db.query(PreMatchNegotiationDB).filter(
             PreMatchNegotiationDB.negotiation_id == negotiation_id
@@ -387,7 +386,7 @@ class PreMatchNegotiationService:
         negotiation_id: str,
         request_id: str,
         response: str,
-        attachments: Optional[List[str]] = None,
+        attachments: list[str] | None = None,
     ) -> VerificationRequest:
         """
         Respond to a capability verification request.
@@ -430,7 +429,7 @@ class PreMatchNegotiationService:
         self,
         negotiation_id: str,
         scope: ScopeConfirmation,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Confirm the scope of the engagement.
         """
@@ -450,9 +449,9 @@ class PreMatchNegotiationService:
     async def propose_terms(
         self,
         negotiation_id: str,
-        terms: Dict[str, Any],
+        terms: dict[str, Any],
         proposer_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Propose terms for the engagement.
         """
@@ -476,8 +475,8 @@ class PreMatchNegotiationService:
     async def agree_to_terms(
         self,
         negotiation_id: str,
-        terms: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        terms: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Agree to proposed terms.
         """
@@ -497,7 +496,7 @@ class PreMatchNegotiationService:
         self,
         negotiation_id: str,
         confirmer_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Confirm the match - both parties must confirm.
         """
@@ -539,7 +538,7 @@ class PreMatchNegotiationService:
         negotiation_id: str,
         reason: str,
         decliner_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Decline the match.
         """
@@ -566,7 +565,7 @@ class PreMatchNegotiationService:
         negotiation_id: str,
         reason: str,
         canceller_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Cancel the negotiation.
         """
@@ -590,9 +589,9 @@ class PreMatchNegotiationService:
     async def get_negotiations_for_agent(
         self,
         agent_id: str,
-        status: Optional[NegotiationStatus] = None,
+        status: NegotiationStatus | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get all negotiations for an agent.
         """
@@ -638,7 +637,7 @@ class PreMatchNegotiationService:
     def _get_and_validate_negotiation(
         self,
         negotiation_id: str,
-    ) -> Optional[PreMatchNegotiationDB]:
+    ) -> PreMatchNegotiationDB | None:
         """Get negotiation and validate it's not expired"""
         negotiation = self.db.query(PreMatchNegotiationDB).filter(
             PreMatchNegotiationDB.negotiation_id == negotiation_id
@@ -688,7 +687,7 @@ class PreMatchNegotiationService:
             self.logger.error(f"Error getting gene capsule match: {e}")
             return GeneCapsuleMatch()
 
-    def _negotiation_to_dict(self, negotiation: PreMatchNegotiationDB) -> Dict[str, Any]:
+    def _negotiation_to_dict(self, negotiation: PreMatchNegotiationDB) -> dict[str, Any]:
         """Convert negotiation DB model to dict"""
         return {
             "negotiation_id": negotiation.negotiation_id,

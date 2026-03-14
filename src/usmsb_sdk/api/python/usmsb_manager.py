@@ -7,8 +7,7 @@ Provides unified access to all SDK components and services.
 
 import logging
 import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
 
 from usmsb_sdk.config.settings import Settings, get_settings
 from usmsb_sdk.core.elements import Agent, Environment
@@ -25,8 +24,8 @@ from usmsb_sdk.intelligence_adapters.manager import (
     IntelligenceSourceManager,
     SelectionStrategy,
 )
-from usmsb_sdk.services.behavior_prediction_service import BehaviorPredictionService
 from usmsb_sdk.services.agentic_workflow_service import AgenticWorkflowService
+from usmsb_sdk.services.behavior_prediction_service import BehaviorPredictionService
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +64,8 @@ class USMSBManager:
 
     def __init__(
         self,
-        config_path: Optional[str] = None,
-        settings: Optional[Settings] = None,
+        config_path: str | None = None,
+        settings: Settings | None = None,
         **kwargs,
     ):
         """
@@ -82,12 +81,12 @@ class USMSBManager:
         self._config_overrides = kwargs
 
         self._initialized = False
-        self._source_manager: Optional[IntelligenceSourceManager] = None
-        self._services: Dict[str, Any] = {}
+        self._source_manager: IntelligenceSourceManager | None = None
+        self._services: dict[str, Any] = {}
 
         # Registries
-        self._agents: Dict[str, Agent] = {}
-        self._environments: Dict[str, Environment] = {}
+        self._agents: dict[str, Agent] = {}
+        self._environments: dict[str, Environment] = {}
 
     async def initialize(self) -> bool:
         """
@@ -165,7 +164,7 @@ class USMSBManager:
             self._services["agentic_workflow"] = AgenticWorkflowService(llm)
             logger.info("Initialized application services")
 
-    def get_service(self, name: str) -> Optional[Any]:
+    def get_service(self, name: str) -> Any | None:
         """
         Get a service by name.
 
@@ -177,7 +176,7 @@ class USMSBManager:
         """
         return self._services.get(name)
 
-    def get_llm(self, name: Optional[str] = None) -> Optional[ILLMAdapter]:
+    def get_llm(self, name: str | None = None) -> ILLMAdapter | None:
         """
         Get an LLM adapter.
 
@@ -191,13 +190,13 @@ class USMSBManager:
             return None
         return self._source_manager.get_llm(name)
 
-    def get_knowledge_base(self, name: Optional[str] = None) -> Optional[IKnowledgeBaseAdapter]:
+    def get_knowledge_base(self, name: str | None = None) -> IKnowledgeBaseAdapter | None:
         """Get a knowledge base adapter."""
         if not self._source_manager:
             return None
         return self._source_manager.get_knowledge_base(name)
 
-    def get_agentic_framework(self, name: Optional[str] = None) -> Optional[IAgenticFrameworkAdapter]:
+    def get_agentic_framework(self, name: str | None = None) -> IAgenticFrameworkAdapter | None:
         """Get an agentic framework adapter."""
         if not self._source_manager:
             return None
@@ -240,11 +239,11 @@ class USMSBManager:
         """Register an agent with the manager."""
         self._agents[agent.id] = agent
 
-    def get_agent(self, agent_id: str) -> Optional[Agent]:
+    def get_agent(self, agent_id: str) -> Agent | None:
         """Get a registered agent by ID."""
         return self._agents.get(agent_id)
 
-    def list_agents(self) -> List[Agent]:
+    def list_agents(self) -> list[Agent]:
         """List all registered agents."""
         return list(self._agents.values())
 
@@ -252,11 +251,11 @@ class USMSBManager:
         """Register an environment with the manager."""
         self._environments[environment.id] = environment
 
-    def get_environment(self, env_id: str) -> Optional[Environment]:
+    def get_environment(self, env_id: str) -> Environment | None:
         """Get a registered environment by ID."""
         return self._environments.get(env_id)
 
-    def list_environments(self) -> List[Environment]:
+    def list_environments(self) -> list[Environment]:
         """List all registered environments."""
         return list(self._environments.values())
 
@@ -270,7 +269,7 @@ class USMSBManager:
         """Check if the SDK is initialized."""
         return self._initialized
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         Perform a health check.
 

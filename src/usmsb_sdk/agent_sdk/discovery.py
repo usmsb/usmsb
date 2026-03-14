@@ -14,24 +14,22 @@ Implements the discovery system for finding and recommending agents, including:
 - Batch comparison analysis
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
-from uuid import uuid4
-from urllib.parse import quote
 import asyncio
-import aiohttp
 import json
 import logging
 import re
-from collections import defaultdict
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
+from uuid import uuid4
+
+import aiohttp
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
-    CapabilityDefinition,
     ProtocolType,
-    SkillDefinition,
 )
 from usmsb_sdk.agent_sdk.communication import CommunicationManager, Message, MessageType
 
@@ -56,25 +54,25 @@ class SortBy(Enum):
 @dataclass
 class DiscoveryFilter:
     """Filter criteria for agent discovery"""
-    skills: Optional[List[str]] = None
-    capabilities: Optional[List[str]] = None
-    tags: Optional[List[str]] = None
-    keywords: Optional[List[str]] = None
-    protocols: Optional[List[ProtocolType]] = None
-    min_rating: Optional[float] = None
-    max_latency: Optional[float] = None
+    skills: list[str] | None = None
+    capabilities: list[str] | None = None
+    tags: list[str] | None = None
+    keywords: list[str] | None = None
+    protocols: list[ProtocolType] | None = None
+    min_rating: float | None = None
+    max_latency: float | None = None
     online_only: bool = True
     exclude_self: bool = True
-    exclude_ids: Optional[Set[str]] = None
-    include_only: Optional[Set[str]] = None
-    categories: Optional[List[str]] = None
-    capability_levels: Optional[Dict[str, str]] = None  # capability -> min level
+    exclude_ids: set[str] | None = None
+    include_only: set[str] | None = None
+    categories: list[str] | None = None
+    capability_levels: dict[str, str] | None = None  # capability -> min level
     scope: DiscoveryScope = DiscoveryScope.PLATFORM
     sort_by: SortBy = SortBy.RELEVANCE
     limit: int = 100
     offset: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "skills": self.skills,
@@ -97,7 +95,7 @@ class DiscoveryFilter:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DiscoveryFilter":
+    def from_dict(cls, data: dict[str, Any]) -> "DiscoveryFilter":
         """Create from dictionary"""
         return cls(
             skills=data.get("skills"),
@@ -127,20 +125,20 @@ class AgentInfo:
     name: str
     description: str
     version: str = "1.0.0"
-    skills: List[Dict[str, Any]] = field(default_factory=list)
-    capabilities: List[Dict[str, Any]] = field(default_factory=list)
-    protocols: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    skills: list[dict[str, Any]] = field(default_factory=list)
+    capabilities: list[dict[str, Any]] = field(default_factory=list)
+    protocols: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     rating: float = 0.0
     latency: float = 0.0
-    last_seen: Optional[datetime] = None
+    last_seen: datetime | None = None
     is_online: bool = False
-    endpoint: Optional[str] = None
-    p2p_endpoint: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    endpoint: str | None = None
+    p2p_endpoint: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     score: float = 0.0  # Computed relevance score
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "agent_id": self.agent_id,
@@ -162,7 +160,7 @@ class AgentInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentInfo":
         """Create from dictionary"""
         return cls(
             agent_id=data["agent_id"],
@@ -191,14 +189,14 @@ class AgentInfo:
         """Check if agent has a specific capability"""
         return any(c.get("name") == capability_name for c in self.capabilities)
 
-    def get_skill(self, skill_name: str) -> Optional[Dict[str, Any]]:
+    def get_skill(self, skill_name: str) -> dict[str, Any] | None:
         """Get skill by name"""
         for skill in self.skills:
             if skill.get("name") == skill_name:
                 return skill
         return None
 
-    def get_capability(self, capability_name: str) -> Optional[Dict[str, Any]]:
+    def get_capability(self, capability_name: str) -> dict[str, Any] | None:
         """Get capability by name"""
         for cap in self.capabilities:
             if cap.get("name") == capability_name:
@@ -210,13 +208,13 @@ class AgentInfo:
 class RecommendationResult:
     """Result of a recommendation query"""
     task_description: str
-    recommended_agents: List[AgentInfo]
+    recommended_agents: list[AgentInfo]
     total_candidates: int
     algorithm: str
     confidence: float
-    explanations: Dict[str, str] = field(default_factory=dict)  # agent_id -> explanation
+    explanations: dict[str, str] = field(default_factory=dict)  # agent_id -> explanation
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "task_description": self.task_description,
@@ -254,7 +252,7 @@ class DiscoveryManager:
         agent_id: str,
         agent_config: AgentConfig,
         communication_manager: CommunicationManager,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.agent_id = agent_id
         self.config = agent_config
@@ -262,12 +260,12 @@ class DiscoveryManager:
         self.logger = logger or logging.getLogger(__name__)
 
         # Cache
-        self._agent_cache: Dict[str, AgentInfo] = {}
-        self._cache_expiry: Dict[str, datetime] = {}
+        self._agent_cache: dict[str, AgentInfo] = {}
+        self._cache_expiry: dict[str, datetime] = {}
         self._cache_ttl = timedelta(minutes=5)
 
         # HTTP session
-        self._http_session: Optional[aiohttp.ClientSession] = None
+        self._http_session: aiohttp.ClientSession | None = None
 
         # State
         self._initialized = False
@@ -290,7 +288,7 @@ class DiscoveryManager:
 
     # ==================== Discovery Methods ====================
 
-    async def discover(self, filter_criteria: Optional[DiscoveryFilter] = None) -> List[AgentInfo]:
+    async def discover(self, filter_criteria: DiscoveryFilter | None = None) -> list[AgentInfo]:
         """
         Discover agents matching the given criteria.
 
@@ -341,7 +339,7 @@ class DiscoveryManager:
 
         return agents[start:end]
 
-    async def _discover_local(self, filter_criteria: DiscoveryFilter) -> List[AgentInfo]:
+    async def _discover_local(self, filter_criteria: DiscoveryFilter) -> list[AgentInfo]:
         """Discover from local cache"""
         agents = []
         now = datetime.now()
@@ -356,7 +354,7 @@ class DiscoveryManager:
 
         return agents
 
-    async def _discover_platform(self, filter_criteria: DiscoveryFilter) -> List[AgentInfo]:
+    async def _discover_platform(self, filter_criteria: DiscoveryFilter) -> list[AgentInfo]:
         """Discover from platform registry"""
         if not self._http_session:
             return []
@@ -408,7 +406,7 @@ class DiscoveryManager:
             self.logger.error(f"Platform discovery error: {e}")
             return []
 
-    async def _discover_network(self, filter_criteria: DiscoveryFilter) -> List[AgentInfo]:
+    async def _discover_network(self, filter_criteria: DiscoveryFilter) -> list[AgentInfo]:
         """Discover from P2P network"""
         agents = []
 
@@ -452,7 +450,7 @@ class DiscoveryManager:
 
         return agents
 
-    def _merge_discoveries(self, agent_lists: List[List[AgentInfo]]) -> List[AgentInfo]:
+    def _merge_discoveries(self, agent_lists: list[list[AgentInfo]]) -> list[AgentInfo]:
         """Merge multiple discovery results, deduplicating by agent_id"""
         merged = {}
 
@@ -472,7 +470,7 @@ class DiscoveryManager:
 
     # ==================== Convenience Methods ====================
 
-    async def discover_by_skill(self, skill_name: str, limit: int = 10) -> List[AgentInfo]:
+    async def discover_by_skill(self, skill_name: str, limit: int = 10) -> list[AgentInfo]:
         """Discover agents with a specific skill"""
         filter_criteria = DiscoveryFilter(
             skills=[skill_name],
@@ -483,9 +481,9 @@ class DiscoveryManager:
     async def discover_by_capability(
         self,
         capability_name: str,
-        min_level: Optional[str] = None,
+        min_level: str | None = None,
         limit: int = 10,
-    ) -> List[AgentInfo]:
+    ) -> list[AgentInfo]:
         """Discover agents with a specific capability"""
         capability_levels = {capability_name: min_level} if min_level else None
 
@@ -498,9 +496,9 @@ class DiscoveryManager:
 
     async def discover_by_keywords(
         self,
-        keywords: List[str],
+        keywords: list[str],
         limit: int = 10,
-    ) -> List[AgentInfo]:
+    ) -> list[AgentInfo]:
         """Discover agents by keywords"""
         filter_criteria = DiscoveryFilter(
             keywords=keywords,
@@ -510,9 +508,9 @@ class DiscoveryManager:
 
     async def discover_by_tags(
         self,
-        tags: List[str],
+        tags: list[str],
         limit: int = 10,
-    ) -> List[AgentInfo]:
+    ) -> list[AgentInfo]:
         """Discover agents by tags"""
         filter_criteria = DiscoveryFilter(
             tags=tags,
@@ -520,7 +518,7 @@ class DiscoveryManager:
         )
         return await self.discover(filter_criteria)
 
-    async def get_agent(self, agent_id: str) -> Optional[AgentInfo]:
+    async def get_agent(self, agent_id: str) -> AgentInfo | None:
         """Get information about a specific agent"""
         # Check cache first
         if agent_id in self._agent_cache:
@@ -557,7 +555,7 @@ class DiscoveryManager:
 
         return None
 
-    async def get_all_agent_ids(self) -> List[str]:
+    async def get_all_agent_ids(self) -> list[str]:
         """Get all known agent IDs"""
         # Combine cached and platform agents
         ids = set(self._agent_cache.keys())
@@ -575,7 +573,7 @@ class DiscoveryManager:
         self,
         task_description: str,
         limit: int = 5,
-    ) -> List[AgentInfo]:
+    ) -> list[AgentInfo]:
         """
         Get recommended agents for a task.
 
@@ -628,7 +626,7 @@ class DiscoveryManager:
         recommended = [c[2] for c in scored_candidates[:limit]]
         explanations = {c[2].agent_id: c[1] for c in scored_candidates[:limit]}
 
-        result = RecommendationResult(
+        RecommendationResult(
             task_description=task_description,
             recommended_agents=recommended,
             total_candidates=len(candidates),
@@ -641,7 +639,7 @@ class DiscoveryManager:
 
         return recommended
 
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """Extract keywords from text"""
         # Basic keyword extraction
         # Remove common words
@@ -669,13 +667,13 @@ class DiscoveryManager:
         self,
         agent: AgentInfo,
         task_description: str,
-        keywords: List[str],
-    ) -> Tuple[float, str]:
+        keywords: list[str],
+    ) -> tuple[float, str]:
         """Calculate recommendation score for an agent"""
         score = 0.0
         explanations = []
 
-        task_lower = task_description.lower()
+        task_description.lower()
 
         # Score based on skill matches
         for skill in agent.skills:
@@ -746,7 +744,7 @@ class DiscoveryManager:
 
     # ==================== Filtering and Sorting ====================
 
-    def _apply_filters(self, agents: List[AgentInfo], filter_criteria: DiscoveryFilter) -> List[AgentInfo]:
+    def _apply_filters(self, agents: list[AgentInfo], filter_criteria: DiscoveryFilter) -> list[AgentInfo]:
         """Apply filter criteria to agents"""
         filtered = []
 
@@ -798,8 +796,8 @@ class DiscoveryManager:
 
             # Tags filter
             if filter_criteria.tags:
-                agent_tags = set(t.lower() for t in agent.tags)
-                required_tags = set(t.lower() for t in filter_criteria.tags)
+                agent_tags = {t.lower() for t in agent.tags}
+                required_tags = {t.lower() for t in filter_criteria.tags}
                 if not required_tags.intersection(agent_tags):
                     continue
 
@@ -840,8 +838,8 @@ class DiscoveryManager:
 
             # Categories filter
             if filter_criteria.categories:
-                agent_categories = set(c.get("category", "").lower() for c in agent.capabilities)
-                required_categories = set(c.lower() for c in filter_criteria.categories)
+                agent_categories = {c.get("category", "").lower() for c in agent.capabilities}
+                required_categories = {c.lower() for c in filter_criteria.categories}
                 if not required_categories.intersection(agent_categories):
                     continue
 
@@ -849,7 +847,7 @@ class DiscoveryManager:
 
         return filtered
 
-    def _score_agents(self, agents: List[AgentInfo], filter_criteria: DiscoveryFilter) -> List[AgentInfo]:
+    def _score_agents(self, agents: list[AgentInfo], filter_criteria: DiscoveryFilter) -> list[AgentInfo]:
         """Calculate relevance scores for agents"""
         keywords = filter_criteria.keywords or []
 
@@ -893,7 +891,7 @@ class DiscoveryManager:
 
         return agents
 
-    def _sort_agents(self, agents: List[AgentInfo], sort_by: SortBy) -> List[AgentInfo]:
+    def _sort_agents(self, agents: list[AgentInfo], sort_by: SortBy) -> list[AgentInfo]:
         """Sort agents by specified criteria"""
         if sort_by == SortBy.RELEVANCE:
             return sorted(agents, key=lambda a: a.score, reverse=True)
@@ -910,7 +908,7 @@ class DiscoveryManager:
 
     # ==================== Cache Management ====================
 
-    async def _update_cache(self, agents: List[AgentInfo]) -> None:
+    async def _update_cache(self, agents: list[AgentInfo]) -> None:
         """Update local cache with discovered agents"""
         now = datetime.now()
 
@@ -961,7 +959,7 @@ class DimensionScore:
     dimension: MatchDimension
     score: float  # 0.0 - 1.0
     weight: float
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -969,13 +967,13 @@ class MultiDimensionalMatchResult:
     """Result of multi-dimensional matching"""
     agent: AgentInfo
     overall_score: float
-    dimension_scores: List[DimensionScore]
-    strengths: List[str]
-    weaknesses: List[str]
+    dimension_scores: list[DimensionScore]
+    strengths: list[str]
+    weaknesses: list[str]
     recommendation: str
-    gene_capsule_match: Optional[Dict[str, Any]] = None
+    gene_capsule_match: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent.agent_id,
             "agent_name": self.agent.name,
@@ -999,32 +997,32 @@ class MultiDimensionalMatchResult:
 @dataclass
 class SearchCriteria:
     """Multi-dimensional search criteria"""
-    task_description: Optional[str] = None
-    required_skills: Optional[List[str]] = None
-    required_capabilities: Optional[List[str]] = None
+    task_description: str | None = None
+    required_skills: list[str] | None = None
+    required_capabilities: list[str] | None = None
 
     # Price constraints
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
-    price_type: Optional[str] = None  # hourly, fixed, per_request
+    budget_min: float | None = None
+    budget_max: float | None = None
+    price_type: str | None = None  # hourly, fixed, per_request
 
     # Reputation constraints
-    min_rating: Optional[float] = None
-    min_successful_tasks: Optional[int] = None
+    min_rating: float | None = None
+    min_successful_tasks: int | None = None
     require_verified: bool = False
 
     # Availability constraints
-    availability_window: Optional[Tuple[datetime, datetime]] = None
-    max_response_time: Optional[float] = None  # seconds
+    availability_window: tuple[datetime, datetime] | None = None
+    max_response_time: float | None = None  # seconds
     require_online: bool = False
 
     # Experience requirements (Gene Capsule)
-    require_experience_in: Optional[List[str]] = None  # Task types
-    min_experience_count: Optional[int] = None
+    require_experience_in: list[str] | None = None  # Task types
+    min_experience_count: int | None = None
     require_verified_experience: bool = False
 
     # Weights for each dimension (should sum to 1.0)
-    dimension_weights: Dict[MatchDimension, float] = field(default_factory=lambda: {
+    dimension_weights: dict[MatchDimension, float] = field(default_factory=lambda: {
         MatchDimension.CAPABILITY: 0.30,
         MatchDimension.PRICE: 0.15,
         MatchDimension.REPUTATION: 0.20,
@@ -1032,7 +1030,7 @@ class SearchCriteria:
         MatchDimension.EXPERIENCE: 0.25,
     })
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_description": self.task_description,
             "required_skills": self.required_skills,
@@ -1060,9 +1058,9 @@ class SearchCriteria:
 class WatchCondition:
     """Condition for watching agent changes"""
     condition_type: str  # "status_change", "new_capability", "price_change", "rating_change"
-    agent_ids: Optional[Set[str]] = None
-    filter_criteria: Optional[DiscoveryFilter] = None
-    threshold: Optional[float] = None
+    agent_ids: set[str] | None = None
+    filter_criteria: DiscoveryFilter | None = None
+    threshold: float | None = None
     created_at: datetime = field(default_factory=datetime.now)
 
 
@@ -1081,14 +1079,14 @@ class WatchEvent:
 @dataclass
 class AgentComparison:
     """Comparison between multiple agents"""
-    agents: List[AgentInfo]
-    comparison_dimensions: List[MatchDimension]
-    rankings: Dict[str, int]  # agent_id -> rank
-    scores: Dict[str, Dict[MatchDimension, float]]  # agent_id -> dimension -> score
+    agents: list[AgentInfo]
+    comparison_dimensions: list[MatchDimension]
+    rankings: dict[str, int]  # agent_id -> rank
+    scores: dict[str, dict[MatchDimension, float]]  # agent_id -> dimension -> score
     summary: str
     recommendation: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agents": [a.to_dict() for a in self.agents],
             "comparison_dimensions": [d.value for d in self.comparison_dimensions],
@@ -1113,19 +1111,19 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         agent_id: str,
         agent_config: AgentConfig,
         communication_manager: CommunicationManager,
-        platform_client: Optional[Any] = None,  # PlatformClient
-        logger: Optional[logging.Logger] = None,
+        platform_client: Any | None = None,  # PlatformClient
+        logger: logging.Logger | None = None,
     ):
         super().__init__(agent_id, agent_config, communication_manager, logger)
         self.platform_client = platform_client
 
         # Enhanced features
-        self._watchers: Dict[str, WatchCondition] = {}
-        self._watch_callbacks: Dict[str, Callable] = {}
-        self._watch_task: Optional[asyncio.Task] = None
+        self._watchers: dict[str, WatchCondition] = {}
+        self._watch_callbacks: dict[str, Callable] = {}
+        self._watch_task: asyncio.Task | None = None
 
         # Experience cache from gene capsule searches
-        self._experience_cache: Dict[str, List[Dict]] = {}
+        self._experience_cache: dict[str, list[dict]] = {}
 
         # Semantic matching LLM client (optional)
         self._llm_adapter = None
@@ -1156,7 +1154,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         criteria: SearchCriteria,
         limit: int = 20,
-    ) -> List[MultiDimensionalMatchResult]:
+    ) -> list[MultiDimensionalMatchResult]:
         """
         Perform multi-dimensional search with comprehensive scoring.
 
@@ -1225,9 +1223,9 @@ class EnhancedDiscoveryManager(DiscoveryManager):
             details=exp_details,
         ))
         if exp_score > 0.7:
-            strengths.append(f"Proven experience in relevant tasks")
+            strengths.append("Proven experience in relevant tasks")
         elif exp_score < 0.3 and criteria.require_experience_in:
-            weaknesses.append(f"Limited relevant experience")
+            weaknesses.append("Limited relevant experience")
 
         # 3. Reputation Score
         rep_score, rep_details = self._score_reputation(agent, criteria)
@@ -1240,7 +1238,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         if rep_score > 0.8:
             strengths.append(f"High reputation ({agent.rating:.1f} rating)")
         elif rep_score < 0.5:
-            weaknesses.append(f"Lower reputation score")
+            weaknesses.append("Lower reputation score")
 
         # 4. Price Match
         price_score, price_details = self._score_price_match(agent, criteria)
@@ -1251,9 +1249,9 @@ class EnhancedDiscoveryManager(DiscoveryManager):
             details=price_details,
         ))
         if price_score > 0.8:
-            strengths.append(f"Price within budget")
+            strengths.append("Price within budget")
         elif price_score < 0.5:
-            weaknesses.append(f"Price may exceed budget")
+            weaknesses.append("Price may exceed budget")
 
         # 5. Availability Score
         avail_score, avail_details = self._score_availability(agent, criteria)
@@ -1264,9 +1262,9 @@ class EnhancedDiscoveryManager(DiscoveryManager):
             details=avail_details,
         ))
         if avail_score > 0.8:
-            strengths.append(f"Currently available")
+            strengths.append("Currently available")
         elif avail_score < 0.5:
-            weaknesses.append(f"Limited availability")
+            weaknesses.append("Limited availability")
 
         # Calculate overall score
         overall_score = sum(ds.score * ds.weight for ds in dimension_scores)
@@ -1290,7 +1288,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         agent: AgentInfo,
         criteria: SearchCriteria,
-    ) -> Tuple[float, Dict[str, Any]]:
+    ) -> tuple[float, dict[str, Any]]:
         """Score capability match"""
         if not criteria.required_capabilities and not criteria.required_skills:
             return (0.7, {"reason": "No specific capabilities required"})
@@ -1325,7 +1323,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         agent: AgentInfo,
         criteria: SearchCriteria,
-    ) -> Tuple[float, Dict[str, Any]]:
+    ) -> tuple[float, dict[str, Any]]:
         """Score experience match using Gene Capsule"""
         if not criteria.require_experience_in:
             return (0.5, {"reason": "No experience requirements specified"})
@@ -1387,7 +1385,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         agent: AgentInfo,
         criteria: SearchCriteria,
-    ) -> Tuple[float, Dict[str, Any]]:
+    ) -> tuple[float, dict[str, Any]]:
         """Score reputation"""
         # Base score from rating
         rating_score = agent.rating / 5.0 if agent.rating else 0.5
@@ -1413,7 +1411,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         agent: AgentInfo,
         criteria: SearchCriteria,
-    ) -> Tuple[float, Dict[str, Any]]:
+    ) -> tuple[float, dict[str, Any]]:
         """Score price alignment"""
         if not criteria.budget_min and not criteria.budget_max:
             return (0.7, {"reason": "No budget specified"})
@@ -1457,7 +1455,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         agent: AgentInfo,
         criteria: SearchCriteria,
-    ) -> Tuple[float, Dict[str, Any]]:
+    ) -> tuple[float, dict[str, Any]]:
         """Score availability"""
         details = {}
 
@@ -1494,8 +1492,8 @@ class EnhancedDiscoveryManager(DiscoveryManager):
     def _generate_recommendation(
         self,
         overall_score: float,
-        strengths: List[str],
-        weaknesses: List[str],
+        strengths: list[str],
+        weaknesses: list[str],
     ) -> str:
         """Generate a recommendation message"""
         if overall_score >= 0.8:
@@ -1513,7 +1511,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
         self,
         task_description: str,
         limit: int = 10,
-    ) -> List[MultiDimensionalMatchResult]:
+    ) -> list[MultiDimensionalMatchResult]:
         """
         Perform semantic search using task description.
 
@@ -1542,7 +1540,7 @@ class EnhancedDiscoveryManager(DiscoveryManager):
 
         return await self.multi_dimensional_search(criteria, limit)
 
-    async def _extract_task_intent(self, task_description: str) -> Dict[str, Any]:
+    async def _extract_task_intent(self, task_description: str) -> dict[str, Any]:
         """Extract task intent using LLM or heuristics"""
         # If LLM adapter is available, use it
         if self._llm_adapter:
@@ -1658,7 +1656,7 @@ Return as JSON with keys: skills, capabilities, budget_min, budget_max, experien
                 self.logger.error(f"Watch loop error: {e}")
                 await asyncio.sleep(5)
 
-    async def _check_watch_condition(self, condition: WatchCondition) -> List[WatchEvent]:
+    async def _check_watch_condition(self, condition: WatchCondition) -> list[WatchEvent]:
         """Check if watch condition is triggered"""
         events = []
 
@@ -1708,8 +1706,8 @@ Return as JSON with keys: skills, capabilities, budget_min, budget_max, experien
 
     async def compare_agents(
         self,
-        agent_ids: List[str],
-        criteria: Optional[SearchCriteria] = None,
+        agent_ids: list[str],
+        criteria: SearchCriteria | None = None,
     ) -> AgentComparison:
         """
         Compare multiple agents across dimensions.
@@ -1739,7 +1737,7 @@ Return as JSON with keys: skills, capabilities, budget_min, budget_max, experien
             MatchDimension.AVAILABILITY,
         ]
 
-        scores: Dict[str, Dict[MatchDimension, float]] = {}
+        scores: dict[str, dict[MatchDimension, float]] = {}
 
         for agent in agents:
             result = await self._score_multi_dimensional(agent, criteria)
@@ -1793,7 +1791,7 @@ Return as JSON with keys: skills, capabilities, budget_min, budget_max, experien
         task_description: str,
         min_relevance: float = 0.6,
         limit: int = 10,
-    ) -> List[MultiDimensionalMatchResult]:
+    ) -> list[MultiDimensionalMatchResult]:
         """
         Discover agents based on their proven experience (Gene Capsule).
 
@@ -1878,7 +1876,7 @@ Return as JSON with keys: skills, capabilities, budget_min, budget_max, experien
         self,
         task_type: str,
         limit: int = 5,
-    ) -> List[MultiDimensionalMatchResult]:
+    ) -> list[MultiDimensionalMatchResult]:
         """
         Get recommendations based on historical success patterns.
 

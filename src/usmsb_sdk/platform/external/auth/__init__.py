@@ -28,41 +28,40 @@ Usage:
 """
 
 # Base types and enums
+# Coordinator
+from usmsb_sdk.platform.external.auth.auth_coordinator import (
+    MAX_SESSION_DURATION_HOURS,
+    SESSION_DURATION_HOURS,
+    AuthCoordinator,
+    SessionInfo,
+    VerificationContext,
+)
 from usmsb_sdk.platform.external.auth.base_auth import (
-    Permission,
-    StakeTier,
     AuthContext,
     BaseAuthResult,
-    WalletAuthResult,
-    StakeVerificationResult,
     FullAuthResult,
     IAuthProvider,
-)
-
-# Wallet authentication
-from usmsb_sdk.platform.external.auth.wallet_auth import (
-    WalletBinding,
-    IWalletAuthenticator,
-    MockWalletAuthenticator,
+    Permission,
+    StakeTier,
+    StakeVerificationResult,
+    WalletAuthResult,
 )
 
 # Stake verification
 from usmsb_sdk.platform.external.auth.stake_verifier import (
-    StakeInfo,
+    MINIMUM_STAKE_FOR_REGISTRATION,
+    STAKE_LOCK_PERIOD_DAYS,
     AgentRegistration,
     IStakeVerifier,
     MockStakeVerifier,
-    MINIMUM_STAKE_FOR_REGISTRATION,
-    STAKE_LOCK_PERIOD_DAYS,
+    StakeInfo,
 )
 
-# Coordinator
-from usmsb_sdk.platform.external.auth.auth_coordinator import (
-    SessionInfo,
-    VerificationContext,
-    AuthCoordinator,
-    SESSION_DURATION_HOURS,
-    MAX_SESSION_DURATION_HOURS,
+# Wallet authentication
+from usmsb_sdk.platform.external.auth.wallet_auth import (
+    IWalletAuthenticator,
+    MockWalletAuthenticator,
+    WalletBinding,
 )
 
 __all__ = [

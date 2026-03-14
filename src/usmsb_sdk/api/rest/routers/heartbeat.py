@@ -9,17 +9,12 @@ Authentication: All endpoints require X-API-Key + X-Agent-ID headers.
 """
 
 import time
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from usmsb_sdk.api.database import (
-    get_db,
-    update_agent_heartbeat,
-    get_agent as db_get_agent
-)
-from usmsb_sdk.api.rest.unified_auth import get_current_user_unified, ErrorCode
+from usmsb_sdk.api.database import get_db, update_agent_heartbeat
+from usmsb_sdk.api.rest.unified_auth import ErrorCode, get_current_user_unified
 
 router = APIRouter(prefix="/heartbeat", tags=["Heartbeat"])
 
@@ -33,7 +28,7 @@ DEFAULT_HEARTBEAT_INTERVAL = 30  # Default heartbeat interval in seconds
 class HeartbeatRequest(BaseModel):
     """Heartbeat request."""
     status: str = Field("online", description="Agent status: online, busy, offline")
-    metadata: Optional[dict] = Field(None, description="Optional metadata")
+    metadata: dict | None = Field(None, description="Optional metadata")
 
 
 class HeartbeatResponse(BaseModel):

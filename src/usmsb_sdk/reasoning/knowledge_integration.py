@@ -4,10 +4,10 @@ Knowledge Graph Integration Module
 知识图谱集成与推理支持
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any
 
 from usmsb_sdk.reasoning.interfaces import IKnowledgeGraphAdapter
 
@@ -21,7 +21,7 @@ class ConceptNode:
     concept_id: str
     name: str
     concept_type: str
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
     confidence: float = 1.0
 
 
@@ -33,7 +33,7 @@ class RelationEdge:
     source: str
     target: str
     relation_type: str
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
     confidence: float = 1.0
     weight: float = 1.0
 
@@ -52,10 +52,10 @@ class TripleStore:
     """三元组存储"""
 
     def __init__(self):
-        self._triples: List[Triple] = []
-        self._subject_index: Dict[str, List[int]] = defaultdict(list)
-        self._predicate_index: Dict[str, List[int]] = defaultdict(list)
-        self._object_index: Dict[str, List[int]] = defaultdict(list)
+        self._triples: list[Triple] = []
+        self._subject_index: dict[str, list[int]] = defaultdict(list)
+        self._predicate_index: dict[str, list[int]] = defaultdict(list)
+        self._object_index: dict[str, list[int]] = defaultdict(list)
 
     def add_triple(self, triple: Triple) -> None:
         idx = len(self._triples)
@@ -64,21 +64,21 @@ class TripleStore:
         self._predicate_index[triple.predicate].append(idx)
         self._object_index[triple.object].append(idx)
 
-    def query_by_subject(self, subject: str) -> List[Triple]:
+    def query_by_subject(self, subject: str) -> list[Triple]:
         return [self._triples[i] for i in self._subject_index.get(subject, [])]
 
-    def query_by_predicate(self, predicate: str) -> List[Triple]:
+    def query_by_predicate(self, predicate: str) -> list[Triple]:
         return [self._triples[i] for i in self._predicate_index.get(predicate, [])]
 
-    def query_by_object(self, object: str) -> List[Triple]:
+    def query_by_object(self, object: str) -> list[Triple]:
         return [self._triples[i] for i in self._object_index.get(object, [])]
 
     def query(
         self,
-        subject: Optional[str] = None,
-        predicate: Optional[str] = None,
-        object: Optional[str] = None,
-    ) -> List[Triple]:
+        subject: str | None = None,
+        predicate: str | None = None,
+        object: str | None = None,
+    ) -> list[Triple]:
         if subject and predicate and object:
             return [
                 t
@@ -106,7 +106,7 @@ class TripleStore:
                 return True
         return False
 
-    def get_all_triples(self) -> List[Triple]:
+    def get_all_triples(self) -> list[Triple]:
         return self._triples.copy()
 
 
@@ -122,11 +122,11 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
     """
 
     def __init__(self):
-        self._nodes: Dict[str, ConceptNode] = {}
-        self._edges: Dict[str, RelationEdge] = {}
+        self._nodes: dict[str, ConceptNode] = {}
+        self._edges: dict[str, RelationEdge] = {}
         self._triple_store = TripleStore()
-        self._relation_types: Set[str] = set()
-        self._inference_rules: List[Dict[str, Any]] = []
+        self._relation_types: set[str] = set()
+        self._inference_rules: list[dict[str, Any]] = []
         self._initialize_default_rules()
 
     def _initialize_default_rules(self):
@@ -173,8 +173,8 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
         self._triple_store.add_triple(triple)
 
     async def query(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         parameters = parameters or {}
         results = []
 
@@ -248,7 +248,7 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
 
         return True
 
-    async def get_related_concepts(self, concept: str, max_depth: int = 2) -> List[Dict[str, Any]]:
+    async def get_related_concepts(self, concept: str, max_depth: int = 2) -> list[dict[str, Any]]:
         related = []
         visited = set()
 
@@ -284,7 +284,7 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
         traverse(concept, 1)
         return related
 
-    async def infer_relations(self, entity1: str, entity2: str) -> List[Dict[str, Any]]:
+    async def infer_relations(self, entity1: str, entity2: str) -> list[dict[str, Any]]:
         relations = []
 
         direct = self._triple_store.query(subject=entity1, object=entity2)
@@ -315,7 +315,7 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
 
         return relations
 
-    async def check_consistency(self, facts: List[Tuple[str, str, str]]) -> Tuple[bool, List[str]]:
+    async def check_consistency(self, facts: list[tuple[str, str, str]]) -> tuple[bool, list[str]]:
         errors = []
 
         for s, p, o in facts:
@@ -337,7 +337,7 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
 
         return len(errors) == 0, errors
 
-    def _find_paths(self, start: str, end: str, max_depth: int = 5) -> List[List[str]]:
+    def _find_paths(self, start: str, end: str, max_depth: int = 5) -> list[list[str]]:
         if start == end:
             return [[start]]
 
@@ -365,8 +365,8 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
         return paths
 
     def _apply_inference_rule(
-        self, rule: Dict[str, Any], entity1: str, entity2: str
-    ) -> List[Dict[str, Any]]:
+        self, rule: dict[str, Any], entity1: str, entity2: str
+    ) -> list[dict[str, Any]]:
         inferred = []
 
         if rule["name"] == "transitivity":
@@ -389,16 +389,16 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
 
         return inferred
 
-    def get_concept(self, concept_id: str) -> Optional[ConceptNode]:
+    def get_concept(self, concept_id: str) -> ConceptNode | None:
         return self._nodes.get(concept_id)
 
-    def get_all_concepts(self) -> List[ConceptNode]:
+    def get_all_concepts(self) -> list[ConceptNode]:
         return list(self._nodes.values())
 
-    def get_relation_types(self) -> List[str]:
+    def get_relation_types(self) -> list[str]:
         return list(self._relation_types)
 
-    def get_subgraph(self, center: str, radius: int = 2) -> Dict[str, Any]:
+    def get_subgraph(self, center: str, radius: int = 2) -> dict[str, Any]:
         nodes = {}
         edges = []
         visited = set()
@@ -442,7 +442,7 @@ class KnowledgeGraphIntegration(IKnowledgeGraphAdapter):
             "edges": edges,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "concepts_count": len(self._nodes),
             "relations_count": len(self._edges),

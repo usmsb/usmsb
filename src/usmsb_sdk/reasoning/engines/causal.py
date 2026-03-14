@@ -4,18 +4,18 @@ Causal Reasoning Engine
 因果推理引擎：因果关系分析、反事实推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Set
 import logging
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
+    ReasoningType,
     UncertaintyMeasure,
     UncertaintyType,
 )
@@ -32,7 +32,7 @@ class CausalRelation:
     strength: float
     necessary: bool = False
     sufficient: bool = False
-    conditions: List[str] = field(default_factory=list)
+    conditions: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -57,13 +57,13 @@ class CausalEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._causal_graph: Dict[str, List[CausalRelation]] = defaultdict(list)
-        self._variables: Set[str] = set()
-        self._observations: List[Dict[str, Any]] = []
+        self._causal_graph: dict[str, list[CausalRelation]] = defaultdict(list)
+        self._variables: set[str] = set()
+        self._observations: list[dict[str, Any]] = []
 
     @property
     def engine_type(self) -> ReasoningType:
@@ -88,10 +88,10 @@ class CausalEngine(BaseReasoningEngine):
         self._variables.add(cause)
         self._variables.add(effect)
 
-    def add_observation(self, observation: Dict[str, Any]) -> None:
+    def add_observation(self, observation: dict[str, Any]) -> None:
         self._observations.append(observation)
 
-    def _discover_causes(self, effect: str, depth: int = 2) -> List[Dict[str, Any]]:
+    def _discover_causes(self, effect: str, depth: int = 2) -> list[dict[str, Any]]:
         causes = []
 
         for cause, relations in self._causal_graph.items():
@@ -117,22 +117,22 @@ class CausalEngine(BaseReasoningEngine):
         return causes
 
     def _estimate_causal_effect(
-        self, cause: str, effect: str, observations: List[Dict[str, Any]]
-    ) -> Tuple[float, Dict[str, Any]]:
+        self, cause: str, effect: str, observations: list[dict[str, Any]]
+    ) -> tuple[float, dict[str, Any]]:
         if not observations:
             return 0.5, {"method": "prior", "confidence": 0.0}
 
-        cause_present = [o for o in observations if o.get(cause) == True or o.get(cause) == 1]
-        cause_absent = [o for o in observations if o.get(cause) == False or o.get(cause) == 0]
+        cause_present = [o for o in observations if o.get(cause) or o.get(cause) == 1]
+        cause_absent = [o for o in observations if not o.get(cause) or o.get(cause) == 0]
 
         if not cause_present or not cause_absent:
             return 0.5, {"method": "insufficient_data", "confidence": 0.0}
 
         effect_when_cause_present = sum(
-            1 for o in cause_present if o.get(effect) == True or o.get(effect) == 1
+            1 for o in cause_present if o.get(effect) or o.get(effect) == 1
         ) / len(cause_present)
         effect_when_cause_absent = sum(
-            1 for o in cause_absent if o.get(effect) == True or o.get(effect) == 1
+            1 for o in cause_absent if o.get(effect) or o.get(effect) == 1
         ) / len(cause_absent)
 
         causal_effect = effect_when_cause_present - effect_when_cause_absent
@@ -147,8 +147,8 @@ class CausalEngine(BaseReasoningEngine):
         }
 
     def _counterfactual_reasoning(
-        self, factual: Dict[str, Any], intervention: Intervention, target: str
-    ) -> Tuple[Any, ConfidenceScore, str]:
+        self, factual: dict[str, Any], intervention: Intervention, target: str
+    ) -> tuple[Any, ConfidenceScore, str]:
         var = intervention.variable
         new_value = intervention.value
 
@@ -160,13 +160,13 @@ class CausalEngine(BaseReasoningEngine):
 
         effect, stats = self._estimate_causal_effect(var, target, self._observations)
 
-        if new_value == True or new_value == 1:
-            if target_value == True or target_value == 1:
+        if new_value or new_value == 1:
+            if target_value or target_value == 1:
                 counterfactual_target = target_value - effect
             else:
                 counterfactual_target = target_value + effect
         else:
-            if target_value == True or target_value == 1:
+            if target_value or target_value == 1:
                 counterfactual_target = target_value + effect
             else:
                 counterfactual_target = target_value - effect
@@ -186,11 +186,11 @@ class CausalEngine(BaseReasoningEngine):
         return counterfactual_target, confidence, trace
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         if not premises:
             return self._create_result(
@@ -225,7 +225,7 @@ class CausalEngine(BaseReasoningEngine):
                     conclusion=f"{best_cause['cause']} 导致 {effect}",
                     confidence=ConfidenceScore(value=best_cause["strength"]),
                     reasoning_chain=reasoning_chain,
-                    alternatives=[c for c in causes[1:4]],
+                    alternatives=list(causes[1:4]),
                     explanations=[
                         f"因果分析: {effect} 的可能原因",
                         f"最可能原因: {best_cause['cause']} (强度: {best_cause['strength']:.2f})",
@@ -299,7 +299,7 @@ class CausalEngine(BaseReasoningEngine):
                     conclusion=f"{best_cause['cause']} 可能导致 {effect}",
                     confidence=ConfidenceScore(value=best_cause["strength"]),
                     reasoning_chain=reasoning_chain,
-                    alternatives=[c for c in causes[1:3]],
+                    alternatives=list(causes[1:3]),
                 )
             else:
                 result = self._create_result(
@@ -311,7 +311,7 @@ class CausalEngine(BaseReasoningEngine):
         self._reasoning_history.append(result)
         return result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         errors = []
 
         for step in reasoning_result.reasoning_chain:
@@ -324,7 +324,7 @@ class CausalEngine(BaseReasoningEngine):
 
         return len(errors) == 0, errors
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         if not premises:
             return ConfidenceScore(value=0.0)
 
@@ -336,7 +336,7 @@ class CausalEngine(BaseReasoningEngine):
         )
         cause = str(conclusion)
 
-        for c, relations in self._causal_graph.items():
+        for _c, relations in self._causal_graph.items():
             for rel in relations:
                 if rel.cause == cause and rel.effect == effect:
                     return ConfidenceScore(value=rel.strength)
@@ -344,8 +344,8 @@ class CausalEngine(BaseReasoningEngine):
         return ConfidenceScore(value=0.0)
 
     def intervene(
-        self, variable: str, value: Any, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, variable: str, value: Any, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         context = context or {}
 
         effects = []

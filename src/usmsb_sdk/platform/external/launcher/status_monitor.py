@@ -7,11 +7,11 @@ Real-time platform status monitoring.
 
 import asyncio
 import logging
-import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 
 class MetricType(Enum):
@@ -28,10 +28,10 @@ class Metric:
     value: float
     metric_type: MetricType
     timestamp: datetime = field(default_factory=datetime.now)
-    tags: Dict[str, str] = field(default_factory=dict)
+    tags: dict[str, str] = field(default_factory=dict)
     unit: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -56,7 +56,7 @@ class NodeMetrics:
     active_connections: int = 0
     last_update: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "node_id": self.node_id,
@@ -83,7 +83,7 @@ class AgentMetrics:
     tasks_failed: int = 0
     avg_task_duration_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "total_agents": self.total_agents,
@@ -109,7 +109,7 @@ class StorageMetrics:
     write_ops_per_sec: float = 0.0
     avg_latency_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "type": self.type,
@@ -135,7 +135,7 @@ class PlatformSummary:
     storage_used_percent: float
     last_update: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "status": self.status,
@@ -156,7 +156,7 @@ class StatusMonitor:
     Monitors node status, agent activity, and storage usage.
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """
         Initialize status monitor.
 
@@ -167,20 +167,20 @@ class StatusMonitor:
         self._logger = logging.getLogger("usmsb.status_monitor")
 
         # Metrics storage
-        self._node_metrics: Dict[str, NodeMetrics] = {}
+        self._node_metrics: dict[str, NodeMetrics] = {}
         self._agent_metrics = AgentMetrics()
         self._storage_metrics = StorageMetrics()
-        self._custom_metrics: Dict[str, Metric] = {}
+        self._custom_metrics: dict[str, Metric] = {}
 
         # State tracking
-        self._start_time: Optional[datetime] = None
+        self._start_time: datetime | None = None
         self._platform_status: str = "unknown"
         self._is_running = False
-        self._monitor_task: Optional[asyncio.Task] = None
+        self._monitor_task: asyncio.Task | None = None
 
         # Event handlers
-        self._status_change_handlers: List[Callable] = []
-        self._alert_handlers: List[Callable] = []
+        self._status_change_handlers: list[Callable] = []
+        self._alert_handlers: list[Callable] = []
 
         # Configuration
         self._monitor_interval = self.config.get("monitor_interval", 10)
@@ -311,7 +311,7 @@ class StatusMonitor:
                 )
 
     async def _trigger_alert(self, alert_type: str, message: str,
-                             details: Dict[str, Any]) -> None:
+                             details: dict[str, Any]) -> None:
         """Trigger an alert."""
         alert = {
             "type": alert_type,
@@ -369,7 +369,7 @@ class StatusMonitor:
     # Custom metrics
     def record_metric(self, name: str, value: float,
                       metric_type: MetricType = MetricType.GAUGE,
-                      tags: Optional[Dict[str, str]] = None,
+                      tags: dict[str, str] | None = None,
                       unit: str = "") -> None:
         """Record a custom metric."""
         self._custom_metrics[name] = Metric(
@@ -380,7 +380,7 @@ class StatusMonitor:
             unit=unit,
         )
 
-    def get_metric(self, name: str) -> Optional[Metric]:
+    def get_metric(self, name: str) -> Metric | None:
         """Get a specific metric."""
         return self._custom_metrics.get(name)
 
@@ -394,7 +394,7 @@ class StatusMonitor:
         self._alert_handlers.append(handler)
 
     # API endpoints
-    def get_node_metrics(self, node_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_node_metrics(self, node_id: str | None = None) -> dict[str, Any]:
         """
         Get node metrics.
 
@@ -411,15 +411,15 @@ class StatusMonitor:
 
         return {nid: m.to_dict() for nid, m in self._node_metrics.items()}
 
-    def get_agent_metrics(self) -> Dict[str, Any]:
+    def get_agent_metrics(self) -> dict[str, Any]:
         """Get agent metrics."""
         return self._agent_metrics.to_dict()
 
-    def get_storage_metrics(self) -> Dict[str, Any]:
+    def get_storage_metrics(self) -> dict[str, Any]:
         """Get storage metrics."""
         return self._storage_metrics.to_dict()
 
-    def get_all_metrics(self) -> Dict[str, Any]:
+    def get_all_metrics(self) -> dict[str, Any]:
         """Get all metrics."""
         return {
             "nodes": self.get_node_metrics(),
@@ -458,7 +458,7 @@ class StatusMonitor:
             storage_used_percent=storage_used_percent,
         )
 
-    def get_status_api(self) -> Dict[str, Any]:
+    def get_status_api(self) -> dict[str, Any]:
         """
         Get status for monitoring API.
 

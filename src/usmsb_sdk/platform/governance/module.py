@@ -5,18 +5,17 @@ Module for decentralized governance including proposals, voting,
 and decision execution.
 """
 
-import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ProposalStatus(str, Enum):
+class ProposalStatus(StrEnum):
     """Status of a governance proposal."""
     DRAFT = "draft"
     ACTIVE = "active"
@@ -27,14 +26,14 @@ class ProposalStatus(str, Enum):
     EXPIRED = "expired"
 
 
-class VoteType(str, Enum):
+class VoteType(StrEnum):
     """Types of votes."""
     YES = "yes"
     NO = "no"
     ABSTAIN = "abstain"
 
 
-class ProposalType(str, Enum):
+class ProposalType(StrEnum):
     """Types of proposals."""
     PARAMETER_CHANGE = "parameter_change"
     TREASURY_SPEND = "treasury_spend"
@@ -70,7 +69,7 @@ class Vote:
     proposal_id: str
     vote_type: VoteType
     voting_power: float
-    reason: Optional[str] = None
+    reason: str | None = None
     timestamp: float = field(default_factory=lambda: time.time())
 
 
@@ -83,19 +82,19 @@ class Proposal:
     proposer_id: str
     type: ProposalType
     status: ProposalStatus = ProposalStatus.DRAFT
-    parameters: Dict[str, Any] = field(default_factory=dict)
-    voting_start: Optional[float] = None
-    voting_end: Optional[float] = None
+    parameters: dict[str, Any] = field(default_factory=dict)
+    voting_start: float | None = None
+    voting_end: float | None = None
     quorum: float = 0.3  # 30% of total voting power
     threshold: float = 0.5  # 50% of votes must be yes
-    votes: List[Vote] = field(default_factory=list)
+    votes: list[Vote] = field(default_factory=list)
     created_at: float = field(default_factory=lambda: time.time())
     updated_at: float = field(default_factory=lambda: time.time())
-    executed_at: Optional[float] = None
-    execution_result: Optional[Any] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    executed_at: float | None = None
+    execution_result: Any | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_vote_counts(self) -> Dict[VoteType, float]:
+    def get_vote_counts(self) -> dict[VoteType, float]:
         """Get vote counts by type."""
         counts = {VoteType.YES: 0.0, VoteType.NO: 0.0, VoteType.ABSTAIN: 0.0}
         for vote in self.votes:
@@ -139,16 +138,16 @@ class GovernanceModule:
         self.default_threshold = default_threshold
         self.min_proposal_stake = min_proposal_stake
 
-        self._proposals: Dict[str, Proposal] = {}
-        self._voting_powers: Dict[str, VotingPower] = {}
+        self._proposals: dict[str, Proposal] = {}
+        self._voting_powers: dict[str, VotingPower] = {}
         self._total_voting_power: float = 0.0
-        self._delegations: Dict[str, str] = {}  # delegator -> delegatee
+        self._delegations: dict[str, str] = {}  # delegator -> delegatee
 
         # Callbacks
-        self.on_proposal_created: Optional[Callable[[Proposal], None]] = None
-        self.on_proposal_passed: Optional[Callable[[Proposal], None]] = None
-        self.on_proposal_rejected: Optional[Callable[[Proposal], None]] = None
-        self.on_vote_cast: Optional[Callable[[Vote], None]] = None
+        self.on_proposal_created: Callable[[Proposal], None] | None = None
+        self.on_proposal_passed: Callable[[Proposal], None] | None = None
+        self.on_proposal_rejected: Callable[[Proposal], None] | None = None
+        self.on_vote_cast: Callable[[Vote], None] | None = None
 
     def register_voter(
         self,
@@ -184,9 +183,9 @@ class GovernanceModule:
     def update_voting_power(
         self,
         agent_id: str,
-        token_balance: Optional[float] = None,
-        staked_tokens: Optional[float] = None,
-        reputation: Optional[float] = None,
+        token_balance: float | None = None,
+        staked_tokens: float | None = None,
+        reputation: float | None = None,
     ) -> bool:
         """Update voting power for an agent."""
         power = self._voting_powers.get(agent_id)
@@ -255,10 +254,10 @@ class GovernanceModule:
         description: str,
         proposer_id: str,
         type: ProposalType,
-        parameters: Optional[Dict[str, Any]] = None,
-        quorum: Optional[float] = None,
-        threshold: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        parameters: dict[str, Any] | None = None,
+        quorum: float | None = None,
+        threshold: float | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Proposal:
         """
         Create a new proposal.
@@ -306,7 +305,7 @@ class GovernanceModule:
     def activate_proposal(
         self,
         proposal_id: str,
-        voting_period_hours: Optional[float] = None,
+        voting_period_hours: float | None = None,
     ) -> bool:
         """
         Activate a proposal for voting.
@@ -336,8 +335,8 @@ class GovernanceModule:
         proposal_id: str,
         voter_id: str,
         vote_type: VoteType,
-        reason: Optional[str] = None,
-    ) -> Optional[Vote]:
+        reason: str | None = None,
+    ) -> Vote | None:
         """
         Cast a vote on a proposal.
 
@@ -470,7 +469,7 @@ class GovernanceModule:
             proposal.execution_result = {"error": str(e)}
             return False
 
-    def _execute_proposal_action(self, proposal: Proposal) -> Dict[str, Any]:
+    def _execute_proposal_action(self, proposal: Proposal) -> dict[str, Any]:
         """Execute the action defined in the proposal."""
         # This would integrate with actual system components
         return {
@@ -479,16 +478,16 @@ class GovernanceModule:
             "parameters": proposal.parameters,
         }
 
-    def get_proposal(self, proposal_id: str) -> Optional[Proposal]:
+    def get_proposal(self, proposal_id: str) -> Proposal | None:
         """Get proposal by ID."""
         return self._proposals.get(proposal_id)
 
     def list_proposals(
         self,
-        status: Optional[ProposalStatus] = None,
-        type: Optional[ProposalType] = None,
-        proposer_id: Optional[str] = None,
-    ) -> List[Proposal]:
+        status: ProposalStatus | None = None,
+        type: ProposalType | None = None,
+        proposer_id: str | None = None,
+    ) -> list[Proposal]:
         """List proposals with filters."""
         proposals = list(self._proposals.values())
 
@@ -503,11 +502,11 @@ class GovernanceModule:
 
         return proposals
 
-    def get_voter_info(self, agent_id: str) -> Optional[VotingPower]:
+    def get_voter_info(self, agent_id: str) -> VotingPower | None:
         """Get voter information."""
         return self._voting_powers.get(agent_id)
 
-    def get_governance_stats(self) -> Dict[str, Any]:
+    def get_governance_stats(self) -> dict[str, Any]:
         """Get governance statistics."""
         total_proposals = len(self._proposals)
         active_proposals = sum(

@@ -17,14 +17,15 @@ import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class SyncMode(str, Enum):
+class SyncMode(StrEnum):
     """Synchronization modes."""
     INCREMENTAL = "incremental"  # WebSocket-based incremental sync
     BATCH = "batch"              # gRPC-based batch sync
@@ -33,7 +34,7 @@ class SyncMode(str, Enum):
     IPFS = "ipfs"                # IPFS-based data sync
 
 
-class SyncStatus(str, Enum):
+class SyncStatus(StrEnum):
     """Status of a sync operation."""
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -43,14 +44,14 @@ class SyncStatus(str, Enum):
     PARTIAL = "partial"
 
 
-class SyncDirection(str, Enum):
+class SyncDirection(StrEnum):
     """Direction of sync."""
     PUSH = "push"       # Push local changes to remote
     PULL = "pull"       # Pull remote changes to local
     BIDIRECTIONAL = "bidirectional"  # Both directions
 
 
-class ConflictResolution(str, Enum):
+class ConflictResolution(StrEnum):
     """Conflict resolution strategies."""
     LAST_WRITE_WINS = "last_write_wins"
     FIRST_WRITE_WINS = "first_write_wins"
@@ -69,9 +70,9 @@ class DataChunk:
     is_compressed: bool = False
     is_last: bool = False
     total_chunks: int = 1
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "chunk_id": self.chunk_id,
             "sequence_num": self.sequence_num,
@@ -134,15 +135,15 @@ class SyncOperation:
     data_type: str
     status: SyncStatus = SyncStatus.PENDING
     created_at: float = field(default_factory=time.time)
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    started_at: float | None = None
+    completed_at: float | None = None
     total_items: int = 0
     synced_items: int = 0
     failed_items: int = 0
     bytes_transferred: int = 0
-    error_message: Optional[str] = None
-    checkpoints: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    error_message: str | None = None
+    checkpoints: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def start(self) -> None:
         """Mark operation as started."""
@@ -160,7 +161,7 @@ class SyncOperation:
             return 0.0
         return (self.synced_items / self.total_items) * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "operation_id": self.operation_id,
             "mode": self.mode.value,
@@ -193,11 +194,11 @@ class SyncResult:
     conflicts_count: int
     bytes_transferred: int
     duration_seconds: float
-    errors: List[str] = field(default_factory=list)
-    conflicts: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "operation_id": self.operation_id,
             "success": self.success,
@@ -222,10 +223,10 @@ class ConflictInfo:
     remote_timestamp: float
     local_node: str
     remote_node: str
-    resolution: Optional[str] = None
+    resolution: str | None = None
     resolved_value: Any = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "key": self.key,
             "local_value": self.local_value,
@@ -247,10 +248,10 @@ class Checkpoint:
     sequence_num: int
     timestamp: float = field(default_factory=time.time)
     synced_items: int = 0
-    state: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "checkpoint_id": self.checkpoint_id,
             "operation_id": self.operation_id,
@@ -275,7 +276,7 @@ class SyncStats:
     avg_sync_time: float = 0.0
     active_operations: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_operations": self.total_operations,
             "successful_operations": self.successful_operations,
@@ -354,37 +355,37 @@ class SyncService:
         self.checkpoint_interval = checkpoint_interval
 
         # Data providers and appliers
-        self._data_providers: Dict[str, Callable] = {}
-        self._data_appliers: Dict[str, Callable] = {}
-        self._conflict_resolvers: Dict[str, Callable] = {}
+        self._data_providers: dict[str, Callable] = {}
+        self._data_appliers: dict[str, Callable] = {}
+        self._conflict_resolvers: dict[str, Callable] = {}
 
         # Sync state
-        self._sync_states: Dict[str, Dict[str, Any]] = defaultdict(dict)
-        self._last_sync_times: Dict[str, float] = {}
+        self._sync_states: dict[str, dict[str, Any]] = defaultdict(dict)
+        self._last_sync_times: dict[str, float] = {}
 
         # Operations
-        self._operations: Dict[str, SyncOperation] = {}
-        self._active_operations: Dict[str, asyncio.Task] = {}
+        self._operations: dict[str, SyncOperation] = {}
+        self._active_operations: dict[str, asyncio.Task] = {}
 
         # Checkpoints
-        self._checkpoints: Dict[str, List[Checkpoint]] = defaultdict(list)
+        self._checkpoints: dict[str, list[Checkpoint]] = defaultdict(list)
 
         # Statistics
         self._stats = SyncStats()
 
         # State
         self._running = False
-        self._tasks: Set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task] = set()
 
         # Broadcast service (set externally)
-        self._broadcast_service: Optional[Any] = None
+        self._broadcast_service: Any | None = None
 
         # gRPC client/server (for batch sync)
-        self._grpc_server: Optional[Any] = None
-        self._grpc_clients: Dict[str, Any] = {}
+        self._grpc_server: Any | None = None
+        self._grpc_clients: dict[str, Any] = {}
 
         # IPFS client (for IPFS sync)
-        self._ipfs_client: Optional[Any] = None
+        self._ipfs_client: Any | None = None
 
     # ==================== Lifecycle ====================
 
@@ -421,7 +422,7 @@ class SyncService:
         self._running = False
 
         # Cancel active operations
-        for op_id, task in list(self._active_operations.items()):
+        for _op_id, task in list(self._active_operations.items()):
             task.cancel()
 
         # Wait for tasks
@@ -442,9 +443,9 @@ class SyncService:
     def register_data_provider(
         self,
         data_type: str,
-        provider: Callable[[Optional[float], Optional[int]], Iterator[Dict[str, Any]]],
-        applier: Callable[[List[Dict[str, Any]]], int],
-        conflict_resolver: Optional[Callable[[ConflictInfo], Any]] = None,
+        provider: Callable[[float | None, int | None], Iterator[dict[str, Any]]],
+        applier: Callable[[list[dict[str, Any]]], int],
+        conflict_resolver: Callable[[ConflictInfo], Any] | None = None,
     ) -> None:
         """
         Register a data provider for a data type.
@@ -476,7 +477,7 @@ class SyncService:
         data_type: str,
         mode: SyncMode = SyncMode.INCREMENTAL,
         direction: SyncDirection = SyncDirection.BIDIRECTIONAL,
-        since: Optional[float] = None,
+        since: float | None = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> SyncResult:
         """
@@ -559,7 +560,7 @@ class SyncService:
     async def _incremental_sync(
         self,
         operation: SyncOperation,
-        since: Optional[float],
+        since: float | None,
         timeout: float,
     ) -> SyncResult:
         """Perform incremental sync via WebSocket."""
@@ -664,7 +665,7 @@ class SyncService:
         timeout: float,
     ) -> SyncResult:
         """Perform full state sync."""
-        start_time = time.time()
+        time.time()
 
         # Full sync is essentially incremental sync with since=None
         result = await self._incremental_sync(operation, None, timeout)
@@ -709,7 +710,7 @@ class SyncService:
 
     # ==================== Helper Methods ====================
 
-    def _batch(self, items: List[Any], size: int) -> Iterator[List[Any]]:
+    def _batch(self, items: list[Any], size: int) -> Iterator[list[Any]]:
         """Batch items into chunks."""
         for i in range(0, len(items), size):
             yield items[i:i + size]
@@ -718,7 +719,7 @@ class SyncService:
         self,
         peer_id: str,
         data_type: str,
-        changes: List[Dict[str, Any]],
+        changes: list[dict[str, Any]],
     ) -> int:
         """Send changes to a peer."""
         if not self._broadcast_service:
@@ -751,8 +752,8 @@ class SyncService:
         self,
         peer_id: str,
         data_type: str,
-        since: Optional[float],
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        since: float | None,
+    ) -> tuple[list[dict[str, Any]], int]:
         """Receive changes from a peer."""
         # This would normally request and wait for changes from the peer
         # For now, return empty list
@@ -764,9 +765,9 @@ class SyncService:
 
     async def _detect_conflicts(
         self,
-        remote_changes: List[Dict[str, Any]],
-        local_changes: List[Dict[str, Any]],
-    ) -> List[ConflictInfo]:
+        remote_changes: list[dict[str, Any]],
+        local_changes: list[dict[str, Any]],
+    ) -> list[ConflictInfo]:
         """Detect conflicts between local and remote changes."""
         conflicts = []
         local_by_key = {c.get("key"): c for c in local_changes if "key" in c}
@@ -847,7 +848,7 @@ class SyncService:
     async def recover_from_checkpoint(
         self,
         operation_id: str,
-    ) -> Optional[SyncOperation]:
+    ) -> SyncOperation | None:
         """Recover a sync operation from checkpoint."""
         if operation_id not in self._checkpoints:
             return None
@@ -938,7 +939,7 @@ class SyncService:
         """Set the broadcast service for communication."""
         self._broadcast_service = service
 
-    def handle_sync_message(self, message: Dict[str, Any]) -> None:
+    def handle_sync_message(self, message: dict[str, Any]) -> None:
         """Handle incoming sync message."""
         msg_type = message.get("type")
 
@@ -947,7 +948,7 @@ class SyncService:
         elif msg_type == "sync_request":
             asyncio.create_task(self._handle_sync_request(message))
 
-    async def _handle_sync_changes(self, message: Dict[str, Any]) -> None:
+    async def _handle_sync_changes(self, message: dict[str, Any]) -> None:
         """Handle incoming sync changes."""
         data_type = message.get("data_type")
         changes = message.get("changes", [])
@@ -962,7 +963,7 @@ class SyncService:
         except Exception as e:
             logger.error(f"Failed to apply {data_type} changes: {e}")
 
-    async def _handle_sync_request(self, message: Dict[str, Any]) -> None:
+    async def _handle_sync_request(self, message: dict[str, Any]) -> None:
         """Handle incoming sync request."""
         data_type = message.get("data_type")
         since = message.get("since")
@@ -983,21 +984,21 @@ class SyncService:
         """Get sync statistics."""
         return self._stats
 
-    def get_operation(self, operation_id: str) -> Optional[SyncOperation]:
+    def get_operation(self, operation_id: str) -> SyncOperation | None:
         """Get an operation by ID."""
         return self._operations.get(operation_id)
 
-    def get_active_operations(self) -> List[SyncOperation]:
+    def get_active_operations(self) -> list[SyncOperation]:
         """Get list of active operations."""
         return [
             op for op in self._operations.values()
             if op.status == SyncStatus.IN_PROGRESS
         ]
 
-    def get_sync_state(self, peer_id: str, data_type: str) -> Dict[str, Any]:
+    def get_sync_state(self, peer_id: str, data_type: str) -> dict[str, Any]:
         """Get sync state for a peer/data type."""
         return self._sync_states.get(f"{peer_id}:{data_type}", {})
 
-    def get_last_sync_time(self, peer_id: str, data_type: str) -> Optional[float]:
+    def get_last_sync_time(self, peer_id: str, data_type: str) -> float | None:
         """Get last sync time for a peer/data type."""
         return self._last_sync_times.get(f"{peer_id}:{data_type}")

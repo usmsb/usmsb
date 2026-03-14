@@ -8,11 +8,10 @@ import asyncio
 import logging
 import statistics
 import time
-from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +32,10 @@ class MetricValue:
     value: float
     metric_type: MetricType
     timestamp: float = field(default_factory=time.time)
-    tags: Dict[str, str] = field(default_factory=dict)
-    unit: Optional[str] = None
+    tags: dict[str, str] = field(default_factory=dict)
+    unit: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "name": self.name,
@@ -53,25 +52,25 @@ class MetricSeries:
     """A time series of metric values."""
     name: str
     metric_type: MetricType
-    values: List[Tuple[float, float]] = field(default_factory=list)  # (timestamp, value)
-    tags: Dict[str, str] = field(default_factory=dict)
-    unit: Optional[str] = None
+    values: list[tuple[float, float]] = field(default_factory=list)  # (timestamp, value)
+    tags: dict[str, str] = field(default_factory=dict)
+    unit: str | None = None
     max_size: int = 1000
 
-    def add_value(self, value: float, timestamp: Optional[float] = None) -> None:
+    def add_value(self, value: float, timestamp: float | None = None) -> None:
         """Add a value to the series."""
         ts = timestamp or time.time()
         self.values.append((ts, value))
         if len(self.values) > self.max_size:
             self.values.pop(0)
 
-    def get_latest(self) -> Optional[float]:
+    def get_latest(self) -> float | None:
         """Get the latest value."""
         if self.values:
             return self.values[-1][1]
         return None
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         """Get statistics for the series."""
         if not self.values:
             return {}
@@ -91,7 +90,7 @@ class MetricSeries:
 class Counter:
     """A counter metric that only increases."""
 
-    def __init__(self, name: str, tags: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, tags: dict[str, str] | None = None):
         self.name = name
         self.value = 0
         self.tags = tags or {}
@@ -122,7 +121,7 @@ class Counter:
 class Gauge:
     """A gauge metric that can go up or down."""
 
-    def __init__(self, name: str, tags: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, tags: dict[str, str] | None = None):
         self.name = name
         self.value = 0.0
         self.tags = tags or {}
@@ -153,17 +152,17 @@ class Histogram:
     def __init__(
         self,
         name: str,
-        buckets: Optional[List[float]] = None,
-        tags: Optional[Dict[str, str]] = None,
+        buckets: list[float] | None = None,
+        tags: dict[str, str] | None = None,
     ):
         self.name = name
         self.buckets = buckets or [0.1, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")]
-        self.bucket_counts: Dict[float, int] = {b: 0 for b in self.buckets}
+        self.bucket_counts: dict[float, int] = dict.fromkeys(self.buckets, 0)
         self.sum = 0.0
         self.count = 0
         self.tags = tags or {}
         self.series = MetricSeries(name, MetricType.HISTOGRAM, tags=self.tags)
-        self._values: List[float] = []
+        self._values: list[float] = []
 
     def observe(self, value: float) -> None:
         """Observe a value."""
@@ -177,7 +176,7 @@ class Histogram:
 
         self.series.add_value(value)
 
-    def get_percentile(self, percentile: float) -> Optional[float]:
+    def get_percentile(self, percentile: float) -> float | None:
         """Get a percentile value."""
         if not self._values:
             return None
@@ -185,7 +184,7 @@ class Histogram:
         index = int(len(sorted_values) * percentile / 100)
         return sorted_values[min(index, len(sorted_values) - 1)]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get histogram statistics."""
         stats = {
             "count": self.count,
@@ -204,13 +203,13 @@ class Histogram:
 class Timer:
     """A timer metric for measuring durations."""
 
-    def __init__(self, name: str, tags: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, tags: dict[str, str] | None = None):
         self.name = name
         self.tags = tags or {}
         self.histogram = Histogram(name, tags=self.tags)
-        self._start_times: Dict[str, float] = {}
+        self._start_times: dict[str, float] = {}
 
-    def start(self, label: Optional[str] = None) -> str:
+    def start(self, label: str | None = None) -> str:
         """Start a timer and return a label for stopping."""
         label = label or f"{self.name}_{len(self._start_times)}"
         self._start_times[label] = time.time()
@@ -248,7 +247,7 @@ class Timer:
                 self.stop(label)
         return wrapper
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get timer statistics."""
         return self.histogram.get_stats()
 
@@ -268,11 +267,11 @@ class MetricsRegistry:
             namespace: Optional namespace prefix for all metrics
         """
         self.namespace = namespace
-        self._counters: Dict[str, Counter] = {}
-        self._gauges: Dict[str, Gauge] = {}
-        self._histograms: Dict[str, Histogram] = {}
-        self._timers: Dict[str, Timer] = {}
-        self._callbacks: List[Callable] = []
+        self._counters: dict[str, Counter] = {}
+        self._gauges: dict[str, Gauge] = {}
+        self._histograms: dict[str, Histogram] = {}
+        self._timers: dict[str, Timer] = {}
+        self._callbacks: list[Callable] = []
 
     def _get_full_name(self, name: str) -> str:
         """Get the full metric name with namespace."""
@@ -283,7 +282,7 @@ class MetricsRegistry:
     def counter(
         self,
         name: str,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> Counter:
         """
         Get or create a counter metric.
@@ -303,7 +302,7 @@ class MetricsRegistry:
     def gauge(
         self,
         name: str,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> Gauge:
         """
         Get or create a gauge metric.
@@ -323,8 +322,8 @@ class MetricsRegistry:
     def histogram(
         self,
         name: str,
-        buckets: Optional[List[float]] = None,
-        tags: Optional[Dict[str, str]] = None,
+        buckets: list[float] | None = None,
+        tags: dict[str, str] | None = None,
     ) -> Histogram:
         """
         Get or create a histogram metric.
@@ -345,7 +344,7 @@ class MetricsRegistry:
     def timer(
         self,
         name: str,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> Timer:
         """
         Get or create a timer metric.
@@ -362,7 +361,7 @@ class MetricsRegistry:
             self._timers[full_name] = Timer(full_name, tags)
         return self._timers[full_name]
 
-    def get_all_metrics(self) -> Dict[str, Any]:
+    def get_all_metrics(self) -> dict[str, Any]:
         """Get all metric values."""
         metrics = {}
 
@@ -396,7 +395,7 @@ class MetricsRegistry:
 
         return metrics
 
-    def get_metric(self, name: str) -> Optional[Union[Counter, Gauge, Histogram, Timer]]:
+    def get_metric(self, name: str) -> Counter | Gauge | Histogram | Timer | None:
         """Get a specific metric by name."""
         full_name = self._get_full_name(name)
         if full_name in self._counters:
@@ -413,7 +412,7 @@ class MetricsRegistry:
         """Register a callback to be called when metrics are collected."""
         self._callbacks.append(callback)
 
-    async def collect(self) -> Dict[str, Any]:
+    async def collect(self) -> dict[str, Any]:
         """Collect all metrics including callbacks."""
         metrics = self.get_all_metrics()
 
@@ -453,7 +452,7 @@ class MetricsRegistry:
 
         return "\n".join(lines)
 
-    def _format_tags(self, tags: Dict[str, str]) -> str:
+    def _format_tags(self, tags: dict[str, str]) -> str:
         """Format tags for Prometheus export."""
         if not tags:
             return ""
@@ -487,8 +486,8 @@ class MetricsCollector:
         self.registry = registry
         self.interval = interval
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._collectors: List[Callable] = []
+        self._task: asyncio.Task | None = None
+        self._collectors: list[Callable] = []
 
     def add_collector(self, collector: Callable) -> None:
         """Add a collector function."""
@@ -563,8 +562,8 @@ async def collect_system_metrics(registry: MetricsRegistry) -> None:
 
 
 # Global metrics registry
-_registry: Optional[MetricsRegistry] = None
-_collector: Optional[MetricsCollector] = None
+_registry: MetricsRegistry | None = None
+_collector: MetricsCollector | None = None
 
 
 def get_metrics_registry() -> MetricsRegistry:

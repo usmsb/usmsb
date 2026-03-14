@@ -8,19 +8,17 @@ Implements complete on-chain governance:
 - Treasury management
 """
 import asyncio
-import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-import hashlib
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ProposalType(str, Enum):
+class ProposalType(StrEnum):
     """Types of governance proposals."""
     PARAMETER_CHANGE = "parameter_change"      # Change platform parameters
     FEATURE_ADDITION = "feature_addition"      # Add new features
@@ -31,7 +29,7 @@ class ProposalType(str, Enum):
     FEE_ADJUSTMENT = "fee_adjustment"          # Adjust platform fees
 
 
-class ProposalStatus(str, Enum):
+class ProposalStatus(StrEnum):
     """Status of a proposal."""
     DRAFT = "draft"                 # Being drafted
     DISCUSSION = "discussion"        # In discussion phase
@@ -43,7 +41,7 @@ class ProposalStatus(str, Enum):
     EXPIRED = "expired"             # Expired without execution
 
 
-class VoteChoice(str, Enum):
+class VoteChoice(StrEnum):
     """Vote choices."""
     FOR = "for"
     AGAINST = "against"
@@ -61,15 +59,15 @@ class Proposal:
     proposer_stake: float
 
     # Content
-    changes: Dict[str, Any]  # Proposed changes
-    execution_code: Optional[str] = None  # Code to execute if passed
+    changes: dict[str, Any]  # Proposed changes
+    execution_code: str | None = None  # Code to execute if passed
 
     # Timeline
     created_at: float
     discussion_ends_at: float
     voting_starts_at: float
     voting_ends_at: float
-    execution_at: Optional[float] = None  # Time-locked execution time
+    execution_at: float | None = None  # Time-locked execution time
 
     # Status
     status: ProposalStatus = ProposalStatus.DRAFT
@@ -86,10 +84,10 @@ class Proposal:
     approval_threshold: float = 0.60  # 60% must vote for
 
     # Metadata
-    tags: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "proposalId": self.proposal_id,
             "title": self.title,
@@ -126,10 +124,10 @@ class Vote:
     stake_weight: float  # Voter's stake at time of vote
     reputation_weight: float  # Voter's reputation multiplier
     total_weight: float  # Combined weight
-    reason: Optional[str] = None
+    reason: str | None = None
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "voteId": self.vote_id,
             "proposalId": self.proposal_id,
@@ -154,7 +152,7 @@ class GovernanceStats:
     proposals_executed: int = 0
     proposals_failed: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "totalProposals": self.total_proposals,
             "activeProposals": self.active_proposals,
@@ -204,17 +202,17 @@ class GovernanceService:
         self.reputation = reputation_service
 
         # Storage
-        self._proposals: Dict[str, Proposal] = {}
-        self._votes: Dict[str, Dict[str, Vote]] = {}  # proposal_id -> voter_id -> Vote
+        self._proposals: dict[str, Proposal] = {}
+        self._votes: dict[str, dict[str, Vote]] = {}  # proposal_id -> voter_id -> Vote
         self._total_stake: float = 0.0
 
         # Callbacks
-        self.on_proposal_created: Optional[Callable[[Proposal], None]] = None
-        self.on_proposal_executed: Optional[Callable[[Proposal], None]] = None
+        self.on_proposal_created: Callable[[Proposal], None] | None = None
+        self.on_proposal_executed: Callable[[Proposal], None] | None = None
 
         # Background tasks
         self._running = False
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
 
     async def start(self) -> None:
         """Start background tasks."""
@@ -342,10 +340,10 @@ class GovernanceService:
         proposal_type: ProposalType,
         proposer_id: str,
         proposer_stake: float,
-        changes: Dict[str, Any],
+        changes: dict[str, Any],
         execution_code: str = None,
-        tags: List[str] = None,
-    ) -> Optional[Proposal]:
+        tags: list[str] = None,
+    ) -> Proposal | None:
         """
         Create a new proposal.
 
@@ -405,7 +403,7 @@ class GovernanceService:
 
         return proposal
 
-    def get_proposal(self, proposal_id: str) -> Optional[Proposal]:
+    def get_proposal(self, proposal_id: str) -> Proposal | None:
         """Get a proposal by ID."""
         return self._proposals.get(proposal_id)
 
@@ -414,7 +412,7 @@ class GovernanceService:
         status: ProposalStatus = None,
         proposal_type: ProposalType = None,
         limit: int = 50,
-    ) -> List[Proposal]:
+    ) -> list[Proposal]:
         """List proposals with optional filters."""
         proposals = list(self._proposals.values())
 
@@ -452,7 +450,7 @@ class GovernanceService:
         stake: float,
         reputation: float = 0.5,
         reason: str = None,
-    ) -> Optional[Vote]:
+    ) -> Vote | None:
         """
         Cast a vote on a proposal.
 
@@ -514,15 +512,15 @@ class GovernanceService:
         logger.info(f"Vote cast: {voter_id} voted {choice.value} on {proposal_id}")
         return vote
 
-    def get_vote(self, proposal_id: str, voter_id: str) -> Optional[Vote]:
+    def get_vote(self, proposal_id: str, voter_id: str) -> Vote | None:
         """Get a specific vote."""
         return self._votes.get(proposal_id, {}).get(voter_id)
 
-    def get_proposal_votes(self, proposal_id: str) -> List[Vote]:
+    def get_proposal_votes(self, proposal_id: str) -> list[Vote]:
         """Get all votes for a proposal."""
         return list(self._votes.get(proposal_id, {}).values())
 
-    def get_voter_history(self, voter_id: str) -> List[Vote]:
+    def get_voter_history(self, voter_id: str) -> list[Vote]:
         """Get voting history for a voter."""
         history = []
         for votes in self._votes.values():
@@ -559,7 +557,7 @@ class GovernanceService:
 
 
 # Global instance
-_governance_service: Optional[GovernanceService] = None
+_governance_service: GovernanceService | None = None
 
 
 async def get_governance_service() -> GovernanceService:

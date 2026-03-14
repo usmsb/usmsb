@@ -12,17 +12,17 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
-from .config import NodeConfig, NodeRole
+from .config import NodeConfig
 
 logger = logging.getLogger(__name__)
 
 
-class NodeState(str, Enum):
+class NodeState(StrEnum):
     """States a node can be in."""
     CREATED = "created"
     INITIALIZING = "initializing"
@@ -35,7 +35,7 @@ class NodeState(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ConnectionStatus(str, Enum):
+class ConnectionStatus(StrEnum):
     """Status of a connection to another node."""
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
@@ -55,7 +55,7 @@ class NodeConnection:
     remote_address: str
     remote_port: int
     status: ConnectionStatus = ConnectionStatus.DISCONNECTED
-    connected_at: Optional[float] = None
+    connected_at: float | None = None
     last_activity: float = field(default_factory=time.time)
     bytes_sent: int = 0
     bytes_received: int = 0
@@ -63,11 +63,11 @@ class NodeConnection:
     messages_received: int = 0
     latency_ms: float = 0.0
     error_count: int = 0
-    last_error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # WebSocket connection (set at runtime)
-    websocket: Optional[Any] = None
+    websocket: Any | None = None
 
     def update_activity(self) -> None:
         """Update last activity timestamp."""
@@ -85,7 +85,7 @@ class NodeConnection:
         self.messages_received += 1
         self.update_activity()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "connection_id": self.connection_id,
@@ -118,12 +118,12 @@ class NodeMetrics:
     sync_operations: int = 0
     broadcast_operations: int = 0
     error_count: int = 0
-    last_error: Optional[str] = None
+    last_error: str | None = None
     cpu_usage: float = 0.0
     memory_usage: float = 0.0
     disk_usage: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "uptime_seconds": self.uptime_seconds,
@@ -180,17 +180,17 @@ class NodeManager:
         """
         self.config = config
         self.state = NodeState.CREATED
-        self.started_at: Optional[float] = None
+        self.started_at: float | None = None
 
         # Connections
-        self._connections: Dict[str, NodeConnection] = {}
-        self._connections_by_node: Dict[str, str] = {}  # node_id -> connection_id
+        self._connections: dict[str, NodeConnection] = {}
+        self._connections_by_node: dict[str, str] = {}  # node_id -> connection_id
 
         # Metrics
         self._metrics = NodeMetrics()
 
         # Event handlers
-        self._event_handlers: Dict[str, List[Callable]] = {
+        self._event_handlers: dict[str, list[Callable]] = {
             "state_change": [],
             "connection_opened": [],
             "connection_closed": [],
@@ -201,15 +201,15 @@ class NodeManager:
 
         # Background tasks
         self._running = False
-        self._tasks: Set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task] = set()
 
         # Server
-        self._server: Optional[asyncio.Server] = None
+        self._server: asyncio.Server | None = None
 
         # Services (set externally)
-        self._discovery_service: Optional[Any] = None
-        self._broadcast_service: Optional[Any] = None
-        self._sync_service: Optional[Any] = None
+        self._discovery_service: Any | None = None
+        self._broadcast_service: Any | None = None
+        self._sync_service: Any | None = None
 
     # ==================== Lifecycle Management ====================
 
@@ -279,7 +279,7 @@ class NodeManager:
         self._running = False
 
         # Close all connections
-        for conn_id, connection in list(self._connections.items()):
+        for conn_id, _connection in list(self._connections.items()):
             await self._close_connection(conn_id, "Node shutting down")
 
         # Cancel background tasks
@@ -317,7 +317,7 @@ class NodeManager:
 
     # ==================== Connection Management ====================
 
-    async def connect_to_peer(self, address: str, port: Optional[int] = None) -> Optional[NodeConnection]:
+    async def connect_to_peer(self, address: str, port: int | None = None) -> NodeConnection | None:
         """
         Connect to a peer node.
 
@@ -373,7 +373,7 @@ class NodeManager:
 
             return connection
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Connection timeout to {address}:{port}")
             self._metrics.error_count += 1
             return None
@@ -503,7 +503,7 @@ class NodeManager:
                 message = json.loads(data.decode().strip())
                 await self._process_message(connection, message, writer)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send keepalive
                 try:
                     writer.write(b'{"type": "ping"}\n')
@@ -520,7 +520,7 @@ class NodeManager:
     async def _process_message(
         self,
         connection: NodeConnection,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         writer: asyncio.StreamWriter
     ) -> None:
         """Process a received message."""
@@ -551,7 +551,7 @@ class NodeManager:
 
         self._metrics.total_messages_received += 1
 
-    async def send_message(self, node_id: str, message: Dict[str, Any]) -> bool:
+    async def send_message(self, node_id: str, message: dict[str, Any]) -> bool:
         """
         Send a message to a connected node.
 
@@ -582,7 +582,7 @@ class NodeManager:
             logger.error(f"Failed to send message to {node_id}: {e}")
             return False
 
-    async def broadcast_message(self, message: Dict[str, Any]) -> int:
+    async def broadcast_message(self, message: dict[str, Any]) -> int:
         """
         Broadcast a message to all connected nodes.
 
@@ -684,7 +684,7 @@ class NodeManager:
 
     # ==================== Status and Info ====================
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get current node status."""
         return {
             "node_id": self.config.node_id,
@@ -700,11 +700,11 @@ class NodeManager:
             "config": self.config.to_dict(),
         }
 
-    def get_connections(self) -> List[Dict[str, Any]]:
+    def get_connections(self) -> list[dict[str, Any]]:
         """Get list of all connections."""
         return [conn.to_dict() for conn in self._connections.values()]
 
-    def get_connection(self, node_id: str) -> Optional[NodeConnection]:
+    def get_connection(self, node_id: str) -> NodeConnection | None:
         """Get connection to a specific node."""
         if node_id not in self._connections_by_node:
             return None

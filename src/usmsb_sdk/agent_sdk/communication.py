@@ -9,22 +9,22 @@ Implements the unified communication system for agents, including:
 - WebSocket and gRPC support
 """
 
+import asyncio
+import json
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any
 from uuid import uuid4
-import asyncio
+
 import aiohttp
-import json
-import logging
-import struct
 import websockets
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
     ProtocolType,
-    ProtocolConfig,
 )
 
 
@@ -58,19 +58,19 @@ class Message:
     sender_id: str
     content: Any
     message_id: str = field(default_factory=lambda: str(uuid4()))
-    receiver_id: Optional[str] = None
-    correlation_id: Optional[str] = None  # For request/response matching
+    receiver_id: str | None = None
+    correlation_id: str | None = None  # For request/response matching
     timestamp: datetime = field(default_factory=datetime.now)
     priority: MessagePriority = MessagePriority.NORMAL
     ttl: int = 60  # Time-to-live in seconds
-    protocol: Optional[ProtocolType] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    protocol: ProtocolType | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def is_expired(self) -> bool:
         """Check if message has expired"""
         return datetime.now() > self.timestamp + timedelta(seconds=self.ttl)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
             "message_id": self.message_id,
@@ -91,7 +91,7 @@ class Message:
         return json.dumps(self.to_dict())
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Message":
+    def from_dict(cls, data: dict[str, Any]) -> "Message":
         """Create from dictionary"""
         return cls(
             message_id=data.get("message_id", str(uuid4())),
@@ -100,7 +100,11 @@ class Message:
             receiver_id=data.get("receiver_id"),
             content=data["content"],
             correlation_id=data.get("correlation_id"),
-            timestamp=datetime.fromisoformat(data["timestamp"]) if isinstance(data.get("timestamp"), str) else datetime.now(),
+            timestamp=(
+                datetime.fromisoformat(data["timestamp"])
+                if isinstance(data.get("timestamp"), str)
+                else datetime.now()
+            ),
             priority=MessagePriority(data.get("priority", 1)),
             ttl=data.get("ttl", 60),
             protocol=ProtocolType(data["protocol"]) if data.get("protocol") else None,
@@ -123,7 +127,7 @@ class Message:
             protocol=self.protocol,
         )
 
-    def create_error(self, error_message: str, error_code: Optional[str] = None) -> "Message":
+    def create_error(self, error_message: str, error_code: str | None = None) -> "Message":
         """Create an error response for this message"""
         return Message(
             type=MessageType.ERROR,
@@ -143,12 +147,12 @@ class Session:
     """Represents a communication session between agents"""
     session_id: str
     initiator_id: str
-    participant_ids: Set[str]
+    participant_ids: set[str]
     created_at: datetime = field(default_factory=datetime.now)
     last_activity: datetime = field(default_factory=datetime.now)
     state: str = "active"
-    protocol: Optional[ProtocolType] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    protocol: ProtocolType | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     message_count: int = 0
 
     def is_active(self) -> bool:
@@ -160,7 +164,7 @@ class Session:
         self.last_activity = datetime.now()
         self.message_count += 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "session_id": self.session_id,
@@ -185,14 +189,14 @@ class P2PConnection:
     bytes_sent: int = 0
     bytes_received: int = 0
     latency: float = 0.0
-    websocket: Optional[Any] = None
+    websocket: Any | None = None
     protocol: ProtocolType = ProtocolType.P2P
 
     def is_connected(self) -> bool:
         """Check if connection is active"""
         return self.state == "connected" and self.websocket is not None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary (without websocket)"""
         return {
             "agent_id": self.agent_id,
@@ -224,7 +228,7 @@ class CommunicationManager:
         agent_id: str,
         agent_config: AgentConfig,
         message_handler: Callable,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.agent_id = agent_id
         self.config = agent_config
@@ -232,34 +236,34 @@ class CommunicationManager:
         self.logger = logger or logging.getLogger(__name__)
 
         # Sessions
-        self._sessions: Dict[str, Session] = {}
+        self._sessions: dict[str, Session] = {}
         self._session_lock = asyncio.Lock()
 
         # P2P connections
-        self._p2p_connections: Dict[str, P2PConnection] = {}
+        self._p2p_connections: dict[str, P2PConnection] = {}
         self._p2p_lock = asyncio.Lock()
 
         # HTTP/WebSocket
-        self._http_session: Optional[aiohttp.ClientSession] = None
-        self._http_server: Optional[Any] = None  # HTTP REST server
-        self._websocket_server: Optional[Any] = None
-        self._active_websockets: Dict[str, websockets.WebSocketClientProtocol] = {}
+        self._http_session: aiohttp.ClientSession | None = None
+        self._http_server: Any | None = None  # HTTP REST server
+        self._websocket_server: Any | None = None
+        self._active_websockets: dict[str, websockets.WebSocketClientProtocol] = {}
 
         # Message routing
-        self._pending_responses: Dict[str, asyncio.Future] = {}
+        self._pending_responses: dict[str, asyncio.Future] = {}
         self._message_queue: asyncio.Queue = asyncio.Queue()
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable] = {}
 
         # State
         self._initialized = False
         self._running = False
 
     @property
-    def p2p_connections(self) -> Dict[str, P2PConnection]:
+    def p2p_connections(self) -> dict[str, P2PConnection]:
         return self._p2p_connections
 
     @property
-    def sessions(self) -> Dict[str, Session]:
+    def sessions(self) -> dict[str, Session]:
         return self._sessions
 
     # ==================== Initialization ====================
@@ -268,7 +272,8 @@ class CommunicationManager:
         """Initialize communication channels
 
         Args:
-            skip_http_start: If True, skip auto-starting HTTP server (useful when starting manually later)
+            skip_http_start: If True, skip auto-starting HTTP server
+                (useful when starting manually later)
         """
         if self._initialized:
             return
@@ -327,8 +332,8 @@ class CommunicationManager:
     async def send(
         self,
         message: Message,
-        protocol: Optional[ProtocolType] = None,
-    ) -> Optional[Message]:
+        protocol: ProtocolType | None = None,
+    ) -> Message | None:
         """
         Send a message using the appropriate protocol.
 
@@ -386,7 +391,7 @@ class CommunicationManager:
         enabled = self.config.get_enabled_protocols()
         return enabled[0] if enabled else ProtocolType.HTTP
 
-    async def send_p2p(self, message: Message, target_id: str) -> Optional[Message]:
+    async def send_p2p(self, message: Message, target_id: str) -> Message | None:
         """Send message via P2P connection"""
         if target_id not in self._p2p_connections:
             # Try to establish connection
@@ -395,7 +400,7 @@ class CommunicationManager:
 
         return await self._send_p2p(message)
 
-    async def _send_p2p(self, message: Message) -> Optional[Message]:
+    async def _send_p2p(self, message: Message) -> Message | None:
         """Internal P2P send implementation"""
         target_id = message.receiver_id
         if not target_id or target_id not in self._p2p_connections:
@@ -421,7 +426,7 @@ class CommunicationManager:
             conn.state = "error"
             raise
 
-    async def _send_websocket(self, message: Message) -> Optional[Message]:
+    async def _send_websocket(self, message: Message) -> Message | None:
         """Send message via WebSocket"""
         target_id = message.receiver_id
 
@@ -441,7 +446,7 @@ class CommunicationManager:
         # Fall back to platform relay
         return await self._send_via_relay(message, "websocket")
 
-    async def _send_http(self, message: Message) -> Optional[Message]:
+    async def _send_http(self, message: Message) -> Message | None:
         """Send message via HTTP"""
         if not self._http_session:
             raise RuntimeError("HTTP session not initialized")
@@ -472,7 +477,7 @@ class CommunicationManager:
             self.logger.error(f"HTTP send error: {e}")
             raise
 
-    async def _send_a2a(self, message: Message) -> Optional[Message]:
+    async def _send_a2a(self, message: Message) -> Message | None:
         """Send message via A2A protocol"""
         # A2A uses HTTP as transport with specific headers
         if not self._http_session:
@@ -510,7 +515,7 @@ class CommunicationManager:
             self.logger.error(f"A2A send error: {e}")
             raise
 
-    async def _send_mcp(self, message: Message) -> Optional[Message]:
+    async def _send_mcp(self, message: Message) -> Message | None:
         """Send message via MCP (Model Context Protocol)"""
         if not self._http_session:
             raise RuntimeError("HTTP session not initialized")
@@ -545,14 +550,14 @@ class CommunicationManager:
             self.logger.error(f"MCP send error: {e}")
             raise
 
-    async def _send_grpc(self, message: Message) -> Optional[Message]:
+    async def _send_grpc(self, message: Message) -> Message | None:
         """Send message via gRPC"""
         # gRPC implementation would require grpcio library
         # For now, fall back to HTTP with gRPC-style message
         self.logger.warning("gRPC not fully implemented, using HTTP fallback")
         return await self._send_http(message)
 
-    async def _send_via_relay(self, message: Message, protocol: str) -> Optional[Message]:
+    async def _send_via_relay(self, message: Message, protocol: str) -> Message | None:
         """Send message via platform relay"""
         if not self._http_session:
             raise RuntimeError("HTTP session not initialized")
@@ -588,7 +593,7 @@ class CommunicationManager:
 
     # ==================== P2P Connection Management ====================
 
-    async def establish_p2p(self, target_id: str, endpoint: Optional[str] = None) -> bool:
+    async def establish_p2p(self, target_id: str, endpoint: str | None = None) -> bool:
         """
         Establish a P2P connection with another agent.
 
@@ -674,7 +679,7 @@ class CommunicationManager:
             del self._p2p_connections[target_id]
             self.logger.info(f"P2P connection closed with {target_id}")
 
-    async def _discover_p2p_endpoint(self, target_id: str) -> Optional[str]:
+    async def _discover_p2p_endpoint(self, target_id: str) -> str | None:
         """Discover P2P endpoint for an agent"""
         if not self._http_session:
             return None
@@ -835,19 +840,19 @@ class CommunicationManager:
                     error_msg = message.create_error(str(e))
                     await self.send(error_msg)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 self.logger.error(f"Message processing error: {e}")
 
-    async def _wait_for_response(self, correlation_id: str, timeout: float = 30.0) -> Optional[Message]:
+    async def _wait_for_response(self, correlation_id: str, timeout: float = 30.0) -> Message | None:
         """Wait for a response message"""
         future = asyncio.Future()
         self._pending_responses[correlation_id] = future
 
         try:
             return await asyncio.wait_for(future, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending_responses.pop(correlation_id, None)
             raise TimeoutError(f"No response received for message {correlation_id}")
 
@@ -855,9 +860,9 @@ class CommunicationManager:
 
     async def create_session(
         self,
-        participant_ids: List[str],
-        protocol: Optional[ProtocolType] = None,
-        metadata: Optional[Dict] = None,
+        participant_ids: list[str],
+        protocol: ProtocolType | None = None,
+        metadata: dict | None = None,
     ) -> Session:
         """Create a new communication session"""
         session_id = str(uuid4())
@@ -875,7 +880,7 @@ class CommunicationManager:
         self.logger.info(f"Created session {session_id} with participants: {participant_ids}")
         return session
 
-    async def get_session(self, session_id: str) -> Optional[Session]:
+    async def get_session(self, session_id: str) -> Session | None:
         """Get session by ID"""
         return self._sessions.get(session_id)
 
@@ -888,7 +893,7 @@ class CommunicationManager:
 
     # ==================== Health Check ====================
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Perform health check on communication channels"""
         health = {
             "status": "healthy",

@@ -9,24 +9,23 @@ import asyncio
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 from usmsb_sdk.platform.external.storage.base_storage import (
     DataLocation,
     DataNotFoundError,
-    StorageError,
     StorageInterface,
     StorageResult,
     StorageType,
 )
 from usmsb_sdk.platform.external.storage.file_storage import FileStorage
+from usmsb_sdk.platform.external.storage.ipfs_storage import IPFSConnectionConfig, IPFSStorage
 from usmsb_sdk.platform.external.storage.sqlite_storage import SQLiteStorage
-from usmsb_sdk.platform.external.storage.ipfs_storage import IPFSStorage, IPFSConnectionConfig
-
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +72,9 @@ class SyncStatus:
     source_type: StorageType
     target_type: StorageType
     synced: bool
-    last_sync: Optional[datetime] = None
-    error: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_sync: datetime | None = None
+    error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -83,14 +82,14 @@ class DataIndex:
     """Index entry for tracking data across layers."""
     key: str
     primary_location: StorageType
-    locations: Dict[StorageType, DataLocation]
+    locations: dict[StorageType, DataLocation]
     checksum: str
     size: int
     created_at: datetime
     updated_at: datetime
     version: int
-    sync_status: Dict[Tuple[StorageType, StorageType], SyncStatus]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    sync_status: dict[tuple[StorageType, StorageType], SyncStatus]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class StorageManager:
@@ -112,9 +111,9 @@ class StorageManager:
 
     def __init__(
         self,
-        file_storage: Optional[FileStorage] = None,
-        sqlite_storage: Optional[SQLiteStorage] = None,
-        ipfs_storage: Optional[IPFSStorage] = None,
+        file_storage: FileStorage | None = None,
+        sqlite_storage: SQLiteStorage | None = None,
+        ipfs_storage: IPFSStorage | None = None,
         cache_strategy: CacheStrategy = CacheStrategy.WRITE_THROUGH,
         sync_strategy: SyncStrategy = SyncStrategy.HYBRID,
         consistency_level: ConsistencyLevel = ConsistencyLevel.READ_YOUR_WRITES,
@@ -132,7 +131,7 @@ class StorageManager:
             consistency_level: Consistency level.
             sync_interval_seconds: Interval for periodic sync.
         """
-        self.layers: Dict[StorageType, StorageLayer] = {}
+        self.layers: dict[StorageType, StorageLayer] = {}
         self.cache_strategy = cache_strategy
         self.sync_strategy = sync_strategy
         self.consistency_level = consistency_level
@@ -156,16 +155,16 @@ class StorageManager:
             )
 
         # Data index for tracking
-        self._index: Dict[str, DataIndex] = {}
-        self._write_buffer: Dict[str, Tuple[Any, Dict[str, Any]]] = {}
+        self._index: dict[str, DataIndex] = {}
+        self._write_buffer: dict[str, tuple[Any, dict[str, Any]]] = {}
 
         # Sync task
-        self._sync_task: Optional[asyncio.Task] = None
+        self._sync_task: asyncio.Task | None = None
         self._running = False
 
         # Event handlers
-        self._on_sync_complete: Optional[Callable] = None
-        self._on_sync_error: Optional[Callable] = None
+        self._on_sync_complete: Callable | None = None
+        self._on_sync_error: Callable | None = None
 
     async def initialize(self) -> bool:
         """Initialize all storage layers."""
@@ -211,14 +210,14 @@ class StorageManager:
         serialized = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha256(serialized.encode()).hexdigest()
 
-    def _get_layer_by_priority(self) -> List[StorageLayer]:
+    def _get_layer_by_priority(self) -> list[StorageLayer]:
         """Get layers sorted by priority."""
         return sorted(
             [l for l in self.layers.values() if l.enabled],
             key=lambda l: l.priority,
         )
 
-    def _select_write_layers(self, metadata: Optional[Dict] = None) -> List[StorageLayer]:
+    def _select_write_layers(self, metadata: dict | None = None) -> list[StorageLayer]:
         """Select layers for writing based on data requirements."""
         layers = []
 
@@ -239,7 +238,7 @@ class StorageManager:
 
         return layers
 
-    def _select_read_layers(self, key: str) -> List[StorageLayer]:
+    def _select_read_layers(self, key: str) -> list[StorageLayer]:
         """Select layers for reading."""
         layers = []
 
@@ -263,9 +262,9 @@ class StorageManager:
         self,
         key: str,
         data: Any,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         overwrite: bool = False,
-        target_layers: Optional[List[StorageType]] = None,
+        target_layers: list[StorageType] | None = None,
     ) -> StorageResult:
         """
         Store data across storage layers.
@@ -394,7 +393,7 @@ class StorageManager:
     async def retrieve(
         self,
         key: str,
-        preferred_layer: Optional[StorageType] = None,
+        preferred_layer: StorageType | None = None,
     ) -> StorageResult:
         """
         Retrieve data from storage layers.
@@ -541,7 +540,7 @@ class StorageManager:
 
         return False
 
-    async def get_metadata(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_metadata(self, key: str) -> dict[str, Any] | None:
         """Get metadata for a key."""
         if key in self._index:
             return self._index[key].metadata
@@ -556,10 +555,10 @@ class StorageManager:
 
     async def sync(
         self,
-        key: Optional[str] = None,
-        source: Optional[StorageType] = None,
-        target: Optional[StorageType] = None,
-    ) -> Dict[str, SyncStatus]:
+        key: str | None = None,
+        source: StorageType | None = None,
+        target: StorageType | None = None,
+    ) -> dict[str, SyncStatus]:
         """
         Synchronize data between layers.
 
@@ -587,8 +586,8 @@ class StorageManager:
     async def _sync_key(
         self,
         key: str,
-        source: Optional[StorageType] = None,
-        target: Optional[StorageType] = None,
+        source: StorageType | None = None,
+        target: StorageType | None = None,
     ) -> SyncStatus:
         """Synchronize a single key between layers."""
         if key not in self._index:
@@ -761,19 +760,19 @@ class StorageManager:
     # Convenience methods for layer-specific access
 
     @property
-    def file_storage(self) -> Optional[FileStorage]:
+    def file_storage(self) -> FileStorage | None:
         """Get file storage layer."""
         layer = self.layers.get(StorageType.FILE)
         return layer.storage if layer else None
 
     @property
-    def sqlite_storage(self) -> Optional[SQLiteStorage]:
+    def sqlite_storage(self) -> SQLiteStorage | None:
         """Get SQLite storage layer."""
         layer = self.layers.get(StorageType.SQLITE)
         return layer.storage if layer else None
 
     @property
-    def ipfs_storage(self) -> Optional[IPFSStorage]:
+    def ipfs_storage(self) -> IPFSStorage | None:
         """Get IPFS storage layer."""
         layer = self.layers.get(StorageType.IPFS)
         return layer.storage if layer else None
@@ -782,7 +781,7 @@ class StorageManager:
         self,
         key: str,
         data: Any,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ) -> StorageResult:
         """Store data only to file storage."""
         return await self.store(key, data, metadata, target_layers=[StorageType.FILE])
@@ -791,7 +790,7 @@ class StorageManager:
         self,
         key: str,
         data: Any,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ) -> StorageResult:
         """Store data only to SQLite storage."""
         return await self.store(key, data, metadata, target_layers=[StorageType.SQLITE])
@@ -800,12 +799,12 @@ class StorageManager:
         self,
         key: str,
         data: Any,
-        metadata: Optional[Dict] = None,
+        metadata: dict | None = None,
     ) -> StorageResult:
         """Store data only to IPFS storage."""
         return await self.store(key, data, metadata, target_layers=[StorageType.IPFS])
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get statistics for all storage layers."""
         stats = {
             "cache_strategy": self.cache_strategy.value,
@@ -827,9 +826,9 @@ class StorageManager:
 
     async def list_keys(
         self,
-        prefix: Optional[str] = None,
+        prefix: str | None = None,
         limit: int = 100,
-    ) -> List[str]:
+    ) -> list[str]:
         """List all keys across layers."""
         keys = set(self._index.keys())
 
@@ -848,7 +847,7 @@ class StorageManager:
 
         return result[:limit]
 
-    async def get_data_locations(self, key: str) -> Dict[StorageType, DataLocation]:
+    async def get_data_locations(self, key: str) -> dict[StorageType, DataLocation]:
         """Get all locations where data is stored."""
         if key in self._index:
             return self._index[key].locations.copy()
@@ -868,7 +867,7 @@ class StorageManager:
     async def ensure_consistency(
         self,
         key: str,
-        level: Optional[ConsistencyLevel] = None,
+        level: ConsistencyLevel | None = None,
     ) -> bool:
         """
         Ensure data consistency across layers.
@@ -889,7 +888,7 @@ class StorageManager:
         primary_checksum = index_entry.checksum
 
         # Check each layer
-        for storage_type, location in index_entry.locations.items():
+        for storage_type, _location in index_entry.locations.items():
             layer = self.layers.get(storage_type)
             if not layer:
                 continue
@@ -975,9 +974,9 @@ class StorageManager:
 
 
 async def create_storage_manager(
-    base_path: Union[str, Path],
+    base_path: str | Path,
     database_name: str = "usmsb_storage.db",
-    ipfs_config: Optional[IPFSConnectionConfig] = None,
+    ipfs_config: IPFSConnectionConfig | None = None,
     cache_strategy: CacheStrategy = CacheStrategy.WRITE_THROUGH,
     sync_strategy: SyncStrategy = SyncStrategy.HYBRID,
 ) -> StorageManager:

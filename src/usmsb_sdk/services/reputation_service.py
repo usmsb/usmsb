@@ -8,18 +8,16 @@ Implements a comprehensive reputation system:
 - Transaction-based updates
 - Periodic recalculation
 """
-import json
 import logging
 import time
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
-from enum import Enum
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ReputationDimension(str, Enum):
+class ReputationDimension(StrEnum):
     """Dimensions of reputation."""
     RELIABILITY = "reliability"      # Completes transactions
     QUALITY = "quality"              # Quality of work
@@ -32,11 +30,11 @@ class ReputationDimension(str, Enum):
 class ReputationScore:
     """Multi-dimensional reputation score."""
     overall: float
-    dimensions: Dict[str, float]
+    dimensions: dict[str, float]
     confidence: float  # Based on number of data points
     last_updated: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "overall": round(self.overall, 4),
             "dimensions": {k: round(v, 4) for k, v in self.dimensions.items()},
@@ -54,10 +52,10 @@ class ReputationEvent:
     dimension: str
     impact: float  # -1.0 to 1.0
     weight: float  # Based on stake/importance
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
     timestamp: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "eventId": self.event_id,
             "agentId": self.agent_id,
@@ -77,7 +75,7 @@ class ReputationLevel:
     name: str
     min_score: float
     max_score: float
-    benefits: Dict[str, Any]
+    benefits: dict[str, Any]
 
     # Predefined levels
     LEVELS = [
@@ -151,8 +149,8 @@ class ReputationService:
         self.blockchain = blockchain_service
 
         # In-memory cache
-        self._scores: Dict[str, ReputationScore] = {}
-        self._events: Dict[str, List[ReputationEvent]] = {}
+        self._scores: dict[str, ReputationScore] = {}
+        self._events: dict[str, list[ReputationEvent]] = {}
 
         # Last recalculation time
         self._last_recalc: float = 0
@@ -188,7 +186,7 @@ class ReputationService:
         dimension: str,
         impact: float,
         weight: float = 1.0,
-        metadata: Dict[str, Any] = None,
+        metadata: dict[str, Any] = None,
     ) -> ReputationEvent:
         """
         Record a reputation-affecting event.
@@ -252,7 +250,7 @@ class ReputationService:
 
         score.last_updated = time.time()
 
-    def _calculate_overall(self, dimensions: Dict[str, float]) -> float:
+    def _calculate_overall(self, dimensions: dict[str, float]) -> float:
         """Calculate overall score from dimensions."""
         total = 0.0
         weight_sum = 0.0
@@ -268,7 +266,7 @@ class ReputationService:
         self,
         agent_id: str,
         as_role: str,  # "buyer" or "seller"
-        rating: Optional[int] = None,
+        rating: int | None = None,
         amount: float = 0,
         on_time: bool = True,
     ) -> None:
@@ -363,11 +361,11 @@ class ReputationService:
             metadata={"type": contribution_type},
         )
 
-    def get_score(self, agent_id: str) -> Optional[ReputationScore]:
+    def get_score(self, agent_id: str) -> ReputationScore | None:
         """Get current reputation score for an agent."""
         return self._scores.get(agent_id)
 
-    def get_level(self, agent_id: str) -> Optional[ReputationLevel]:
+    def get_level(self, agent_id: str) -> ReputationLevel | None:
         """Get reputation level for an agent."""
         score = self.get_score(agent_id)
         if score:
@@ -379,7 +377,7 @@ class ReputationService:
         agent_id: str,
         limit: int = 100,
         dimension: str = None,
-    ) -> List[ReputationEvent]:
+    ) -> list[ReputationEvent]:
         """Get reputation events for an agent."""
         events = self._events.get(agent_id, [])
 
@@ -397,7 +395,7 @@ class ReputationService:
         decay_factor = 1 - (self.DECAY_RATE * days)
         count = 0
 
-        for agent_id, score in self._scores.items():
+        for _agent_id, score in self._scores.items():
             # Only decay if no recent activity
             time_since_update = time.time() - score.last_updated
             if time_since_update > 86400:  # More than 1 day
@@ -448,7 +446,7 @@ class ReputationService:
         self,
         dimension: str = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get reputation leaderboard.
 
@@ -481,7 +479,7 @@ class ReputationService:
 
         return results[:limit]
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get reputation system statistics."""
         if not self._scores:
             return {
@@ -510,7 +508,7 @@ class ReputationService:
 
 
 # Global reputation service instance
-_reputation_service: Optional[ReputationService] = None
+_reputation_service: ReputationService | None = None
 
 
 def get_reputation_service() -> ReputationService:

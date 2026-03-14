@@ -19,7 +19,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class TaskComplexity(Enum):
@@ -71,10 +71,10 @@ class TaskStep:
     action: str
     """要执行的动作类型：create_file, create_directory, write_code, execute, etc."""
 
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
     """执行参数"""
 
-    dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
     """依赖的步骤 ID 列表"""
 
     estimated_time: int = 30
@@ -83,10 +83,10 @@ class TaskStep:
     status: StepStatus = StepStatus.PENDING
     """当前状态"""
 
-    result: Optional[Dict[str, Any]] = None
+    result: dict[str, Any] | None = None
     """执行结果"""
 
-    error: Optional[str] = None
+    error: str | None = None
     """错误信息"""
 
     retry_count: int = 0
@@ -112,7 +112,7 @@ class TaskPlan:
     complexity: TaskComplexity
     """任务复杂度"""
 
-    steps: List[TaskStep] = field(default_factory=list)
+    steps: list[TaskStep] = field(default_factory=list)
     """执行步骤列表"""
 
     status: TaskStatus = TaskStatus.PLANNING
@@ -127,28 +127,28 @@ class TaskPlan:
     updated_at: datetime = field(default_factory=datetime.now)
     """更新时间"""
 
-    wallet_address: Optional[str] = None
+    wallet_address: str | None = None
     """用户钱包地址"""
 
-    conversation_id: Optional[str] = None
+    conversation_id: str | None = None
     """关联的会话 ID"""
 
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     """执行上下文"""
 
     def get_total_estimated_time(self) -> int:
         """获取总预计时间"""
         return sum(step.estimated_time for step in self.steps)
 
-    def get_completed_steps(self) -> List[TaskStep]:
+    def get_completed_steps(self) -> list[TaskStep]:
         """获取已完成的步骤"""
         return [s for s in self.steps if s.status == StepStatus.COMPLETED]
 
-    def get_pending_steps(self) -> List[TaskStep]:
+    def get_pending_steps(self) -> list[TaskStep]:
         """获取待执行的步骤"""
         return [s for s in self.steps if s.status == StepStatus.PENDING]
 
-    def get_current_step(self) -> Optional[TaskStep]:
+    def get_current_step(self) -> TaskStep | None:
         """获取当前步骤"""
         if 0 <= self.current_step_index < len(self.steps):
             return self.steps[self.current_step_index]
@@ -169,7 +169,7 @@ class TaskPlan:
                 return False
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "task_id": self.task_id,
@@ -207,12 +207,12 @@ class StepResult:
     """步骤执行结果"""
     step_id: str
     success: bool
-    output: Optional[str] = None
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    output: str | None = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
     execution_time: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "step_id": self.step_id,
             "success": self.success,

@@ -4,7 +4,7 @@ Environment Builder
 Fluent API for creating and configuring Environment instances.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from usmsb_sdk.core.elements import Environment, EnvironmentType
 
@@ -29,13 +29,13 @@ class EnvironmentBuilder:
 
     def __init__(self):
         """Initialize the builder with default values."""
-        self._id: Optional[str] = None
+        self._id: str | None = None
         self._name: str = "Environment"
         self._type: EnvironmentType = EnvironmentType.SOCIAL
-        self._state: Dict[str, Any] = {}
-        self._influencing_factors: List[str] = []
-        self._constraints: Dict[str, Any] = {}
-        self._metadata: Dict[str, Any] = {}
+        self._state: dict[str, Any] = {}
+        self._influencing_factors: list[str] = []
+        self._constraints: dict[str, Any] = {}
+        self._metadata: dict[str, Any] = {}
 
     def with_id(self, env_id: str) -> "EnvironmentBuilder":
         """
@@ -79,7 +79,7 @@ class EnvironmentBuilder:
         self._type = env_type
         return self
 
-    def with_state(self, state: Dict[str, Any]) -> "EnvironmentBuilder":
+    def with_state(self, state: dict[str, Any]) -> "EnvironmentBuilder":
         """
         Set the environment state.
 
@@ -106,7 +106,7 @@ class EnvironmentBuilder:
         self._state[key] = value
         return self
 
-    def with_influencing_factors(self, factors: List[str]) -> "EnvironmentBuilder":
+    def with_influencing_factors(self, factors: list[str]) -> "EnvironmentBuilder":
         """
         Set the influencing factors.
 
@@ -133,7 +133,7 @@ class EnvironmentBuilder:
             self._influencing_factors.append(factor)
         return self
 
-    def with_constraints(self, constraints: Dict[str, Any]) -> "EnvironmentBuilder":
+    def with_constraints(self, constraints: dict[str, Any]) -> "EnvironmentBuilder":
         """
         Set the environment constraints.
 
@@ -160,7 +160,7 @@ class EnvironmentBuilder:
         self._constraints[key] = value
         return self
 
-    def with_metadata(self, metadata: Dict[str, Any]) -> "EnvironmentBuilder":
+    def with_metadata(self, metadata: dict[str, Any]) -> "EnvironmentBuilder":
         """
         Set the environment metadata.
 

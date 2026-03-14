@@ -5,9 +5,8 @@
 """
 
 import json
-import os
-from typing import Dict, Optional, Tuple, Any
 from pathlib import Path
+from typing import Any
 
 
 class ABILoader:
@@ -21,11 +20,11 @@ class ABILoader:
     DEFAULT_ARTIFACTS_DIR = Path(__file__).parent.parent.parent.parent.parent / "contracts" / "artifacts" / "src"
 
     # 合约名称到文件名的映射（如果文件名与合约名不同）
-    CONTRACT_FILE_MAP: Dict[str, str] = {
+    CONTRACT_FILE_MAP: dict[str, str] = {
         # 添加需要特殊映射的合约
     }
 
-    def __init__(self, artifacts_dir: Optional[Path] = None):
+    def __init__(self, artifacts_dir: Path | None = None):
         """
         初始化ABI加载器
 
@@ -50,7 +49,7 @@ class ABILoader:
             FileNotFoundError: 合约文件未找到
         """
         file_path = self._get_contract_path(contract_name)
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             artifact = json.load(f)
         return artifact.get("abi", [])
 
@@ -68,7 +67,7 @@ class ABILoader:
             FileNotFoundError: 合约文件未找到
         """
         file_path = self._get_contract_path(contract_name)
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             artifact = json.load(f)
 
         bytecode = artifact.get("bytecode", "")
@@ -77,7 +76,7 @@ class ABILoader:
             return bytecode.get("object", "")
         return bytecode
 
-    def get_abi_and_bytecode(self, contract_name: str) -> Tuple[list, str]:
+    def get_abi_and_bytecode(self, contract_name: str) -> tuple[list, str]:
         """
         同时加载ABI和字节码
 
@@ -88,7 +87,7 @@ class ABILoader:
             (ABI, 字节码) 元组
         """
         file_path = self._get_contract_path(contract_name)
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             artifact = json.load(f)
 
         bytecode = artifact.get("bytecode", "")
@@ -98,7 +97,7 @@ class ABILoader:
 
         return artifact.get("abi", []), bytecode
 
-    def get_full_artifact(self, contract_name: str) -> Dict[str, Any]:
+    def get_full_artifact(self, contract_name: str) -> dict[str, Any]:
         """
         加载完整的合约编译产物
 
@@ -109,7 +108,7 @@ class ABILoader:
             完整的artifact字典
         """
         file_path = self._get_contract_path(contract_name)
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             return json.load(f)
 
     def _get_contract_path(self, contract_name: str) -> Path:
@@ -166,7 +165,7 @@ class ABILoader:
 
 
 # 全局单例加载器
-_default_loader: Optional[ABILoader] = None
+_default_loader: ABILoader | None = None
 
 
 def get_abi_loader() -> ABILoader:
@@ -182,7 +181,7 @@ def get_abi_loader() -> ABILoader:
     return _default_loader
 
 
-def load_abi(contract_name: str, artifacts_dir: Optional[Path] = None) -> list:
+def load_abi(contract_name: str, artifacts_dir: Path | None = None) -> list:
     """
     快捷函数：加载合约ABI
 
@@ -197,7 +196,7 @@ def load_abi(contract_name: str, artifacts_dir: Optional[Path] = None) -> list:
     return loader.get_abi(contract_name)
 
 
-def load_bytecode(contract_name: str, artifacts_dir: Optional[Path] = None) -> str:
+def load_bytecode(contract_name: str, artifacts_dir: Path | None = None) -> str:
     """
     快捷函数：加载合约字节码
 
@@ -214,8 +213,8 @@ def load_bytecode(contract_name: str, artifacts_dir: Optional[Path] = None) -> s
 
 def load_abi_and_bytecode(
     contract_name: str,
-    artifacts_dir: Optional[Path] = None,
-) -> Tuple[list, str]:
+    artifacts_dir: Path | None = None,
+) -> tuple[list, str]:
     """
     快捷函数：同时加载ABI和字节码
 

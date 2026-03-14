@@ -5,16 +5,14 @@ Manages multi-agent collaboration sessions.
 Supports coordinated task execution among multiple agents.
 """
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +51,12 @@ class CollaborationRole:
     """A role in a collaboration"""
     role_id: str
     role_type: str
-    required_skills: List[str]
-    responsibilities: List[str]
+    required_skills: list[str]
+    responsibilities: list[str]
     status: str  # pending, filled, completed
-    assigned_agent: Optional[str] = None
+    assigned_agent: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role_id": self.role_id,
             "role_type": self.role_type,
@@ -69,7 +67,7 @@ class CollaborationRole:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollaborationRole":
+    def from_dict(cls, data: dict[str, Any]) -> "CollaborationRole":
         return cls(
             role_id=data.get("role_id", ""),
             role_type=data.get("role_type", "support"),
@@ -87,11 +85,11 @@ class CollaborationParticipant:
     agent_name: str
     role: str
     status: str
-    contribution: Optional[Dict[str, Any]] = None
-    joined_at: Optional[datetime] = None
+    contribution: dict[str, Any] | None = None
+    joined_at: datetime | None = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollaborationParticipant":
+    def from_dict(cls, data: dict[str, Any]) -> "CollaborationParticipant":
         return cls(
             agent_id=data.get("agent_id", ""),
             agent_name=data.get("agent_name", "Unknown"),
@@ -107,12 +105,12 @@ class CollaborationPlan:
     """Plan for collaboration execution"""
     plan_id: str
     mode: str
-    phases: List[Dict[str, Any]]
-    dependencies: Dict[str, List[str]]
+    phases: list[dict[str, Any]]
+    dependencies: dict[str, list[str]]
     estimated_duration: int  # seconds
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollaborationPlan":
+    def from_dict(cls, data: dict[str, Any]) -> "CollaborationPlan":
         return cls(
             plan_id=data.get("plan_id", ""),
             mode=data.get("mode", "parallel"),
@@ -128,10 +126,10 @@ class Contribution:
     agent_id: str
     role: str
     output: Any
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     submitted_at: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "role": self.role,
@@ -146,18 +144,22 @@ class CollaborationResult:
     """Final result of a collaboration"""
     session_id: str
     success: bool
-    outputs: Dict[str, Any]
-    metrics: Dict[str, Any]
+    outputs: dict[str, Any]
+    metrics: dict[str, Any]
     completed_at: datetime
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollaborationResult":
+    def from_dict(cls, data: dict[str, Any]) -> "CollaborationResult":
         return cls(
             session_id=data.get("session_id", ""),
             success=data.get("success", False),
             outputs=data.get("outputs", {}),
             metrics=data.get("metrics", {}),
-            completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else datetime.now(),
+            completed_at=(
+                datetime.fromisoformat(data["completed_at"])
+                if data.get("completed_at")
+                else datetime.now()
+            ),
         )
 
 
@@ -168,13 +170,13 @@ class CollaborationSession:
     goal: str
     collaboration_mode: str
     coordinator_id: str
-    participants: List[CollaborationParticipant]
-    roles: List[CollaborationRole]
-    plan: Optional[CollaborationPlan]
+    participants: list[CollaborationParticipant]
+    roles: list[CollaborationRole]
+    plan: CollaborationPlan | None
     status: str
-    result: Optional[CollaborationResult]
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    result: CollaborationResult | None
+    created_at: datetime | None
+    updated_at: datetime | None
 
     @property
     def is_active(self) -> bool:
@@ -185,7 +187,7 @@ class CollaborationSession:
         return self.status in ["completed", "failed", "cancelled"]
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollaborationSession":
+    def from_dict(cls, data: dict[str, Any]) -> "CollaborationSession":
         # Parse goal
         goal = data.get("goal", "")
         if isinstance(goal, str):
@@ -237,8 +239,16 @@ class CollaborationSession:
             plan=plan,
             status=data.get("status", "pending"),
             result=result,
-            created_at=datetime.fromtimestamp(data["created_at"]) if isinstance(data.get("created_at"), (int, float)) else None,
-            updated_at=datetime.fromtimestamp(data["updated_at"]) if isinstance(data.get("updated_at"), (int, float)) else None,
+            created_at=(
+                datetime.fromtimestamp(data["created_at"])
+                if isinstance(data.get("created_at"), (int, float))
+                else None
+            ),
+            updated_at=(
+                datetime.fromtimestamp(data["updated_at"])
+                if isinstance(data.get("updated_at"), (int, float))
+                else None
+            ),
         )
 
 
@@ -257,24 +267,24 @@ class CollaborationManager:
         self,
         platform_client: PlatformClient,
         agent_id: str,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
         self.agent_id = agent_id
         self.logger = logger or logging.getLogger(__name__)
 
         # Session cache
-        self._sessions: Dict[str, CollaborationSession] = {}
+        self._sessions: dict[str, CollaborationSession] = {}
 
     # ==================== Session Creation ====================
 
     async def create(
         self,
         goal: str,
-        required_skills: List[str],
+        required_skills: list[str],
         mode: str = "parallel",
-        coordinator_agent_id: Optional[str] = None,
-    ) -> Optional[CollaborationSession]:
+        coordinator_agent_id: str | None = None,
+    ) -> CollaborationSession | None:
         """
         Create a new collaboration session.
 
@@ -329,7 +339,7 @@ class CollaborationManager:
 
     # ==================== Session Queries ====================
 
-    async def get(self, session_id: str) -> Optional[CollaborationSession]:
+    async def get(self, session_id: str) -> CollaborationSession | None:
         """Get a collaboration session by ID"""
         if session_id in self._sessions:
             return self._sessions[session_id]
@@ -343,7 +353,7 @@ class CollaborationManager:
 
         return None
 
-    async def list_all(self, status: Optional[str] = None) -> List[CollaborationSession]:
+    async def list_all(self, status: str | None = None) -> list[CollaborationSession]:
         """List all collaborations"""
         response = await self._platform.get_collaborations(status=status)
 
@@ -355,12 +365,12 @@ class CollaborationManager:
 
         return []
 
-    async def list_active(self) -> List[CollaborationSession]:
+    async def list_active(self) -> list[CollaborationSession]:
         """List active collaborations"""
         sessions = await self.list_all()
         return [s for s in sessions if s.is_active]
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get collaboration statistics"""
         response = await self._platform.get_collaboration_stats()
 
@@ -370,7 +380,7 @@ class CollaborationManager:
 
     # ==================== Execution ====================
 
-    async def execute(self, session_id: str) -> Optional[CollaborationSession]:
+    async def execute(self, session_id: str) -> CollaborationSession | None:
         """
         Execute a collaboration session.
 
@@ -416,7 +426,7 @@ class CollaborationManager:
         self,
         session_id: str,
         task: str,
-        required_skills: List[str],
+        required_skills: list[str],
     ) -> bool:
         """
         Request help from other participants.
@@ -436,7 +446,7 @@ class CollaborationManager:
     async def sync_progress(
         self,
         session_id: str,
-        progress: Dict[str, Any],
+        progress: dict[str, Any],
     ) -> bool:
         """
         Sync progress with other participants.
@@ -456,7 +466,7 @@ class CollaborationManager:
     async def integrate_results(
         self,
         session_id: str,
-    ) -> Optional[CollaborationResult]:
+    ) -> CollaborationResult | None:
         """
         Integrate results from all participants.
 
@@ -538,9 +548,9 @@ class CollaborationManager:
     async def start_collaboration(
         self,
         goal: str,
-        required_skills: List[str],
+        required_skills: list[str],
         mode: str = "parallel",
-    ) -> Optional[CollaborationSession]:
+    ) -> CollaborationSession | None:
         """
         Convenience method to create and start a collaboration.
         """
@@ -559,8 +569,8 @@ class CollaborationManager:
         self,
         session_id: str,
         output: Any,
-        role: Optional[str] = None,
-        metadata: Optional[Dict] = None,
+        role: str | None = None,
+        metadata: dict | None = None,
     ) -> bool:
         """
         Convenience method to submit a contribution.

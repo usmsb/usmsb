@@ -16,19 +16,17 @@ Git Command Skill - 执行 Git 命令的技能
 """
 
 import asyncio
-import json
 import logging
 import os
-import re
 import shutil
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from usmsb_sdk.core.skills.skill_system import (
     Skill,
     SkillCategory,
     SkillMetadata,
-    SkillParameter,
     SkillOutput,
+    SkillParameter,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,10 +88,10 @@ GIT_DANGEROUS_OPERATIONS = [
 class GitPermissionChecker:
     """Git 权限检查器"""
 
-    def __init__(self, config: Dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] = None):
         self.config = config or GIT_PERMISSION_CONFIG
 
-    def check_path(self, path: str, workspace_root: Optional[str] = None) -> tuple:
+    def check_path(self, path: str, workspace_root: str | None = None) -> tuple:
         """
         检查路径是否在允许范围内
 
@@ -139,7 +137,7 @@ class GitPermissionChecker:
 
         return False, f"Repository domain not in whitelist. Allowed: {allowed_domains}"
 
-    def check_operation(self, command: str, flags: List[str], user_role: str = "human") -> tuple:
+    def check_operation(self, command: str, flags: list[str], user_role: str = "human") -> tuple:
         """
         检查操作是否允许
 
@@ -192,7 +190,13 @@ class GitCommandSkill(Skill):
             "command": SkillParameter(
                 name="command",
                 type="string",
-                description="Git 子命令: clone(克隆), init(初始化), remote(远程), branch(分支), checkout(检出), switch(切换), merge(合并), fetch(获取), pull(拉取), push(推送), add(暂存), commit(提交), reset(重置), revert(回滚), status(状态), log(日志), diff(差异), show(显示), blame(追责)",
+                description=(
+                    "Git 子命令: clone(克隆), init(初始化), remote(远程), "
+                    "branch(分支), checkout(检出), switch(切换), merge(合并), "
+                    "fetch(获取), pull(拉取), push(推送), add(暂存), commit(提交), "
+                    "reset(重置), revert(回滚), status(状态), log(日志), "
+                    "diff(差异), show(显示), blame(追责)"
+                ),
                 required=True,
             ),
             "repository": SkillParameter(
@@ -272,8 +276,8 @@ class GitCommandSkill(Skill):
         }
 
     async def execute(
-        self, inputs: Dict[str, Any], context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, inputs: dict[str, Any], context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """执行 Git 命令"""
         # 获取上下文信息
         wallet_address = context.get("wallet_address") if context else None
@@ -428,8 +432,8 @@ class GitCommandSkill(Skill):
         repository: str,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """克隆仓库"""
         if not repository:
@@ -445,8 +449,8 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """初始化仓库"""
         cmd = ["git", "init"]
@@ -457,9 +461,9 @@ class GitCommandSkill(Skill):
     async def _remote(
         self,
         working_dir: str,
-        repository: Optional[str],
+        repository: str | None,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ):
         """远程操作"""
         cmd = ["git", "remote"]
@@ -473,10 +477,10 @@ class GitCommandSkill(Skill):
     async def _branch(
         self,
         working_dir: str,
-        branch: Optional[str],
+        branch: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """分支操作"""
         cmd = ["git", "branch"]
@@ -489,11 +493,11 @@ class GitCommandSkill(Skill):
     async def _checkout(
         self,
         working_dir: str,
-        branch: Optional[str],
-        path: Optional[str],
+        branch: str | None,
+        path: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """检出分支或文件"""
         cmd = ["git", "checkout"]
@@ -508,10 +512,10 @@ class GitCommandSkill(Skill):
     async def _switch(
         self,
         working_dir: str,
-        branch: Optional[str],
+        branch: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """切换分支"""
         cmd = ["git", "switch"]
@@ -524,10 +528,10 @@ class GitCommandSkill(Skill):
     async def _merge(
         self,
         working_dir: str,
-        branch: Optional[str],
+        branch: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """合并分支"""
         cmd = ["git", "merge"]
@@ -542,8 +546,8 @@ class GitCommandSkill(Skill):
         working_dir: str,
         remote: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """获取"""
         cmd = ["git", "fetch", remote]
@@ -555,10 +559,10 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         remote: str,
-        branch: Optional[str],
+        branch: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """拉取"""
         cmd = ["git", "pull"]
@@ -573,10 +577,10 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         remote: str,
-        branch: Optional[str],
+        branch: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """推送"""
         cmd = ["git", "push"]
@@ -590,10 +594,10 @@ class GitCommandSkill(Skill):
     async def _add(
         self,
         working_dir: str,
-        path: Optional[str],
+        path: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """暂存"""
         cmd = ["git", "add"]
@@ -605,10 +609,10 @@ class GitCommandSkill(Skill):
     async def _commit(
         self,
         working_dir: str,
-        message: Optional[str],
+        message: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """提交"""
         cmd = ["git", "commit", "-m"]
@@ -620,10 +624,10 @@ class GitCommandSkill(Skill):
     async def _reset(
         self,
         working_dir: str,
-        path: Optional[str],
+        path: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """重置"""
         cmd = ["git", "reset"]
@@ -636,10 +640,10 @@ class GitCommandSkill(Skill):
     async def _revert(
         self,
         working_dir: str,
-        commit: Optional[str],
+        commit: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """回滚"""
         cmd = ["git", "revert"]
@@ -653,7 +657,7 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ):
         """状态"""
         return await self._execute_git_command(
@@ -664,8 +668,8 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """日志"""
         cmd = ["git", "log", "--oneline", "--graph", "-20"]
@@ -677,8 +681,8 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """差异"""
         cmd = ["git", "diff"]
@@ -689,10 +693,10 @@ class GitCommandSkill(Skill):
     async def _show(
         self,
         working_dir: str,
-        ref: Optional[str],
+        ref: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """显示"""
         cmd = ["git", "show"]
@@ -705,10 +709,10 @@ class GitCommandSkill(Skill):
     async def _blame(
         self,
         working_dir: str,
-        path: Optional[str],
+        path: str | None,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """追责"""
         cmd = ["git", "blame"]
@@ -722,8 +726,8 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """储藏"""
         cmd = ["git", "stash"]
@@ -735,8 +739,8 @@ class GitCommandSkill(Skill):
         self,
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
-        flags: List[str],
+        env: dict[str, str],
+        flags: list[str],
     ):
         """恢复储藏"""
         cmd = ["git", "stash", "pop"]
@@ -746,10 +750,10 @@ class GitCommandSkill(Skill):
 
     async def _execute_git_command(
         self,
-        cmd: List[str],
+        cmd: list[str],
         working_dir: str,
         timeout: int,
-        env: Dict[str, str],
+        env: dict[str, str],
     ):
         """执行 Git 命令"""
         git_path = shutil.which("git")
@@ -777,7 +781,7 @@ class GitCommandSkill(Skill):
                     process.communicate(),
                     timeout=timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 await process.wait()
                 raise TimeoutError(f"Command timed out after {timeout} seconds")
@@ -807,7 +811,7 @@ class GitCommandSkill(Skill):
                 execution_time=0,
             )
 
-    def _parse_repo_info(self, result, command: str) -> Optional[Dict[str, Any]]:
+    def _parse_repo_info(self, result, command: str) -> dict[str, Any] | None:
         """解析仓库信息"""
         if command in ["init", "clone"] and result.success:
             return {

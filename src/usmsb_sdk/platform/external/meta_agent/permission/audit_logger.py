@@ -15,13 +15,13 @@ import sqlite3
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class AuditLevel(str, Enum):
+class AuditLevel(StrEnum):
     """审计级别"""
 
     INFO = "info"
@@ -30,7 +30,7 @@ class AuditLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class AuditAction(str, Enum):
+class AuditAction(StrEnum):
     """审计操作类型"""
 
     # NPM/NPX 操作
@@ -74,11 +74,11 @@ class AuditLog:
     resource: str = ""
     operation: str = ""
     result: str = "success"
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     ip_address: str = ""
     user_agent: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "timestamp": self.timestamp,
@@ -168,7 +168,7 @@ class AuditLogger:
         operation: str = "",
         result: str = "success",
         level: AuditLevel = AuditLevel.INFO,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         user_id: str = "",
         ip_address: str = "",
         user_agent: str = "",
@@ -212,8 +212,8 @@ class AuditLogger:
 
         cursor.execute(
             """
-            INSERT INTO audit_logs 
-            (id, timestamp, level, action, user_id, wallet_address, role, 
+            INSERT INTO audit_logs
+            (id, timestamp, level, action, user_id, wallet_address, role,
              resource, operation, result, details, ip_address, user_agent)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -239,13 +239,13 @@ class AuditLogger:
 
     async def query(
         self,
-        wallet_address: Optional[str] = None,
-        action: Optional[AuditAction] = None,
-        level: Optional[AuditLevel] = None,
-        start_time: Optional[float] = None,
-        end_time: Optional[float] = None,
+        wallet_address: str | None = None,
+        action: AuditAction | None = None,
+        level: AuditLevel | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """查询审计日志"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
@@ -254,13 +254,13 @@ class AuditLogger:
 
     def _query_logs(
         self,
-        wallet_address: Optional[str],
-        action: Optional[AuditAction],
-        level: Optional[AuditLevel],
-        start_time: Optional[float],
-        end_time: Optional[float],
+        wallet_address: str | None,
+        action: AuditAction | None,
+        level: AuditLevel | None,
+        start_time: float | None,
+        end_time: float | None,
         limit: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """查询日志"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -318,12 +318,12 @@ class AuditLogger:
 
         return results
 
-    async def get_user_stats(self, wallet_address: str) -> Dict[str, Any]:
+    async def get_user_stats(self, wallet_address: str) -> dict[str, Any]:
         """获取用户操作统计"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_user_stats, wallet_address)
 
-    def _get_user_stats(self, wallet_address: str) -> Dict[str, Any]:
+    def _get_user_stats(self, wallet_address: str) -> dict[str, Any]:
         """获取用户统计"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -337,9 +337,9 @@ class AuditLogger:
         # 按操作类型统计
         cursor.execute(
             """
-            SELECT action, COUNT(*) as count 
-            FROM audit_logs 
-            WHERE wallet_address = ? 
+            SELECT action, COUNT(*) as count
+            FROM audit_logs
+            WHERE wallet_address = ?
             GROUP BY action
             """,
             (wallet_address,),
@@ -349,9 +349,9 @@ class AuditLogger:
         # 按结果统计
         cursor.execute(
             """
-            SELECT result, COUNT(*) as count 
-            FROM audit_logs 
-            WHERE wallet_address = ? 
+            SELECT result, COUNT(*) as count
+            FROM audit_logs
+            WHERE wallet_address = ?
             GROUP BY result
             """,
             (wallet_address,),
@@ -361,10 +361,10 @@ class AuditLogger:
         # 最近的操作
         cursor.execute(
             """
-            SELECT action, operation, result, timestamp 
-            FROM audit_logs 
-            WHERE wallet_address = ? 
-            ORDER BY timestamp DESC 
+            SELECT action, operation, result, timestamp
+            FROM audit_logs
+            WHERE wallet_address = ?
+            ORDER BY timestamp DESC
             LIMIT 10
             """,
             (wallet_address,),
@@ -390,7 +390,7 @@ class AuditLogger:
 
 
 # 全局审计日志实例
-_audit_logger: Optional[AuditLogger] = None
+_audit_logger: AuditLogger | None = None
 
 
 def get_audit_logger(db_path: str = "meta_agent_audit.db") -> AuditLogger:

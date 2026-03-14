@@ -9,20 +9,19 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
 from usmsb_sdk.protocol.mcp.types import (
-    MCPMessageType,
-    MCPResourceType,
-    MCPToolStatus,
-    MCPResource,
-    MCPTool,
     MCPPrompt,
-    MCPToolResult,
+    MCPResource,
+    MCPResourceType,
     MCPSamplingRequest,
     MCPSamplingResponse,
+    MCPTool,
+    MCPToolResult,
+    MCPToolStatus,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +29,13 @@ logger = logging.getLogger(__name__)
 class MCPConnection:
     """Manages MCP protocol connection."""
 
-    def __init__(self, server_url: str, api_key: Optional[str] = None):
+    def __init__(self, server_url: str, api_key: str | None = None):
         self.server_url = server_url
         self.api_key = api_key
-        self.session_id: Optional[str] = None
+        self.session_id: str | None = None
         self.connected = False
         self._message_id = 0
-        self._pending_requests: Dict[str, asyncio.Future] = {}
+        self._pending_requests: dict[str, asyncio.Future] = {}
 
     async def connect(self) -> bool:
         """Establish connection to MCP server."""
@@ -59,9 +58,9 @@ class MCPConnection:
     async def send_request(
         self,
         method: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         timeout: float = 30.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send a request to MCP server."""
         if not self.connected:
             raise RuntimeError("Not connected to MCP server")
@@ -69,12 +68,6 @@ class MCPConnection:
         self._message_id += 1
         request_id = str(self._message_id)
 
-        request = {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "method": method,
-            "params": params,
-        }
 
         # In real implementation, send over transport
         logger.debug(f"MCP Request: {method}")
@@ -83,17 +76,12 @@ class MCPConnection:
     async def send_notification(
         self,
         method: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
     ) -> None:
         """Send a notification to MCP server."""
         if not self.connected:
             raise RuntimeError("Not connected to MCP server")
 
-        notification = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        }
 
         logger.debug(f"MCP Notification: {method}")
 
@@ -114,7 +102,7 @@ class MCPAdapter:
     def __init__(
         self,
         server_url: str = "http://localhost:8080/mcp",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         """
         Initialize MCP Adapter.
@@ -126,22 +114,22 @@ class MCPAdapter:
         self.connection = MCPConnection(server_url, api_key)
 
         # Registered resources, tools, prompts
-        self._resources: Dict[str, MCPResource] = {}
-        self._tools: Dict[str, MCPTool] = {}
-        self._prompts: Dict[str, MCPPrompt] = {}
+        self._resources: dict[str, MCPResource] = {}
+        self._tools: dict[str, MCPTool] = {}
+        self._prompts: dict[str, MCPPrompt] = {}
 
         # Tool handlers
-        self._tool_handlers: Dict[str, Callable] = {}
+        self._tool_handlers: dict[str, Callable] = {}
 
         # Resource handlers
-        self._resource_handlers: Dict[str, Callable] = {}
+        self._resource_handlers: dict[str, Callable] = {}
 
         # Context store
-        self._context: Dict[str, Any] = {}
+        self._context: dict[str, Any] = {}
 
         # Callbacks
-        self.on_resource_accessed: Optional[Callable[[MCPResource], None]] = None
-        self.on_tool_executed: Optional[Callable[[MCPTool, MCPToolResult], None]] = None
+        self.on_resource_accessed: Callable[[MCPResource], None] | None = None
+        self.on_tool_executed: Callable[[MCPTool, MCPToolResult], None] | None = None
 
     async def start(self) -> bool:
         """Start the MCP adapter."""
@@ -177,7 +165,7 @@ class MCPAdapter:
         resource_type: MCPResourceType,
         handler: Callable,
         mime_type: str = "text/plain",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MCPResource:
         """
         Register a resource.
@@ -209,7 +197,7 @@ class MCPAdapter:
         logger.info(f"Registered MCP resource: {uri}")
         return resource
 
-    async def list_resources(self) -> List[MCPResource]:
+    async def list_resources(self) -> list[MCPResource]:
         """List all available resources."""
         return list(self._resources.values())
 
@@ -217,7 +205,7 @@ class MCPAdapter:
         self,
         uri: str,
         encoding: str = "utf-8",
-    ) -> Union[str, bytes, Dict[str, Any]]:
+    ) -> str | bytes | dict[str, Any]:
         """
         Read a resource.
 
@@ -250,10 +238,10 @@ class MCPAdapter:
         self,
         name: str,
         description: str,
-        input_schema: Dict[str, Any],
+        input_schema: dict[str, Any],
         handler: Callable,
-        output_schema: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        output_schema: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MCPTool:
         """
         Register a tool.
@@ -283,14 +271,14 @@ class MCPAdapter:
         logger.info(f"Registered MCP tool: {name}")
         return tool
 
-    async def list_tools(self) -> List[MCPTool]:
+    async def list_tools(self) -> list[MCPTool]:
         """List all available tools."""
         return list(self._tools.values())
 
     async def call_tool(
         self,
         name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         timeout: float = 60.0,
     ) -> MCPToolResult:
         """
@@ -333,7 +321,7 @@ class MCPAdapter:
                 execution_time=time.time() - start_time,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = MCPToolResult(
                 tool_name=name,
                 status=MCPToolStatus.TIMEOUT,
@@ -361,8 +349,8 @@ class MCPAdapter:
         name: str,
         description: str,
         template: str,
-        arguments: Optional[List[Dict[str, Any]]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        arguments: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MCPPrompt:
         """
         Register a prompt template.
@@ -389,14 +377,14 @@ class MCPAdapter:
         logger.info(f"Registered MCP prompt: {name}")
         return prompt
 
-    async def list_prompts(self) -> List[MCPPrompt]:
+    async def list_prompts(self) -> list[MCPPrompt]:
         """List all available prompts."""
         return list(self._prompts.values())
 
     async def get_prompt(
         self,
         name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> str:
         """
         Get a prompt with arguments applied.
@@ -424,11 +412,11 @@ class MCPAdapter:
 
     async def create_sampling_request(
         self,
-        messages: List[Dict[str, Any]],
-        model: Optional[str] = None,
+        messages: list[dict[str, Any]],
+        model: str | None = None,
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        stop_sequences: Optional[List[str]] = None,
+        stop_sequences: list[str] | None = None,
     ) -> MCPSamplingRequest:
         """
         Create a sampling request.
@@ -491,7 +479,7 @@ class MCPAdapter:
         """Clear all context values."""
         self._context.clear()
 
-    async def export_context(self) -> Dict[str, Any]:
+    async def export_context(self) -> dict[str, Any]:
         """Export current context."""
         return {
             "context": self._context.copy(),
@@ -500,13 +488,13 @@ class MCPAdapter:
             "prompts": [p.to_dict() for p in self._prompts.values()],
         }
 
-    async def import_context(self, data: Dict[str, Any]) -> None:
+    async def import_context(self, data: dict[str, Any]) -> None:
         """Import context data."""
         self._context.update(data.get("context", {}))
 
     # ========== Utility Methods ==========
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get adapter statistics."""
         return {
             "connected": self.connection.connected,
@@ -522,8 +510,8 @@ class MCPAdapter:
     async def expose_agent_capabilities(
         self,
         agent_id: str,
-        capabilities: Dict[str, Any],
-    ) -> List[MCPTool]:
+        capabilities: dict[str, Any],
+    ) -> list[MCPTool]:
         """
         Expose agent capabilities as MCP tools.
 
@@ -557,8 +545,8 @@ class MCPAdapter:
         self,
         agent_id: str,
         skill_name: str,
-        arguments: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
         """Handle a call to an agent skill."""
         # In real implementation, route to agent communication
         return {
@@ -571,7 +559,7 @@ class MCPAdapter:
 
 # ========== Standard MCP Tools ==========
 
-def create_standard_tools() -> List[Dict[str, Any]]:
+def create_standard_tools() -> list[dict[str, Any]]:
     """Create standard MCP tool definitions."""
     return [
         {

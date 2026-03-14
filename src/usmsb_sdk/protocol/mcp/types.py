@@ -4,21 +4,20 @@ MCP Protocol Types
 This module defines the types used in the Model Context Protocol.
 """
 
-import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class MCPMessageType(str, Enum):
+class MCPMessageType(StrEnum):
     """MCP message types."""
     REQUEST = "request"
     RESPONSE = "response"
     NOTIFICATION = "notification"
 
 
-class MCPResourceType(str, Enum):
+class MCPResourceType(StrEnum):
     """Types of MCP resources."""
     TEXT = "text"
     BINARY = "binary"
@@ -28,7 +27,7 @@ class MCPResourceType(str, Enum):
     API = "api"
 
 
-class MCPToolStatus(str, Enum):
+class MCPToolStatus(StrEnum):
     """Status of tool execution."""
     PENDING = "pending"
     RUNNING = "running"
@@ -45,9 +44,9 @@ class MCPResource:
     description: str
     resource_type: MCPResourceType
     mime_type: str = "text/plain"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "uri": self.uri,
             "name": self.name,
@@ -63,11 +62,11 @@ class MCPTool:
     """An MCP tool that can be invoked."""
     name: str
     description: str
-    input_schema: Dict[str, Any]
-    output_schema: Optional[Dict[str, Any]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -82,11 +81,11 @@ class MCPPrompt:
     """An MCP prompt template."""
     name: str
     description: str
-    arguments: List[Dict[str, Any]] = field(default_factory=list)
+    arguments: list[dict[str, Any]] = field(default_factory=list)
     template: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "description": self.description,
@@ -102,11 +101,11 @@ class MCPToolResult:
     tool_name: str
     status: MCPToolStatus
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "toolName": self.tool_name,
             "status": self.status.value,
@@ -120,14 +119,14 @@ class MCPToolResult:
 @dataclass
 class MCPSamplingRequest:
     """Request for LLM sampling."""
-    messages: List[Dict[str, Any]]
-    model: Optional[str] = None
+    messages: list[dict[str, Any]]
+    model: str | None = None
     max_tokens: int = 1000
     temperature: float = 0.7
-    stop_sequences: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    stop_sequences: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "messages": self.messages,
             "model": self.model,
@@ -144,10 +143,10 @@ class MCPSamplingResponse:
     content: str
     model: str
     stop_reason: str = "end"
-    usage: Dict[str, int] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    usage: dict[str, int] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "content": self.content,
             "model": self.model,
@@ -163,7 +162,7 @@ class MCPServerInfo:
     name: str
     version: str
     protocol_version: str
-    capabilities: Dict[str, Any] = field(default_factory=dict)
+    capabilities: dict[str, Any] = field(default_factory=dict)
     instructions: str = ""
 
 
@@ -171,7 +170,7 @@ class MCPServerInfo:
 class MCPToolCall:
     """MCP tool call request."""
     name: str
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     call_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
@@ -179,13 +178,13 @@ class MCPToolCall:
 class MCPMessage:
     """MCP protocol message."""
     jsonrpc: str = "2.0"
-    id: Optional[str] = None
-    method: Optional[str] = None
-    params: Dict[str, Any] = field(default_factory=dict)
-    result: Optional[Any] = None
-    error: Optional[Dict[str, Any]] = None
+    id: str | None = None
+    method: str | None = None
+    params: dict[str, Any] = field(default_factory=dict)
+    result: Any | None = None
+    error: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         data = {"jsonrpc": self.jsonrpc}
         if self.id is not None:
             data["id"] = self.id

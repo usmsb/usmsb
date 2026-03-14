@@ -9,17 +9,16 @@ Provides HTTP REST API capability for Agents using FastAPI:
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 try:
+    import uvicorn
     from fastapi import FastAPI, HTTPException, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel
-    import uvicorn
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -35,26 +34,26 @@ if FASTAPI_AVAILABLE:
     class InvokeRequest(BaseModel):
         """Request model for /invoke endpoint"""
         method: str = "chat"
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         sender_id: str = "unknown"
 
     class ChatRequest(BaseModel):
         """Request model for /chat endpoint"""
-        message: Optional[str] = None
-        input: Optional[str] = None
+        message: str | None = None
+        input: str | None = None
         sender_id: str = "unknown"
 
     class HeartbeatRequest(BaseModel):
         """Request model for /heartbeat endpoint"""
-        data: Optional[Dict[str, Any]] = None
+        data: dict[str, Any] | None = None
 
     class MessageRequest(BaseModel):
         """Request model for /message endpoint"""
-        message_type: Optional[str] = None
-        message_id: Optional[str] = None
-        sender_id: Optional[str] = None
-        timestamp: Optional[str] = None
-        payload: Optional[Dict[str, Any]] = None
+        message_type: str | None = None
+        message_id: str | None = None
+        sender_id: str | None = None
+        timestamp: str | None = None
+        payload: dict[str, Any] | None = None
 
 
 class HTTPServer:
@@ -108,13 +107,13 @@ class HTTPServer:
         self.cors_origins = cors_origins or ["*"]
 
         # Server state
-        self.app: Optional[FastAPI] = None
-        self._server: Optional[uvicorn.Server] = None
+        self.app: FastAPI | None = None
+        self._server: uvicorn.Server | None = None
         self._running = False
 
         # Platform registration state
         self._registered = False
-        self._registration_token: Optional[str] = None
+        self._registration_token: str | None = None
 
         logger.info(f"HTTPServer created for {agent.name} on port {port}")
 
@@ -205,7 +204,7 @@ class HTTPServer:
                 data = await request.json()
                 logger.info(f"[DEBUG] /invoke data: {data}")
             except:
-                logger.error(f"[DEBUG] /invoke - invalid JSON")
+                logger.error("[DEBUG] /invoke - invalid JSON")
                 raise HTTPException(status_code=400, detail="Invalid JSON")
 
             method = data.get("method", "chat")
@@ -213,7 +212,7 @@ class HTTPServer:
             sender_id = data.get("sender_id", "unknown")
 
             # Construct message
-            message = {
+            {
                 "message_type": method,
                 "message_id": f"http_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}",
                 "sender_id": sender_id,
@@ -366,7 +365,7 @@ class HTTPServer:
             self._running = False
             logger.info(f"HTTP Server stopped for {self.agent.name}")
 
-    async def _default_chat_response(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _default_chat_response(self, params: dict[str, Any]) -> dict[str, Any]:
         """Default chat response"""
         message = params.get("message", "")
         return {
@@ -446,7 +445,7 @@ class HTTPServer:
                 async with session.delete(
                     f"{self.platform_url}/agent-auth/agents/{self.agent.agent_id}",
                     timeout=aiohttp.ClientTimeout(total=5)
-                ) as response:
+                ):
                     self._registered = False
                     logger.info(f"Unregistered from platform: {self.agent.agent_id}")
                     return True

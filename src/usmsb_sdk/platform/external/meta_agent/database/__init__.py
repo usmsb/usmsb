@@ -5,13 +5,13 @@ Provides user-isolated database management for the Meta Agent.
 """
 
 from .user_database import (
-    UserDatabase,
     Conversation,
-    Message,
-    UserProfile,
     ConversationSummary,
     ImportantMemory,
     KnowledgeItem,
+    Message,
+    UserDatabase,
+    UserProfile,
     create_user_database,
 )
 

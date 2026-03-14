@@ -7,9 +7,9 @@ Meta Agent Sync Module
 from usmsb_sdk.meta_agent.sync.auto_sync_manager import (
     AutoSyncManager,
     SyncConfig,
-    SyncStatus,
     SyncError,
     SyncInProgressError,
+    SyncStatus,
 )
 
 __all__ = [

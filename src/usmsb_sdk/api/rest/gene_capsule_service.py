@@ -8,19 +8,17 @@ Platform-side services for gene capsule management including:
 - Value Evaluation Service
 """
 
-import asyncio
 import json
 import logging
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, Text, ForeignKey
+from pydantic import BaseModel
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -193,21 +191,21 @@ class ExperienceGeneCreate(BaseModel):
     task_type: str
     task_category: str
     task_description: str
-    task_keywords: List[str] = []
+    task_keywords: list[str] = []
 
     outcome: str
     quality_score: float
     completion_time: float
 
-    client_rating: Optional[int] = None
-    client_review: Optional[str] = None
-    would_recommend: Optional[bool] = None
+    client_rating: int | None = None
+    client_review: str | None = None
+    would_recommend: bool | None = None
 
-    techniques_used: List[str] = []
-    tools_used: List[str] = []
+    techniques_used: list[str] = []
+    tools_used: list[str] = []
     approach_description: str = ""
-    lessons_learned: List[str] = []
-    best_practices: List[str] = []
+    lessons_learned: list[str] = []
+    best_practices: list[str] = []
 
     share_level: str = "semi_public"
     visible_to_verified_only: bool = False
@@ -215,8 +213,8 @@ class ExperienceGeneCreate(BaseModel):
 
 class ExperienceGeneUpdate(BaseModel):
     """Request model for updating experience gene"""
-    share_level: Optional[str] = None
-    visible_to_verified_only: Optional[bool] = None
+    share_level: str | None = None
+    visible_to_verified_only: bool | None = None
 
 
 class GeneCapsuleResponse(BaseModel):
@@ -263,13 +261,13 @@ class GeneCapsuleStorageService:
 
         return capsule
 
-    async def get_capsule(self, agent_id: str) -> Optional[GeneCapsuleDB]:
+    async def get_capsule(self, agent_id: str) -> GeneCapsuleDB | None:
         """Get capsule by agent ID"""
         return self.db.query(GeneCapsuleDB).filter(
             GeneCapsuleDB.agent_id == agent_id
         ).first()
 
-    async def get_capsule_by_id(self, capsule_id: str) -> Optional[GeneCapsuleDB]:
+    async def get_capsule_by_id(self, capsule_id: str) -> GeneCapsuleDB | None:
         """Get capsule by ID"""
         return self.db.query(GeneCapsuleDB).filter(
             GeneCapsuleDB.capsule_id == capsule_id
@@ -342,7 +340,7 @@ class GeneCapsuleStorageService:
         logger.info(f"Added experience {experience.gene_id} to capsule {capsule_id}")
         return experience
 
-    async def get_experience(self, experience_id: str) -> Optional[ExperienceGeneDB]:
+    async def get_experience(self, experience_id: str) -> ExperienceGeneDB | None:
         """Get experience by ID"""
         return self.db.query(ExperienceGeneDB).filter(
             ExperienceGeneDB.gene_id == experience_id
@@ -353,7 +351,7 @@ class GeneCapsuleStorageService:
         experience_id: str,
         share_level: str,
         visible_to_verified_only: bool,
-    ) -> Optional[ExperienceGeneDB]:
+    ) -> ExperienceGeneDB | None:
         """Update experience visibility"""
         experience = await self.get_experience(experience_id)
         if not experience:
@@ -369,7 +367,7 @@ class GeneCapsuleStorageService:
         self,
         capsule_id: str,
         limit: int = 10,
-    ) -> List[ExperienceGeneDB]:
+    ) -> list[ExperienceGeneDB]:
         """Get publicly visible experiences"""
         return self.db.query(ExperienceGeneDB).filter(
             ExperienceGeneDB.capsule_id == capsule_id,
@@ -441,9 +439,9 @@ class GeneCapsuleStorageService:
         capsule_id: str,
         pattern_name: str,
         pattern_type: str,
-        trigger_conditions: List[str],
+        trigger_conditions: list[str],
         approach: str,
-        experience_ids: List[str],
+        experience_ids: list[str],
     ) -> PatternGeneDB:
         """Add new pattern to capsule"""
         pattern = PatternGeneDB(
@@ -473,7 +471,7 @@ class GeneCapsuleStorageService:
         change_type: str,
         description: str,
         trigger: str = "agent_request",
-        reference: Optional[str] = None,
+        reference: str | None = None,
     ) -> CapsuleVersionDB:
         """Create a new version snapshot"""
         # Get latest version number
@@ -545,7 +543,7 @@ class LLMDesensitizationService:
         self,
         text: str,
         strictness: str = "high",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Perform recursive desensitization
 
@@ -605,8 +603,8 @@ class LLMDesensitizationService:
     async def _identify_sensitive(
         self,
         text: str,
-        context: Dict,
-    ) -> List[Dict]:
+        context: dict,
+    ) -> list[dict]:
         """Use LLM to identify sensitive information"""
         prompt = f"""
 分析以下文本，识别所有可能泄露客户隐私的信息。
@@ -653,9 +651,9 @@ class LLMDesensitizationService:
     async def _apply_desensitization(
         self,
         text: str,
-        sensitive_items: List[Dict],
+        sensitive_items: list[dict],
         strictness: str,
-    ) -> Tuple[str, List[Dict]]:
+    ) -> tuple[str, list[dict]]:
         """Use LLM to generate desensitized version"""
         prompt = f"""
 对以下文本进行脱敏处理。
@@ -702,8 +700,8 @@ class LLMDesensitizationService:
     async def _check_risk(
         self,
         text: str,
-        context: Dict,
-    ) -> Dict[str, Any]:
+        context: dict,
+    ) -> dict[str, Any]:
         """Use LLM to check for remaining risks"""
         prompt = f"""
 检查以下已脱敏文本是否还存在隐私泄露风险。
@@ -786,7 +784,7 @@ class ExperienceValueEvaluator:
     async def evaluate(
         self,
         experience: ExperienceGeneDB,
-        market_context: Optional[Dict] = None,
+        market_context: dict | None = None,
     ) -> float:
         """
         Calculate overall value score for an experience
@@ -828,7 +826,7 @@ class ExperienceValueEvaluator:
     async def _evaluate_scarcity(
         self,
         task_type: str,
-        market_context: Optional[Dict],
+        market_context: dict | None,
     ) -> float:
         """Evaluate how rare this capability is"""
         if not market_context:
@@ -957,7 +955,7 @@ class AutoVerificationService:
     async def verify_experience(
         self,
         experience: ExperienceGeneDB,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Verify an experience automatically
 
@@ -1009,7 +1007,7 @@ class AutoVerificationService:
             "methods": verification_methods,
         }
 
-    async def _verify_transaction(self, experience: ExperienceGeneDB) -> Dict:
+    async def _verify_transaction(self, experience: ExperienceGeneDB) -> dict:
         """Verify via transaction records"""
         # TODO: Query transaction records
         # For now, assume verified if there's a capsule reference
@@ -1017,19 +1015,19 @@ class AutoVerificationService:
             return {"verified": True, "source": "platform_record"}
         return {"verified": False}
 
-    async def _verify_execution_trace(self, experience: ExperienceGeneDB) -> Dict:
+    async def _verify_execution_trace(self, experience: ExperienceGeneDB) -> dict:
         """Verify via execution traces"""
         # TODO: Query execution logs
         # Check if techniques used match actual execution
         return {"verified": False}
 
-    def _verify_client_feedback(self, experience: ExperienceGeneDB) -> Dict:
+    def _verify_client_feedback(self, experience: ExperienceGeneDB) -> dict:
         """Verify via client feedback"""
         if experience.client_rating and experience.client_rating >= 4:
             return {"verified": True, "source": "client_rating"}
         return {"verified": False}
 
-    def _verify_time_consistency(self, experience: ExperienceGeneDB) -> Dict:
+    def _verify_time_consistency(self, experience: ExperienceGeneDB) -> dict:
         """Verify time consistency"""
         if not experience.task_completed_at:
             return {"verified": False}
@@ -1055,11 +1053,11 @@ class GeneCapsuleMatchingService:
     async def find_matching_agents(
         self,
         task_type: str,
-        keywords: List[str],
-        min_rating: Optional[float] = None,
+        keywords: list[str],
+        min_rating: float | None = None,
         verified_only: bool = False,
         limit: int = 10,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Find agents with matching gene capsules
 
@@ -1095,10 +1093,10 @@ class GeneCapsuleMatchingService:
         self,
         capsule: GeneCapsuleDB,
         task_type: str,
-        keywords: List[str],
-        min_rating: Optional[float],
+        keywords: list[str],
+        min_rating: float | None,
         verified_only: bool,
-    ) -> Dict:
+    ) -> dict:
         """Calculate match score for a capsule"""
         # Filter relevant experiences
         relevant_experiences = []

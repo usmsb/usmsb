@@ -12,23 +12,22 @@ Usage:
 """
 
 from usmsb_sdk.protocol.grpc.handler import (
-    gRPCHandler,
+    GRPC_AVAILABLE,
+    ConnectionEndpoint,
+    ConnectionPool,
+    LoadBalancingStrategy,
+    ProtoMessageBuilder,
+    call_grpc_method,
+    create_grpc_handler,
     gRPCConfig,
+    gRPCError,
+    gRPCErrorCode,
+    gRPCHandler,
     gRPCMethod,
     gRPCRequest,
     gRPCResponse,
     gRPCServiceDefinition,
-    gRPCError,
-    gRPCErrorCode,
-    LoadBalancingStrategy,
-    ConnectionPool,
-    ConnectionEndpoint,
-    ProtoMessageBuilder,
-    create_grpc_handler,
-    call_grpc_method,
-    GRPC_AVAILABLE,
 )
-
 
 __all__ = [
     "gRPCHandler",

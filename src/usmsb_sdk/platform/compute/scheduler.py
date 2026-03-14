@@ -8,16 +8,14 @@ Handles job queuing, resource matching, and optimization.
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from enum import StrEnum
 
 from usmsb_sdk.platform.compute.adapter import (
     ComputeJob,
     ComputeResource,
     ComputeSpec,
-    ComputeType,
     IComputeResourceAdapter,
     JobStatus,
     LocalComputeAdapter,
@@ -27,7 +25,7 @@ from usmsb_sdk.platform.compute.adapter import (
 logger = logging.getLogger(__name__)
 
 
-class SchedulingStrategy(str, Enum):
+class SchedulingStrategy(StrEnum):
     """Job scheduling strategies."""
     FIFO = "fifo"  # First in, first out
     PRIORITY = "priority"  # Highest priority first
@@ -85,8 +83,8 @@ class ComputeSchedulerService:
 
     def __init__(
         self,
-        compute_adapter: Optional[IComputeResourceAdapter] = None,
-        config: Optional[SchedulingConfig] = None,
+        compute_adapter: IComputeResourceAdapter | None = None,
+        config: SchedulingConfig | None = None,
     ):
         """
         Initialize the Compute Scheduler Service.
@@ -99,19 +97,19 @@ class ComputeSchedulerService:
         self.config = config or SchedulingConfig()
 
         # State
-        self._queue: List[QueueItem] = []
-        self._running_jobs: Dict[str, ComputeJob] = {}
-        self._resources: Dict[str, ComputeResource] = {}
+        self._queue: list[QueueItem] = []
+        self._running_jobs: dict[str, ComputeJob] = {}
+        self._resources: dict[str, ComputeResource] = {}
         self._metrics = SchedulerMetrics()
 
         # Control
         self._running = False
-        self._scheduler_task: Optional[asyncio.Task] = None
+        self._scheduler_task: asyncio.Task | None = None
 
         # Callbacks
-        self.on_job_started: Optional[Callable[[ComputeJob], None]] = None
-        self.on_job_completed: Optional[Callable[[ComputeJob], None]] = None
-        self.on_job_failed: Optional[Callable[[ComputeJob, str], None]] = None
+        self.on_job_started: Callable[[ComputeJob], None] | None = None
+        self.on_job_completed: Callable[[ComputeJob], None] | None = None
+        self.on_job_failed: Callable[[ComputeJob, str], None] | None = None
 
     async def initialize(self) -> bool:
         """
@@ -173,12 +171,12 @@ class ComputeSchedulerService:
         name: str,
         required_spec: ComputeSpec,
         owner_id: str,
-        command: Optional[str] = None,
-        docker_image: Optional[str] = None,
-        environment: Optional[Dict[str, str]] = None,
+        command: str | None = None,
+        docker_image: str | None = None,
+        environment: dict[str, str] | None = None,
         priority: int = 0,
-        input_data: Optional[str] = None,
-        output_path: Optional[str] = None,
+        input_data: str | None = None,
+        output_path: str | None = None,
     ) -> ComputeJob:
         """
         Submit a new job to the scheduler.
@@ -253,7 +251,7 @@ class ComputeSchedulerService:
 
         return False
 
-    async def get_job(self, job_id: str) -> Optional[ComputeJob]:
+    async def get_job(self, job_id: str) -> ComputeJob | None:
         """Get job by ID."""
         # Check adapter
         job = await self.adapter.get_job(job_id)
@@ -267,11 +265,11 @@ class ComputeSchedulerService:
 
         return None
 
-    async def get_queue(self) -> List[ComputeJob]:
+    async def get_queue(self) -> list[ComputeJob]:
         """Get current job queue."""
         return [item.job for item in self._queue]
 
-    async def get_resources(self) -> List[ComputeResource]:
+    async def get_resources(self) -> list[ComputeResource]:
         """Get available resources."""
         return list(self._resources.values())
 
@@ -349,7 +347,7 @@ class ComputeSchedulerService:
 
         self._metrics.queue_length = len(self._queue)
 
-    def _sort_queue(self) -> List[QueueItem]:
+    def _sort_queue(self) -> list[QueueItem]:
         """Sort queue by scheduling strategy."""
         if self.config.strategy == SchedulingStrategy.FIFO:
             return self._queue.copy()
@@ -366,7 +364,7 @@ class ComputeSchedulerService:
 
         elif self.config.strategy == SchedulingStrategy.FAIR_SHARE:
             # Group by owner and round-robin
-            owner_queues: Dict[str, List[QueueItem]] = {}
+            owner_queues: dict[str, list[QueueItem]] = {}
             for item in self._queue:
                 owner = item.job.owner_id
                 if owner not in owner_queues:
@@ -384,7 +382,7 @@ class ComputeSchedulerService:
 
         return self._queue.copy()
 
-    async def _find_resource(self, required: ComputeSpec) -> Optional[ComputeResource]:
+    async def _find_resource(self, required: ComputeSpec) -> ComputeResource | None:
         """Find a suitable resource for the job."""
         candidates = []
 
@@ -441,7 +439,7 @@ class ComputeSchedulerService:
     def get_resource_recommendations(
         self,
         spec: ComputeSpec,
-    ) -> List[Tuple[ComputeResource, float]]:
+    ) -> list[tuple[ComputeResource, float]]:
         """
         Get resource recommendations for a specification.
 

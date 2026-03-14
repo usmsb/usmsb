@@ -9,18 +9,17 @@ Provides real-time environment state updates:
 - Personalized notifications
 """
 import asyncio
-import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class BroadcastType(str, Enum):
+class BroadcastType(StrEnum):
     """Types of broadcast messages."""
     ENVIRONMENT_UPDATE = "environment_update"
     MARKET_CHANGE = "market_change"
@@ -41,12 +40,12 @@ class BroadcastMessage:
     broadcast_type: BroadcastType
     sender_id: str
     sender_name: str
-    content: Dict[str, Any]
+    content: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
     priority: int = 0  # Higher = more important
-    target_agents: Optional[List[str]] = None  # None = broadcast to all
+    target_agents: list[str] | None = None  # None = broadcast to all
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "broadcastType": self.broadcast_type.value,
             "senderId": self.sender_id,
@@ -83,14 +82,14 @@ class EnvironmentState:
     success_rate: float = 0.95
 
     # Trending data
-    hot_skills: List[str] = field(default_factory=list)
-    hot_categories: List[str] = field(default_factory=list)
-    trending_tags: List[str] = field(default_factory=list)
+    hot_skills: list[str] = field(default_factory=list)
+    hot_categories: list[str] = field(default_factory=list)
+    trending_tags: list[str] = field(default_factory=list)
 
     # Timestamp
     last_updated: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "market": {
                 "totalSupplyListings": self.total_supply_listings,
@@ -126,11 +125,11 @@ class EnvironmentState:
 class PriceAlert:
     """A price alert configuration."""
     agent_id: str
-    skill: Optional[str] = None
-    category: Optional[str] = None
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
-    change_threshold: Optional[float] = None  # Percentage change
+    skill: str | None = None
+    category: str | None = None
+    min_price: float | None = None
+    max_price: float | None = None
+    change_threshold: float | None = None  # Percentage change
     enabled: bool = True
 
 
@@ -138,10 +137,10 @@ class PriceAlert:
 class AgentSubscription:
     """An agent's broadcast subscriptions."""
     agent_id: str
-    subscribed_types: Set[BroadcastType] = field(default_factory=set)
-    price_alerts: List[PriceAlert] = field(default_factory=list)
-    subscribed_skills: List[str] = field(default_factory=list)
-    notification_preferences: Dict[str, bool] = field(default_factory=dict)
+    subscribed_types: set[BroadcastType] = field(default_factory=set)
+    price_alerts: list[PriceAlert] = field(default_factory=list)
+    subscribed_skills: list[str] = field(default_factory=list)
+    notification_preferences: dict[str, bool] = field(default_factory=dict)
 
 
 class EnvironmentBroadcastService:
@@ -169,20 +168,20 @@ class EnvironmentBroadcastService:
 
         # Current state
         self._state = EnvironmentState()
-        self._previous_state: Optional[EnvironmentState] = None
+        self._previous_state: EnvironmentState | None = None
 
         # Subscriptions
-        self._subscriptions: Dict[str, AgentSubscription] = {}
+        self._subscriptions: dict[str, AgentSubscription] = {}
 
         # Callbacks for broadcast
-        self._broadcast_callback: Optional[Callable[[BroadcastMessage], None]] = None
+        self._broadcast_callback: Callable[[BroadcastMessage], None] | None = None
 
         # Background tasks
         self._running = False
-        self._tasks: List[asyncio.Task] = []
+        self._tasks: list[asyncio.Task] = []
 
         # Price history for alerts
-        self._price_history: Dict[str, List[float]] = {}
+        self._price_history: dict[str, list[float]] = {}
 
     def set_broadcast_callback(self, callback: Callable[[BroadcastMessage], None]) -> None:
         """Set the callback for broadcasting messages."""
@@ -430,9 +429,9 @@ class EnvironmentBroadcastService:
         broadcast_type: BroadcastType,
         sender_id: str,
         sender_name: str,
-        content: Dict[str, Any],
+        content: dict[str, Any],
         priority: int = 0,
-        target_agents: Optional[List[str]] = None,
+        target_agents: list[str] | None = None,
     ) -> None:
         """
         Broadcast a message to relevant agents.
@@ -454,7 +453,7 @@ class EnvironmentBroadcastService:
     async def notify_opportunity(
         self,
         agent_id: str,
-        opportunity: Dict[str, Any],
+        opportunity: dict[str, Any],
     ) -> None:
         """Notify an agent of a new opportunity."""
         await self.broadcast(
@@ -509,8 +508,8 @@ class EnvironmentBroadcastService:
     def subscribe_agent(
         self,
         agent_id: str,
-        broadcast_types: List[BroadcastType] = None,
-        skills: List[str] = None,
+        broadcast_types: list[BroadcastType] = None,
+        skills: list[str] = None,
     ) -> AgentSubscription:
         """Subscribe an agent to broadcasts."""
         subscription = AgentSubscription(
@@ -538,13 +537,13 @@ class EnvironmentBroadcastService:
         """Get current environment state."""
         return self._state
 
-    def get_agent_subscription(self, agent_id: str) -> Optional[AgentSubscription]:
+    def get_agent_subscription(self, agent_id: str) -> AgentSubscription | None:
         """Get an agent's subscription."""
         return self._subscriptions.get(agent_id)
 
 
 # Global instance
-_environment_service: Optional[EnvironmentBroadcastService] = None
+_environment_service: EnvironmentBroadcastService | None = None
 
 
 async def get_environment_service() -> EnvironmentBroadcastService:

@@ -4,10 +4,10 @@ Web3客户端封装模块
 提供统一的Web3连接和交互接口，支持异步操作。
 """
 
-from typing import Optional, Any
-from web3 import Web3
-from web3.exceptions import TransactionNotFound, TimeExhausted
 import asyncio
+from typing import Any
+
+from web3 import Web3
 
 from .config import BlockchainConfig
 
@@ -20,8 +20,8 @@ class Web3Client:
 
     def __init__(
         self,
-        config: Optional[BlockchainConfig] = None,
-        rpc_url: Optional[str] = None,
+        config: BlockchainConfig | None = None,
+        rpc_url: str | None = None,
     ):
         """
         初始化Web3客户端
@@ -32,7 +32,7 @@ class Web3Client:
         """
         self.config = config or BlockchainConfig()
         self._rpc_url = rpc_url or self.config.rpc_url
-        self._w3: Optional[Web3] = None
+        self._w3: Web3 | None = None
         self._w3_async = None  # 异步Web3实例（待实现）
 
     @property
@@ -46,7 +46,7 @@ class Web3Client:
         """连接到区块链节点"""
         self._w3 = Web3(Web3.HTTPProvider(self._rpc_url))
 
-    def reconnect(self, new_rpc_url: Optional[str] = None) -> None:
+    def reconnect(self, new_rpc_url: str | None = None) -> None:
         """重新连接到区块链节点
 
         Args:
@@ -163,7 +163,7 @@ class Web3Client:
     def estimate_gas(
         self,
         transaction: dict,
-        block_identifier: Optional[Any] = None,
+        block_identifier: Any | None = None,
     ) -> int:
         """
         估算交易gas
@@ -194,7 +194,7 @@ class Web3Client:
         """
         return self.w3.eth.get_block(block_identifier, full_transactions=full_transactions)
 
-    def get_code(self, address: str, block_identifier: Optional[Any] = None) -> bytes:
+    def get_code(self, address: str, block_identifier: Any | None = None) -> bytes:
         """
         获取合约代码
 

@@ -9,22 +9,21 @@ This module provides comprehensive communication capabilities between agents:
 - Communication channels and topics
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
-from datetime import datetime
 import asyncio
-import json
 import logging
-import uuid
 import time
+import uuid
+from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class MessageType(str, Enum):
+class MessageType(StrEnum):
     """Types of messages agents can exchange."""
     REQUEST = "request"           # Request for action/information
     RESPONSE = "response"         # Response to a request
@@ -36,7 +35,7 @@ class MessageType(str, Enum):
     TRANSACTION = "transaction"  # Transaction-related message
 
 
-class MessagePriority(str, Enum):
+class MessagePriority(StrEnum):
     """Priority levels for messages."""
     LOW = "low"
     NORMAL = "normal"
@@ -44,7 +43,7 @@ class MessagePriority(str, Enum):
     URGENT = "urgent"
 
 
-class DeliveryStatus(str, Enum):
+class DeliveryStatus(StrEnum):
     """Delivery status of messages."""
     PENDING = "pending"
     SENT = "sent"
@@ -59,8 +58,8 @@ class AgentAddress:
     """Address identifying an agent in the network."""
     agent_id: str
     node_id: str  # Node where the agent is running
-    capabilities: List[str] = field(default_factory=list)
-    public_key: Optional[str] = None  # For encrypted communication
+    capabilities: list[str] = field(default_factory=list)
+    public_key: str | None = None  # For encrypted communication
 
     def __str__(self) -> str:
         return f"{self.agent_id}@{self.node_id}"
@@ -78,19 +77,19 @@ class Message:
     type: MessageType = MessageType.NOTIFICATION
     priority: MessagePriority = MessagePriority.NORMAL
     sender: AgentAddress = None
-    recipient: Optional[AgentAddress] = None  # None for broadcast
-    topic: Optional[str] = None  # For pub/sub
+    recipient: AgentAddress | None = None  # None for broadcast
+    topic: str | None = None  # For pub/sub
     subject: str = ""
     content: Any = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None  # TTL for message
-    correlation_id: Optional[str] = None  # For request/response matching
-    reply_to: Optional[str] = None  # Queue/topic for replies
+    expires_at: float | None = None  # TTL for message
+    correlation_id: str | None = None  # For request/response matching
+    reply_to: str | None = None  # Queue/topic for replies
     requires_ack: bool = False
-    signature: Optional[str] = None  # Message signature for verification
+    signature: str | None = None  # Message signature for verification
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize message to dictionary."""
         return {
             "id": self.id,
@@ -110,7 +109,7 @@ class Message:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Message":
+    def from_dict(cls, data: dict[str, Any]) -> "Message":
         """Deserialize message from dictionary."""
         return cls(
             id=data.get("id", str(uuid.uuid4())),
@@ -153,7 +152,7 @@ class MessageReceipt:
     status: DeliveryStatus
     recipient: AgentAddress
     timestamp: float = field(default_factory=time.time)
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class CommunicationChannel(ABC):
@@ -165,7 +164,7 @@ class CommunicationChannel(ABC):
         pass
 
     @abstractmethod
-    async def receive(self, timeout: Optional[float] = None) -> Optional[Message]:
+    async def receive(self, timeout: float | None = None) -> Message | None:
         """Receive a message."""
         pass
 
@@ -189,9 +188,9 @@ class InMemoryCommunicationChannel(CommunicationChannel):
 
     def __init__(self):
         self._inbox: asyncio.Queue = asyncio.Queue()
-        self._subscriptions: Dict[str, List[Callable]] = defaultdict(list)
+        self._subscriptions: dict[str, list[Callable]] = defaultdict(list)
         self._subscription_counter = 0
-        self._message_store: Dict[str, Message] = {}
+        self._message_store: dict[str, Message] = {}
 
     async def send(self, message: Message) -> MessageReceipt:
         """Send a message to the inbox."""
@@ -217,7 +216,7 @@ class InMemoryCommunicationChannel(CommunicationChannel):
             recipient=message.recipient,
         )
 
-    async def receive(self, timeout: Optional[float] = None) -> Optional[Message]:
+    async def receive(self, timeout: float | None = None) -> Message | None:
         """Receive a message from the inbox."""
         try:
             if timeout:
@@ -225,7 +224,7 @@ class InMemoryCommunicationChannel(CommunicationChannel):
             else:
                 message = await self._inbox.get()
             return message
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def subscribe(self, topic: str, handler: Callable[[Message], None]) -> str:
@@ -238,7 +237,7 @@ class InMemoryCommunicationChannel(CommunicationChannel):
     async def unsubscribe(self, subscription_id: str) -> bool:
         """Unsubscribe from a topic."""
         # Find and remove subscription
-        for topic, handlers in self._subscriptions.items():
+        for _topic, handlers in self._subscriptions.items():
             for i, handler in enumerate(handlers):
                 if id(handler) == int(subscription_id.split("_")[1]):
                     handlers.pop(i)
@@ -253,15 +252,15 @@ class P2PCommunicationChannel(CommunicationChannel):
     Uses a peer-to-peer network for message routing between nodes.
     """
 
-    def __init__(self, node_id: str, bootstrap_peers: Optional[List[str]] = None):
+    def __init__(self, node_id: str, bootstrap_peers: list[str] | None = None):
         self.node_id = node_id
         self.bootstrap_peers = bootstrap_peers or []
-        self._peers: Dict[str, str] = {}  # peer_id -> address
-        self._agent_locations: Dict[str, str] = {}  # agent_id -> node_id
+        self._peers: dict[str, str] = {}  # peer_id -> address
+        self._agent_locations: dict[str, str] = {}  # agent_id -> node_id
         self._inbox: asyncio.Queue = asyncio.Queue()
-        self._subscriptions: Dict[str, List[Callable]] = defaultdict(list)
-        self._pending_requests: Dict[str, asyncio.Future] = {}
-        self._message_handlers: Dict[MessageType, Callable] = {}
+        self._subscriptions: dict[str, list[Callable]] = defaultdict(list)
+        self._pending_requests: dict[str, asyncio.Future] = {}
+        self._message_handlers: dict[MessageType, Callable] = {}
 
     async def connect_to_network(self) -> bool:
         """Connect to the P2P network."""
@@ -274,7 +273,7 @@ class P2PCommunicationChannel(CommunicationChannel):
         self._agent_locations[agent_id] = self.node_id
         logger.info(f"Agent {agent_id} registered on node {self.node_id}")
 
-    async def discover_agent(self, agent_id: str) -> Optional[str]:
+    async def discover_agent(self, agent_id: str) -> str | None:
         """Discover which node an agent is on."""
         return self._agent_locations.get(agent_id)
 
@@ -323,14 +322,14 @@ class P2PCommunicationChannel(CommunicationChannel):
             recipient=message.recipient,
         )
 
-    async def receive(self, timeout: Optional[float] = None) -> Optional[Message]:
+    async def receive(self, timeout: float | None = None) -> Message | None:
         """Receive a message."""
         try:
             if timeout:
                 return await asyncio.wait_for(self._inbox.get(), timeout=timeout)
             else:
                 return await self._inbox.get()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def subscribe(self, topic: str, handler: Callable[[Message], None]) -> str:
@@ -355,7 +354,7 @@ class P2PCommunicationChannel(CommunicationChannel):
         subject: str,
         content: Any,
         timeout: float = 30.0,
-    ) -> Optional[Message]:
+    ) -> Message | None:
         """
         Send a request and wait for response.
 
@@ -383,7 +382,7 @@ class P2PCommunicationChannel(CommunicationChannel):
         try:
             response = await asyncio.wait_for(future, timeout=timeout)
             return response
-        except asyncio.TimeoutError:
+        except TimeoutError:
             del self._pending_requests[request.id]
             logger.warning(f"Request {request.id} timed out")
             return None
@@ -406,9 +405,9 @@ class AgentCommunicationManager:
         self.agent_id = agent_id
         self.channel = channel
         self.address = AgentAddress(agent_id=agent_id, node_id="local")
-        self._message_handlers: Dict[MessageType, Callable] = {}
+        self._message_handlers: dict[MessageType, Callable] = {}
         self._running = False
-        self._receive_task: Optional[asyncio.Task] = None
+        self._receive_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Start listening for messages."""
@@ -477,7 +476,7 @@ class AgentCommunicationManager:
         self,
         subject: str,
         content: Any,
-        topic: Optional[str] = None,
+        topic: str | None = None,
     ) -> MessageReceipt:
         """Broadcast a message to all agents or topic subscribers."""
         message = Message(
@@ -495,7 +494,7 @@ class AgentCommunicationManager:
         subject: str,
         content: Any,
         timeout: float = 30.0,
-    ) -> Optional[Message]:
+    ) -> Message | None:
         """Send a request and wait for response."""
         if isinstance(self.channel, P2PCommunicationChannel):
             return await self.channel.request(recipient, subject, content, timeout)
@@ -550,15 +549,15 @@ class AgentCoordinationProtocol:
 
     def __init__(self, comm_manager: AgentCommunicationManager):
         self.comm = comm_manager
-        self._pending_tasks: Dict[str, Dict] = {}
-        self._votes: Dict[str, Dict[str, Any]] = defaultdict(dict)
+        self._pending_tasks: dict[str, dict] = {}
+        self._votes: dict[str, dict[str, Any]] = defaultdict(dict)
 
     async def delegate_task(
         self,
         agent: AgentAddress,
-        task: Dict[str, Any],
+        task: dict[str, Any],
         timeout: float = 60.0,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Delegate a task to another agent.
 
@@ -583,10 +582,10 @@ class AgentCoordinationProtocol:
 
     async def propose_consensus(
         self,
-        participants: List[AgentAddress],
-        proposal: Dict[str, Any],
+        participants: list[AgentAddress],
+        proposal: dict[str, Any],
         timeout: float = 30.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Propose something for consensus among participants.
 
@@ -634,7 +633,7 @@ class AgentCoordinationProtocol:
         self,
         proposal_id: str,
         approve: bool,
-        reason: Optional[str] = None,
+        reason: str | None = None,
     ) -> None:
         """Cast a vote on a proposal."""
         self._votes[proposal_id][self.comm.agent_id] = {
@@ -679,8 +678,8 @@ class AgentCoordinationProtocol:
 
     async def share_information(
         self,
-        recipients: List[AgentAddress],
-        information: Dict[str, Any],
+        recipients: list[AgentAddress],
+        information: dict[str, Any],
     ) -> int:
         """
         Share information with other agents.

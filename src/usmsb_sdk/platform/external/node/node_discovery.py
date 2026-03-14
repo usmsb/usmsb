@@ -13,14 +13,15 @@ import json
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class NodeHealthStatus(str, Enum):
+class NodeHealthStatus(StrEnum):
     """Health status of a discovered node."""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
@@ -36,11 +37,11 @@ class HealthCheckResult:
     status: NodeHealthStatus
     latency_ms: float = 0.0
     response_code: int = 200
-    error_message: Optional[str] = None
+    error_message: str | None = None
     checked_at: float = field(default_factory=time.time)
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "status": self.status.value,
@@ -60,19 +61,19 @@ class DiscoveredNode:
     port: int
     name: str = ""
     version: str = ""
-    services: List[str] = field(default_factory=list)
-    capabilities: Dict[str, Any] = field(default_factory=dict)
+    services: list[str] = field(default_factory=list)
+    capabilities: dict[str, Any] = field(default_factory=dict)
     last_seen: float = field(default_factory=time.time)
     first_seen: float = field(default_factory=time.time)
     health_status: NodeHealthStatus = NodeHealthStatus.UNKNOWN
-    last_health_check: Optional[float] = None
+    last_health_check: float | None = None
     latency_ms: float = 0.0
     success_rate: float = 1.0
     total_checks: int = 0
     failed_checks: int = 0
     reputation: float = 1.0
     score: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     source: str = ""  # Where this node was discovered from
 
     def update_health(self, result: HealthCheckResult) -> None:
@@ -118,7 +119,7 @@ class DiscoveredNode:
         """Check if node info is stale."""
         return time.time() - self.last_seen > max_age
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "node_id": self.node_id,
             "address": self.address,
@@ -154,7 +155,7 @@ class DiscoveryStats:
     failed_checks: int = 0
     discovery_rounds: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_discovered": self.total_discovered,
             "active_nodes": self.active_nodes,
@@ -200,7 +201,7 @@ class NodeDiscoveryService:
 
     def __init__(
         self,
-        seed_nodes: Optional[List[str]] = None,
+        seed_nodes: list[str] | None = None,
         local_node_id: str = "",
         health_check_interval: float = DEFAULT_HEALTH_CHECK_INTERVAL,
         discovery_interval: float = DEFAULT_DISCOVERY_INTERVAL,
@@ -226,23 +227,23 @@ class NodeDiscoveryService:
         self.stale_threshold = stale_threshold
 
         # Discovered nodes
-        self._nodes: Dict[str, DiscoveredNode] = {}
-        self._nodes_by_address: Dict[str, str] = {}  # "address:port" -> node_id
+        self._nodes: dict[str, DiscoveredNode] = {}
+        self._nodes_by_address: dict[str, str] = {}  # "address:port" -> node_id
 
         # Services index
-        self._services_index: Dict[str, Set[str]] = defaultdict(set)
+        self._services_index: dict[str, set[str]] = defaultdict(set)
 
         # Statistics
         self._stats = DiscoveryStats()
 
         # State
         self._running = False
-        self._tasks: Set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task] = set()
 
         # Event handlers
-        self._on_node_discovered: Optional[Callable[[DiscoveredNode], None]] = None
-        self._on_node_lost: Optional[Callable[[str], None]] = None
-        self._on_health_changed: Optional[Callable[[str, NodeHealthStatus], None]] = None
+        self._on_node_discovered: Callable[[DiscoveredNode], None] | None = None
+        self._on_node_lost: Callable[[str], None] | None = None
+        self._on_health_changed: Callable[[str, NodeHealthStatus], None] | None = None
 
     # ==================== Lifecycle ====================
 
@@ -391,7 +392,7 @@ class NodeDiscoveryService:
 
         logger.debug(f"Removed node {node_id}: {reason}")
 
-    def _parse_address(self, address: str) -> Tuple[str, int]:
+    def _parse_address(self, address: str) -> tuple[str, int]:
         """Parse address string into host and port."""
         if ":" in address:
             host, port_str = address.rsplit(":", 1)
@@ -437,7 +438,7 @@ class NodeDiscoveryService:
         if discovered_count > 0:
             logger.info(f"Discovered {discovered_count} new nodes")
 
-    async def _query_node_peers(self, node: DiscoveredNode) -> List[Dict[str, Any]]:
+    async def _query_node_peers(self, node: DiscoveredNode) -> list[dict[str, Any]]:
         """Query a node for its known peers."""
         try:
             reader, writer = await asyncio.wait_for(
@@ -465,9 +466,9 @@ class NodeDiscoveryService:
 
     def _parse_peer_info(
         self,
-        peer_info: Dict[str, Any],
+        peer_info: dict[str, Any],
         source: str
-    ) -> Optional[DiscoveredNode]:
+    ) -> DiscoveredNode | None:
         """Parse peer info into a DiscoveredNode."""
         try:
             node_id = peer_info.get("node_id", "")
@@ -556,7 +557,7 @@ class NodeDiscoveryService:
 
             self._stats.successful_checks += 1
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result = HealthCheckResult(
                 node_id=node.node_id,
                 status=NodeHealthStatus.UNHEALTHY,
@@ -599,7 +600,7 @@ class NodeDiscoveryService:
 
         return result
 
-    async def check_node(self, node_id: str) -> Optional[HealthCheckResult]:
+    async def check_node(self, node_id: str) -> HealthCheckResult | None:
         """Manually check health of a specific node."""
         if node_id not in self._nodes:
             return None
@@ -646,7 +647,7 @@ class NodeDiscoveryService:
 
     # ==================== Public API ====================
 
-    async def discover_service(self, service: str) -> List[DiscoveredNode]:
+    async def discover_service(self, service: str) -> list[DiscoveredNode]:
         """
         Discover nodes providing a specific service.
 
@@ -664,7 +665,7 @@ class NodeDiscoveryService:
         ]
         return sorted(nodes, key=lambda n: n.score, reverse=True)
 
-    async def get_healthy_nodes(self, limit: int = 100) -> List[DiscoveredNode]:
+    async def get_healthy_nodes(self, limit: int = 100) -> list[DiscoveredNode]:
         """
         Get list of healthy nodes.
 
@@ -681,11 +682,11 @@ class NodeDiscoveryService:
         sorted_nodes = sorted(healthy, key=lambda n: n.score, reverse=True)
         return sorted_nodes[:limit]
 
-    async def get_node(self, node_id: str) -> Optional[DiscoveredNode]:
+    async def get_node(self, node_id: str) -> DiscoveredNode | None:
         """Get a specific node by ID."""
         return self._nodes.get(node_id)
 
-    async def get_random_nodes(self, count: int = 10) -> List[DiscoveredNode]:
+    async def get_random_nodes(self, count: int = 10) -> list[DiscoveredNode]:
         """Get random healthy nodes."""
         import random
         healthy = await self.get_healthy_nodes()
@@ -693,7 +694,7 @@ class NodeDiscoveryService:
             return healthy
         return random.sample(healthy, count)
 
-    def get_all_nodes(self) -> List[DiscoveredNode]:
+    def get_all_nodes(self) -> list[DiscoveredNode]:
         """Get all discovered nodes."""
         return list(self._nodes.values())
 
@@ -705,8 +706,8 @@ class NodeDiscoveryService:
         self,
         address: str,
         port: int,
-        node_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        node_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> DiscoveredNode:
         """Manually add a node to discovery."""
         node = DiscoveredNode(
@@ -763,7 +764,7 @@ class NodeDiscoveryService:
 
     # ==================== Peer Exchange ====================
 
-    async def get_peers_for_exchange(self, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_peers_for_exchange(self, limit: int = 50) -> list[dict[str, Any]]:
         """Get peer list for peer exchange protocol."""
         healthy = await self.get_healthy_nodes(limit)
         return [

@@ -10,18 +10,18 @@ Stake Requirements:
 import json
 import time
 import uuid
-from typing import List, Optional, Dict, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from usmsb_sdk.api.cache import cache_manager, generate_cache_key
 from usmsb_sdk.api.database import (
-    get_db,
-    get_agent as db_get_agent,
-    create_agent as db_create_agent,
     create_service as db_create_service,
 )
-from usmsb_sdk.api.cache import cache_manager, generate_cache_key
+from usmsb_sdk.api.database import (
+    get_db,
+)
 from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
     require_stake_unified,
@@ -43,7 +43,7 @@ class AgentServiceCreate(BaseModel):
     service_name: str
     service_type: str = "general"  # Also called 'category' in some places
     description: str = ""
-    capabilities: List[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
     price: float = 0.0
     price_type: str = "hourly"  # hourly, fixed, negotiable
     availability: str = "24/7"  # full-time, part-time, always, limited
@@ -57,7 +57,7 @@ class AgentServiceCreate(BaseModel):
 async def register_agent_service(
     agent_id: str,
     service: AgentServiceCreate,
-    user: Dict[str, Any] = Depends(require_stake_unified(100))
+    user: dict[str, Any] = Depends(require_stake_unified(100))
 ):
     """Register a service provided by an AI Agent.
 
@@ -97,7 +97,7 @@ async def register_agent_service(
     }
 
     # Save to database
-    created_service = db_create_service(service_data)
+    db_create_service(service_data)
 
     # 失效services缓存
     cache_manager.services.invalidate_prefix("services:")
@@ -124,8 +124,8 @@ async def register_agent_service(
 
 @router.get("/services")
 async def list_services(
-    agent_id: Optional[str] = Query(None),
-    category: Optional[str] = Query(None),
+    agent_id: str | None = Query(None),
+    category: str | None = Query(None),
     limit: int = Query(100, ge=1, le=1000),
 ):
     """List all services.
@@ -224,7 +224,7 @@ async def get_service(service_id: str):
 @router.delete("/services/{service_id}")
 async def delete_service(
     service_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Delete a service (soft delete by setting status to 'inactive').
 

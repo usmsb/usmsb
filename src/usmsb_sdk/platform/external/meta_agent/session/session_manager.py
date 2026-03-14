@@ -13,10 +13,9 @@ SessionManager - 会话管理器
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional
 from pathlib import Path
 
-from .user_session import UserSession, SessionConfig
+from .user_session import SessionConfig, UserSession
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +31,8 @@ class SessionManager:
     def __init__(
         self,
         node_id: str,
-        data_dir: Optional[str] = None,
-        config: Optional[SessionConfig] = None
+        data_dir: str | None = None,
+        config: SessionConfig | None = None
     ):
         """
         初始化会话管理器
@@ -48,12 +47,12 @@ class SessionManager:
         self.config: SessionConfig = config or SessionConfig()
 
         # 会话存储
-        self._sessions: Dict[str, UserSession] = {}  # wallet -> session 映射
+        self._sessions: dict[str, UserSession] = {}  # wallet -> session 映射
         self._lock: asyncio.Lock = asyncio.Lock()
 
         # 状态
         self._running: bool = False
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
 
         # 确保数据目录存在
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -139,7 +138,7 @@ class SessionManager:
     async def get_session(
         self,
         wallet_address: str
-    ) -> Optional[UserSession]:
+    ) -> UserSession | None:
         """
         获取已存在的会话（不创建）
 
@@ -237,7 +236,7 @@ class SessionManager:
 
         logger.info(f"Closed all sessions, total: {len(sessions)}")
 
-    async def get_active_sessions(self) -> List[str]:
+    async def get_active_sessions(self) -> list[str]:
         """
         获取所有活跃会话的钱包地址列表
 
@@ -252,7 +251,7 @@ class SessionManager:
 
     async def cleanup_idle_sessions(
         self,
-        max_idle_seconds: Optional[int] = None
+        max_idle_seconds: int | None = None
     ) -> int:
         """
         清理空闲超过指定时间的会话
@@ -297,7 +296,7 @@ class SessionManager:
         定期检查并清理空闲会话。
         此方法由 start() 启动为后台任务。
         """
-        logger.info(f"Cleanup loop started (interval: 60s)")
+        logger.info("Cleanup loop started (interval: 60s)")
 
         while self._running:
             try:
@@ -363,7 +362,7 @@ class SessionManager:
 
         return cleaned
 
-    async def get_session_info(self, wallet_address: str) -> Optional[Dict]:
+    async def get_session_info(self, wallet_address: str) -> dict | None:
         """
         获取会话详细信息
 
@@ -396,7 +395,7 @@ class SessionManager:
             "is_browser_idle": session.is_browser_idle(),
         }
 
-    async def get_session_stats(self) -> Dict:
+    async def get_session_stats(self) -> dict:
         """
         获取会话统计信息
 

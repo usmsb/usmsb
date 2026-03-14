@@ -6,16 +6,18 @@ Authentication:
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from usmsb_sdk.api.database import (
     get_agent as db_get_agent,
+)
+from usmsb_sdk.api.database import (
     get_environment as db_get_environment,
 )
 from usmsb_sdk.api.rest.schemas.prediction import PredictionRequest
-from usmsb_sdk.api.rest.services.utils import safe_json_loads, create_agent_from_db_data
+from usmsb_sdk.api.rest.services.utils import create_agent_from_db_data, safe_json_loads
 from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 from usmsb_sdk.core.elements import Environment, EnvironmentType
 
@@ -35,7 +37,7 @@ def set_prediction_service(service):
 @router.post("/behavior")
 async def predict_behavior(
     request: PredictionRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """
     Predict agent behavior.

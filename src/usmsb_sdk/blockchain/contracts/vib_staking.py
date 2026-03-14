@@ -9,11 +9,10 @@ VIBStaking质押客户端模块
 """
 
 from enum import IntEnum
-from typing import Dict, Any, Optional
-from web3 import Web3
+from typing import Any
 
 from ..config import BlockchainConfig
-from .base import BaseContractClient, TransactionError, ContractError
+from .base import BaseContractClient, ContractError, TransactionError
 
 
 class StakeTier(IntEnum):
@@ -98,10 +97,10 @@ class VIBStakingClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Any] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Any] = None,
+        web3_client: Any | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: Any | None = None,
     ):
         """
         初始化VIBStaking客户端
@@ -132,7 +131,7 @@ class VIBStakingClient(BaseContractClient):
         lock_period: LockPeriod,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         质押VIBE（需先approve）
@@ -182,7 +181,7 @@ class VIBStakingClient(BaseContractClient):
         self,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         取消质押
@@ -223,7 +222,7 @@ class VIBStakingClient(BaseContractClient):
         self,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         领取奖励
@@ -264,7 +263,7 @@ class VIBStakingClient(BaseContractClient):
         self,
         from_address: str,
         private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         紧急提取（放弃所有奖励）
@@ -328,7 +327,7 @@ class VIBStakingClient(BaseContractClient):
         except Exception:
             return StakeTier.BRONZE
 
-    async def get_stake_info(self, address: str) -> Dict[str, Any]:
+    async def get_stake_info(self, address: str) -> dict[str, Any]:
         """
         获取质押信息
 
@@ -534,7 +533,7 @@ class VIBStakingClient(BaseContractClient):
 
     async def get_stake_details(
         self, address: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         获取质押详情（用于治理）
 

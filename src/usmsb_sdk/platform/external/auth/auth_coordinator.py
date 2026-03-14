@@ -8,25 +8,23 @@ import hashlib
 import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
 
 from usmsb_sdk.platform.external.auth.base_auth import (
     AuthContext,
     FullAuthResult,
     Permission,
 )
+from usmsb_sdk.platform.external.auth.stake_verifier import (
+    MINIMUM_STAKE_FOR_REGISTRATION,
+    IStakeVerifier,
+    MockStakeVerifier,
+    StakeVerificationResult,
+)
 from usmsb_sdk.platform.external.auth.wallet_auth import (
     IWalletAuthenticator,
     MockWalletAuthenticator,
     WalletAuthResult,
 )
-from usmsb_sdk.platform.external.auth.stake_verifier import (
-    IStakeVerifier,
-    MockStakeVerifier,
-    StakeVerificationResult,
-    MINIMUM_STAKE_FOR_REGISTRATION,
-)
-
 
 # Constants
 SESSION_DURATION_HOURS = 24 * 7  # 7 days
@@ -53,9 +51,9 @@ class SessionInfo:
     session_id: str
     session_token: str
     wallet_address: str
-    agent_id: Optional[str] = None
-    did: Optional[str] = None
-    permissions: List[Permission] = field(default_factory=list)
+    agent_id: str | None = None
+    did: str | None = None
+    permissions: list[Permission] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     expires_at: datetime = field(default_factory=lambda: datetime.now() + timedelta(hours=SESSION_DURATION_HOURS))
     last_activity: datetime = field(default_factory=datetime.now)
@@ -79,7 +77,7 @@ class VerificationContext:
     require_stake: bool = True
     minimum_stake: float = MINIMUM_STAKE_FOR_REGISTRATION
     require_agent_binding: bool = False
-    agent_id: Optional[str] = None
+    agent_id: str | None = None
     session_duration_hours: int = SESSION_DURATION_HOURS
 
 
@@ -95,8 +93,8 @@ class AuthCoordinator:
 
     def __init__(
         self,
-        wallet_authenticator: Optional[IWalletAuthenticator] = None,
-        stake_verifier: Optional[IStakeVerifier] = None,
+        wallet_authenticator: IWalletAuthenticator | None = None,
+        stake_verifier: IStakeVerifier | None = None,
         session_duration_hours: int = SESSION_DURATION_HOURS
     ):
         """
@@ -110,8 +108,8 @@ class AuthCoordinator:
         self._wallet_auth = wallet_authenticator or MockWalletAuthenticator()
         self._stake_verifier = stake_verifier or MockStakeVerifier()
         self._session_duration = min(session_duration_hours, MAX_SESSION_DURATION_HOURS)
-        self._sessions: Dict[str, SessionInfo] = {}  # session_id -> info
-        self._token_to_session: Dict[str, str] = {}  # token -> session_id
+        self._sessions: dict[str, SessionInfo] = {}  # session_id -> info
+        self._token_to_session: dict[str, str] = {}  # token -> session_id
 
     async def initialize(self) -> bool:
         """
@@ -311,7 +309,7 @@ class AuthCoordinator:
     async def validate_session(
         self,
         session_token: str
-    ) -> Optional[SessionInfo]:
+    ) -> SessionInfo | None:
         """
         Validate a session token and return session info.
 
@@ -413,8 +411,8 @@ class AuthCoordinator:
     async def _create_session(
         self,
         wallet_result: WalletAuthResult,
-        stake_result: Optional[StakeVerificationResult],
-        agent_id: Optional[str],
+        stake_result: StakeVerificationResult | None,
+        agent_id: str | None,
         duration_hours: int
     ) -> SessionInfo:
         """Create a new authenticated session."""
@@ -456,8 +454,8 @@ class AuthCoordinator:
     def _calculate_permissions(
         self,
         wallet_result: WalletAuthResult,
-        stake_result: Optional[StakeVerificationResult]
-    ) -> List[Permission]:
+        stake_result: StakeVerificationResult | None
+    ) -> list[Permission]:
         """Calculate combined permissions based on verification results."""
         permissions = [Permission.READ]  # Base permission
 
@@ -477,7 +475,7 @@ class AuthCoordinator:
 
     # Testing utilities
 
-    def get_active_sessions(self) -> List[SessionInfo]:
+    def get_active_sessions(self) -> list[SessionInfo]:
         """Get all active sessions - useful for testing."""
         return [
             s for s in self._sessions.values()

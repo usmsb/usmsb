@@ -4,19 +4,11 @@
 策略调整和参数优化
 """
 
-import asyncio
-import json
 import logging
-import math
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Any
 
 from .models import (
-    Capability,
-    CapabilityLevel,
-    LearningGoal,
     SelfReflection,
 )
 
@@ -32,8 +24,8 @@ class OptimizationParameter:
     min_value: float
     max_value: float
     step_size: float
-    history: List[float] = field(default_factory=list)
-    performance_history: List[float] = field(default_factory=list)
+    history: list[float] = field(default_factory=list)
+    performance_history: list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -76,16 +68,16 @@ class SelfOptimizer:
         self.capability_assessor = capability_assessor
         self.meta_learner = meta_learner
 
-        self._parameters: Dict[str, OptimizationParameter] = {}
-        self._optimization_history: List[OptimizationResult] = []
-        self._strategy_adjustments: List[StrategyAdjustment] = []
+        self._parameters: dict[str, OptimizationParameter] = {}
+        self._optimization_history: list[OptimizationResult] = []
+        self._strategy_adjustments: list[StrategyAdjustment] = []
 
         self._learning_rate: float = 0.1
         self._exploration_rate: float = 0.2
         self._adaptation_speed: float = 0.5
 
-        self._performance_baseline: Dict[str, float] = {}
-        self._optimization_candidates: List[str] = []
+        self._performance_baseline: dict[str, float] = {}
+        self._optimization_candidates: list[str] = []
 
         self._initialized = False
 
@@ -160,7 +152,7 @@ class SelfOptimizer:
             ),
         }
 
-    async def optimize(self) -> Dict[str, Any]:
+    async def optimize(self) -> dict[str, Any]:
         """
         执行优化
 
@@ -187,7 +179,7 @@ class SelfOptimizer:
 
         return results
 
-    async def _optimize_parameters(self) -> List[Dict[str, Any]]:
+    async def _optimize_parameters(self) -> list[dict[str, Any]]:
         """优化参数"""
         improvements = []
 
@@ -227,7 +219,7 @@ class SelfOptimizer:
     async def _find_optimal_value(
         self,
         param: OptimizationParameter,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """寻找最优参数值"""
         current = param.current_value
 
@@ -291,7 +283,7 @@ class SelfOptimizer:
         elif name == "adaptation_speed":
             self._adaptation_speed = value
 
-    async def _optimize_strategies(self) -> List[Dict[str, Any]]:
+    async def _optimize_strategies(self) -> list[dict[str, Any]]:
         """优化策略"""
         improvements = []
 
@@ -342,7 +334,7 @@ class SelfOptimizer:
 
         return improvements
 
-    async def _optimize_resources(self) -> List[Dict[str, Any]]:
+    async def _optimize_resources(self) -> list[dict[str, Any]]:
         """优化资源分配"""
         improvements = []
 
@@ -372,8 +364,8 @@ class SelfOptimizer:
 
     async def adaptive_adjust(
         self,
-        context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         自适应调整
 
@@ -419,7 +411,7 @@ class SelfOptimizer:
     async def update_performance(
         self,
         performance_score: float,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ):
         """
         更新性能记录
@@ -431,7 +423,7 @@ class SelfOptimizer:
             if len(param.performance_history) > 100:
                 param.performance_history = param.performance_history[-100:]
 
-    async def generate_optimization_report(self) -> Dict[str, Any]:
+    async def generate_optimization_report(self) -> dict[str, Any]:
         """生成优化报告"""
         await self._ensure_initialized()
 
@@ -478,7 +470,7 @@ class SelfOptimizer:
     async def suggest_improvements(
         self,
         reflection: SelfReflection,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         根据自我反思建议改进
 
@@ -526,7 +518,7 @@ class SelfOptimizer:
 
         return suggestions
 
-    def get_parameter(self, name: str) -> Optional[float]:
+    def get_parameter(self, name: str) -> float | None:
         """获取参数值"""
         if name in self._parameters:
             return self._parameters[name].current_value

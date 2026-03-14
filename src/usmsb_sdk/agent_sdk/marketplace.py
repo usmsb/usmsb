@@ -7,14 +7,13 @@ Enables agents to publish services, post demands, and find matches.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Union
-from uuid import uuid4
+from typing import Any
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +53,9 @@ class PriceRange:
     """Price range for budget or suggestions"""
     min: float
     max: float
-    recommended: Optional[float] = None
+    recommended: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {"min": self.min, "max": self.max}
         if self.recommended is not None:
             result["recommended"] = self.recommended
@@ -72,11 +71,11 @@ class MatchScore:
     reputation_match: float
     time_match: float
     semantic_match: float = 0.0
-    suggested_price_range: Optional[PriceRange] = None
+    suggested_price_range: PriceRange | None = None
     reasoning: str = ""
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MatchScore":
+    def from_dict(cls, data: dict[str, Any]) -> "MatchScore":
         price_range = None
         if data.get("suggested_price_range"):
             pr = data["suggested_price_range"]
@@ -96,7 +95,7 @@ class MatchScore:
             reasoning=data.get("reasoning", ""),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "overall": round(self.overall, 3),
             "capability_match": round(self.capability_match, 3),
@@ -117,15 +116,15 @@ class ServiceDefinition:
     service_name: str
     description: str
     category: str
-    skills: List[str]
+    skills: list[str]
     price: float
     price_type: str = "hourly"
     availability: str = "24/7"
     max_concurrent: int = 10
-    quality_guarantees: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    quality_guarantees: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "service_name": self.service_name,
             "description": self.description,
@@ -148,15 +147,15 @@ class Service:
     service_name: str
     description: str
     category: str
-    skills: List[str]
+    skills: list[str]
     price: float
     price_type: str
     availability: str
     status: str
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Service":
+    def from_dict(cls, data: dict[str, Any]) -> "Service":
         return cls(
             id=data.get("id", ""),
             agent_id=data.get("agent_id", ""),
@@ -177,16 +176,16 @@ class DemandDefinition:
     """Definition of a demand/requirement to be published"""
     title: str
     description: str
-    required_skills: List[str]
+    required_skills: list[str]
     budget_min: float
     budget_max: float
     category: str = ""
-    deadline: Optional[datetime] = None
+    deadline: datetime | None = None
     priority: str = "medium"
-    quality_requirements: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    quality_requirements: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "title": self.title,
             "description": self.description,
@@ -210,16 +209,16 @@ class Demand:
     title: str
     description: str
     category: str
-    required_skills: List[str]
+    required_skills: list[str]
     budget_min: float
     budget_max: float
     priority: str
     status: str
-    deadline: Optional[datetime] = None
-    created_at: Optional[datetime] = None
+    deadline: datetime | None = None
+    created_at: datetime | None = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Demand":
+    def from_dict(cls, data: dict[str, Any]) -> "Demand":
         return cls(
             id=data.get("id", ""),
             agent_id=data.get("agent_id", ""),
@@ -243,13 +242,13 @@ class Opportunity:
     type: str  # demand or supply
     counterpart_id: str
     counterpart_name: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
     match_score: MatchScore
     status: str
-    created_at: Optional[float] = None
+    created_at: float | None = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Opportunity":
+    def from_dict(cls, data: dict[str, Any]) -> "Opportunity":
         score_data = data.get("match_score", {})
         return cls(
             opportunity_id=data.get("opportunity_id", ""),
@@ -277,22 +276,22 @@ class MarketplaceManager:
     def __init__(
         self,
         platform_client: PlatformClient,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
         self.logger = logger or logging.getLogger(__name__)
 
         # Local caches
-        self._my_services: Dict[str, Service] = {}
-        self._my_demands: Dict[str, Demand] = {}
-        self._opportunity_watchers: List[Callable] = []
+        self._my_services: dict[str, Service] = {}
+        self._my_demands: dict[str, Demand] = {}
+        self._opportunity_watchers: list[Callable] = []
 
     # ==================== Service Management ====================
 
     async def publish_service(
         self,
         service_def: ServiceDefinition,
-    ) -> Union[Service, None]:
+    ) -> Service | None:
         """
         Publish a service to the marketplace.
 
@@ -323,10 +322,10 @@ class MarketplaceManager:
 
     async def list_services(
         self,
-        category: Optional[str] = None,
-        agent_id: Optional[str] = None,
+        category: str | None = None,
+        agent_id: str | None = None,
         limit: int = 100,
-    ) -> List[Service]:
+    ) -> list[Service]:
         """
         List services on the marketplace.
 
@@ -348,7 +347,7 @@ class MarketplaceManager:
             return [Service.from_dict(s) for s in response.data]
         return []
 
-    async def list_my_services(self) -> List[Service]:
+    async def list_my_services(self) -> list[Service]:
         """List all services published by this agent"""
         return list(self._my_services.values())
 
@@ -381,7 +380,7 @@ class MarketplaceManager:
     async def publish_demand(
         self,
         demand_def: DemandDefinition,
-    ) -> Union[Demand, None]:
+    ) -> Demand | None:
         """
         Publish a demand to the marketplace.
 
@@ -414,10 +413,10 @@ class MarketplaceManager:
 
     async def list_demands(
         self,
-        category: Optional[str] = None,
-        agent_id: Optional[str] = None,
+        category: str | None = None,
+        agent_id: str | None = None,
         limit: int = 100,
-    ) -> List[Demand]:
+    ) -> list[Demand]:
         """
         List demands on the marketplace.
 
@@ -439,7 +438,7 @@ class MarketplaceManager:
             return [Demand.from_dict(d) for d in response.data]
         return []
 
-    async def list_my_demands(self) -> List[Demand]:
+    async def list_my_demands(self) -> list[Demand]:
         """List all demands published by this agent"""
         return list(self._my_demands.values())
 
@@ -459,9 +458,9 @@ class MarketplaceManager:
     async def find_opportunities(
         self,
         as_supplier: bool = True,
-        capabilities: Optional[List[str]] = None,
-        budget_range: Optional[tuple] = None,
-    ) -> List[Opportunity]:
+        capabilities: list[str] | None = None,
+        budget_range: tuple | None = None,
+    ) -> list[Opportunity]:
         """
         Find matching opportunities.
 
@@ -490,7 +489,7 @@ class MarketplaceManager:
             return [Opportunity.from_dict(o) for o in response.data]
         return []
 
-    async def get_opportunity(self, opportunity_id: str) -> Optional[Opportunity]:
+    async def get_opportunity(self, opportunity_id: str) -> Opportunity | None:
         """Get a specific opportunity by ID"""
         opportunities = await self.get_all_opportunities()
         for opp in opportunities:
@@ -498,7 +497,7 @@ class MarketplaceManager:
                 return opp
         return None
 
-    async def get_all_opportunities(self) -> List[Opportunity]:
+    async def get_all_opportunities(self) -> list[Opportunity]:
         """Get all opportunities for this agent"""
         response = await self._platform.get_opportunities()
 
@@ -506,7 +505,7 @@ class MarketplaceManager:
             return [Opportunity.from_dict(o) for o in response.data]
         return []
 
-    async def get_matching_stats(self) -> Dict[str, Any]:
+    async def get_matching_stats(self) -> dict[str, Any]:
         """Get matching statistics"""
         response = await self._platform.get_matching_stats()
 
@@ -518,7 +517,7 @@ class MarketplaceManager:
 
     async def watch_opportunities(
         self,
-        callback: Callable[[List[Opportunity]], None],
+        callback: Callable[[list[Opportunity]], None],
         interval: float = 60.0,
         as_supplier: bool = True,
     ) -> asyncio.Task:
@@ -586,7 +585,7 @@ class MarketplaceManager:
 
     # ==================== Convenience Methods ====================
 
-    async def find_work(self, capabilities: Optional[List[str]] = None) -> List[Opportunity]:
+    async def find_work(self, capabilities: list[str] | None = None) -> list[Opportunity]:
         """
         Find work opportunities matching agent's capabilities.
         Shorthand for find_opportunities(as_supplier=True)
@@ -595,9 +594,9 @@ class MarketplaceManager:
 
     async def find_workers(
         self,
-        required_skills: List[str],
-        budget_range: Optional[tuple] = None,
-    ) -> List[Opportunity]:
+        required_skills: list[str],
+        budget_range: tuple | None = None,
+    ) -> list[Opportunity]:
         """
         Find workers/suppliers for a task.
         Shorthand for find_opportunities(as_supplier=False)

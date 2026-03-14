@@ -17,15 +17,13 @@ Usage:
 """
 
 from usmsb_sdk.protocol.a2a.client import (
+    A2AAgentInfo,
     A2AClient,
     A2AEnvelope,
     A2ASkillRequest,
     A2ASkillResponse,
-    A2AAgentInfo,
 )
-
 from usmsb_sdk.protocol.a2a.server import A2AServer
-
 
 __all__ = [
     # Client

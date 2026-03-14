@@ -13,20 +13,19 @@ notifications about relevant changes in the environment.
 """
 
 import asyncio
-import json
 import logging
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, AsyncIterator
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class BroadcastType(str, Enum):
+class BroadcastType(StrEnum):
     """Types of broadcast messages."""
     SUPPLY_AVAILABLE = "supply_available"
     DEMAND_SEEKING = "demand_seeking"
@@ -42,7 +41,7 @@ class BroadcastType(str, Enum):
     HEARTBEAT = "heartbeat"
 
 
-class BroadcastPriority(str, Enum):
+class BroadcastPriority(StrEnum):
     """Priority levels for broadcasts."""
     LOW = "low"
     NORMAL = "normal"
@@ -50,7 +49,7 @@ class BroadcastPriority(str, Enum):
     URGENT = "urgent"
 
 
-class BroadcastScope(str, Enum):
+class BroadcastScope(StrEnum):
     """Scope of broadcast delivery."""
     GLOBAL = "global"         # All agents in environment
     REGION = "region"         # Agents in a region
@@ -66,16 +65,16 @@ class BroadcastMessage:
     broadcast_type: BroadcastType
     sender_id: str
     sender_name: str
-    content: Dict[str, Any]
+    content: dict[str, Any]
     scope: BroadcastScope = BroadcastScope.GLOBAL
     priority: BroadcastPriority = BroadcastPriority.NORMAL
-    topics: List[str] = field(default_factory=list)
-    target_agents: List[str] = field(default_factory=list)
-    required_capabilities: List[str] = field(default_factory=list)
+    topics: list[str] = field(default_factory=list)
+    target_agents: list[str] = field(default_factory=list)
+    required_capabilities: list[str] = field(default_factory=list)
     ttl: float = 300.0  # Time to live in seconds
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    expires_at: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.expires_at is None:
@@ -85,7 +84,7 @@ class BroadcastMessage:
         """Check if message has expired."""
         return time.time() > self.expires_at if self.expires_at else False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "broadcast_type": self.broadcast_type.value,
@@ -104,7 +103,7 @@ class BroadcastMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BroadcastMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "BroadcastMessage":
         return cls(
             message_id=data.get("message_id", str(uuid.uuid4())),
             broadcast_type=BroadcastType(data.get("broadcast_type", "environment_update")),
@@ -128,12 +127,12 @@ class Subscription:
     """A subscription to broadcast topics."""
     subscription_id: str
     agent_id: str
-    topics: List[str]
-    broadcast_types: List[BroadcastType] = field(default_factory=list)
-    capabilities: List[str] = field(default_factory=list)
+    topics: list[str]
+    broadcast_types: list[BroadcastType] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     active: bool = True
-    callback: Optional[Callable] = None
+    callback: Callable | None = None
     queue: asyncio.Queue = field(default_factory=asyncio.Queue)
 
     def matches(self, message: BroadcastMessage) -> bool:
@@ -164,12 +163,12 @@ class Subscription:
 class BroadcastStats:
     """Statistics for the broadcast service."""
     total_messages: int = 0
-    messages_by_type: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    messages_by_type: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     active_subscriptions: int = 0
     total_deliveries: int = 0
     failed_deliveries: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_messages": self.total_messages,
             "messages_by_type": dict(self.messages_by_type),
@@ -207,30 +206,30 @@ class EnvironmentBroadcastService:
         self.max_history = max_history
 
         # Subscriptions
-        self._subscriptions: Dict[str, Subscription] = {}
+        self._subscriptions: dict[str, Subscription] = {}
 
         # Message history
-        self._message_history: List[BroadcastMessage] = []
+        self._message_history: list[BroadcastMessage] = []
 
         # Agent registry for capability-based routing
-        self._agent_capabilities: Dict[str, List[str]] = {}
+        self._agent_capabilities: dict[str, list[str]] = {}
 
         # Agent queues for direct delivery
-        self._agent_queues: Dict[str, asyncio.Queue] = {}
+        self._agent_queues: dict[str, asyncio.Queue] = {}
 
         # Statistics
         self._stats = BroadcastStats()
 
         # Topic index for fast lookup
-        self._topic_subscribers: Dict[str, Set[str]] = defaultdict(set)
+        self._topic_subscribers: dict[str, set[str]] = defaultdict(set)
 
         # Running state
         self._running = False
-        self._delivery_task: Optional[asyncio.Task] = None
+        self._delivery_task: asyncio.Task | None = None
 
         # Callbacks
-        self.on_message_broadcast: Optional[Callable[[BroadcastMessage, int], None]] = None
-        self.on_subscription_added: Optional[Callable[[Subscription], None]] = None
+        self.on_message_broadcast: Callable[[BroadcastMessage, int], None] | None = None
+        self.on_subscription_added: Callable[[Subscription], None] | None = None
 
     async def start(self) -> None:
         """Start the broadcast service."""
@@ -267,14 +266,14 @@ class EnvironmentBroadcastService:
         broadcast_type: BroadcastType,
         sender_id: str,
         sender_name: str,
-        content: Dict[str, Any],
+        content: dict[str, Any],
         scope: BroadcastScope = BroadcastScope.GLOBAL,
         priority: BroadcastPriority = BroadcastPriority.NORMAL,
-        topics: Optional[List[str]] = None,
-        target_agents: Optional[List[str]] = None,
-        required_capabilities: Optional[List[str]] = None,
+        topics: list[str] | None = None,
+        target_agents: list[str] | None = None,
+        required_capabilities: list[str] | None = None,
         ttl: float = 300.0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> BroadcastMessage:
         """
         Broadcast a message to the environment.
@@ -401,10 +400,10 @@ class EnvironmentBroadcastService:
         self,
         agent_id: str,
         agent_name: str,
-        resource: Dict[str, Any],
-        price_range: Optional[Dict[str, float]] = None,
+        resource: dict[str, Any],
+        price_range: dict[str, float] | None = None,
         availability: str = "now",
-        topics: Optional[List[str]] = None,
+        topics: list[str] | None = None,
     ) -> BroadcastMessage:
         """
         Broadcast supply availability.
@@ -440,10 +439,10 @@ class EnvironmentBroadcastService:
         self,
         agent_id: str,
         agent_name: str,
-        requirement: Dict[str, Any],
-        budget: Optional[Dict[str, float]] = None,
-        deadline: Optional[str] = None,
-        topics: Optional[List[str]] = None,
+        requirement: dict[str, Any],
+        budget: dict[str, float] | None = None,
+        deadline: str | None = None,
+        topics: list[str] | None = None,
     ) -> BroadcastMessage:
         """
         Broadcast demand seeking.
@@ -480,7 +479,7 @@ class EnvironmentBroadcastService:
         from_agent_id: str,
         from_agent_name: str,
         to_agent_id: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> BroadcastMessage:
         """
         Broadcast a negotiation request.
@@ -510,8 +509,8 @@ class EnvironmentBroadcastService:
         self,
         agent_id: str,
         agent_name: str,
-        capabilities: List[str],
-        metadata: Optional[Dict[str, Any]] = None,
+        capabilities: list[str],
+        metadata: dict[str, Any] | None = None,
     ) -> BroadcastMessage:
         """Broadcast that an agent is online."""
         # Update capabilities
@@ -554,7 +553,7 @@ class EnvironmentBroadcastService:
         self,
         agent_id: str,
         agent_name: str,
-        status: Dict[str, Any],
+        status: dict[str, Any],
     ) -> BroadcastMessage:
         """Broadcast a heartbeat signal."""
         return await self.broadcast(
@@ -571,7 +570,7 @@ class EnvironmentBroadcastService:
     async def broadcast_market_signal(
         self,
         signal_type: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         priority: BroadcastPriority = BroadcastPriority.NORMAL,
     ) -> BroadcastMessage:
         """
@@ -624,8 +623,8 @@ class EnvironmentBroadcastService:
         self,
         alert_level: str,
         message: str,
-        affected_agents: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        affected_agents: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> BroadcastMessage:
         """Broadcast an alert."""
         priority = BroadcastPriority.HIGH if alert_level in ["critical", "high"] else BroadcastPriority.NORMAL
@@ -650,10 +649,10 @@ class EnvironmentBroadcastService:
     async def subscribe(
         self,
         agent_id: str,
-        topics: Optional[List[str]] = None,
-        broadcast_types: Optional[List[BroadcastType]] = None,
-        capabilities: Optional[List[str]] = None,
-        callback: Optional[Callable] = None,
+        topics: list[str] | None = None,
+        broadcast_types: list[BroadcastType] | None = None,
+        capabilities: list[str] | None = None,
+        callback: Callable | None = None,
     ) -> Subscription:
         """
         Subscribe to broadcasts.
@@ -722,7 +721,7 @@ class EnvironmentBroadcastService:
         self,
         agent_id: str,
         timeout: float = 1.0,
-    ) -> List[BroadcastMessage]:
+    ) -> list[BroadcastMessage]:
         """Get pending messages for an agent."""
         messages = []
 
@@ -742,11 +741,11 @@ class EnvironmentBroadcastService:
 
     def get_message_history(
         self,
-        broadcast_type: Optional[BroadcastType] = None,
-        sender_id: Optional[str] = None,
-        topic: Optional[str] = None,
+        broadcast_type: BroadcastType | None = None,
+        sender_id: str | None = None,
+        topic: str | None = None,
         limit: int = 100,
-    ) -> List[BroadcastMessage]:
+    ) -> list[BroadcastMessage]:
         """
         Get message history.
 
@@ -779,7 +778,7 @@ class EnvironmentBroadcastService:
         self,
         agent_id: str,
         since: float,
-        broadcast_types: Optional[List[BroadcastType]] = None,
+        broadcast_types: list[BroadcastType] | None = None,
     ) -> int:
         """
         Replay messages to an agent since a timestamp.
@@ -820,7 +819,7 @@ class EnvironmentBroadcastService:
     def register_agent_capabilities(
         self,
         agent_id: str,
-        capabilities: List[str],
+        capabilities: list[str],
     ) -> None:
         """Register capabilities for an agent."""
         self._agent_capabilities[agent_id] = capabilities
@@ -844,7 +843,7 @@ class EnvironmentBroadcastService:
         for sid in to_remove:
             del self._subscriptions[sid]
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get service statistics."""
         return {
             **self._stats.to_dict(),
@@ -853,6 +852,6 @@ class EnvironmentBroadcastService:
             "history_size": len(self._message_history),
         }
 
-    def get_active_topics(self) -> List[str]:
+    def get_active_topics(self) -> list[str]:
         """Get list of active topics."""
         return list(self._topic_subscribers.keys())

@@ -3,7 +3,6 @@ LLM Manager - 多 LLM 支持
 """
 
 import logging
-from typing import Any, Dict, List, Optional
 
 from usmsb_sdk.intelligence_adapters.base import IntelligenceSourceConfig, IntelligenceSourceType
 from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
@@ -46,7 +45,7 @@ class LLMManager:
         await self._adapter.initialize()
         logger.info("MiniMax adapter initialized in LLM Manager")
 
-    async def chat(self, message: str, system_prompt: Optional[str] = None) -> str:
+    async def chat(self, message: str, system_prompt: str | None = None) -> str:
         """聊天"""
         if self.provider == "minimax" and self._adapter:
             return await self._adapter.generate_with_system(
@@ -61,14 +60,14 @@ class LLMManager:
             return await self._chat_local(message, system_prompt)
         return "LLM not configured"
 
-    async def _chat_openai(self, message: str, system_prompt: Optional[str]) -> str:
+    async def _chat_openai(self, message: str, system_prompt: str | None) -> str:
         """OpenAI 聊天"""
         return f"OpenAI response to: {message}"
 
-    async def _chat_claude(self, message: str, system_prompt: Optional[str]) -> str:
+    async def _chat_claude(self, message: str, system_prompt: str | None) -> str:
         """Claude 聊天"""
         return f"Claude response to: {message}"
 
-    async def _chat_local(self, message: str, system_prompt: Optional[str]) -> str:
+    async def _chat_local(self, message: str, system_prompt: str | None) -> str:
         """本地 LLM 聊天"""
         return f"Local LLM response to: {message}"

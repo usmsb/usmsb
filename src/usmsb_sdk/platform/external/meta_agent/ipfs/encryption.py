@@ -5,11 +5,10 @@ Provides AES-256-GCM encryption/decryption utilities and wallet signature-based 
 """
 
 import os
-from typing import Optional, Tuple
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
@@ -85,7 +84,7 @@ class Encryption:
         return plaintext
 
     @staticmethod
-    def derive_key_from_signature(signature: str, salt: Optional[bytes] = None) -> bytes:
+    def derive_key_from_signature(signature: str, salt: bytes | None = None) -> bytes:
         """
         Derive AES-256 encryption key from a wallet signature.
 
@@ -332,8 +331,8 @@ class KeyDerivation:
     @staticmethod
     def generate_test_signature(
         private_key: str,
-        message: Optional[str] = None
-    ) -> Tuple[str, str]:
+        message: str | None = None
+    ) -> tuple[str, str]:
         """
         Generate a test signature (for testing purposes only).
 

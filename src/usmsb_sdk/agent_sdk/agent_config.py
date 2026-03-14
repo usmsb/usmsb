@@ -8,11 +8,11 @@ Provides configuration classes for agent setup including:
 - Network and security settings
 """
 
+import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 from uuid import uuid4
-import json
 
 
 class ProtocolType(Enum):
@@ -43,11 +43,11 @@ class SkillParameter:
     type: str  # "string", "integer", "float", "boolean", "array", "object"
     description: str
     required: bool = True
-    default: Optional[Any] = None
-    enum: Optional[List[Any]] = None
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    pattern: Optional[str] = None  # Regex pattern for string validation
+    default: Any | None = None
+    enum: list[Any] | None = None
+    min_value: float | None = None
+    max_value: float | None = None
+    pattern: str | None = None  # Regex pattern for string validation
 
 
 @dataclass
@@ -56,17 +56,17 @@ class SkillDefinition:
 
     name: str
     description: str
-    parameters: List[SkillParameter] = field(default_factory=list)
+    parameters: list[SkillParameter] = field(default_factory=list)
     returns: str = "object"
     timeout: int = 30  # seconds
     rate_limit: int = 100  # requests per minute
     requires_auth: bool = False
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     version: str = "1.0.0"
     deprecated: bool = False
-    examples: List[Dict[str, Any]] = field(default_factory=list)
+    examples: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return {
             "name": self.name,
@@ -96,7 +96,7 @@ class SkillDefinition:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SkillDefinition":
+    def from_dict(cls, data: dict[str, Any]) -> "SkillDefinition":
         """Create from dictionary representation"""
         params = []
         for p in data.get("parameters", []):
@@ -138,11 +138,11 @@ class CapabilityDefinition:
     category: str  # e.g., "nlp", "vision", "data", "automation"
     version: str = "1.0.0"  # 版本号
     level: str = "basic"  # "basic", "intermediate", "advanced", "expert"
-    dependencies: List[str] = field(default_factory=list)
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    certifications: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    metrics: dict[str, Any] = field(default_factory=dict)
+    certifications: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return {
             "name": self.name,
@@ -156,7 +156,7 @@ class CapabilityDefinition:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CapabilityDefinition":
+    def from_dict(cls, data: dict[str, Any]) -> "CapabilityDefinition":
         """Create from dictionary representation"""
         return cls(
             name=data["name"],
@@ -180,15 +180,15 @@ class ProtocolConfig:
     port: int = 0  # 0 for auto-assign
     transport: TransportType = TransportType.TCP
     tls_enabled: bool = False
-    tls_cert_path: Optional[str] = None
-    tls_key_path: Optional[str] = None
+    tls_cert_path: str | None = None
+    tls_key_path: str | None = None
     timeout: int = 30
     max_connections: int = 100
     retry_attempts: int = 3
     retry_delay: float = 1.0
-    custom_settings: Dict[str, Any] = field(default_factory=dict)
+    custom_settings: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return {
             "protocol_type": self.protocol_type.value,
@@ -207,7 +207,7 @@ class ProtocolConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ProtocolConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "ProtocolConfig":
         """Create from dictionary representation"""
         return cls(
             protocol_type=ProtocolType(data["protocol_type"]),
@@ -230,8 +230,8 @@ class ProtocolConfig:
 class NetworkConfig:
     """Network configuration for the agent"""
 
-    platform_endpoints: List[str] = field(default_factory=lambda: ["http://localhost:8000"])
-    p2p_bootstrap_nodes: List[str] = field(default_factory=list)
+    platform_endpoints: list[str] = field(default_factory=lambda: ["http://localhost:8000"])
+    p2p_bootstrap_nodes: list[str] = field(default_factory=list)
     p2p_listen_port: int = 9000
     p2p_nat_traversal: bool = True
     p2p_relay_enabled: bool = True
@@ -239,7 +239,7 @@ class NetworkConfig:
     keepalive_interval: int = 30
     discovery_interval: int = 60
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return {
             "platform_endpoints": self.platform_endpoints,
@@ -253,7 +253,7 @@ class NetworkConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "NetworkConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "NetworkConfig":
         """Create from dictionary representation"""
         return cls(
             platform_endpoints=data.get("platform_endpoints", ["http://localhost:8000"]),
@@ -272,17 +272,17 @@ class SecurityConfig:
     """Security configuration for the agent"""
 
     auth_enabled: bool = True
-    api_key: Optional[str] = None
-    jwt_secret: Optional[str] = None
-    allowed_origins: List[str] = field(default_factory=lambda: ["*"])
+    api_key: str | None = None
+    jwt_secret: str | None = None
+    allowed_origins: list[str] = field(default_factory=lambda: ["*"])
     rate_limiting_enabled: bool = True
     max_requests_per_minute: int = 1000
     encryption_enabled: bool = True
     encryption_algorithm: str = "AES-256-GCM"
     signature_enabled: bool = True
-    trusted_agents: Set[str] = field(default_factory=set)
+    trusted_agents: set[str] = field(default_factory=set)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return {
             "auth_enabled": self.auth_enabled,
@@ -298,7 +298,7 @@ class SecurityConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SecurityConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "SecurityConfig":
         """Create from dictionary representation"""
         return cls(
             auth_enabled=data.get("auth_enabled", True),
@@ -328,15 +328,15 @@ class AgentConfig:
     description: str
     agent_id: str = field(default_factory=lambda: str(uuid4()))
     version: str = "1.0.0"
-    owner: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    owner: str | None = None
+    tags: list[str] = field(default_factory=list)
 
     # Capabilities and Skills
-    capabilities: List[CapabilityDefinition] = field(default_factory=list)
-    skills: List[SkillDefinition] = field(default_factory=list)
+    capabilities: list[CapabilityDefinition] = field(default_factory=list)
+    skills: list[SkillDefinition] = field(default_factory=list)
 
     # Protocol configurations
-    protocols: Dict[ProtocolType, ProtocolConfig] = field(default_factory=dict)
+    protocols: dict[ProtocolType, ProtocolConfig] = field(default_factory=dict)
 
     # Network configuration
     network: NetworkConfig = field(default_factory=NetworkConfig)
@@ -345,7 +345,7 @@ class AgentConfig:
     security: SecurityConfig = field(default_factory=SecurityConfig)
 
     # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Runtime settings
     auto_register: bool = True
@@ -363,7 +363,7 @@ class AgentConfig:
             for protocol_type in ProtocolType:
                 self.protocols[protocol_type] = ProtocolConfig(protocol_type=protocol_type)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return {
             "agent_id": self.agent_id,
@@ -391,7 +391,7 @@ class AgentConfig:
         return json.dumps(self.to_dict(), indent=2)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentConfig":
         """Create from dictionary representation"""
         capabilities = [CapabilityDefinition.from_dict(c) for c in data.get("capabilities", [])]
 
@@ -437,7 +437,7 @@ class AgentConfig:
         self.capabilities.append(capability)
 
     def enable_protocol(
-        self, protocol_type: ProtocolType, config: Optional[ProtocolConfig] = None
+        self, protocol_type: ProtocolType, config: ProtocolConfig | None = None
     ) -> None:
         """Enable a specific protocol"""
         if config:
@@ -452,6 +452,6 @@ class AgentConfig:
         if protocol_type in self.protocols:
             self.protocols[protocol_type].enabled = False
 
-    def get_enabled_protocols(self) -> List[ProtocolType]:
+    def get_enabled_protocols(self) -> list[ProtocolType]:
         """Get list of enabled protocols"""
         return [p for p, c in self.protocols.items() if c.enabled]

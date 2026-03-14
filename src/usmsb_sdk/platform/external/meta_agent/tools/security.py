@@ -11,13 +11,13 @@
 import logging
 import os
 import re
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class SecurityLevel(str, Enum):
+class SecurityLevel(StrEnum):
     """安全级别"""
 
     LOW = "low"  # 低风险，无需确认
@@ -25,7 +25,7 @@ class SecurityLevel(str, Enum):
     HIGH = "high"  # 高风险，必须确认
 
 
-class SensitiveOperation(str, Enum):
+class SensitiveOperation(StrEnum):
     """敏感操作类型"""
 
     EXECUTE_COMMAND = "execute_command"
@@ -111,7 +111,6 @@ ALLOWED_COMMANDS = {
     "gradle",
     "maven",
     "pytest",
-    "pytest",
     "jest",
     "mocha",
     "tsc",
@@ -168,7 +167,6 @@ ALLOWED_COMMANDS = {
     "code",
     "subl",
     "tree",
-    "find",
     "locate",
 }
 
@@ -234,7 +232,7 @@ def get_security_level(tool_name: str) -> SecurityLevel:
         return SecurityLevel.LOW
 
 
-def check_command_whitelist(command: str) -> Dict[str, Any]:
+def check_command_whitelist(command: str) -> dict[str, Any]:
     """
     检查命令是否在白名单中
 
@@ -359,7 +357,7 @@ def is_sensitive_operation(tool_name: str) -> bool:
     return tool_name in SENSITIVE_OPERATIONS
 
 
-def format_blocked_response(tool_name: str, reason: str) -> Dict[str, Any]:
+def format_blocked_response(tool_name: str, reason: str) -> dict[str, Any]:
     """格式化阻止响应"""
     return {
         "status": "blocked",
@@ -370,7 +368,7 @@ def format_blocked_response(tool_name: str, reason: str) -> Dict[str, Any]:
     }
 
 
-def format_confirmation_response(tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+def format_confirmation_response(tool_name: str, params: dict[str, Any]) -> dict[str, Any]:
     """格式化需要确认的响应"""
     return {
         "status": "requires_confirmation",
@@ -384,13 +382,13 @@ class PendingConfirmations:
     """待确认的操作队列"""
 
     def __init__(self):
-        self._confirmations: Dict[str, Dict[str, Any]] = {}
+        self._confirmations: dict[str, dict[str, Any]] = {}
         self._confirmation_id = 0
 
     def add(
         self,
         tool_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         user_id: str,
     ) -> str:
         """添加待确认操作"""
@@ -406,11 +404,11 @@ class PendingConfirmations:
 
         return confirmation_id
 
-    def get(self, confirmation_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, confirmation_id: str) -> dict[str, Any] | None:
         """获取确认信息"""
         return self._confirmations.get(confirmation_id)
 
-    def confirm(self, confirmation_id: str) -> Optional[Dict[str, Any]]:
+    def confirm(self, confirmation_id: str) -> dict[str, Any] | None:
         """确认操作"""
         return self._confirmations.pop(confirmation_id, None)
 

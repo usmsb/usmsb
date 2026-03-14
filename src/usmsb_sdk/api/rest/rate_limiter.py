@@ -16,13 +16,12 @@ Tiers have different rate limits:
 
 import time
 from collections import defaultdict
-from typing import Dict, Optional, Tuple
-from fastapi import Request, Response
+
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from usmsb_sdk.api.rest.error_handler import rate_limited_error
-
 
 # Rate limit configuration per tier (requests per minute)
 TIER_RATE_LIMITS = {
@@ -45,7 +44,7 @@ class RateLimitStore:
 
     def __init__(self):
         # Structure: {key: [(timestamp, count), ...]}
-        self._requests: Dict[str, list] = defaultdict(list)
+        self._requests: dict[str, list] = defaultdict(list)
 
     def cleanup(self, key: str) -> None:
         """Remove expired entries."""
@@ -91,7 +90,7 @@ class RateLimiter:
 
     def __init__(self):
         self._store = RateLimitStore()
-        self._agent_tiers: Dict[str, str] = {}  # Cache agent tiers
+        self._agent_tiers: dict[str, str] = {}  # Cache agent tiers
 
     def get_tier_limit(self, tier: str) -> int:
         """Get rate limit for tier."""
@@ -105,7 +104,7 @@ class RateLimiter:
         self,
         key: str,
         tier: str = "NONE"
-    ) -> Tuple[bool, int, int, int]:
+    ) -> tuple[bool, int, int, int]:
         """
         Check if request is allowed.
 
@@ -122,7 +121,7 @@ class RateLimiter:
 
         return True, remaining, limit, 0
 
-    def get_headers(self, key: str, tier: str) -> Dict[str, str]:
+    def get_headers(self, key: str, tier: str) -> dict[str, str]:
         """Get rate limit headers for response."""
         limit = self.get_tier_limit(tier) + BURST_ALLOWANCE
         remaining = self._store.get_remaining(key, limit)

@@ -3,33 +3,24 @@ Main AgentPlatform class for interacting with USMSB Platform.
 """
 
 import asyncio
-import hashlib
-import time
-from typing import Any, Dict, Optional, List
 
 import aiohttp
 
 from .intent_parser import IntentParser
-from .stake_checker import StakeChecker
 from .registration import (
-    RegistrationClient,
-    RegistrationResult,
     BindingRequestResult,
     BindingStatus,
-    APIKeyInfo,
+    RegistrationClient,
+    RegistrationResult,
 )
+from .stake_checker import StakeChecker
 from .types import (
-    ActionType,
     ErrorCode,
     Intent,
     PlatformResult,
+    RetryConfig,
     StakeInfo,
     StakeRequirement,
-    RetryConfig,
-    WalletInfo,
-    ReputationInfo,
-    RewardInfo,
-    HeartbeatStatus,
 )
 
 
@@ -41,12 +32,12 @@ class PlatformClient:
         base_url: str,
         api_key: str,
         agent_id: str,
-        retry_config: Optional[RetryConfig] = None
+        retry_config: RetryConfig | None = None
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.agent_id = agent_id
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self.retry_config = retry_config or RetryConfig()
 
         # API handlers
@@ -86,9 +77,9 @@ class PlatformClient:
         self,
         method: str,
         path: str,
-        data: Optional[Dict] = None,
-        params: Optional[Dict] = None
-    ) -> Dict:
+        data: dict | None = None,
+        params: dict | None = None
+    ) -> dict:
         """Make request with automatic retry on transient errors."""
         session = await self._get_session()
         url = f"{self.base_url}{path}"
@@ -118,7 +109,7 @@ class PlatformClient:
 
         raise last_error or Exception("Request failed after retries")
 
-    async def _handle_response(self, resp: aiohttp.ClientResponse) -> Dict:
+    async def _handle_response(self, resp: aiohttp.ClientResponse) -> dict:
         """Handle HTTP response and extract data with enhanced error handling."""
         try:
             data = await resp.json()
@@ -159,19 +150,19 @@ class PlatformClient:
 
         return data
 
-    async def get(self, path: str, params: Optional[Dict] = None) -> Dict:
+    async def get(self, path: str, params: dict | None = None) -> dict:
         """Make GET request with retry."""
         return await self._request_with_retry("GET", path, params=params)
 
-    async def post(self, path: str, data: Optional[Dict] = None) -> Dict:
+    async def post(self, path: str, data: dict | None = None) -> dict:
         """Make POST request with retry."""
         return await self._request_with_retry("POST", path, data=data)
 
-    async def patch(self, path: str, data: Optional[Dict] = None) -> Dict:
+    async def patch(self, path: str, data: dict | None = None) -> dict:
         """Make PATCH request with retry."""
         return await self._request_with_retry("PATCH", path, data=data)
 
-    async def delete(self, path: str) -> Dict:
+    async def delete(self, path: str) -> dict:
         """Make DELETE request with retry."""
         return await self._request_with_retry("DELETE", path)
 
@@ -195,29 +186,29 @@ class BaseAPI:
 class CollaborationAPI(BaseAPI):
     """Collaboration API handler."""
 
-    async def create(self, goal: str = "", description: str = "", **kwargs) -> Dict:
+    async def create(self, goal: str = "", description: str = "", **kwargs) -> dict:
         return await self.client.post("/collaborations", {
             "goal_description": goal,
             "description": description,
             **kwargs
         })
 
-    async def join(self, collab_id: str = "", **kwargs) -> Dict:
+    async def join(self, collab_id: str = "", **kwargs) -> dict:
         return await self.client.post(f"/collaborations/{collab_id}/join", kwargs)
 
-    async def contribute(self, collab_id: str = "", content: str = "", **kwargs) -> Dict:
+    async def contribute(self, collab_id: str = "", content: str = "", **kwargs) -> dict:
         return await self.client.post(f"/collaborations/{collab_id}/contribute", {
             "contribution": {"content": content},
             **kwargs
         })
 
-    async def list(self, **kwargs) -> Dict:
+    async def list(self, **kwargs) -> dict:
         return await self.client.get("/collaborations", kwargs)
 
-    async def get(self, session_id: str) -> Dict:
+    async def get(self, session_id: str) -> dict:
         return await self.client.get(f"/collaborations/{session_id}")
 
-    async def complete(self, session_id: str) -> Dict:
+    async def complete(self, session_id: str) -> dict:
         return await self.client.post(f"/collaborations/{session_id}/complete", {})
 
 
@@ -230,9 +221,9 @@ class MarketplaceAPI(BaseAPI):
         name: str = "",
         price: int = 0,
         description: str = "",
-        skills: Optional[list] = None,
+        skills: list | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         return await self.client.post(f"/agents/{self.client.agent_id}/services", {
             "name": name,
             "price": price,
@@ -241,14 +232,14 @@ class MarketplaceAPI(BaseAPI):
             **kwargs
         })
 
-    async def find_work(self, skill_filter: str = "", **kwargs) -> Dict:
+    async def find_work(self, skill_filter: str = "", **kwargs) -> dict:
         return await self.client.post("/matching/search-demands", {
             "agent_id": self.client.agent_id,
             "capabilities": [skill_filter] if skill_filter else [],
             **kwargs
         })
 
-    async def find_workers(self, skills: Optional[list] = None, **kwargs) -> Dict:
+    async def find_workers(self, skills: list | None = None, **kwargs) -> dict:
         return await self.client.post("/matching/search-suppliers", {
             "agent_id": self.client.agent_id,
             "required_skills": skills or [],
@@ -261,7 +252,7 @@ class MarketplaceAPI(BaseAPI):
         budget: int = 0,
         description: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         return await self.client.post("/demands", {
             "title": title,
             "budget_min": budget,
@@ -270,10 +261,10 @@ class MarketplaceAPI(BaseAPI):
             **kwargs
         })
 
-    async def list_services(self, **kwargs) -> Dict:
+    async def list_services(self, **kwargs) -> dict:
         return await self.client.get("/services", kwargs)
 
-    async def delete_service(self, service_id: str) -> Dict:
+    async def delete_service(self, service_id: str) -> dict:
         return await self.client.delete(f"/services/{service_id}")
 
 
@@ -281,25 +272,25 @@ class MarketplaceAPI(BaseAPI):
 class DiscoveryAPI(BaseAPI):
     """Discovery API handler."""
 
-    async def by_capability(self, capability: str = "", **kwargs) -> Dict:
+    async def by_capability(self, capability: str = "", **kwargs) -> dict:
         return await self.client.post("/network/explore", {
             "target_capabilities": [capability] if capability else [],
             **kwargs
         })
 
-    async def by_skill(self, skills: Optional[list] = None, **kwargs) -> Dict:
+    async def by_skill(self, skills: list | None = None, **kwargs) -> dict:
         return await self.client.post("/network/explore", {
             "target_capabilities": skills or [],
             **kwargs
         })
 
-    async def recommend(self, goal: str = "", **kwargs) -> Dict:
+    async def recommend(self, goal: str = "", **kwargs) -> dict:
         return await self.client.post("/network/recommendations", {
             "target_capability": goal,
             **kwargs
         })
 
-    async def stats(self) -> Dict:
+    async def stats(self) -> dict:
         return await self.client.get("/network/stats")
 
 
@@ -310,33 +301,33 @@ class NegotiationAPI(BaseAPI):
     async def initiate(
         self,
         target_id: str = "",
-        terms: Optional[Dict] = None,
+        terms: dict | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         return await self.client.post("/matching/negotiate", {
             "counterpart_id": target_id,
             "context": terms or {},
             **kwargs
         })
 
-    async def accept(self, negotiation_id: str = "", **kwargs) -> Dict:
+    async def accept(self, negotiation_id: str = "", **kwargs) -> dict:
         return await self.client.post(f"/matching/negotiations/{negotiation_id}/accept", kwargs)
 
-    async def reject(self, negotiation_id: str = "", **kwargs) -> Dict:
+    async def reject(self, negotiation_id: str = "", **kwargs) -> dict:
         return await self.client.post(f"/matching/negotiations/{negotiation_id}/reject", kwargs)
 
     async def propose(
         self,
         negotiation_id: str = "",
-        new_terms: Optional[Dict] = None,
+        new_terms: dict | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         return await self.client.post(f"/matching/negotiations/{negotiation_id}/proposal", {
             "proposal": new_terms or {},
             **kwargs
         })
 
-    async def list(self) -> Dict:
+    async def list(self) -> dict:
         return await self.client.get("/matching/negotiations")
 
 
@@ -347,9 +338,9 @@ class WorkflowAPI(BaseAPI):
     async def create(
         self,
         name: str = "",
-        steps: Optional[list] = None,
+        steps: list | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         return await self.client.post("/workflows", {
             "task_description": name,
             "available_tools": steps or [],
@@ -359,12 +350,12 @@ class WorkflowAPI(BaseAPI):
     async def execute(
         self,
         workflow_id: str = "",
-        inputs: Optional[Dict] = None,
+        inputs: dict | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         return await self.client.post(f"/workflows/{workflow_id}/execute", kwargs)
 
-    async def list(self, **kwargs) -> Dict:
+    async def list(self, **kwargs) -> dict:
         return await self.client.get("/workflows", kwargs)
 
 
@@ -372,16 +363,16 @@ class WorkflowAPI(BaseAPI):
 class LearningAPI(BaseAPI):
     """Learning API handler."""
 
-    async def analyze(self, **kwargs) -> Dict:
+    async def analyze(self, **kwargs) -> dict:
         return await self.client.post("/learning/analyze", kwargs)
 
-    async def insights(self, **kwargs) -> Dict:
+    async def insights(self, **kwargs) -> dict:
         return await self.client.get("/learning/insights", kwargs)
 
-    async def strategy(self, **kwargs) -> Dict:
+    async def strategy(self, **kwargs) -> dict:
         return await self.client.get("/learning/strategy", kwargs)
 
-    async def market(self, **kwargs) -> Dict:
+    async def market(self, **kwargs) -> dict:
         return await self.client.get("/learning/market", kwargs)
 
 
@@ -389,7 +380,7 @@ class LearningAPI(BaseAPI):
 class GeneCapsuleAPI(BaseAPI):
     """Gene Capsule API handler for experience management."""
 
-    async def get_capsule(self, agent_id: str = "") -> Dict:
+    async def get_capsule(self, agent_id: str = "") -> dict:
         """Get agent's gene capsule."""
         target_id = agent_id or self.client.agent_id
         return await self.client.get(f"/gene-capsule/{target_id}")
@@ -398,10 +389,10 @@ class GeneCapsuleAPI(BaseAPI):
         self,
         title: str = "",
         description: str = "",
-        skills: Optional[List[str]] = None,
+        skills: list[str] | None = None,
         auto_desensitize: bool = True,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Add a new experience gene."""
         return await self.client.post("/gene-capsule/experiences", {
             "agent_id": self.client.agent_id,
@@ -419,7 +410,7 @@ class GeneCapsuleAPI(BaseAPI):
         experience_id: str = "",
         share_level: str = "semi_public",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Update experience visibility."""
         return await self.client.patch(f"/gene-capsule/experiences/{experience_id}/visibility", {
             "agent_id": self.client.agent_id,
@@ -430,11 +421,11 @@ class GeneCapsuleAPI(BaseAPI):
     async def match(
         self,
         task_description: str = "",
-        required_skills: Optional[List[str]] = None,
+        required_skills: list[str] | None = None,
         min_relevance: float = 0.3,
         limit: int = 10,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Find matching experiences."""
         return await self.client.post("/gene-capsule/match", {
             "agent_id": self.client.agent_id,
@@ -447,10 +438,10 @@ class GeneCapsuleAPI(BaseAPI):
 
     async def showcase(
         self,
-        experience_ids: Optional[List[str]] = None,
+        experience_ids: list[str] | None = None,
         for_negotiation: bool = True,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Export showcase for negotiation."""
         return await self.client.post("/gene-capsule/showcase", {
             "agent_id": self.client.agent_id,
@@ -462,11 +453,11 @@ class GeneCapsuleAPI(BaseAPI):
     async def search_agents(
         self,
         task_description: str = "",
-        required_skills: Optional[List[str]] = None,
+        required_skills: list[str] | None = None,
         min_relevance: float = 0.3,
         limit: int = 10,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Search agents by experience."""
         return await self.client.post("/gene-capsule/search-agents", {
             "task_description": task_description,
@@ -480,7 +471,7 @@ class GeneCapsuleAPI(BaseAPI):
         self,
         experience_id: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Request verification for an experience."""
         return await self.client.post(f"/gene-capsule/experiences/{experience_id}/verify", {
             "agent_id": self.client.agent_id,
@@ -493,7 +484,7 @@ class GeneCapsuleAPI(BaseAPI):
         context: str = "",
         recursion_depth: int = 3,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Desensitize text using LLM."""
         return await self.client.post("/gene-capsule/desensitize", {
             "text": text,
@@ -515,7 +506,7 @@ class PreMatchNegotiationAPI(BaseAPI):
         initial_message: str = "",
         expiration_hours: int = 24,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Initiate a pre-match negotiation."""
         return await self.client.post("/negotiations/pre-match", {
             "demand_agent_id": demand_agent_id,
@@ -526,7 +517,7 @@ class PreMatchNegotiationAPI(BaseAPI):
             **kwargs
         })
 
-    async def get(self, negotiation_id: str) -> Dict:
+    async def get(self, negotiation_id: str) -> dict:
         """Get negotiation details."""
         return await self.client.get(f"/negotiations/pre-match/{negotiation_id}")
 
@@ -535,7 +526,7 @@ class PreMatchNegotiationAPI(BaseAPI):
         negotiation_id: str = "",
         question: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Ask a clarification question."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/questions", {
             "question": question,
@@ -549,7 +540,7 @@ class PreMatchNegotiationAPI(BaseAPI):
         question_id: str = "",
         answer: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Answer a clarification question."""
         return await self.client.post(
             f"/negotiations/pre-match/{negotiation_id}/questions/{question_id}/answer",
@@ -567,7 +558,7 @@ class PreMatchNegotiationAPI(BaseAPI):
         verification_type: str = "portfolio",
         request_detail: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Request capability verification."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/verify", {
             "capability": capability,
@@ -581,9 +572,9 @@ class PreMatchNegotiationAPI(BaseAPI):
         negotiation_id: str = "",
         request_id: str = "",
         response: str = "",
-        attachments: Optional[List[str]] = None,
+        attachments: list[str] | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Respond to verification request."""
         return await self.client.post(
             f"/negotiations/pre-match/{negotiation_id}/verify/{request_id}/respond",
@@ -597,10 +588,10 @@ class PreMatchNegotiationAPI(BaseAPI):
     async def confirm_scope(
         self,
         negotiation_id: str = "",
-        deliverables: Optional[List[str]] = None,
+        deliverables: list[str] | None = None,
         timeline: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Confirm the scope."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/scope", {
             "deliverables": deliverables or [],
@@ -611,9 +602,9 @@ class PreMatchNegotiationAPI(BaseAPI):
     async def propose_terms(
         self,
         negotiation_id: str = "",
-        terms: Optional[Dict] = None,
+        terms: dict | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Propose terms."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/terms/propose", {
             "terms": terms or {},
@@ -621,11 +612,11 @@ class PreMatchNegotiationAPI(BaseAPI):
             **kwargs
         })
 
-    async def agree_terms(self, negotiation_id: str = "", **kwargs) -> Dict:
+    async def agree_terms(self, negotiation_id: str = "", **kwargs) -> dict:
         """Agree to terms."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/terms/agree", kwargs)
 
-    async def confirm(self, negotiation_id: str = "", **kwargs) -> Dict:
+    async def confirm(self, negotiation_id: str = "", **kwargs) -> dict:
         """Confirm the match."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/confirm", kwargs)
 
@@ -634,7 +625,7 @@ class PreMatchNegotiationAPI(BaseAPI):
         negotiation_id: str = "",
         reason: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Decline the match."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/decline", {
             "reason": reason,
@@ -647,7 +638,7 @@ class PreMatchNegotiationAPI(BaseAPI):
         negotiation_id: str = "",
         reason: str = "",
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Cancel the negotiation."""
         return await self.client.post(f"/negotiations/pre-match/{negotiation_id}/cancel", {
             "reason": reason,
@@ -655,7 +646,7 @@ class PreMatchNegotiationAPI(BaseAPI):
             **kwargs
         })
 
-    async def list(self, status: str = None, limit: int = 50) -> Dict:
+    async def list(self, status: str = None, limit: int = 50) -> dict:
         """List agent's negotiations."""
         params = {"status": status, "limit": limit} if status else {"limit": limit}
         return await self.client.get(f"/negotiations/pre-match/agent/{self.client.agent_id}", params)
@@ -668,10 +659,10 @@ class MetaAgentAPI(BaseAPI):
     async def chat(
         self,
         message: str = "",
-        wallet_address: Optional[str] = None,
-        context: Optional[Dict] = None,
+        wallet_address: str | None = None,
+        context: dict | None = None,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Chat with Meta Agent.
 
         Args:
@@ -689,10 +680,10 @@ class MetaAgentAPI(BaseAPI):
 
     async def get_history(
         self,
-        wallet_address: Optional[str] = None,
+        wallet_address: str | None = None,
         limit: int = 50,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Get conversation history for a wallet address.
 
         Args:
@@ -705,7 +696,7 @@ class MetaAgentAPI(BaseAPI):
             **kwargs
         })
 
-    async def get_user_info(self, wallet_address: Optional[str] = None) -> Dict:
+    async def get_user_info(self, wallet_address: str | None = None) -> dict:
         """Get user info including permissions and stake.
 
         Args:
@@ -714,11 +705,11 @@ class MetaAgentAPI(BaseAPI):
         target_wallet = wallet_address or self.client.agent_id
         return await self.client.get(f"/meta-agent/user/{target_wallet}")
 
-    async def get_evolution_stats(self) -> Dict:
+    async def get_evolution_stats(self) -> dict:
         """Get evolution statistics."""
         return await self.client.get("/meta-agent/evolution-stats")
 
-    async def get_tools(self) -> Dict:
+    async def get_tools(self) -> dict:
         """Get available tools from Meta Agent."""
         return await self.client.get("/meta-agent/tools")
 
@@ -727,31 +718,31 @@ class MetaAgentAPI(BaseAPI):
 class StakingAPI(BaseAPI):
     """Staking API handler."""
 
-    async def deposit(self, amount: int, **kwargs) -> Dict:
+    async def deposit(self, amount: int, **kwargs) -> dict:
         """Stake VIBE tokens."""
         return await self.client.post(f"/api/agents/{self.client.agent_id}/stake", {
             "amount": amount,
             **kwargs
         })
 
-    async def withdraw(self, amount: int, **kwargs) -> Dict:
+    async def withdraw(self, amount: int, **kwargs) -> dict:
         """Withdraw staked VIBE tokens."""
         return await self.client.post(f"/api/agents/{self.client.agent_id}/unstake", {
             "amount": amount,
             **kwargs
         })
 
-    async def get_info(self, agent_id: str = "") -> Dict:
+    async def get_info(self, agent_id: str = "") -> dict:
         """Get staking info."""
         target_id = agent_id or self.client.agent_id
         return await self.client.get(f"/api/agents/{target_id}/stake")
 
-    async def get_rewards(self, agent_id: str = "") -> Dict:
+    async def get_rewards(self, agent_id: str = "") -> dict:
         """Get pending rewards."""
         # Backend uses authenticated context, no ID in path
         return await self.client.get("/staking/rewards")
 
-    async def claim_rewards(self, **kwargs) -> Dict:
+    async def claim_rewards(self, **kwargs) -> dict:
         """Claim pending rewards."""
         # Backend uses authenticated context, no ID in path
         return await self.client.post("/staking/claim", kwargs)
@@ -761,7 +752,7 @@ class StakingAPI(BaseAPI):
 class ReputationAPI(BaseAPI):
     """Reputation API handler."""
 
-    async def get(self, agent_id: str = "") -> Dict:
+    async def get(self, agent_id: str = "") -> dict:
         """Get agent reputation."""
         # Backend uses authenticated context
         return await self.client.get("/reputation")
@@ -771,7 +762,7 @@ class ReputationAPI(BaseAPI):
         agent_id: str = "",
         limit: int = 100,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Get reputation history."""
         # Backend uses authenticated context
         return await self.client.get("/reputation/history", {
@@ -784,7 +775,7 @@ class ReputationAPI(BaseAPI):
 class WalletAPI(BaseAPI):
     """Wallet API handler."""
 
-    async def get_balance(self, agent_id: str = "") -> Dict:
+    async def get_balance(self, agent_id: str = "") -> dict:
         """Get wallet balance."""
         target_id = agent_id or self.client.agent_id
         return await self.client.get(f"/api/agents/{target_id}/wallet")
@@ -794,7 +785,7 @@ class WalletAPI(BaseAPI):
         agent_id: str = "",
         limit: int = 50,
         **kwargs
-    ) -> Dict:
+    ) -> dict:
         """Get transaction history."""
         target_id = agent_id or self.client.agent_id
         return await self.client.get(f"/api/agents/{target_id}/transactions", {
@@ -807,13 +798,13 @@ class WalletAPI(BaseAPI):
 class HeartbeatAPI(BaseAPI):
     """Heartbeat API handler."""
 
-    async def send(self, status: str = "online") -> Dict:
+    async def send(self, status: str = "online") -> dict:
         """Send heartbeat."""
         return await self.client.post(f"/api/agents/{self.client.agent_id}/heartbeat", {
             "status": status
         })
 
-    async def get_status(self, agent_id: str = "") -> Dict:
+    async def get_status(self, agent_id: str = "") -> dict:
         """Get agent status."""
         target_id = agent_id or self.client.agent_id
         return await self.client.get(f"/api/agents/{target_id}/status")
@@ -843,7 +834,7 @@ class AgentPlatform:
         api_key: str,
         agent_id: str,
         base_url: str = "http://localhost:8000",
-        retry_config: Optional[RetryConfig] = None
+        retry_config: RetryConfig | None = None
     ):
         """
         Initialize AgentPlatform.
@@ -859,8 +850,8 @@ class AgentPlatform:
         self.base_url = base_url
 
         self.intent_parser = IntentParser()
-        self._client: Optional[PlatformClient] = None
-        self._stake_checker: Optional[StakeChecker] = None
+        self._client: PlatformClient | None = None
+        self._stake_checker: StakeChecker | None = None
         self._retry_config = retry_config
 
     def _get_client(self) -> PlatformClient:
@@ -1132,7 +1123,7 @@ class AgentPlatform:
         self,
         title: str,
         description: str,
-        skills: List[str] = None,
+        skills: list[str] = None,
         auto_desensitize: bool = True
     ) -> PlatformResult:
         """Add experience to gene capsule."""
@@ -1164,7 +1155,7 @@ class AgentPlatform:
         self,
         name: str,
         price: int,
-        skills: Optional[list] = None,
+        skills: list | None = None,
         **kwargs
     ) -> PlatformResult:
         """Publish a service to the marketplace."""
@@ -1205,7 +1196,7 @@ class AgentPlatform:
     async def register(
         name: str,
         description: str = "",
-        capabilities: Optional[list] = None,
+        capabilities: list | None = None,
         base_url: str = "http://localhost:8000"
     ) -> RegistrationResult:
         """
@@ -1257,9 +1248,9 @@ class AgentPlatform:
 
     async def update_profile(
         self,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        capabilities: Optional[list] = None
+        name: str | None = None,
+        description: str | None = None,
+        capabilities: list | None = None
     ) -> PlatformResult:
         """Update Agent's profile information."""
         client = self._get_client()

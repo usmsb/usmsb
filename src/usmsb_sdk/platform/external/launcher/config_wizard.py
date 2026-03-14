@@ -9,10 +9,10 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -25,7 +25,7 @@ class NodeConfig:
     host: str = "localhost"
     port: int = 8080
     enabled: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -46,7 +46,7 @@ class LoggingConfig:
     """Logging configuration schema."""
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    file: Optional[str] = None
+    file: str | None = None
     max_size: int = 10485760  # 10MB
     backup_count: int = 5
 
@@ -56,11 +56,11 @@ class PlatformConfig:
     """Platform configuration schema."""
     name: str = "usmsb-platform"
     version: str = "1.0.0"
-    nodes: List[Dict[str, Any]] = field(default_factory=list)
-    storage: Dict[str, Any] = field(default_factory=dict)
-    logging: Dict[str, Any] = field(default_factory=dict)
-    services: Dict[str, Any] = field(default_factory=dict)
-    security: Dict[str, Any] = field(default_factory=dict)
+    nodes: list[dict[str, Any]] = field(default_factory=list)
+    storage: dict[str, Any] = field(default_factory=dict)
+    logging: dict[str, Any] = field(default_factory=dict)
+    services: dict[str, Any] = field(default_factory=dict)
+    security: dict[str, Any] = field(default_factory=dict)
 
 
 class ConfigWizard:
@@ -70,7 +70,7 @@ class ConfigWizard:
     Supports both interactive mode and command-line arguments.
     """
 
-    def __init__(self, output_path: Optional[str] = None):
+    def __init__(self, output_path: str | None = None):
         """
         Initialize configuration wizard.
 
@@ -81,7 +81,7 @@ class ConfigWizard:
         self._logger = logging.getLogger("usmsb.config_wizard")
         self._config = PlatformConfig()
 
-    def run_interactive(self) -> Dict[str, Any]:
+    def run_interactive(self) -> dict[str, Any]:
         """
         Run interactive configuration wizard.
 
@@ -124,7 +124,7 @@ class ConfigWizard:
 
         return config
 
-    def run_from_args(self, args: List[str]) -> Dict[str, Any]:
+    def run_from_args(self, args: list[str]) -> dict[str, Any]:
         """
         Run wizard with command-line arguments.
 
@@ -331,7 +331,7 @@ class ConfigWizard:
         self._config.services = services
 
     def _prompt(self, message: str, default: str = "",
-                choices: Optional[List[str]] = None,
+                choices: list[str] | None = None,
                 is_password: bool = False) -> str:
         """
         Prompt user for input.
@@ -375,7 +375,7 @@ class ConfigWizard:
                 print("\nConfiguration cancelled.")
                 sys.exit(0)
 
-    def _generate_config(self) -> Dict[str, Any]:
+    def _generate_config(self) -> dict[str, Any]:
         """
         Generate and validate configuration.
 
@@ -393,7 +393,7 @@ class ConfigWizard:
 
         return config
 
-    def _validate_config(self, config: Dict[str, Any]) -> bool:
+    def _validate_config(self, config: dict[str, Any]) -> bool:
         """
         Validate configuration.
 
@@ -435,7 +435,7 @@ class ConfigWizard:
         self._logger.info("Configuration validated successfully")
         return True
 
-    def _save_config(self, config: Dict[str, Any]) -> None:
+    def _save_config(self, config: dict[str, Any]) -> None:
         """
         Save configuration to file.
 

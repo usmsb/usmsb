@@ -40,17 +40,14 @@
             await processor.handle_continuation(...)
 """
 
-import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
-from ..models.chat_result import (
-    BackgroundTaskContext,
-    ChatResult,
-    ToolRetryInfo,
-)
 from ..memory.conversation import MessageRole
+from ..models.chat_result import (
+    ChatResult,
+)
 
 if TYPE_CHECKING:
     from ..agent import MetaAgent
@@ -74,9 +71,9 @@ class BackgroundTaskProcessor:
         conversation_id: str,
         owner_id: str,
         chat_result: ChatResult,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         user_session,
-        wallet_address: Optional[str] = None,
+        wallet_address: str | None = None,
     ) -> None:
         """
         处理后台任务的主入口
@@ -160,7 +157,7 @@ class BackgroundTaskProcessor:
         conversation_id: str,
         owner_id: str,
         chat_result: ChatResult,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         user_session,
     ) -> str:
         """
@@ -268,7 +265,7 @@ class BackgroundTaskProcessor:
         param_name: str,
         info_type: str,
         description: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         从历史记录中提取正确的参数值
 
@@ -320,9 +317,9 @@ class BackgroundTaskProcessor:
     def _analyze_tool_failure(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         error: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         分析工具失败原因，提取重试信息
 
@@ -365,7 +362,7 @@ class BackgroundTaskProcessor:
         self,
         conversation_id: str,
         chat_result: ChatResult,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         user_session,
     ) -> str:
         """
@@ -405,7 +402,7 @@ class BackgroundTaskProcessor:
 
     async def _simple_continuation(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
     ) -> str:
         """
         简单继续处理：没有工具结果时的处理
@@ -433,9 +430,9 @@ class BackgroundTaskProcessor:
 
     async def _continuation_with_results(
         self,
-        messages: List[Dict[str, str]],
-        tool_results: List[Dict[str, Any]],
-        executed_tools: List[str],
+        messages: list[dict[str, str]],
+        tool_results: list[dict[str, Any]],
+        executed_tools: list[str],
     ) -> str:
         """
         基于工具结果继续处理
@@ -470,7 +467,7 @@ class BackgroundTaskProcessor:
 
     def _format_tool_results_for_llm(
         self,
-        tool_results: List[Dict[str, Any]],
+        tool_results: list[dict[str, Any]],
     ) -> str:
         """格式化工具结果给 LLM"""
         parts = []
@@ -498,8 +495,8 @@ class BackgroundTaskProcessor:
         self,
         user_message: str,
         tool_name: str,
-        tool_result: Dict[str, Any],
-        previous_results: List[Dict[str, Any]],
+        tool_result: dict[str, Any],
+        previous_results: list[dict[str, Any]],
     ) -> str:
         """
         基于工具执行成功的结果生成最终回复
@@ -544,7 +541,7 @@ class BackgroundTaskProcessor:
         self,
         conversation_id: str,
         content: str,
-        tool_calls: Optional[List] = None,
+        tool_calls: list | None = None,
     ) -> None:
         """添加后台任务日志消息"""
         try:

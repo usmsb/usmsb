@@ -2,7 +2,7 @@
 Context module for Meta Agent
 """
 
-from .manager import ContextManager, ContextConfig, UserInfo
+from .manager import ContextConfig, ContextManager, UserInfo
 
 __all__ = [
     "ContextManager",

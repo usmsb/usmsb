@@ -27,13 +27,13 @@ Usage:
 
 from usmsb_sdk.platform.external.system_agents.base_system_agent import (
     BaseSystemAgent,
-    SystemAgentPermission,
     SystemAgentConfig,
+    SystemAgentPermission,
 )
+from usmsb_sdk.platform.external.system_agents.logger_agent import LoggerAgent
 from usmsb_sdk.platform.external.system_agents.monitor_agent import MonitorAgent
 from usmsb_sdk.platform.external.system_agents.recommender_agent import RecommenderAgent
 from usmsb_sdk.platform.external.system_agents.router_agent import RouterAgent
-from usmsb_sdk.platform.external.system_agents.logger_agent import LoggerAgent
 
 __all__ = [
     # Base classes

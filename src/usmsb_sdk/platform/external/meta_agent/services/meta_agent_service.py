@@ -13,16 +13,14 @@ Meta Agent Service - 精准匹配服务
 - 主动联系 Agent 告知机会
 """
 
-import asyncio
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any
 from uuid import uuid4
-
-from ..memory.conversation import ParticipantType, MessageRole
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +52,9 @@ class ConversationMessage:
     role: str  # "meta_agent" or "agent"
     content: str
     timestamp: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "content": self.content,
@@ -72,15 +70,15 @@ class MetaAgentConversation:
     agent_id: str
     meta_agent_id: str
     conversation_type: ConversationType
-    messages: List[ConversationMessage] = field(default_factory=list)
-    extracted_capabilities: List[str] = field(default_factory=list)
-    extracted_experiences: List[Dict[str, Any]] = field(default_factory=list)
-    extracted_preferences: Dict[str, Any] = field(default_factory=dict)
+    messages: list[ConversationMessage] = field(default_factory=list)
+    extracted_capabilities: list[str] = field(default_factory=list)
+    extracted_experiences: list[dict[str, Any]] = field(default_factory=list)
+    extracted_preferences: dict[str, Any] = field(default_factory=dict)
     status: str = "active"  # active, completed, archived
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "conversation_id": self.conversation_id,
             "agent_id": self.agent_id,
@@ -103,35 +101,35 @@ class AgentProfile:
     status: AgentProfileStatus = AgentProfileStatus.NEW
 
     # 基础信息
-    name: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    category: str | None = None
 
     # 提取的能力
-    core_capabilities: List[str] = field(default_factory=list)
-    skill_domains: List[str] = field(default_factory=list)
+    core_capabilities: list[str] = field(default_factory=list)
+    skill_domains: list[str] = field(default_factory=list)
 
     # 代表性经验
-    representative_experiences: List[Dict[str, Any]] = field(default_factory=list)
+    representative_experiences: list[dict[str, Any]] = field(default_factory=list)
 
     # 工作方式
-    work_style: Dict[str, Any] = field(default_factory=dict)
+    work_style: dict[str, Any] = field(default_factory=dict)
 
     # 偏好
-    preferences: Dict[str, Any] = field(default_factory=dict)
+    preferences: dict[str, Any] = field(default_factory=dict)
 
     # 统计
     conversation_count: int = 0
-    last_conversation_at: Optional[datetime] = None
+    last_conversation_at: datetime | None = None
 
     # 评分
-    self_assessed_level: Optional[str] = None  # beginner, intermediate, expert
-    meta_agent_assessment: Optional[Dict[str, float]] = None  # Meta Agent 的评估
+    self_assessed_level: str | None = None  # beginner, intermediate, expert
+    meta_agent_assessment: dict[str, float] | None = None  # Meta Agent 的评估
 
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "status": self.status.value,
@@ -158,13 +156,13 @@ class AgentRecommendation:
     agent_id: str
     agent_name: str
     match_score: float
-    match_reasons: List[str]
-    gene_capsule_highlights: List[Dict[str, Any]]
-    availability: Optional[str] = None
-    suggested_price_range: Optional[Dict[str, float]] = None
+    match_reasons: list[str]
+    gene_capsule_highlights: list[dict[str, Any]]
+    availability: str | None = None
+    suggested_price_range: dict[str, float] | None = None
     confidence_level: str = "medium"  # low, medium, high
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "agent_name": self.agent_name,
@@ -187,12 +185,12 @@ class Opportunity:
     counterpart_id: str
     counterpart_name: str
     match_score: float
-    deadline: Optional[datetime] = None
-    budget_range: Optional[Dict[str, float]] = None
-    required_capabilities: List[str] = field(default_factory=list)
+    deadline: datetime | None = None
+    budget_range: dict[str, float] | None = None
+    required_capabilities: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "opportunity_id": self.opportunity_id,
             "type": self.type,
@@ -257,11 +255,11 @@ class MetaAgentService:
         self.pre_match_negotiation_service = pre_match_negotiation_service
 
         # 存储对话和画像
-        self._conversations: Dict[str, MetaAgentConversation] = {}
-        self._agent_profiles: Dict[str, AgentProfile] = {}
+        self._conversations: dict[str, MetaAgentConversation] = {}
+        self._agent_profiles: dict[str, AgentProfile] = {}
 
         # 机会通知回调
-        self._opportunity_callbacks: Dict[str, Callable] = {}
+        self._opportunity_callbacks: dict[str, Callable] = {}
 
         self._initialized = False
 
@@ -516,7 +514,7 @@ Agent 画像：
             logger.error(f"Failed to generate consultation response: {e}")
             return "抱歉，我暂时无法回答这个问题。请稍后再试。"
 
-    async def _get_market_insights(self) -> Dict[str, Any]:
+    async def _get_market_insights(self) -> dict[str, Any]:
         """获取市场洞察"""
         # TODO: 从实际数据中获取
         return {
@@ -635,9 +633,9 @@ Agent 画像：
 
     async def recommend_for_demand(
         self,
-        demand: Dict[str, Any],
+        demand: dict[str, Any],
         limit: int = 5,
-    ) -> List[AgentRecommendation]:
+    ) -> list[AgentRecommendation]:
         """
         为需求推荐最佳 Agent
 
@@ -705,7 +703,7 @@ Agent 画像：
     async def _calculate_profile_match(
         self,
         profile: AgentProfile,
-        demand: Dict[str, Any],
+        demand: dict[str, Any],
     ) -> float:
         """计算画像与需求的匹配分数"""
         score = 0.0
@@ -735,8 +733,8 @@ Agent 画像：
     def _generate_match_reasons(
         self,
         profile: AgentProfile,
-        demand: Dict[str, Any],
-    ) -> List[str]:
+        demand: dict[str, Any],
+    ) -> list[str]:
         """生成匹配原因"""
         reasons = []
 
@@ -859,7 +857,7 @@ Agent 画像：
     async def receive_showcase(
         self,
         agent_id: str,
-        showcase: Dict[str, Any],
+        showcase: dict[str, Any],
     ) -> bool:
         """
         接收 Agent 主动展示
@@ -921,19 +919,19 @@ Agent 画像：
 
     # ==================== 辅助方法 ====================
 
-    def get_conversation(self, conversation_id: str) -> Optional[MetaAgentConversation]:
+    def get_conversation(self, conversation_id: str) -> MetaAgentConversation | None:
         """获取对话"""
         return self._conversations.get(conversation_id)
 
-    def get_agent_profile(self, agent_id: str) -> Optional[AgentProfile]:
+    def get_agent_profile(self, agent_id: str) -> AgentProfile | None:
         """获取 Agent 画像"""
         return self._agent_profiles.get(agent_id)
 
-    def get_all_profiles(self) -> List[AgentProfile]:
+    def get_all_profiles(self) -> list[AgentProfile]:
         """获取所有 Agent 画像"""
         return list(self._agent_profiles.values())
 
-    async def scan_for_opportunities(self) -> List[Opportunity]:
+    async def scan_for_opportunities(self) -> list[Opportunity]:
         """
         扫描平台上的机会
 

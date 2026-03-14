@@ -7,12 +7,10 @@ hourly counters, and dynamic adjustment capabilities.
 
 import asyncio
 import hashlib
-import json
 import logging
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,18 +40,18 @@ class ResourceQuota:
     max_chat_per_hour: int = 500
     max_tool_calls_per_hour: int = 1000
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert quota to dictionary."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ResourceQuota":
+    def from_dict(cls, data: dict[str, Any]) -> "ResourceQuota":
         """Create quota from dictionary."""
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
 # Role-based quotas configuration
-ROLE_QUOTAS: Dict[str, ResourceQuota] = {
+ROLE_QUOTAS: dict[str, ResourceQuota] = {
     "USER": ResourceQuota(
         max_storage_mb=100,
         max_workspace_files=1000,
@@ -141,7 +139,7 @@ class QuotaManager:
     - Optional Redis backend support
     """
 
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self, redis_url: str | None = None):
         """
         Initialize Quota Manager.
 
@@ -151,14 +149,14 @@ class QuotaManager:
         """
         self.redis_url = redis_url
         self._redis_client = None
-        self._usage_cache: Dict[str, Dict[str, Any]] = {}  # wallet_address -> {resource_type: usage_data}
-        self._hourly_counters: Dict[str, Dict[str, Dict[str, int]]] = {}  # hour_key -> {wallet -> {resource_type: count}}
-        self._locks: Dict[str, asyncio.Lock] = {}
+        self._usage_cache: dict[str, dict[str, Any]] = {}  # wallet_address -> {resource_type: usage_data}
+        self._hourly_counters: dict[str, dict[str, dict[str, int]]] = {}  # hour_key -> {wallet -> {resource_type: count}}
+        self._locks: dict[str, asyncio.Lock] = {}
         self._running = False
-        self._reset_task: Optional[asyncio.Task] = None
+        self._reset_task: asyncio.Task | None = None
 
         # In-memory user role mapping (can be extended to fetch from database)
-        self._user_roles: Dict[str, str] = {}
+        self._user_roles: dict[str, str] = {}
 
     async def start(self) -> None:
         """Start the quota manager and scheduled tasks."""
@@ -187,7 +185,7 @@ class QuotaManager:
         wallet_address: str,
         resource_type: str,
         requested: int = 1
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Check if a resource request is within quota limits.
 
@@ -257,7 +255,7 @@ class QuotaManager:
         wallet_address: str,
         resource_type: str,
         amount: int = 1,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: dict[str, Any] | None = None
     ) -> None:
         """
         Record resource usage.
@@ -305,7 +303,7 @@ class QuotaManager:
     async def get_usage_report(
         self,
         wallet_address: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get comprehensive usage report for a user.
 
@@ -555,7 +553,7 @@ class QuotaManager:
 
         logger.info(f"Cleared quota data for {wallet_address}")
 
-    async def get_all_users_usage(self) -> Dict[str, Dict[str, Any]]:
+    async def get_all_users_usage(self) -> dict[str, dict[str, Any]]:
         """
         Get usage summary for all users.
 
@@ -583,10 +581,10 @@ class QuotaManager:
 
 
 # Singleton instance for easy access
-_default_manager: Optional[QuotaManager] = None
+_default_manager: QuotaManager | None = None
 
 
-def get_quota_manager(redis_url: Optional[str] = None) -> QuotaManager:
+def get_quota_manager(redis_url: str | None = None) -> QuotaManager:
     """
     Get or create the default QuotaManager instance.
 

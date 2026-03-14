@@ -12,16 +12,14 @@ Key Concepts:
 """
 
 import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 from uuid import uuid4
 
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, APIResponse
-
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +76,7 @@ class DesensitizationResult:
     """Result of LLM desensitization"""
     original: str
     desensitized: str
-    changes: List[ChangeRecord]
+    changes: list[ChangeRecord]
     iterations: int
     final_risk_level: str
 
@@ -96,7 +94,7 @@ class ExperienceGene:
 
     # Task description (desensitized)
     task_description: str
-    task_keywords: List[str]
+    task_keywords: list[str]
 
     # Execution result
     outcome: str  # success, partial, failed
@@ -104,41 +102,41 @@ class ExperienceGene:
     completion_time: float  # seconds
 
     # Client feedback
-    client_rating: Optional[int]  # 1-5
-    client_review: Optional[str]  # desensitized
-    would_recommend: Optional[bool]
+    client_rating: int | None  # 1-5
+    client_review: str | None  # desensitized
+    would_recommend: bool | None
 
     # Techniques and methods
-    techniques_used: List[str]
-    tools_used: List[str]
+    techniques_used: list[str]
+    tools_used: list[str]
     approach_description: str
 
     # Shareable experience
-    lessons_learned: List[str]
-    best_practices: List[str]
+    lessons_learned: list[str]
+    best_practices: list[str]
 
     # Verification
     verified: bool
     verification_status: str
-    verification_methods: List[str] = field(default_factory=list)
-    verification_timestamp: Optional[datetime] = None
+    verification_methods: list[str] = field(default_factory=list)
+    verification_timestamp: datetime | None = None
 
     # Visibility
     share_level: str = ShareLevel.SEMI_PUBLIC.value
     visible_to_verified_only: bool = False
 
     # Value score (computed)
-    value_score: Optional[float] = None
+    value_score: float | None = None
 
     # Timestamps
     created_at: datetime = field(default_factory=datetime.now)
-    task_completed_at: Optional[datetime] = None
+    task_completed_at: datetime | None = None
 
     # Original data (for internal use, not exposed)
     _original_description: str = ""
-    _desensitization_result: Optional[DesensitizationResult] = None
+    _desensitization_result: DesensitizationResult | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "gene_id": self.gene_id,
@@ -169,7 +167,7 @@ class ExperienceGene:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ExperienceGene":
+    def from_dict(cls, data: dict[str, Any]) -> "ExperienceGene":
         """Create from dictionary"""
         verification_ts = None
         if data.get("verification_timestamp"):
@@ -239,13 +237,13 @@ class SkillGene:
     avg_quality_score: float = 0.0
 
     # Related experiences
-    related_experience_ids: List[str] = field(default_factory=list)
+    related_experience_ids: list[str] = field(default_factory=list)
 
     # Certifications
-    certifications: List[str] = field(default_factory=list)
-    verified_at: Optional[datetime] = None
+    certifications: list[str] = field(default_factory=list)
+    verified_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "skill_id": self.skill_id,
             "skill_name": self.skill_name,
@@ -260,7 +258,7 @@ class SkillGene:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SkillGene":
+    def from_dict(cls, data: dict[str, Any]) -> "SkillGene":
         verified_at = None
         if data.get("verified_at"):
             if isinstance(data["verified_at"], str):
@@ -298,7 +296,7 @@ class PatternGene:
     pattern_type: str
 
     # Pattern definition
-    trigger_conditions: List[str]  # When to apply this pattern
+    trigger_conditions: list[str]  # When to apply this pattern
     approach: str                   # How to apply
     expected_outcome: str           # What to expect
 
@@ -307,12 +305,12 @@ class PatternGene:
     success_rate: float = 0.0
 
     # Supporting examples
-    example_experience_ids: List[str] = field(default_factory=list)
+    example_experience_ids: list[str] = field(default_factory=list)
 
     # Confidence
     confidence: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "pattern_id": self.pattern_id,
             "pattern_name": self.pattern_name,
@@ -327,7 +325,7 @@ class PatternGene:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PatternGene":
+    def from_dict(cls, data: dict[str, Any]) -> "PatternGene":
         return cls(
             pattern_id=data.get("pattern_id", ""),
             pattern_name=data.get("pattern_name", ""),
@@ -367,9 +365,9 @@ class GeneCapsule:
     version: str
 
     # Core genes
-    experience_genes: List[ExperienceGene] = field(default_factory=list)
-    skill_genes: List[SkillGene] = field(default_factory=list)
-    pattern_genes: List[PatternGene] = field(default_factory=list)
+    experience_genes: list[ExperienceGene] = field(default_factory=list)
+    skill_genes: list[SkillGene] = field(default_factory=list)
+    pattern_genes: list[PatternGene] = field(default_factory=list)
 
     # Statistics
     total_tasks: int = 0
@@ -383,7 +381,7 @@ class GeneCapsule:
     created_at: datetime = field(default_factory=datetime.now)
     last_updated: datetime = field(default_factory=datetime.now)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "capsule_id": self.capsule_id,
             "agent_id": self.agent_id,
@@ -400,7 +398,7 @@ class GeneCapsule:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GeneCapsule":
+    def from_dict(cls, data: dict[str, Any]) -> "GeneCapsule":
         created_at = datetime.now()
         if data.get("created_at"):
             if isinstance(data["created_at"], str):
@@ -430,7 +428,7 @@ class GeneCapsule:
             last_updated=last_updated,
         )
 
-    def get_public_experiences(self) -> List[ExperienceGene]:
+    def get_public_experiences(self) -> list[ExperienceGene]:
         """Get experiences that can be publicly shown"""
         return [
             e for e in self.experience_genes
@@ -440,8 +438,8 @@ class GeneCapsule:
     def find_similar_experiences(
         self,
         task_type: str,
-        keywords: List[str],
-    ) -> List[ExperienceGene]:
+        keywords: list[str],
+    ) -> list[ExperienceGene]:
         """Find experiences similar to given criteria"""
         matching = []
         for exp in self.experience_genes:
@@ -455,8 +453,8 @@ class GeneCapsule:
                 score += 0.5
 
             # Keyword match
-            exp_keywords = set(k.lower() for k in exp.task_keywords)
-            query_keywords = set(k.lower() for k in keywords)
+            exp_keywords = {k.lower() for k in exp.task_keywords}
+            query_keywords = {k.lower() for k in keywords}
             if exp_keywords and query_keywords:
                 overlap = len(exp_keywords & query_keywords) / len(query_keywords)
                 score += 0.5 * overlap
@@ -493,18 +491,18 @@ class GeneCapsuleManager:
         self,
         agent_id: str,
         platform_client: PlatformClient,
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
     ):
         self.agent_id = agent_id
         self.platform = platform_client
         self.logger = logger or logging.getLogger(__name__)
 
-        self._capsule: Optional[GeneCapsule] = None
-        self._pending_experiences: List[ExperienceGene] = []
+        self._capsule: GeneCapsule | None = None
+        self._pending_experiences: list[ExperienceGene] = []
         self._lock = asyncio.Lock()
 
     @property
-    def capsule(self) -> Optional[GeneCapsule]:
+    def capsule(self) -> GeneCapsule | None:
         return self._capsule
 
     @property
@@ -550,13 +548,13 @@ class GeneCapsuleManager:
         outcome: str,
         quality_score: float,
         completion_time: float,
-        techniques_used: List[str],
-        tools_used: Optional[List[str]] = None,
+        techniques_used: list[str],
+        tools_used: list[str] | None = None,
         approach_description: str = "",
-        lessons_learned: Optional[List[str]] = None,
-        client_rating: Optional[int] = None,
-        client_review: Optional[str] = None,
-        would_recommend: Optional[bool] = None,
+        lessons_learned: list[str] | None = None,
+        client_rating: int | None = None,
+        client_review: str | None = None,
+        would_recommend: bool | None = None,
         share_level: str = ShareLevel.SEMI_PUBLIC.value,
         auto_desensitize: bool = True,
     ) -> ExperienceGene:
@@ -678,7 +676,7 @@ class GeneCapsuleManager:
 
         return text
 
-    def _extract_keywords(self, text: str) -> List[str]:
+    def _extract_keywords(self, text: str) -> list[str]:
         """Extract keywords from text"""
         import re
 
@@ -774,14 +772,14 @@ class GeneCapsuleManager:
             if ratings:
                 self._capsule.avg_satisfaction = sum(ratings) / len(ratings)
 
-    async def _detect_patterns(self) -> List[PatternGene]:
+    async def _detect_patterns(self) -> list[PatternGene]:
         """
         Detect new patterns from experiences
 
         When similar approaches are used 3+ times, form a pattern
         """
         # Group experiences by similar approach
-        approach_groups: Dict[str, List[ExperienceGene]] = {}
+        approach_groups: dict[str, list[ExperienceGene]] = {}
 
         for exp in self._capsule.experience_genes:
             if exp.outcome != "success":
@@ -895,13 +893,13 @@ class GeneCapsuleManager:
 
     # ==================== Queries ====================
 
-    def get_capsule_summary(self) -> Dict[str, Any]:
+    def get_capsule_summary(self) -> dict[str, Any]:
         """Get summary of gene capsule for display"""
         if not self._capsule:
             return {}
 
         # Count by category
-        categories: Dict[str, int] = {}
+        categories: dict[str, int] = {}
         for exp in self._capsule.experience_genes:
             cat = exp.task_category or "other"
             categories[cat] = categories.get(cat, 0) + 1
@@ -950,12 +948,12 @@ class GeneCapsuleManager:
 
     def find_relevant_experiences(
         self,
-        task_type: Optional[str] = None,
-        keywords: Optional[List[str]] = None,
-        min_rating: Optional[int] = None,
+        task_type: str | None = None,
+        keywords: list[str] | None = None,
+        min_rating: int | None = None,
         verified_only: bool = False,
         limit: int = 5,
-    ) -> List[ExperienceGene]:
+    ) -> list[ExperienceGene]:
         """Find experiences matching criteria"""
         if not self._capsule:
             return []
@@ -985,8 +983,8 @@ class GeneCapsuleManager:
             # Score by keyword match
             score = 0.0
             if keywords:
-                exp_keywords = set(k.lower() for k in exp.task_keywords)
-                query_keywords = set(k.lower() for k in keywords)
+                exp_keywords = {k.lower() for k in exp.task_keywords}
+                query_keywords = {k.lower() for k in keywords}
                 if exp_keywords & query_keywords:
                     score = len(exp_keywords & query_keywords) / len(query_keywords)
             else:
@@ -998,7 +996,7 @@ class GeneCapsuleManager:
         matching.sort(key=lambda x: (x[0], x[1].quality_score), reverse=True)
         return [e for _, e in matching[:limit]]
 
-    def export_showcase(self) -> Dict[str, Any]:
+    def export_showcase(self) -> dict[str, Any]:
         """
         Export showcase material for display
 

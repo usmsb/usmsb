@@ -2,14 +2,15 @@
 System endpoints (health, metrics, status).
 """
 
-import time
 import platform
+import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 from fastapi import APIRouter
 
-from usmsb_sdk.api.database import get_metrics as db_get_metrics, get_db
+from usmsb_sdk.api.database import get_db
+from usmsb_sdk.api.database import get_metrics as db_get_metrics
 from usmsb_sdk.api.rest.schemas.system import HealthResponse
 
 router = APIRouter(tags=["System"])
@@ -136,7 +137,7 @@ async def get_metrics_endpoint():
 
 
 @router.get("/status")
-async def get_system_status() -> Dict[str, Any]:
+async def get_system_status() -> dict[str, Any]:
     """Get detailed system status."""
     # Calculate uptime
     uptime_seconds = time.time() - _start_time
@@ -210,7 +211,7 @@ async def get_system_status() -> Dict[str, Any]:
 
 
 @router.get("/stats/summary")
-async def get_stats_summary() -> Dict[str, Any]:
+async def get_stats_summary() -> dict[str, Any]:
     """Get summary statistics for dashboard."""
     stats = {
         "total_agents": 0,

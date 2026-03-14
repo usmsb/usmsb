@@ -11,53 +11,48 @@ AGI Reasoning Engine Module
 - 元推理（关于推理的推理）
 """
 
-from usmsb_sdk.reasoning.interfaces import (
-    IReasoningEngine,
-    IReasoningChain,
-    IKnowledgeGraphAdapter,
-    ReasoningType,
-    ReasoningResult,
-    ReasoningStep,
-    ConfidenceScore,
-    UncertaintyMeasure,
-)
-
 from usmsb_sdk.reasoning.base import (
     BaseReasoningEngine,
-    ReasoningContext,
     ReasoningChain,
+    ReasoningContext,
 )
-
+from usmsb_sdk.reasoning.chain_manager import (
+    ChainExecutionResult,
+    ReasoningChainManager,
+)
 from usmsb_sdk.reasoning.engines import (
+    AbductiveEngine,
+    AnalogicalEngine,
+    CausalEngine,
+    CommonsenseEngine,
     DeductiveEngine,
     InductiveEngine,
-    AbductiveEngine,
-    CausalEngine,
-    AnalogicalEngine,
+    MetaReasoningEngine,
     SpatialEngine,
     TemporalEngine,
-    CommonsenseEngine,
-    MetaReasoningEngine,
 )
-
-from usmsb_sdk.reasoning.uncertainty import (
-    ProbabilityDistribution,
-    FuzzySet,
-    DempsterShafer,
-    BayesianNetwork,
-    UncertaintyManager,
+from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
+    IKnowledgeGraphAdapter,
+    IReasoningChain,
+    IReasoningEngine,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+    UncertaintyMeasure,
 )
-
-from usmsb_sdk.reasoning.chain_manager import (
-    ReasoningChainManager,
-    ChainExecutionResult,
-)
-
 from usmsb_sdk.reasoning.knowledge_integration import (
-    KnowledgeGraphIntegration,
-    TripleStore,
     ConceptNode,
+    KnowledgeGraphIntegration,
     RelationEdge,
+    TripleStore,
+)
+from usmsb_sdk.reasoning.uncertainty import (
+    BayesianNetwork,
+    DempsterShafer,
+    FuzzySet,
+    ProbabilityDistribution,
+    UncertaintyManager,
 )
 
 __all__ = [

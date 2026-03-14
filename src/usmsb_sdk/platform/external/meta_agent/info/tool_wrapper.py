@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Any
 from uuid import uuid4
 
 from .types import InfoNeed, InfoNeedType
@@ -35,7 +35,7 @@ class InfoExtractorTool:
         "required": ["desc"],
     }
 
-    async def execute(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, params: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         logger.info(f"Tool execute called with params: {params}")
         logger.info(f"Tool execute called with context user_id: {context.get('user_id')}")
         logger.info(f"info_extractor in context: {type(context.get('info_extractor'))}")

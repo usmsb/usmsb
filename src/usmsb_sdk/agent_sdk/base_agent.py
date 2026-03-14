@@ -14,14 +14,17 @@ The BaseAgent class implements:
 - Platform integration (marketplace, wallet, collaboration, etc.)
 """
 
-from abc import ABC, abstractmethod
-from asyncio import Lock, Event, create_task, gather, sleep
-from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
 import asyncio
 import logging
-import os
+from abc import ABC, abstractmethod
+from asyncio import Event, Lock, create_task, gather, sleep
+from collections.abc import Callable
+from datetime import datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from usmsb_sdk.agent_sdk.http_server import HTTPServer
 
 from usmsb_sdk.agent_sdk.agent_config import (
     AgentConfig,
@@ -30,46 +33,42 @@ from usmsb_sdk.agent_sdk.agent_config import (
     SkillDefinition,
     SkillParameter,
 )
-from usmsb_sdk.agent_sdk.registration import RegistrationManager, RegistrationStatus
-from usmsb_sdk.agent_sdk.communication import CommunicationManager, Message, MessageType, Session
-from usmsb_sdk.agent_sdk.discovery import DiscoveryManager, AgentInfo, DiscoveryFilter
-
-# New platform integration modules
-from usmsb_sdk.agent_sdk.platform_client import PlatformClient, RegistrationResult
-from usmsb_sdk.agent_sdk.marketplace import (
-    MarketplaceManager,
-    ServiceDefinition,
-    Service,
-    DemandDefinition,
-    Demand,
-    Opportunity,
-    MatchScore,
+from usmsb_sdk.agent_sdk.collaboration import (
+    CollaborationManager,
+    CollaborationSession,
 )
-from usmsb_sdk.agent_sdk.wallet import WalletManager, WalletBalance, StakeInfo, StakeResult
+from usmsb_sdk.agent_sdk.communication import CommunicationManager, Message, MessageType, Session
+from usmsb_sdk.agent_sdk.discovery import AgentInfo, DiscoveryFilter, DiscoveryManager
+from usmsb_sdk.agent_sdk.learning import (
+    LearningInsight,
+    LearningManager,
+    MarketInsights,
+    PerformanceAnalysis,
+)
+from usmsb_sdk.agent_sdk.marketplace import (
+    Demand,
+    DemandDefinition,
+    MarketplaceManager,
+    Opportunity,
+    Service,
+    ServiceDefinition,
+)
 from usmsb_sdk.agent_sdk.negotiation import (
     NegotiationManager,
     NegotiationSession,
     NegotiationTerms,
     ProposalResult,
 )
-from usmsb_sdk.agent_sdk.collaboration import (
-    CollaborationManager,
-    CollaborationSession,
-    CollaborationRole,
-    Contribution,
-)
-from usmsb_sdk.agent_sdk.workflow import WorkflowManager, Workflow, WorkflowResult
-from usmsb_sdk.agent_sdk.learning import (
-    LearningManager,
-    LearningInsight,
-    PerformanceAnalysis,
-    MarketInsights,
-    Experience,
-)
+
+# New platform integration modules
+from usmsb_sdk.agent_sdk.platform_client import PlatformClient, RegistrationResult
+from usmsb_sdk.agent_sdk.registration import RegistrationManager, RegistrationStatus
+from usmsb_sdk.agent_sdk.wallet import StakeInfo, StakeResult, WalletBalance, WalletManager
+from usmsb_sdk.agent_sdk.workflow import Workflow, WorkflowManager, WorkflowResult
 
 # Database imports for wallet binding check
 try:
-    from usmsb_sdk.api.database import has_wallet_binding, set_agent_offline, get_agent
+    from usmsb_sdk.api.database import get_agent, has_wallet_binding, set_agent_offline
     _DB_AVAILABLE = True
 except ImportError:
     _DB_AVAILABLE = False
@@ -110,7 +109,9 @@ class BaseAgent(ABC):
                 self.logger.info("Initializing MyAgent")
                 # Setup resources
 
-            async def handle_message(self, message: Message, session: Optional[Session]) -> Optional[Message]:
+            async def handle_message(
+                self, message: Message, session: Optional[Session]
+            ) -> Optional[Message]:
                 self.logger.info(f"Received: {message.content}")
                 return Message(
                     type=MessageType.RESPONSE,
@@ -152,34 +153,34 @@ class BaseAgent(ABC):
         self.logger.setLevel(getattr(logging, config.log_level.upper(), logging.INFO))
 
         # Core components
-        self._registration_manager: Optional[RegistrationManager] = None
-        self._communication_manager: Optional[CommunicationManager] = None
-        self._discovery_manager: Optional[DiscoveryManager] = None
+        self._registration_manager: RegistrationManager | None = None
+        self._communication_manager: CommunicationManager | None = None
+        self._discovery_manager: DiscoveryManager | None = None
 
         # Platform integration components
-        self._platform_client: Optional[PlatformClient] = None
-        self._marketplace: Optional[MarketplaceManager] = None
-        self._wallet: Optional[WalletManager] = None
-        self._negotiation: Optional[NegotiationManager] = None
-        self._collaboration: Optional[CollaborationManager] = None
-        self._workflow: Optional[WorkflowManager] = None
-        self._learning: Optional[LearningManager] = None
+        self._platform_client: PlatformClient | None = None
+        self._marketplace: MarketplaceManager | None = None
+        self._wallet: WalletManager | None = None
+        self._negotiation: NegotiationManager | None = None
+        self._collaboration: CollaborationManager | None = None
+        self._workflow: WorkflowManager | None = None
+        self._learning: LearningManager | None = None
 
         # Platform URL for integration
         self._platform_url: str = "http://localhost:8000"
 
         # Skill and capability registries
-        self._skills: Dict[str, SkillDefinition] = {s.name: s for s in config.skills}
-        self._capabilities: Dict[str, CapabilityDefinition] = {
+        self._skills: dict[str, SkillDefinition] = {s.name: s for s in config.skills}
+        self._capabilities: dict[str, CapabilityDefinition] = {
             c.name: c for c in config.capabilities
         }
 
         # Message handlers
-        self._message_handlers: Dict[str, Callable] = {}
-        self._skill_handlers: Dict[str, Callable] = {}
+        self._message_handlers: dict[str, Callable] = {}
+        self._skill_handlers: dict[str, Callable] = {}
 
         # Background tasks
-        self._background_tasks: Set[asyncio.Task] = set()
+        self._background_tasks: set[asyncio.Task] = set()
 
         # Metrics
         self._metrics = {
@@ -192,10 +193,10 @@ class BaseAgent(ABC):
         }
 
         # Event hooks
-        self._on_state_change_hooks: List[Callable] = []
-        self._on_message_hooks: List[Callable] = []
-        self._on_skill_hooks: List[Callable] = []
-        self._on_error_hooks: List[Callable] = []
+        self._on_state_change_hooks: list[Callable] = []
+        self._on_message_hooks: list[Callable] = []
+        self._on_skill_hooks: list[Callable] = []
+        self._on_error_hooks: list[Callable] = []
 
     @property
     def state(self) -> AgentState:
@@ -208,17 +209,17 @@ class BaseAgent(ABC):
         return self._running and self._state == AgentState.RUNNING
 
     @property
-    def skills(self) -> List[SkillDefinition]:
+    def skills(self) -> list[SkillDefinition]:
         """Get list of available skills"""
         return list(self._skills.values())
 
     @property
-    def capabilities(self) -> List[CapabilityDefinition]:
+    def capabilities(self) -> list[CapabilityDefinition]:
         """Get list of capabilities"""
         return list(self._capabilities.values())
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         """Get agent metrics"""
         return {
             **self._metrics,
@@ -243,7 +244,7 @@ class BaseAgent(ABC):
                 except Exception as e:
                     self.logger.error(f"Error in state change hook: {e}")
 
-    def _calculate_uptime(self) -> Optional[float]:
+    def _calculate_uptime(self) -> float | None:
         """Calculate agent uptime in seconds"""
         if self._metrics["start_time"]:
             return (datetime.now() - self._metrics["start_time"]).total_seconds()
@@ -330,7 +331,9 @@ class BaseAgent(ABC):
 
                     if has_wallet:
                         # Has wallet binding - just set offline (keep record)
-                        self.logger.info(f"Agent {self.name} has wallet binding, setting to offline")
+                        self.logger.info(
+                            f"Agent {self.name} has wallet binding, setting to offline"
+                        )
                         set_agent_offline(agent_id)
                     else:
                         # No wallet binding - fully unregister
@@ -457,8 +460,8 @@ class BaseAgent(ABC):
 
     @abstractmethod
     async def handle_message(
-        self, message: Message, session: Optional[Session] = None
-    ) -> Optional[Message]:
+        self, message: Message, session: Session | None = None
+    ) -> Message | None:
         """
         Handle incoming messages.
 
@@ -472,7 +475,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    async def execute_skill(self, skill_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_skill(self, skill_name: str, params: dict[str, Any]) -> Any:
         """
         Execute a skill by name.
 
@@ -518,7 +521,9 @@ class BaseAgent(ABC):
             logger=self.logger,
             message_handler=self._handle_internal_message,
         )
-        await self._communication_manager.initialize(skip_http_start=self.config.skip_http_auto_start)
+        await self._communication_manager.initialize(
+            skip_http_start=self.config.skip_http_auto_start
+        )
 
         # Initialize discovery manager
         self._discovery_manager = DiscoveryManager(
@@ -538,8 +543,8 @@ class BaseAgent(ABC):
     async def _register_builtin_skills(self) -> None:
         """Register built-in skills including npm and git executors"""
         try:
-            from usmsb_sdk.core.skills.npm_skill import NpxCommandSkill
             from usmsb_sdk.core.skills.git_skill import GitCommandSkill
+            from usmsb_sdk.core.skills.npm_skill import NpxCommandSkill
 
             npm_skill = NpxCommandSkill()
 
@@ -628,7 +633,11 @@ class BaseAgent(ABC):
                     SkillParameter(
                         name="command",
                         type="string",
-                        description="Git子命令: clone, init, remote, branch, checkout, switch, merge, fetch, pull, push, add, commit, reset, revert, status, log, diff, show, blame, stash",
+                        description=(
+                            "Git子命令: clone, init, remote, branch, checkout, "
+                            "switch, merge, fetch, pull, push, add, commit, "
+                            "reset, revert, status, log, diff, show, blame, stash"
+                        ),
                         required=True,
                     ),
                     SkillParameter(
@@ -819,7 +828,7 @@ class BaseAgent(ABC):
 
             await sleep(self.config.network.discovery_interval)
 
-    async def _perform_health_check(self) -> Dict[str, Any]:
+    async def _perform_health_check(self) -> dict[str, Any]:
         """Perform internal health check"""
         health = {
             "status": "healthy",
@@ -845,8 +854,8 @@ class BaseAgent(ABC):
     # ==================== Message Handling ====================
 
     async def _handle_internal_message(
-        self, message: Message, session: Optional[Session] = None
-    ) -> Optional[Message]:
+        self, message: Message, session: Session | None = None
+    ) -> Message | None:
         """Internal message handler with hooks and metrics"""
         self._metrics["messages_received"] += 1
         self._metrics["last_activity"] = datetime.now()
@@ -882,7 +891,7 @@ class BaseAgent(ABC):
 
     # ==================== Skill Management ====================
 
-    def register_skill(self, skill: SkillDefinition, handler: Optional[Callable] = None) -> None:
+    def register_skill(self, skill: SkillDefinition, handler: Callable | None = None) -> None:
         """Register a skill with optional handler"""
         self._skills[skill.name] = skill
         if handler:
@@ -896,7 +905,7 @@ class BaseAgent(ABC):
             self._skill_handlers.pop(skill_name, None)
             self.logger.info(f"Unregistered skill: {skill_name}")
 
-    async def call_skill(self, skill_name: str, params: Dict[str, Any] = None) -> Any:
+    async def call_skill(self, skill_name: str, params: dict[str, Any] = None) -> Any:
         """Execute a skill by name"""
         params = params or {}
 
@@ -933,14 +942,14 @@ class BaseAgent(ABC):
                     return await handler(params)
                 else:
                     return handler(params)
-            except Exception as e:
+            except Exception:
                 self._metrics["errors"] += 1
                 raise
 
         # Delegate to user implementation
         return await self.execute_skill(skill_name, params)
 
-    def _validate_skill_params(self, skill: SkillDefinition, params: Dict[str, Any]) -> None:
+    def _validate_skill_params(self, skill: SkillDefinition, params: dict[str, Any]) -> None:
         """Validate skill parameters against definition"""
         for param in skill.parameters:
             if param.required and param.name not in params:
@@ -995,7 +1004,7 @@ class BaseAgent(ABC):
         """Check if agent has a specific capability"""
         return capability_name in self._capabilities
 
-    def get_capability(self, capability_name: str) -> Optional[CapabilityDefinition]:
+    def get_capability(self, capability_name: str) -> CapabilityDefinition | None:
         """Get capability by name"""
         return self._capabilities.get(capability_name)
 
@@ -1006,10 +1015,10 @@ class BaseAgent(ABC):
         target_id: str,
         content: Any,
         message_type: MessageType = MessageType.REQUEST,
-        protocol: Optional[ProtocolType] = None,
+        protocol: ProtocolType | None = None,
         use_p2p: bool = False,
         **kwargs,
-    ) -> Optional[Message]:
+    ) -> Message | None:
         """
         Send a message to another agent.
 
@@ -1045,9 +1054,9 @@ class BaseAgent(ABC):
     async def broadcast(
         self,
         content: Any,
-        filter_criteria: Optional[DiscoveryFilter] = None,
-        protocol: Optional[ProtocolType] = None,
-    ) -> List[Message]:
+        filter_criteria: DiscoveryFilter | None = None,
+        protocol: ProtocolType | None = None,
+    ) -> list[Message]:
         """
         Broadcast a message to multiple agents.
 
@@ -1090,8 +1099,8 @@ class BaseAgent(ABC):
 
     async def discover_agents(
         self,
-        filter_criteria: Optional[DiscoveryFilter] = None,
-    ) -> List[AgentInfo]:
+        filter_criteria: DiscoveryFilter | None = None,
+    ) -> list[AgentInfo]:
         """
         Discover agents matching criteria.
 
@@ -1106,14 +1115,14 @@ class BaseAgent(ABC):
 
         return await self._discovery_manager.discover(filter_criteria)
 
-    async def discover_by_skill(self, skill_name: str) -> List[AgentInfo]:
+    async def discover_by_skill(self, skill_name: str) -> list[AgentInfo]:
         """Discover agents with a specific skill"""
         if not self._discovery_manager:
             raise RuntimeError("Discovery manager not initialized")
 
         return await self._discovery_manager.discover_by_skill(skill_name)
 
-    async def discover_by_capability(self, capability_name: str) -> List[AgentInfo]:
+    async def discover_by_capability(self, capability_name: str) -> list[AgentInfo]:
         """Discover agents with a specific capability"""
         if not self._discovery_manager:
             raise RuntimeError("Discovery manager not initialized")
@@ -1124,7 +1133,7 @@ class BaseAgent(ABC):
         self,
         task_description: str,
         limit: int = 5,
-    ) -> List[AgentInfo]:
+    ) -> list[AgentInfo]:
         """Get recommended agents for a task"""
         if not self._discovery_manager:
             raise RuntimeError("Discovery manager not initialized")
@@ -1153,7 +1162,7 @@ class BaseAgent(ABC):
         if self._communication_manager:
             await self._communication_manager.close_p2p(target_id)
 
-    def get_p2p_connections(self) -> List[str]:
+    def get_p2p_connections(self) -> list[str]:
         """Get list of active P2P connections"""
         if self._communication_manager:
             return list(self._communication_manager.p2p_connections.keys())
@@ -1198,7 +1207,7 @@ class BaseAgent(ABC):
             return self._registration_manager.status
         return RegistrationStatus.NOT_REGISTERED
 
-    async def get_registered_protocols(self) -> List[ProtocolType]:
+    async def get_registered_protocols(self) -> list[ProtocolType]:
         """Get list of registered protocols"""
         if self._registration_manager:
             return self._registration_manager.registered_protocols
@@ -1206,7 +1215,7 @@ class BaseAgent(ABC):
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert agent info to dictionary"""
         return {
             "agent_id": self.agent_id,
@@ -1221,42 +1230,45 @@ class BaseAgent(ABC):
         }
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}(id={self.agent_id}, name={self.name}, state={self._state.value})>"
+        return (
+            f"<{self.__class__.__name__}("
+            f"id={self.agent_id}, name={self.name}, state={self._state.value})>"
+        )
 
     # ==================== Platform Integration ====================
 
     @property
-    def platform(self) -> Optional[PlatformClient]:
+    def platform(self) -> PlatformClient | None:
         """Get platform client"""
         return self._platform_client
 
     @property
-    def marketplace(self) -> Optional[MarketplaceManager]:
+    def marketplace(self) -> MarketplaceManager | None:
         """Get marketplace manager"""
         return self._marketplace
 
     @property
-    def wallet(self) -> Optional[WalletManager]:
+    def wallet(self) -> WalletManager | None:
         """Get wallet manager"""
         return self._wallet
 
     @property
-    def negotiation(self) -> Optional[NegotiationManager]:
+    def negotiation(self) -> NegotiationManager | None:
         """Get negotiation manager"""
         return self._negotiation
 
     @property
-    def collaboration(self) -> Optional[CollaborationManager]:
+    def collaboration(self) -> CollaborationManager | None:
         """Get collaboration manager"""
         return self._collaboration
 
     @property
-    def workflow(self) -> Optional[WorkflowManager]:
+    def workflow(self) -> WorkflowManager | None:
         """Get workflow manager"""
         return self._workflow
 
     @property
-    def learning(self) -> Optional[LearningManager]:
+    def learning(self) -> LearningManager | None:
         """Get learning manager"""
         return self._learning
 
@@ -1296,7 +1308,7 @@ class BaseAgent(ABC):
 
     # --- Service Management ---
 
-    async def offer_service(self, service_def: ServiceDefinition) -> Optional[Service]:
+    async def offer_service(self, service_def: ServiceDefinition) -> Service | None:
         """
         Publish a service to the marketplace.
 
@@ -1322,7 +1334,7 @@ class BaseAgent(ABC):
             return await self._marketplace.unpublish_service(service_id)
         return False
 
-    async def list_my_services(self) -> List[Service]:
+    async def list_my_services(self) -> list[Service]:
         """List my published services"""
         if self._marketplace:
             return await self._marketplace.list_my_services()
@@ -1330,7 +1342,7 @@ class BaseAgent(ABC):
 
     # --- Demand Management ---
 
-    async def request_service(self, demand_def: DemandDefinition) -> Optional[Demand]:
+    async def request_service(self, demand_def: DemandDefinition) -> Demand | None:
         """
         Publish a service request/demand.
 
@@ -1350,7 +1362,7 @@ class BaseAgent(ABC):
             return await self._marketplace.cancel_demand(demand_id)
         return False
 
-    async def list_my_demands(self) -> List[Demand]:
+    async def list_my_demands(self) -> list[Demand]:
         """List my published demands"""
         if self._marketplace:
             return await self._marketplace.list_my_demands()
@@ -1358,7 +1370,7 @@ class BaseAgent(ABC):
 
     # --- Matching & Opportunities ---
 
-    async def find_work(self, capabilities: Optional[List[str]] = None) -> List[Opportunity]:
+    async def find_work(self, capabilities: list[str] | None = None) -> list[Opportunity]:
         """
         Find work opportunities matching agent's capabilities.
 
@@ -1378,9 +1390,9 @@ class BaseAgent(ABC):
 
     async def find_workers(
         self,
-        required_skills: List[str],
-        budget_range: Optional[tuple] = None,
-    ) -> List[Opportunity]:
+        required_skills: list[str],
+        budget_range: tuple | None = None,
+    ) -> list[Opportunity]:
         """
         Find workers/suppliers for a task.
 
@@ -1396,7 +1408,7 @@ class BaseAgent(ABC):
 
         return await self._marketplace.find_workers(required_skills, budget_range)
 
-    async def get_opportunities(self) -> List[Opportunity]:
+    async def get_opportunities(self) -> list[Opportunity]:
         """Get all available opportunities"""
         if self._marketplace:
             return await self._marketplace.get_all_opportunities()
@@ -1407,7 +1419,7 @@ class BaseAgent(ABC):
     async def negotiate(
         self,
         opportunity_id: str,
-    ) -> Optional[NegotiationSession]:
+    ) -> NegotiationSession | None:
         """
         Start negotiating for an opportunity.
 
@@ -1471,9 +1483,9 @@ class BaseAgent(ABC):
     async def start_collaboration(
         self,
         goal: str,
-        required_skills: List[str],
+        required_skills: list[str],
         mode: str = "parallel",
-    ) -> Optional[CollaborationSession]:
+    ) -> CollaborationSession | None:
         """
         Start a multi-agent collaboration.
 
@@ -1504,14 +1516,14 @@ class BaseAgent(ABC):
         self,
         session_id: str,
         output: Any,
-        role: Optional[str] = None,
+        role: str | None = None,
     ) -> bool:
         """Submit contribution to collaboration"""
         if self._collaboration:
             return await self._collaboration.contribute(session_id, output, role)
         return False
 
-    async def list_collaborations(self) -> List[CollaborationSession]:
+    async def list_collaborations(self) -> list[CollaborationSession]:
         """List active collaborations"""
         if self._collaboration:
             return await self._collaboration.list_active()
@@ -1522,8 +1534,8 @@ class BaseAgent(ABC):
     async def plan_workflow(
         self,
         task: str,
-        tools: Optional[List[str]] = None,
-    ) -> Optional[Workflow]:
+        tools: list[str] | None = None,
+    ) -> Workflow | None:
         """
         Create a workflow for a task.
 
@@ -1539,15 +1551,15 @@ class BaseAgent(ABC):
 
         return await self._workflow.create(task, tools)
 
-    async def run_workflow(self, workflow_id: str) -> Optional[WorkflowResult]:
+    async def run_workflow(self, workflow_id: str) -> WorkflowResult | None:
         """Execute a workflow"""
         if self._workflow:
             return await self._workflow.execute(workflow_id)
         return None
 
     async def run_task(
-        self, task: str, tools: Optional[List[str]] = None
-    ) -> Optional[WorkflowResult]:
+        self, task: str, tools: list[str] | None = None
+    ) -> WorkflowResult | None:
         """
         Convenience: Create and run a workflow in one call.
 
@@ -1564,7 +1576,7 @@ class BaseAgent(ABC):
 
     # --- Wallet ---
 
-    async def get_balance(self) -> Optional[WalletBalance]:
+    async def get_balance(self) -> WalletBalance | None:
         """Get wallet balance"""
         if self._wallet:
             return await self._wallet.get_balance()
@@ -1596,7 +1608,7 @@ class BaseAgent(ABC):
             message="Wallet not initialized",
         )
 
-    async def get_stake_info(self) -> Optional[StakeInfo]:
+    async def get_stake_info(self) -> StakeInfo | None:
         """Get stake information"""
         if self._wallet:
             return await self._wallet.get_stake_info()
@@ -1604,19 +1616,19 @@ class BaseAgent(ABC):
 
     # --- Learning ---
 
-    async def get_insights(self) -> List[LearningInsight]:
+    async def get_insights(self) -> list[LearningInsight]:
         """Get learning insights"""
         if self._learning:
             return await self._learning.get_insights()
         return []
 
-    async def analyze_performance(self) -> Optional[PerformanceAnalysis]:
+    async def analyze_performance(self) -> PerformanceAnalysis | None:
         """Analyze own performance"""
         if self._learning:
             return await self._learning.analyze_performance()
         return None
 
-    async def optimize_strategy(self) -> Optional[Dict[str, Any]]:
+    async def optimize_strategy(self) -> dict[str, Any] | None:
         """Get optimized matching strategy"""
         if self._learning:
             strategy = await self._learning.get_optimized_strategy()
@@ -1628,7 +1640,7 @@ class BaseAgent(ABC):
             }
         return None
 
-    async def analyze_market(self) -> Optional[MarketInsights]:
+    async def analyze_market(self) -> MarketInsights | None:
         """Get market insights"""
         if self._learning:
             return await self._learning.get_market_insights()
@@ -1638,8 +1650,8 @@ class BaseAgent(ABC):
         self,
         experience_type: str,
         outcome: str,
-        details: Dict[str, Any],
-        lessons: Optional[List[str]] = None,
+        details: dict[str, Any],
+        lessons: list[str] | None = None,
     ) -> bool:
         """
         Report an experience for learning.

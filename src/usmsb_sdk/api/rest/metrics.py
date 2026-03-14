@@ -41,7 +41,7 @@ def get_auto_unregister_metrics():
     """
     metrics_output = []
 
-    for name, metric in auto_unregister_metrics.items():
+    for _name, metric in auto_unregister_metrics.items():
         if isinstance(metric, Counter):
             metrics_output.append(f"# TYPE {metric.name} counter")
             metrics_output.append(f"{metric.name} {metric.get_value()}")

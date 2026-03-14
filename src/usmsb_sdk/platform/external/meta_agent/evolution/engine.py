@@ -13,14 +13,14 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
 
-class EvolutionType(str, Enum):
+class EvolutionType(StrEnum):
     """进化类型"""
 
     KNOWLEDGE_GAIN = "knowledge_gain"  # 获得新知识
@@ -30,7 +30,7 @@ class EvolutionType(str, Enum):
     CAPABILITY_EXPANSION = "capability_exp"  # 能力扩展
 
 
-class EvolutionStatus(str, Enum):
+class EvolutionStatus(StrEnum):
     """进化状态"""
 
     PENDING = "pending"
@@ -48,13 +48,13 @@ class EvolutionRecord:
     description: str = ""
     knowledge_content: str = ""
     confidence: float = 0.5
-    source_conversation_id: Optional[str] = None
+    source_conversation_id: str | None = None
     status: EvolutionStatus = EvolutionStatus.PENDING
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
-    applied_at: Optional[float] = None
+    applied_at: float | None = None
     effectiveness: float = 0.0
     application_count: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -85,16 +85,16 @@ class EvolutionEngine:
         self.conversations = conversation_manager
 
         # 进化记录
-        self._evolution_records: List[EvolutionRecord] = []
+        self._evolution_records: list[EvolutionRecord] = []
 
         # 能力指标
-        self._capabilities: Dict[str, CapabilityMetric] = {}
+        self._capabilities: dict[str, CapabilityMetric] = {}
 
         # 学习配置
         self._learning_threshold = 0.6  # 置信度阈值
         self._evolution_interval = 300  # 进化检查间隔（秒）
         self._running = False
-        self._evolution_task: Optional[asyncio.Task] = None
+        self._evolution_task: asyncio.Task | None = None
 
     async def start(self):
         """启动进化引擎"""
@@ -119,8 +119,8 @@ class EvolutionEngine:
     async def learn_from_conversation(
         self,
         conversation_id: str,
-        messages: List[Dict[str, Any]],
-    ) -> List[EvolutionRecord]:
+        messages: list[dict[str, Any]],
+    ) -> list[EvolutionRecord]:
         """
         从对话中学习
 
@@ -176,7 +176,7 @@ class EvolutionEngine:
         self._evolution_records.extend(records)
         return records
 
-    async def _analyze_conversation(self, messages: List[Dict]) -> Dict[str, Any]:
+    async def _analyze_conversation(self, messages: list[dict]) -> dict[str, Any]:
         """使用 LLM 分析对话"""
         conversation_text = "\n".join(
             [f"{m.get('role', 'user')}: {m.get('content', '')}" for m in messages]
@@ -252,7 +252,7 @@ class EvolutionEngine:
         cap.improvement_rate = improvement
         cap.last_updated = datetime.now().timestamp()
 
-    async def reflect_and_improve(self) -> Dict[str, Any]:
+    async def reflect_and_improve(self) -> dict[str, Any]:
         """
         自我反思与改进
 
@@ -284,7 +284,7 @@ class EvolutionEngine:
             "focus_areas": reflection.get("focus_areas", []),
         }
 
-    async def _generate_reflection(self, records: List[EvolutionRecord]) -> Dict[str, Any]:
+    async def _generate_reflection(self, records: list[EvolutionRecord]) -> dict[str, Any]:
         """生成反思"""
         records_summary = "\n".join(
             [
@@ -339,7 +339,7 @@ class EvolutionEngine:
                 logger.error(f"Evolution loop error: {e}")
                 await asyncio.sleep(60)
 
-    def get_evolution_stats(self) -> Dict[str, Any]:
+    def get_evolution_stats(self) -> dict[str, Any]:
         """获取进化统计"""
         return {
             "total_evolutions": len(self._evolution_records),

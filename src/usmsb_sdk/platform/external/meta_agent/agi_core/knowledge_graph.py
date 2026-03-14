@@ -15,6 +15,7 @@ USMSB九大要素映射：
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -22,14 +23,13 @@ import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
-import hashlib
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class RelationType(str, Enum):
+class RelationType(StrEnum):
     IS_A = "is_a"
     HAS_A = "has_a"
     CAUSES = "causes"
@@ -51,7 +51,7 @@ class RelationType(str, Enum):
     USMSB_ENV = "environment"
 
 
-class KnowledgeStatus(str, Enum):
+class KnowledgeStatus(StrEnum):
     NEW = "new"
     CONFIRMED = "confirmed"
     STRENGTHENED = "strengthened"
@@ -63,17 +63,17 @@ class KnowledgeStatus(str, Enum):
 class KnowledgeNode:
     id: str
     content: str
-    usmsb_element: Optional[str] = None
+    usmsb_element: str | None = None
     status: KnowledgeStatus = KnowledgeStatus.NEW
     confidence: float = 0.5
     importance: float = 0.5
     access_count: int = 0
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     updated_at: float = field(default_factory=lambda: datetime.now().timestamp())
-    source: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    source: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "content": self.content,
@@ -97,17 +97,17 @@ class KnowledgeEdge:
     relation_type: RelationType = RelationType.RELATES
     weight: float = 1.0
     confidence: float = 0.5
-    evidence: List[str] = field(default_factory=list)
-    temporal_start: Optional[float] = None
-    temporal_end: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    evidence: list[str] = field(default_factory=list)
+    temporal_start: float | None = None
+    temporal_end: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class CausalChain:
     id: str
-    nodes: List[str] = field(default_factory=list)
-    edges: List[str] = field(default_factory=list)
+    nodes: list[str] = field(default_factory=list)
+    edges: list[str] = field(default_factory=list)
     confidence: float = 0.0
     description: str = ""
 
@@ -122,12 +122,12 @@ class DynamicKnowledgeGraph:
         self.db_path = db_path
         self._initialized = False
 
-        self._nodes: Dict[str, KnowledgeNode] = {}
-        self._edges: Dict[str, KnowledgeEdge] = {}
-        self._adjacency: Dict[str, Set[str]] = defaultdict(set)
-        self._reverse_adjacency: Dict[str, Set[str]] = defaultdict(set)
-        self._usmsb_index: Dict[str, Set[str]] = defaultdict(set)
-        self._entity_index: Dict[str, str] = {}
+        self._nodes: dict[str, KnowledgeNode] = {}
+        self._edges: dict[str, KnowledgeEdge] = {}
+        self._adjacency: dict[str, set[str]] = defaultdict(set)
+        self._reverse_adjacency: dict[str, set[str]] = defaultdict(set)
+        self._usmsb_index: dict[str, set[str]] = defaultdict(set)
+        self._entity_index: dict[str, str] = {}
 
     async def init(self):
         if self._initialized:
@@ -235,9 +235,9 @@ class DynamicKnowledgeGraph:
     async def add_node(
         self,
         content: str,
-        usmsb_element: Optional[str] = None,
-        source: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        usmsb_element: str | None = None,
+        source: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> KnowledgeNode:
         """添加知识节点"""
         await self.init()
@@ -266,7 +266,7 @@ class DynamicKnowledgeGraph:
         relation_type: RelationType = RelationType.RELATES,
         weight: float = 1.0,
         confidence: float = 0.5,
-        evidence: Optional[List[str]] = None,
+        evidence: list[str] | None = None,
     ) -> KnowledgeEdge:
         """添加关系边"""
         await self.init()
@@ -292,10 +292,10 @@ class DynamicKnowledgeGraph:
     async def query(
         self,
         query: str,
-        usmsb_elements: Optional[List[str]] = None,
+        usmsb_elements: list[str] | None = None,
         max_depth: int = 2,
         limit: int = 20,
-    ) -> List[Tuple[KnowledgeNode, float]]:
+    ) -> list[tuple[KnowledgeNode, float]]:
         """查询相关知识"""
         await self.init()
 
@@ -322,8 +322,8 @@ class DynamicKnowledgeGraph:
         return candidates[:limit]
 
     async def get_neighbors(
-        self, node_id: str, depth: int = 1, relation_types: Optional[List[RelationType]] = None
-    ) -> List[KnowledgeNode]:
+        self, node_id: str, depth: int = 1, relation_types: list[RelationType] | None = None
+    ) -> list[KnowledgeNode]:
         """获取邻居节点"""
         await self.init()
 
@@ -354,7 +354,7 @@ class DynamicKnowledgeGraph:
 
     async def find_causal_chain(
         self, start_id: str, end_id: str, max_depth: int = 5
-    ) -> Optional[CausalChain]:
+    ) -> CausalChain | None:
         """发现因果链"""
         await self.init()
 
@@ -384,13 +384,13 @@ class DynamicKnowledgeGraph:
 
         return None
 
-    def _calc_chain_confidence(self, edge_ids: List[str]) -> float:
+    def _calc_chain_confidence(self, edge_ids: list[str]) -> float:
         if not edge_ids:
             return 0.0
         confidences = [self._edges[eid].confidence for eid in edge_ids if eid in self._edges]
         return sum(confidences) / len(confidences) if confidences else 0.0
 
-    async def get_usmsb_knowledge(self, element: str) -> List[KnowledgeNode]:
+    async def get_usmsb_knowledge(self, element: str) -> list[KnowledgeNode]:
         """获取特定USMSB要素的知识"""
         await self.init()
         node_ids = self._usmsb_index.get(element, set())
@@ -462,7 +462,7 @@ class DynamicKnowledgeGraph:
 
         return f"kg_{hashlib.sha256(content.encode()).hexdigest()[:12]}_{uuid.uuid4().hex[:8]}"
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {
             "nodes": len(self._nodes),
             "edges": len(self._edges),
@@ -470,7 +470,7 @@ class DynamicKnowledgeGraph:
             "relation_distribution": self._count_relations(),
         }
 
-    def _count_relations(self) -> Dict[str, int]:
+    def _count_relations(self) -> dict[str, int]:
         counts = defaultdict(int)
         for edge in self._edges.values():
             counts[edge.relation_type.value] += 1

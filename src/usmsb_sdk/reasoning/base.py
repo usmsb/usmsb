@@ -4,21 +4,20 @@ Reasoning Engine Base Classes
 推理引擎的基类实现
 """
 
+import logging
+import uuid
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
-import logging
-import time
-import uuid
+from typing import Any
 
 from usmsb_sdk.reasoning.interfaces import (
+    ConfidenceScore,
+    IKnowledgeGraphAdapter,
     IReasoningChain,
     IReasoningEngine,
-    IKnowledgeGraphAdapter,
-    ReasoningType,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
+    ReasoningType,
     UncertaintyMeasure,
 )
 
@@ -31,24 +30,24 @@ class ReasoningContext:
 
     context_id: str
     query: str
-    background_knowledge: List[str] = field(default_factory=list)
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    goals: List[str] = field(default_factory=list)
-    assumptions: List[str] = field(default_factory=list)
+    background_knowledge: list[str] = field(default_factory=list)
+    constraints: dict[str, Any] = field(default_factory=dict)
+    goals: list[str] = field(default_factory=list)
+    assumptions: list[str] = field(default_factory=list)
     max_depth: int = 10
     timeout: float = 60.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ReasoningChain(IReasoningChain):
     """推理链实现"""
 
-    def __init__(self, chain_id: Optional[str] = None):
+    def __init__(self, chain_id: str | None = None):
         self.chain_id = chain_id or str(uuid.uuid4())[:8]
-        self._steps: List[ReasoningStep] = []
-        self._step_index: Dict[str, ReasoningStep] = {}
-        self._conclusions: Set[str] = set()
-        self._contradictions: List[Dict[str, Any]] = []
+        self._steps: list[ReasoningStep] = []
+        self._step_index: dict[str, ReasoningStep] = {}
+        self._conclusions: set[str] = set()
+        self._contradictions: list[dict[str, Any]] = []
 
     def add_step(self, step: ReasoningStep) -> None:
         self._steps.append(step)
@@ -56,17 +55,17 @@ class ReasoningChain(IReasoningChain):
         for conclusion in step.output_conclusions:
             self._conclusions.add(conclusion)
 
-    def get_step(self, step_id: str) -> Optional[ReasoningStep]:
+    def get_step(self, step_id: str) -> ReasoningStep | None:
         return self._step_index.get(step_id)
 
-    def get_chain(self) -> List[ReasoningStep]:
+    def get_chain(self) -> list[ReasoningStep]:
         return self._steps.copy()
 
-    def validate_consistency(self) -> Tuple[bool, List[Dict[str, Any]]]:
+    def validate_consistency(self) -> tuple[bool, list[dict[str, Any]]]:
         contradictions = self.detect_contradictions()
         return len(contradictions) == 0, contradictions
 
-    def detect_contradictions(self) -> List[Dict[str, Any]]:
+    def detect_contradictions(self) -> list[dict[str, Any]]:
         contradictions = []
         negation_patterns = ["not ", "非", "不", "no ", "never "]
 
@@ -95,7 +94,7 @@ class ReasoningChain(IReasoningChain):
         self._contradictions = contradictions
         return contradictions
 
-    def get_dependencies(self, step_id: str) -> List[str]:
+    def get_dependencies(self, step_id: str) -> list[str]:
         dependencies = []
         step = self.get_step(step_id)
         if step:
@@ -105,10 +104,10 @@ class ReasoningChain(IReasoningChain):
                         dependencies.append(other_step.step_id)
         return dependencies
 
-    def get_derived_conclusions(self) -> Set[str]:
+    def get_derived_conclusions(self) -> set[str]:
         return self._conclusions.copy()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "chain_id": self.chain_id,
             "steps": [s.to_dict() for s in self._steps],
@@ -122,13 +121,13 @@ class BaseReasoningEngine(IReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         self.knowledge_adapter = knowledge_adapter
         self.config = config or {}
         self._engine_id = str(uuid.uuid4())[:8]
-        self._reasoning_history: List[ReasoningResult] = []
+        self._reasoning_history: list[ReasoningResult] = []
 
     @property
     @abstractmethod
@@ -139,10 +138,10 @@ class BaseReasoningEngine(IReasoningEngine):
         self,
         conclusion: Any,
         confidence: ConfidenceScore,
-        reasoning_chain: List[ReasoningStep],
-        uncertainty: Optional[UncertaintyMeasure] = None,
-        alternatives: Optional[List[Dict[str, Any]]] = None,
-        explanations: Optional[List[str]] = None,
+        reasoning_chain: list[ReasoningStep],
+        uncertainty: UncertaintyMeasure | None = None,
+        alternatives: list[dict[str, Any]] | None = None,
+        explanations: list[str] | None = None,
     ) -> ReasoningResult:
         return ReasoningResult(
             result_id=str(uuid.uuid4())[:8],
@@ -158,11 +157,11 @@ class BaseReasoningEngine(IReasoningEngine):
     def _create_step(
         self,
         step_type: ReasoningType,
-        input_premises: List[str],
-        output_conclusions: List[str],
+        input_premises: list[str],
+        output_conclusions: list[str],
         inference_rule: str,
         confidence: ConfidenceScore,
-        uncertainty: Optional[UncertaintyMeasure] = None,
+        uncertainty: UncertaintyMeasure | None = None,
         reasoning_trace: str = "",
     ) -> ReasoningStep:
         return ReasoningStep(
@@ -177,13 +176,13 @@ class BaseReasoningEngine(IReasoningEngine):
         )
 
     async def _query_knowledge(
-        self, query: str, parameters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, parameters: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         if self.knowledge_adapter:
             return await self.knowledge_adapter.query(query, parameters)
         return []
 
-    async def _get_background_knowledge(self, concepts: List[str]) -> Dict[str, List[str]]:
+    async def _get_background_knowledge(self, concepts: list[str]) -> dict[str, list[str]]:
         result = {}
         if self.knowledge_adapter:
             for concept in concepts:
@@ -191,7 +190,7 @@ class BaseReasoningEngine(IReasoningEngine):
                 result[concept] = [r.get("concept", "") for r in related]
         return result
 
-    def get_history(self) -> List[ReasoningResult]:
+    def get_history(self) -> list[ReasoningResult]:
         return self._reasoning_history.copy()
 
     def clear_history(self) -> None:
@@ -199,19 +198,19 @@ class BaseReasoningEngine(IReasoningEngine):
 
     @abstractmethod
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         pass
 
     @abstractmethod
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         pass
 
     @abstractmethod
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         pass
 
-    async def explain(self, reasoning_result: ReasoningResult) -> List[str]:
+    async def explain(self, reasoning_result: ReasoningResult) -> list[str]:
         explanations = []
         for step in reasoning_result.reasoning_chain:
             if step.reasoning_trace:

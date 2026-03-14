@@ -7,11 +7,9 @@ Provides wallet signature verification and wallet-agent binding interfaces.
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Set
 
 from usmsb_sdk.platform.external.auth.base_auth import (
     AuthContext,
-    BaseAuthResult,
     IAuthProvider,
     Permission,
     WalletAuthResult,
@@ -214,10 +212,10 @@ class MockWalletAuthenticator(IWalletAuthenticator):
     def __init__(self):
         """Initialize the mock authenticator."""
         self._initialized: bool = False
-        self._bindings: Dict[str, Set[str]] = {}  # wallet -> set of agent_ids
-        self._agent_bindings: Dict[str, Set[str]] = {}  # agent -> set of wallets
-        self._binding_details: Dict[tuple, WalletBinding] = {}  # (wallet, agent) -> binding
-        self._used_nonces: Set[str] = set()
+        self._bindings: dict[str, set[str]] = {}  # wallet -> set of agent_ids
+        self._agent_bindings: dict[str, set[str]] = {}  # agent -> set of wallets
+        self._binding_details: dict[tuple, WalletBinding] = {}  # (wallet, agent) -> binding
+        self._used_nonces: set[str] = set()
         self._did_counter: int = 0
 
     async def initialize(self) -> bool:

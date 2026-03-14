@@ -10,11 +10,11 @@ This module defines the abstract interfaces for intelligence sources:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class IntelligenceSourceType(str, Enum):
+class IntelligenceSourceType(StrEnum):
     """Types of intelligence sources."""
     LLM = "llm"
     KNOWLEDGE_BASE = "knowledge_base"
@@ -22,7 +22,7 @@ class IntelligenceSourceType(str, Enum):
     HUMAN = "human"
 
 
-class IntelligenceSourceStatus(str, Enum):
+class IntelligenceSourceStatus(StrEnum):
     """Status of an intelligence source."""
     UNINITIALIZED = "uninitialized"
     INITIALIZING = "initializing"
@@ -37,12 +37,12 @@ class IntelligenceSourceConfig:
     """Configuration for an intelligence source."""
     name: str
     type: IntelligenceSourceType
-    api_key: Optional[str] = None
-    model: Optional[str] = None
-    endpoint: Optional[str] = None
+    api_key: str | None = None
+    model: str | None = None
+    endpoint: str | None = None
     max_retries: int = 3
     timeout: float = 30.0
-    extra_params: Dict[str, Any] = field(default_factory=dict)
+    extra_params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -54,7 +54,7 @@ class IntelligenceSourceMetrics:
     total_tokens_used: int = 0
     total_cost: float = 0.0
     average_latency: float = 0.0
-    last_request_time: Optional[float] = None
+    last_request_time: float | None = None
 
 
 class IIntelligenceSource(ABC):
@@ -142,7 +142,7 @@ class ILLMAdapter(IIntelligenceSource):
     async def generate_text(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -163,7 +163,7 @@ class ILLMAdapter(IIntelligenceSource):
         self,
         system_prompt: str,
         user_prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -184,10 +184,10 @@ class ILLMAdapter(IIntelligenceSource):
     async def understand_intent(
         self,
         text: str,
-        schema: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        schema: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Understand the intent from text.
 
@@ -205,9 +205,9 @@ class ILLMAdapter(IIntelligenceSource):
     @abstractmethod
     async def reason(
         self,
-        facts: List[str],
+        facts: list[str],
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -229,9 +229,9 @@ class ILLMAdapter(IIntelligenceSource):
         self,
         item: Any,
         criteria: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Evaluate an item against criteria.
 
@@ -250,9 +250,9 @@ class ILLMAdapter(IIntelligenceSource):
     async def embed(
         self,
         text: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Generate embeddings for text.
 
@@ -279,9 +279,9 @@ class IKnowledgeBaseAdapter(IIntelligenceSource):
     async def query_knowledge(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Query the knowledge base.
 
@@ -299,9 +299,9 @@ class IKnowledgeBaseAdapter(IIntelligenceSource):
     async def retrieve_facts(
         self,
         entity: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Retrieve facts about an entity.
 
@@ -318,11 +318,11 @@ class IKnowledgeBaseAdapter(IIntelligenceSource):
     @abstractmethod
     async def semantic_search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        filters: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Perform semantic search using embeddings.
 
@@ -341,9 +341,9 @@ class IKnowledgeBaseAdapter(IIntelligenceSource):
     async def add_knowledge(
         self,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        embedding: Optional[List[float]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
+        embedding: list[float] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """
         Add knowledge to the knowledge base.
@@ -372,11 +372,11 @@ class IAgenticFrameworkAdapter(IIntelligenceSource):
     async def plan_action_sequence(
         self,
         goal: str,
-        current_state: Dict[str, Any],
-        available_tools: List[str],
-        context: Optional[Dict[str, Any]] = None,
+        current_state: dict[str, Any],
+        available_tools: list[str],
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Plan a sequence of actions to achieve a goal.
 
@@ -396,10 +396,10 @@ class IAgenticFrameworkAdapter(IIntelligenceSource):
     async def execute_tool(
         self,
         tool_name: str,
-        params: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any],
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute a tool.
 
@@ -418,10 +418,10 @@ class IAgenticFrameworkAdapter(IIntelligenceSource):
     async def coordinate_agents(
         self,
         task: str,
-        agents: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        agents: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Coordinate multiple agents for a task.
 
@@ -441,7 +441,7 @@ class IAgenticFrameworkAdapter(IIntelligenceSource):
         self,
         name: str,
         description: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         handler: callable,
     ) -> None:
         """

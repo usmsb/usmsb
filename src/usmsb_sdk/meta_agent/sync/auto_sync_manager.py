@@ -9,14 +9,13 @@ AutoSyncManager - 自动同步管理器
 """
 
 import asyncio
+import logging
 import random
 import time
-import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Callable, Awaitable
-from enum import Enum
 from collections import defaultdict
-
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +77,12 @@ class SyncStatus:
     wallet_address: str
     state: SyncState = SyncState.IDLE
     last_sync_time: float = 0.0
-    last_sync_type: Optional[SyncType] = None
-    last_cid: Optional[str] = None
-    pending_syncs: Set[SyncType] = field(default_factory=set)
-    in_progress_sync: Optional[SyncType] = None
+    last_sync_type: SyncType | None = None
+    last_cid: str | None = None
+    pending_syncs: set[SyncType] = field(default_factory=set)
+    in_progress_sync: SyncType | None = None
     retry_count: int = 0
-    last_error: Optional[str] = None
+    last_error: str | None = None
 
     @property
     def is_syncing(self) -> bool:
@@ -102,9 +101,9 @@ class SyncResult:
     success: bool
     wallet_address: str
     sync_type: SyncType
-    cid: Optional[str] = None
+    cid: str | None = None
     timestamp: float = field(default_factory=time.time)
-    error: Optional[str] = None
+    error: str | None = None
     retry_count: int = 0
 
 
@@ -121,8 +120,8 @@ class AutoSyncManager:
 
     def __init__(
         self,
-        config: Optional[SyncConfig] = None,
-        sync_callback: Optional[Callable[[str, SyncType], Awaitable[str]]] = None
+        config: SyncConfig | None = None,
+        sync_callback: Callable[[str, SyncType], Awaitable[str]] | None = None
     ):
         """
         初始化自动同步管理器
@@ -135,13 +134,13 @@ class AutoSyncManager:
         self._sync_callback = sync_callback
 
         # 状态管理
-        self._sync_status: Dict[str, SyncStatus] = {}
-        self._pending_tasks: Dict[str, Dict[SyncType, asyncio.Task]] = defaultdict(dict)
-        self._sync_locks: Dict[str, asyncio.Lock] = {}
+        self._sync_status: dict[str, SyncStatus] = {}
+        self._pending_tasks: dict[str, dict[SyncType, asyncio.Task]] = defaultdict(dict)
+        self._sync_locks: dict[str, asyncio.Lock] = {}
 
         # 服务状态
         self._running = False
-        self._background_tasks: Set[asyncio.Task] = set()
+        self._background_tasks: set[asyncio.Task] = set()
         self._shutdown_event = asyncio.Event()
 
         # 统计信息
@@ -302,7 +301,7 @@ class AutoSyncManager:
 
         return results
 
-    async def force_sync(self, wallet_address: str, sync_type: Optional[SyncType] = None):
+    async def force_sync(self, wallet_address: str, sync_type: SyncType | None = None):
         """
         强制立即同步（用户手动触发）
 
@@ -456,7 +455,7 @@ class AutoSyncManager:
                     )
                     # 如果被唤醒，退出
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
 
                 if self._shutdown_event.is_set():
@@ -503,7 +502,7 @@ class AutoSyncManager:
         """
         return self._get_or_create_status(wallet_address)
 
-    def get_all_sync_status(self) -> Dict[str, SyncStatus]:
+    def get_all_sync_status(self) -> dict[str, SyncStatus]:
         """
         获取所有用户的同步状态
 
@@ -512,7 +511,7 @@ class AutoSyncManager:
         """
         return self._sync_status.copy()
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """
         获取同步统计信息
 
@@ -570,7 +569,7 @@ class AutoSyncManager:
         self._sync_callback = callback
         logger.info("Sync callback updated")
 
-    async def sync_all_pending(self) -> List[SyncResult]:
+    async def sync_all_pending(self) -> list[SyncResult]:
         """
         同步所有待处理的数据
 

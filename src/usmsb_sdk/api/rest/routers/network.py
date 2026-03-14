@@ -5,9 +5,9 @@ Authentication: All endpoints require authentication (no stake required)
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import APIRouter, Query, Depends, Body
+from fastapi import APIRouter, Depends
 
 from usmsb_sdk.api.database import (
     get_all_agents as db_get_all_agents,
@@ -21,13 +21,13 @@ from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 router = APIRouter(prefix="/network", tags=["Network Explorer"])
 
 # In-memory storage for network stats
-network_stats_store: Dict[str, Any] = {}
+network_stats_store: dict[str, Any] = {}
 
 
 @router.post("/explore")
 async def explore_network(
     request: NetworkExploreRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Explore the network to discover new agents.
 
@@ -79,7 +79,7 @@ async def explore_network(
 @router.post("/recommendations")
 async def request_recommendations(
     request: RecommendationRequest,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Request recommendations from the network.
 
@@ -130,7 +130,7 @@ async def request_recommendations(
 
 
 @router.get("/stats")
-async def get_network_stats(user: Dict[str, Any] = Depends(get_current_user_unified)):
+async def get_network_stats(user: dict[str, Any] = Depends(get_current_user_unified)):
     """Get network exploration statistics.
 
     Requires:

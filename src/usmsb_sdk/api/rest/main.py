@@ -6,7 +6,6 @@ Provides endpoints for agent management, predictions, simulations, and workflows
 """
 
 import os
-import sys
 from pathlib import Path
 
 # Load .env file from various possible locations
@@ -26,8 +25,8 @@ if env_path.exists():
                 key, value = line.split("=", 1)
                 os.environ.setdefault(key, value)
 
-import logging
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -35,62 +34,60 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from usmsb_sdk.config.settings import get_settings, Settings
-from usmsb_sdk.intelligence_adapters.base import IntelligenceSourceConfig, IntelligenceSourceType
-from usmsb_sdk.intelligence_adapters.llm.openai_adapter import OpenAIAdapter
-from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
-from usmsb_sdk.intelligence_adapters.manager import IntelligenceSourceManager, SelectionStrategy
-from usmsb_sdk.services.behavior_prediction_service import BehaviorPredictionService
-from usmsb_sdk.services.agentic_workflow_service import AgenticWorkflowService
-from usmsb_sdk.services.matching_engine import MatchingEngine
-
 # Import database module
 from usmsb_sdk.api.database import (
-    init_db,
-    check_and_mark_offline_agents,
-    auto_unregister_inactive_agents,
-    AUTO_UNREGISTER_GRACE_PERIOD,
     AUTO_UNREGISTER_CHECK_INTERVAL,
+    AUTO_UNREGISTER_GRACE_PERIOD,
+    auto_unregister_inactive_agents,
+    check_and_mark_offline_agents,
+    init_db,
 )
+from usmsb_sdk.api.rest.agent_auth import router as agent_auth_router
 
 # Import existing routers
 from usmsb_sdk.api.rest.auth import router as auth_router
-from usmsb_sdk.api.rest.transactions import router as transactions_router
+from usmsb_sdk.api.rest.dynamic_pricing import router as dynamic_pricing_router
 from usmsb_sdk.api.rest.environment import router as environment_router
 from usmsb_sdk.api.rest.governance import router as governance_router
-from usmsb_sdk.api.rest.agent_auth import router as agent_auth_router
+
+# Import Meta Agent router
+from usmsb_sdk.api.rest.meta_agent import router as meta_agent_router
 from usmsb_sdk.api.rest.quotes import router as quotes_router
-from usmsb_sdk.api.rest.dynamic_pricing import router as dynamic_pricing_router
 
 # Import new modular routers
 from usmsb_sdk.api.rest.routers import (
     agents_router,
-    environments_router,
-    demands_router,
-    predictions_router,
-    workflows_router,
-    matching_router,
-    network_router,
-    collaborations_router,
-    learning_router,
-    registration_router,
-    services_router,
-    system_router,
-    gene_capsule_router,
-    pre_match_negotiation_router,
-    meta_agent_matching_router,
-    staking_router,
-    reputation_router,
-    wallet_router,
-    heartbeat_router,
     blockchain_router,
+    collaborations_router,
+    demands_router,
+    environments_router,
+    gene_capsule_router,
+    heartbeat_router,
+    learning_router,
+    matching_router,
+    meta_agent_matching_router,
+    network_router,
+    pre_match_negotiation_router,
+    predictions_router,
+    registration_router,
+    reputation_router,
+    services_router,
+    staking_router,
+    system_router,
+    wallet_router,
+    workflows_router,
 )
-
-# Import Meta Agent router
-from usmsb_sdk.api.rest.meta_agent import router as meta_agent_router
+from usmsb_sdk.api.rest.transactions import router as transactions_router
 
 # Import WebSocket manager
 from usmsb_sdk.api.rest.websocket import get_ws_manager
+from usmsb_sdk.config.settings import Settings, get_settings
+from usmsb_sdk.intelligence_adapters.base import IntelligenceSourceConfig, IntelligenceSourceType
+from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
+from usmsb_sdk.intelligence_adapters.manager import IntelligenceSourceManager, SelectionStrategy
+from usmsb_sdk.services.agentic_workflow_service import AgenticWorkflowService
+from usmsb_sdk.services.behavior_prediction_service import BehaviorPredictionService
+from usmsb_sdk.services.matching_engine import MatchingEngine
 
 logger = logging.getLogger(__name__)
 
@@ -219,10 +216,11 @@ async def lifespan(app: FastAPI):
     logger.info("Matching engine initialized")
 
     # Initialize Gene Capsule services with simple in-memory implementation
-    from usmsb_sdk.api.rest.routers.gene_capsule import set_gene_capsule_services
-    from usmsb_sdk.api.rest import gene_capsule_service as gene_service_module
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+
+    from usmsb_sdk.api.rest import gene_capsule_service as gene_service_module
+    from usmsb_sdk.api.rest.routers.gene_capsule import set_gene_capsule_services
 
     try:
         # Create a simple SQLite engine for gene capsule storage
@@ -253,18 +251,18 @@ async def lifespan(app: FastAPI):
         set_gene_capsule_services()
 
     # Set service references in routers
-    from usmsb_sdk.api.rest.routers.predictions import set_prediction_service
-    from usmsb_sdk.api.rest.routers.workflows import set_workflow_service
     from usmsb_sdk.api.rest.routers.matching import set_matching_engine
+    from usmsb_sdk.api.rest.routers.predictions import set_prediction_service
     from usmsb_sdk.api.rest.routers.system import set_global_references
+    from usmsb_sdk.api.rest.routers.workflows import set_workflow_service
 
     set_prediction_service(prediction_service)
     set_workflow_service(workflow_service)
     set_matching_engine(matching_engine)
 
     # Initialize Permission Manager first
-    from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
     from usmsb_sdk.api.rest.meta_agent import set_meta_agent, set_permission_manager
+    from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
 
     try:
         permission_manager = PermissionManager("meta_agent.db")
@@ -426,7 +424,7 @@ app.include_router(blockchain_router, prefix="/api")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication."""
     manager = await get_ws_manager()
-    client = await manager.connect(websocket)
+    await manager.connect(websocket)
     try:
         while True:
             try:
@@ -442,8 +440,9 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/metrics")
 async def metrics_endpoint():
     """Prometheus metrics endpoint for monitoring auto-unregister mechanism."""
-    from usmsb_sdk.api.rest.metrics import get_auto_unregister_metrics
     from fastapi.responses import PlainTextResponse
+
+    from usmsb_sdk.api.rest.metrics import get_auto_unregister_metrics
 
     metrics_text = get_auto_unregister_metrics()
     return PlainTextResponse(content=metrics_text, media_type="text/plain")

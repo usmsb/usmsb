@@ -6,10 +6,11 @@ Async event bus for pub/sub messaging within the SDK.
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -70,15 +71,15 @@ class Event:
     """Represents an event in the system."""
     event_type: str
     source: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     event_id: str = field(default_factory=lambda: str(uuid4())[:8])
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
     priority: EventPriority = EventPriority.NORMAL
-    target: Optional[str] = None
-    correlation_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    target: str | None = None
+    correlation_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert event to dictionary."""
         return {
             "event_id": self.event_id,
@@ -93,7 +94,7 @@ class Event:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Event":
+    def from_dict(cls, data: dict[str, Any]) -> "Event":
         """Create event from dictionary."""
         return cls(
             event_id=data.get("event_id", str(uuid4())[:8]),
@@ -143,13 +144,13 @@ class EventBus:
             max_queue_size: Maximum size of the event queue
             dead_letter_enabled: Whether to enable dead letter queue
         """
-        self._subscriptions: Dict[str, List[Subscription]] = {}
+        self._subscriptions: dict[str, list[Subscription]] = {}
         self._event_queue: asyncio.Queue = asyncio.Queue(maxsize=max_queue_size)
-        self._dead_letter_queue: List[Event] = [] if dead_letter_enabled else None
+        self._dead_letter_queue: list[Event] = [] if dead_letter_enabled else None
         self._dead_letter_enabled = dead_letter_enabled
         self._running = False
-        self._processor_task: Optional[asyncio.Task] = None
-        self._event_history: List[Event] = []
+        self._processor_task: asyncio.Task | None = None
+        self._event_history: list[Event] = []
         self._history_size = 1000
 
     async def start(self) -> None:
@@ -220,7 +221,7 @@ class EventBus:
         Returns:
             True if subscription was found and removed
         """
-        for pattern, subs in self._subscriptions.items():
+        for _pattern, subs in self._subscriptions.items():
             for i, sub in enumerate(subs):
                 if sub.subscription_id == subscription_id:
                     subs.pop(i)
@@ -255,10 +256,10 @@ class EventBus:
         self,
         event_type: str,
         source: str,
-        data: Dict[str, Any],
-        target: Optional[str] = None,
+        data: dict[str, Any],
+        target: str | None = None,
         priority: EventPriority = EventPriority.NORMAL,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> str:
         """
         Convenience method to create and publish an event.
@@ -294,7 +295,7 @@ class EventBus:
                     timeout=1.0
                 )
                 await self._dispatch_event(event)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break
@@ -356,10 +357,10 @@ class EventBus:
 
     def get_event_history(
         self,
-        event_type: Optional[str] = None,
-        source: Optional[str] = None,
+        event_type: str | None = None,
+        source: str | None = None,
         limit: int = 100,
-    ) -> List[Event]:
+    ) -> list[Event]:
         """
         Get event history.
 
@@ -380,7 +381,7 @@ class EventBus:
 
         return events[-limit:]
 
-    def get_dead_letter_events(self) -> List[Event]:
+    def get_dead_letter_events(self) -> list[Event]:
         """Get events in the dead letter queue."""
         return self._dead_letter_queue.copy() if self._dead_letter_queue else []
 
@@ -392,7 +393,7 @@ class EventBus:
             return count
         return 0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get event bus statistics."""
         return {
             "running": self._running,
@@ -404,7 +405,7 @@ class EventBus:
 
 
 # Global event bus instance
-_event_bus: Optional[EventBus] = None
+_event_bus: EventBus | None = None
 
 
 def get_event_bus() -> EventBus:

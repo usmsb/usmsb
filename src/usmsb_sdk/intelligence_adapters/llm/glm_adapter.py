@@ -5,12 +5,11 @@ Implementation of the ILLMAdapter interface for Zhipu AI's GLM-5 models.
 Supports GLM-4, GLM-4-Plus, GLM-4-Air, GLM-4-Flash and other Chinese domestic models.
 """
 
-import asyncio
 import json
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -56,7 +55,7 @@ class GLMAdapter(ILLMAdapter):
         "glm-5-plus": {"input": 0.02, "output": 0.02},
     }
 
-    def __init__(self, config: Optional[IntelligenceSourceConfig] = None):
+    def __init__(self, config: IntelligenceSourceConfig | None = None):
         """
         Initialize GLM adapter.
 
@@ -79,7 +78,7 @@ class GLMAdapter(ILLMAdapter):
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
         self.base_url = config.endpoint or self.API_BASE_URL
 
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     async def initialize(self) -> bool:
         """Initialize the GLM client."""
@@ -146,7 +145,7 @@ class GLMAdapter(ILLMAdapter):
     async def generate_text(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -203,7 +202,7 @@ class GLMAdapter(ILLMAdapter):
         self,
         system_prompt: str,
         user_prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """
@@ -270,10 +269,10 @@ class GLMAdapter(ILLMAdapter):
     async def understand_intent(
         self,
         text: str,
-        schema: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        schema: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Understand intent from text using GLM's Chinese NLU capabilities."""
         start_time = time.time()
 
@@ -329,9 +328,9 @@ class GLMAdapter(ILLMAdapter):
 
     async def reason(
         self,
-        facts: List[str],
+        facts: list[str],
         query: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ) -> str:
         """Perform reasoning over facts using GLM's reasoning capabilities."""
@@ -350,9 +349,9 @@ class GLMAdapter(ILLMAdapter):
         self,
         item: Any,
         criteria: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Evaluate an item against criteria."""
         start_time = time.time()
 
@@ -416,9 +415,9 @@ class GLMAdapter(ILLMAdapter):
     async def embed(
         self,
         text: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> List[float]:
+    ) -> list[float]:
         """Generate embeddings for text."""
         start_time = time.time()
 
@@ -458,7 +457,7 @@ class GLMAdapter(ILLMAdapter):
     async def generate_stream(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         **kwargs
     ):
         """Generate text with streaming."""
@@ -498,10 +497,10 @@ class GLMAdapter(ILLMAdapter):
     async def function_call(
         self,
         prompt: str,
-        functions: List[Dict[str, Any]],
-        context: Optional[Dict[str, Any]] = None,
+        functions: list[dict[str, Any]],
+        context: dict[str, Any] | None = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute function calling with GLM models.
 
@@ -556,7 +555,7 @@ class GLMAdapter(ILLMAdapter):
             logger.error(f"Function calling failed: {e}")
             raise
 
-    def _calculate_cost(self, usage: Dict[str, int]) -> float:
+    def _calculate_cost(self, usage: dict[str, int]) -> float:
         """Calculate cost based on token usage (in RMB)."""
         if not usage:
             return 0.0

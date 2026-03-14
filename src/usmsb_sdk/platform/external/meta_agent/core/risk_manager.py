@@ -3,7 +3,6 @@
 """
 
 import logging
-from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -14,15 +13,15 @@ class RiskManager:
     def __init__(self):
         self.risks = []
 
-    async def identify_risks(self, action: Dict) -> List[Dict]:
+    async def identify_risks(self, action: dict) -> list[dict]:
         """识别风险"""
         return []
 
-    async def assess_risk(self, risk: Dict) -> float:
+    async def assess_risk(self, risk: dict) -> float:
         """评估风险"""
         return 0.0
 
-    async def mitigate_risk(self, risk: Dict) -> Dict:
+    async def mitigate_risk(self, risk: dict) -> dict:
         """缓解风险"""
         return risk
 

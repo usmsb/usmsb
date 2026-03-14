@@ -8,11 +8,10 @@ Agent注册表客户端模块
 - Agent数量统计
 """
 
-from typing import Dict, Any, Optional
-from web3 import Web3
+from typing import Any
 
 from ..config import BlockchainConfig
-from .base import BaseContractClient, TransactionError, ContractError
+from .base import BaseContractClient, ContractError
 
 
 class AgentRegistryClient(BaseContractClient):
@@ -23,10 +22,10 @@ class AgentRegistryClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Any] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Any] = None,
+        web3_client: Any | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: Any | None = None,
     ):
         """
         初始化Agent注册表客户端
@@ -56,7 +55,7 @@ class AgentRegistryClient(BaseContractClient):
         wallet_address: str,
         owner_address: str,
         owner_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         注册Agent（msg.sender被记录为Owner）
@@ -100,7 +99,7 @@ class AgentRegistryClient(BaseContractClient):
         self,
         wallet_address: str,
         admin_private_key: str,
-        gas: Optional[int] = None,
+        gas: int | None = None,
     ) -> str:
         """
         注销Agent（仅Admin）

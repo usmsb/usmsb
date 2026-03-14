@@ -11,14 +11,13 @@ UserSession - 用户会话核心类
 4. 跨节点支持：支持主节点检查和数据迁移
 """
 
-import asyncio
 import json
 import os
-import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -71,9 +70,9 @@ class UserProfile:
         last_updated: 最后更新时间
     """
 
-    preferences: Dict[str, Any] = field(default_factory=dict)
-    commitments: List[str] = field(default_factory=list)
-    knowledge: Dict[str, Any] = field(default_factory=dict)
+    preferences: dict[str, Any] = field(default_factory=dict)
+    commitments: list[str] = field(default_factory=list)
+    knowledge: dict[str, Any] = field(default_factory=dict)
     last_updated: float = field(default_factory=time.time)
 
 
@@ -105,8 +104,8 @@ class UserSession:
         self,
         wallet_address: str,
         node_id: str,
-        config: Optional[SessionConfig] = None,
-        data_dir: Optional[str] = None,
+        config: SessionConfig | None = None,
+        data_dir: str | None = None,
     ):
         """
         初始化用户会话
@@ -127,11 +126,11 @@ class UserSession:
         self.is_primary_node: bool = False
 
         # 延迟初始化组件（首次访问时创建）
-        self._workspace: Optional["UserWorkspace"] = None
-        self._sandbox: Optional["CodeSandbox"] = None
-        self._browser_context: Optional["BrowserContext"] = None
-        self._db: Optional["UserDatabase"] = None
-        self._ipfs_client: Optional["IPFSClient"] = None
+        self._workspace: UserWorkspace | None = None
+        self._sandbox: CodeSandbox | None = None
+        self._browser_context: BrowserContext | None = None
+        self._db: UserDatabase | None = None
+        self._ipfs_client: IPFSClient | None = None
 
         # 状态跟踪
         self.created_at: float = time.time()
@@ -143,11 +142,11 @@ class UserSession:
         self._last_browser_active: float = time.time()
 
         # 用户缓存数据
-        self._profile_cache: Optional[UserProfile] = None
-        self._ipfs_cid: Optional[str] = None
+        self._profile_cache: UserProfile | None = None
+        self._ipfs_cid: str | None = None
 
         # 数据迁移服务（延迟初始化）
-        self._data_migration: Optional[DataMigration] = None
+        self._data_migration: DataMigration | None = None
 
     # ========== 属性访问器（延迟初始化） ==========
 
@@ -356,7 +355,7 @@ class UserSession:
         # 加载或创建元数据
         meta_file = user_dir / "meta.json"
         if meta_file.exists():
-            with open(meta_file, "r") as f:
+            with open(meta_file) as f:
                 meta_data = json.load(f)
                 self.is_primary_node = meta_data.get("primary_node") == self.node_id
                 self._ipfs_cid = meta_data.get("ipfs_cid")
@@ -427,7 +426,7 @@ class UserSession:
 
         self._cleanup_done = True
 
-    async def get_profile(self) -> Dict[str, Any]:
+    async def get_profile(self) -> dict[str, Any]:
         """
         获取用户画像（本地优先）
 
@@ -460,7 +459,7 @@ class UserSession:
             if profile_data:
                 self._profile_cache = UserProfile(**profile_data)
                 return profile_data
-        except Exception as e:
+        except Exception:
             # 本地查询失败，继续尝试 IPFS
             pass
 
@@ -476,7 +475,7 @@ class UserSession:
                     await self.db.update_profile(UserProfile(**profile_data))
                     self._profile_cache = UserProfile(**profile_data)
                     return profile_data
-        except Exception as e:
+        except Exception:
             # IPFS 拉取失败，返回空画像
             pass
 
@@ -506,7 +505,7 @@ class UserSession:
         self.update_activity()
 
     async def sync_to_ipfs(
-        self, progress_callback: Optional[Callable[[Dict], None]] = None, verify: bool = True
+        self, progress_callback: Callable[[dict], None] | None = None, verify: bool = True
     ) -> str:
         """
         同步数据到 IPFS
@@ -553,7 +552,7 @@ class UserSession:
         result = await self.data_migration.export_to_ipfs(verify=verify)
 
         if not result.success:
-            raise IOError(f"IPFS sync failed: {result.error}")
+            raise OSError(f"IPFS sync failed: {result.error}")
 
         return result.cid
 
@@ -577,7 +576,7 @@ class UserSession:
 
     async def migrate_to_this_node(
         self,
-        progress_callback: Optional[Callable[[Dict], None]] = None,
+        progress_callback: Callable[[dict], None] | None = None,
         force: bool = False,
         verify: bool = True,
     ) -> bool:
@@ -697,7 +696,7 @@ class UserSession:
 
 
 # 为 UserProfile 添加 to_dict 方法
-def _user_profile_to_dict(self) -> Dict[str, Any]:
+def _user_profile_to_dict(self) -> dict[str, Any]:
     """将 UserProfile 转换为字典"""
     return {
         "preferences": self.preferences,

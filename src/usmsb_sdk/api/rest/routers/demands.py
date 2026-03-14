@@ -7,22 +7,24 @@ Authentication:
 - delete: Requires authentication + ownership
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from usmsb_sdk.api.cache import cache_manager, generate_cache_key
+from usmsb_sdk.api.database import (
+    create_demand as db_create_demand,
+)
 from usmsb_sdk.api.database import (
     get_db,
-    get_agent as db_get_agent,
-    create_demand as db_create_demand,
+)
+from usmsb_sdk.api.database import (
     search_demands as db_search_demands,
 )
-from usmsb_sdk.api.cache import cache_manager, generate_cache_key
 from usmsb_sdk.api.rest.schemas.demand import DemandCreate
 from usmsb_sdk.api.rest.services.utils import safe_json_loads
 from usmsb_sdk.api.rest.unified_auth import (
     get_current_user_unified,
-    verify_agent_access,
 )
 
 router = APIRouter(prefix="/demands", tags=["Demands"])
@@ -31,7 +33,7 @@ router = APIRouter(prefix="/demands", tags=["Demands"])
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_demand_endpoint(
     demand_create: DemandCreate,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Create a new demand.
 
@@ -73,8 +75,8 @@ async def create_demand_endpoint(
 
 @router.get("")
 async def list_demands(
-    agent_id: Optional[str] = Query(None),
-    category: Optional[str] = Query(None),
+    agent_id: str | None = Query(None),
+    category: str | None = Query(None),
     limit: int = Query(100, ge=1, le=1000),
 ):
     """List all demands.
@@ -122,7 +124,7 @@ async def list_demands(
 @router.delete("/{demand_id}")
 async def delete_demand(
     demand_id: str,
-    user: Dict[str, Any] = Depends(get_current_user_unified)
+    user: dict[str, Any] = Depends(get_current_user_unified)
 ):
     """Delete a demand.
 

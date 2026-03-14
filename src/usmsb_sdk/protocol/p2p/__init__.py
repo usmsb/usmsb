@@ -11,14 +11,13 @@ Usage:
 """
 
 from usmsb_sdk.protocol.p2p.handler import (
+    P2PDHTEntry,
     P2PHandler,
-    P2PNodeInfo,
     P2PMessage,
+    P2PNodeInfo,
     P2PSkillRequest,
     P2PSkillResponse,
-    P2PDHTEntry,
 )
-
 
 __all__ = [
     "P2PHandler",

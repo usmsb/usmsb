@@ -2,7 +2,7 @@
 Prediction-related Pydantic schemas.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -11,9 +11,9 @@ class PredictionRequest(BaseModel):
     """Schema for prediction request."""
 
     agent_id: str
-    environment_id: Optional[str] = None
-    goal_name: Optional[str] = None
-    context: Optional[Dict[str, Any]] = None
+    environment_id: str | None = None
+    goal_name: str | None = None
+    context: dict[str, Any] | None = None
 
 
 class PredictionResponse(BaseModel):
@@ -24,5 +24,5 @@ class PredictionResponse(BaseModel):
     predicted_behavior: str
     confidence: float = 0.0
     reasoning: str = ""
-    context: Dict[str, Any] = {}
+    context: dict[str, Any] = {}
     created_at: float = 0.0

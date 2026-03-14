@@ -4,19 +4,15 @@ E2E Tests for USMSB Agent Platform Skill
 This test suite validates the complete Agent registration and usage flow.
 """
 
-import asyncio
-import sys
 import os
+import sys
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from usmsb_agent_platform import (
-    AgentPlatform,
-    RegistrationResult,
-    BindingStatus,
-    PlatformResult,
     ActionType,
+    PlatformResult,
     StakeTier,
 )
 from usmsb_agent_platform.intent_parser import IntentParser
@@ -33,44 +29,44 @@ class TestIntentParser:
         """Test parsing collaboration create request"""
         intent = self.parser.parse("创建协作，目标是开发电商网站")
         assert intent.action == ActionType.COLLABORATION_CREATE
-        assert intent.action.requires_stake == True
+        assert intent.action.requires_stake
 
     def test_parse_collaboration_join(self):
         """Test parsing collaboration join request"""
         intent = self.parser.parse("加入协作 collab-abc123")
         assert intent.action == ActionType.COLLABORATION_JOIN
-        assert intent.action.requires_stake == False
+        assert not intent.action.requires_stake
 
     def test_parse_marketplace_publish_service(self):
         """Test parsing publish service request"""
         intent = self.parser.parse("发布服务，Python开发，500 VIBE")
         assert intent.action == ActionType.MARKETPLACE_PUBLISH_SERVICE
-        assert intent.action.requires_stake == True
+        assert intent.action.requires_stake
         assert intent.parameters.get("price") == 500
 
     def test_parse_find_work(self):
         """Test parsing find work request"""
         intent = self.parser.parse("找工作")
         assert intent.action == ActionType.MARKETPLACE_FIND_WORK
-        assert intent.action.requires_stake == False
+        assert not intent.action.requires_stake
 
     def test_parse_discovery(self):
         """Test parsing discovery request"""
         intent = self.parser.parse("发现会 Python 的 Agent")
         assert intent.action == ActionType.DISCOVERY_BY_SKILL
-        assert intent.action.requires_stake == False
+        assert not intent.action.requires_stake
 
     def test_parse_negotiation_initiate(self):
         """Test parsing negotiation initiate"""
         intent = self.parser.parse("发起协商")
         assert intent.action == ActionType.NEGOTIATION_INITIATE
-        assert intent.action.requires_stake == False
+        assert not intent.action.requires_stake
 
     def test_parse_negotiation_accept(self):
         """Test parsing negotiation accept"""
         intent = self.parser.parse("接受协商")
         assert intent.action == ActionType.NEGOTIATION_ACCEPT
-        assert intent.action.requires_stake == True
+        assert intent.action.requires_stake
 
     def test_parse_english_request(self):
         """Test parsing English request"""
@@ -97,15 +93,15 @@ class TestStakeChecker:
         from usmsb_agent_platform.types import StakeInfo
         info = StakeInfo.from_amount("test-agent", 0)
         assert info.tier == StakeTier.NONE
-        assert info.can_perform(ActionType.COLLABORATION_JOIN) == True
-        assert info.can_perform(ActionType.COLLABORATION_CREATE) == False
+        assert info.can_perform(ActionType.COLLABORATION_JOIN)
+        assert not info.can_perform(ActionType.COLLABORATION_CREATE)
 
     def test_stake_tier_bronze(self):
         """Test BRONZE tier (100-999 VIBE)"""
         from usmsb_agent_platform.types import StakeInfo
         info = StakeInfo.from_amount("test-agent", 100)
         assert info.tier == StakeTier.BRONZE
-        assert info.can_perform(ActionType.COLLABORATION_CREATE) == True
+        assert info.can_perform(ActionType.COLLABORATION_CREATE)
         assert info.get_max_agents() == 1
 
     def test_stake_tier_silver(self):
@@ -156,7 +152,7 @@ class TestActionRequirements:
         ]
 
         for action in stake_required_actions:
-            assert action.requires_stake == True, f"{action} should require stake"
+            assert action.requires_stake, f"{action} should require stake"
 
     def test_actions_not_requiring_stake(self):
         """Verify all actions that don't require stake"""
@@ -173,7 +169,7 @@ class TestActionRequirements:
         ]
 
         for action in no_stake_actions:
-            assert action.requires_stake == False, f"{action} should not require stake"
+            assert not action.requires_stake, f"{action} should not require stake"
 
 
 class TestPlatformResult:
@@ -186,8 +182,8 @@ class TestPlatformResult:
             result={"id": "123"},
             message="Success"
         )
-        assert result.success == True
-        assert result.to_dict()["success"] == True
+        assert result.success
+        assert result.to_dict()["success"]
         assert result.to_dict()["result"]["id"] == "123"
 
     def test_error_result(self):
@@ -197,7 +193,7 @@ class TestPlatformResult:
             error="Something went wrong",
             code="INTERNAL_ERROR"
         )
-        assert result.success == False
+        assert not result.success
         assert result.to_dict()["error"] == "Something went wrong"
         assert result.to_dict()["code"] == "INTERNAL_ERROR"
 
@@ -206,8 +202,8 @@ class TestPlatformResult:
         success_result = PlatformResult(success=True)
         error_result = PlatformResult(success=False)
 
-        assert bool(success_result) == True
-        assert bool(error_result) == False
+        assert bool(success_result)
+        assert not bool(error_result)
 
 
 class TestRegistration:

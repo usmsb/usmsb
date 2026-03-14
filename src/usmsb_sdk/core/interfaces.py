@@ -14,7 +14,7 @@ This module defines the 9 universal action interfaces of the USMSB model:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from usmsb_sdk.core.elements import (
     Agent,
@@ -23,7 +23,6 @@ from usmsb_sdk.core.elements import (
     Information,
     Resource,
     Risk,
-    Rule,
     Value,
 )
 
@@ -40,7 +39,7 @@ class IPerceptionService(ABC):
     async def perceive(
         self,
         input_data: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Information:
         """
         Perceive and process input data.
@@ -57,9 +56,9 @@ class IPerceptionService(ABC):
     @abstractmethod
     async def batch_perceive(
         self,
-        input_list: List[Any],
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[Information]:
+        input_list: list[Any],
+        context: dict[str, Any] | None = None
+    ) -> list[Information]:
         """
         Process multiple inputs in batch.
 
@@ -86,8 +85,8 @@ class IDecisionService(ABC):
         self,
         agent: Agent,
         goal: Goal,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Make a decision for the agent towards a goal.
 
@@ -112,8 +111,8 @@ class IDecisionService(ABC):
         self,
         agent: Agent,
         goal: Goal,
-        constraints: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        constraints: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Generate a sequence of actions to achieve a goal.
 
@@ -139,9 +138,9 @@ class IExecutionService(ABC):
     @abstractmethod
     async def execute(
         self,
-        action: Dict[str, Any],
+        action: dict[str, Any],
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Any:
         """
         Execute an action.
@@ -159,10 +158,10 @@ class IExecutionService(ABC):
     @abstractmethod
     async def execute_sequence(
         self,
-        actions: List[Dict[str, Any]],
+        actions: list[dict[str, Any]],
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[Any]:
+        context: dict[str, Any] | None = None
+    ) -> list[Any]:
         """
         Execute a sequence of actions.
 
@@ -180,9 +179,9 @@ class IExecutionService(ABC):
     async def execute_tool(
         self,
         tool_name: str,
-        params: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        params: dict[str, Any],
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Execute a specific tool.
 
@@ -211,7 +210,7 @@ class IInteractionService(ABC):
         sender: Agent,
         receiver: Agent,
         message: Any,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Any:
         """
         Facilitate interaction between two agents.
@@ -231,10 +230,10 @@ class IInteractionService(ABC):
     async def broadcast(
         self,
         sender: Agent,
-        receivers: List[Agent],
+        receivers: list[Agent],
         message: Any,
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[Any]:
+        context: dict[str, Any] | None = None
+    ) -> list[Any]:
         """
         Broadcast a message to multiple agents.
 
@@ -252,10 +251,10 @@ class IInteractionService(ABC):
     @abstractmethod
     async def negotiate(
         self,
-        agents: List[Agent],
+        agents: list[Agent],
         topic: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Facilitate negotiation between agents.
 
@@ -283,7 +282,7 @@ class ITransformationService(ABC):
         self,
         input_data: Any,
         target_type: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Any:
         """
         Transform input to target type.
@@ -304,7 +303,7 @@ class ITransformationService(ABC):
         resource: Resource,
         target_type: str,
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Resource:
         """
         Transform a resource to a different form.
@@ -334,7 +333,7 @@ class IEvaluationService(ABC):
         self,
         item: Any,
         criteria: str,
-        context: Optional[Dict[str, Any]] = None
+        context: dict[str, Any] | None = None
     ) -> Value:
         """
         Evaluate an item against criteria.
@@ -354,8 +353,8 @@ class IEvaluationService(ABC):
         self,
         agent: Agent,
         goal: Goal,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Evaluate progress towards a goal.
 
@@ -376,11 +375,11 @@ class IEvaluationService(ABC):
     @abstractmethod
     async def evaluate_action_outcome(
         self,
-        action: Dict[str, Any],
+        action: dict[str, Any],
         outcome: Any,
         goal: Goal,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Evaluate the outcome of an action.
 
@@ -408,8 +407,8 @@ class IFeedbackService(ABC):
     async def process_feedback(
         self,
         feedback_data: Any,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Process feedback data.
 
@@ -430,10 +429,10 @@ class IFeedbackService(ABC):
     async def generate_feedback(
         self,
         agent: Agent,
-        action: Dict[str, Any],
+        action: dict[str, Any],
         outcome: Any,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Generate feedback for an agent action.
 
@@ -462,8 +461,8 @@ class ILearningService(ABC):
         self,
         experience_data: Any,
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Learn from experience data.
 
@@ -484,8 +483,8 @@ class ILearningService(ABC):
     async def update_knowledge(
         self,
         agent: Agent,
-        new_knowledge: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        new_knowledge: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> bool:
         """
         Update agent's knowledge base.
@@ -504,9 +503,9 @@ class ILearningService(ABC):
     async def optimize_behavior(
         self,
         agent: Agent,
-        performance_metrics: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        performance_metrics: dict[str, Any],
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Optimize agent behavior based on metrics.
 
@@ -532,8 +531,8 @@ class IRiskManagementService(ABC):
     @abstractmethod
     async def identify_risks(
         self,
-        context: Dict[str, Any]
-    ) -> List[Risk]:
+        context: dict[str, Any]
+    ) -> list[Risk]:
         """
         Identify potential risks in a context.
 
@@ -549,8 +548,8 @@ class IRiskManagementService(ABC):
     async def assess_risk(
         self,
         risk: Risk,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Assess a risk's probability and impact.
 
@@ -568,8 +567,8 @@ class IRiskManagementService(ABC):
         self,
         risk: Risk,
         agent: Agent,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Manage a risk (mitigate, transfer, accept, or avoid).
 
@@ -588,8 +587,8 @@ class IRiskManagementService(ABC):
         self,
         agent: Agent,
         environment: Environment,
-        context: Optional[Dict[str, Any]] = None
-    ) -> List[Risk]:
+        context: dict[str, Any] | None = None
+    ) -> list[Risk]:
         """
         Monitor for new and changing risks.
 

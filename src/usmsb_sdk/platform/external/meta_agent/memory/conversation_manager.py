@@ -13,11 +13,10 @@ import logging
 import os
 import sqlite3
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .conversation import (
     Conversation,
-    ConversationGoal,
     ConversationStatus,
     LearningOutcome,
     Message,
@@ -42,7 +41,7 @@ class ConversationManager:
 
     def __init__(self, db_path: str = "meta_agent.db"):
         self.db_path = db_path
-        self._active_conversations: Dict[str, Conversation] = {}
+        self._active_conversations: dict[str, Conversation] = {}
         self._initialized = False
 
     async def init(self):
@@ -149,8 +148,8 @@ class ConversationManager:
         self,
         owner_id: str,
         owner_type: ParticipantType = ParticipantType.HUMAN,
-        participants: Optional[List[Participant]] = None,
-        context: Optional[Dict[str, Any]] = None,
+        participants: list[Participant] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> Conversation:
         """
         创建新会话
@@ -196,7 +195,7 @@ class ConversationManager:
         self,
         conversation_id: str,
         accessor_id: str,
-    ) -> Optional[Conversation]:
+    ) -> Conversation | None:
         """
         获取会话（带访问控制）
 
@@ -242,10 +241,10 @@ class ConversationManager:
         conversation_id: str,
         role: MessageRole,
         content: str,
-        intent: Optional[str] = None,
-        entities: Optional[List[Dict]] = None,
-        sentiment: Optional[str] = None,
-        tool_calls: Optional[List[Dict]] = None,
+        intent: str | None = None,
+        entities: list[dict] | None = None,
+        sentiment: str | None = None,
+        tool_calls: list[dict] | None = None,
     ) -> Message:
         """添加消息到会话"""
         conversation = self._active_conversations.get(conversation_id)
@@ -277,7 +276,7 @@ class ConversationManager:
         conversation_id: str,
         accessor_id: str,
         limit: int = 50,
-    ) -> List[Message]:
+    ) -> list[Message]:
         """获取会话历史（带访问控制）"""
         conversation = await self.get_conversation(conversation_id, accessor_id)
         if not conversation:
@@ -289,7 +288,7 @@ class ConversationManager:
         conversation_id: str,
         accessor_id: str,
         max_tokens: int = 4000,
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """获取用于 LLM 的消息格式"""
         conversation = await self.get_conversation(conversation_id, accessor_id)
         if not conversation:
@@ -300,7 +299,7 @@ class ConversationManager:
         self,
         conversation_id: str,
         accessor_id: str,
-        satisfaction_score: Optional[float] = None,
+        satisfaction_score: float | None = None,
     ) -> bool:
         """结束会话"""
         conversation = await self.get_conversation(conversation_id, accessor_id)
@@ -324,7 +323,7 @@ class ConversationManager:
         knowledge_type: str,
         content: str,
         confidence: float = 0.5,
-        applicable_contexts: Optional[List[str]] = None,
+        applicable_contexts: list[str] | None = None,
     ) -> LearningOutcome:
         """添加学习产出"""
         outcome = LearningOutcome(
@@ -344,10 +343,10 @@ class ConversationManager:
 
     async def get_learning_outcomes(
         self,
-        knowledge_type: Optional[str] = None,
+        knowledge_type: str | None = None,
         min_confidence: float = 0.0,
         limit: int = 100,
-    ) -> List[LearningOutcome]:
+    ) -> list[LearningOutcome]:
         """获取学习产出"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
@@ -360,10 +359,10 @@ class ConversationManager:
 
     def _query_learning_outcomes(
         self,
-        knowledge_type: Optional[str],
+        knowledge_type: str | None,
         min_confidence: float,
         limit: int,
-    ) -> List[LearningOutcome]:
+    ) -> list[LearningOutcome]:
         """查询学习产出"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -400,20 +399,20 @@ class ConversationManager:
 
         return outcomes
 
-    async def _find_active_conversation(self, owner_id: str) -> Optional[Conversation]:
+    async def _find_active_conversation(self, owner_id: str) -> Conversation | None:
         """查找活跃会话"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._query_active_conversation, owner_id)
 
-    def _query_active_conversation(self, owner_id: str) -> Optional[Conversation]:
+    def _query_active_conversation(self, owner_id: str) -> Conversation | None:
         """查询活跃会话"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         cursor.execute(
             """
-            SELECT * FROM conversations 
-            WHERE owner_id = ? AND status = 'active' 
+            SELECT * FROM conversations
+            WHERE owner_id = ? AND status = 'active'
             ORDER BY updated_at DESC LIMIT 1
             """,
             (owner_id,),
@@ -426,12 +425,12 @@ class ConversationManager:
 
         return self._row_to_conversation(row)
 
-    async def _load_conversation(self, conversation_id: str) -> Optional[Conversation]:
+    async def _load_conversation(self, conversation_id: str) -> Conversation | None:
         """加载会话"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._query_conversation, conversation_id)
 
-    def _query_conversation(self, conversation_id: str) -> Optional[Conversation]:
+    def _query_conversation(self, conversation_id: str) -> Conversation | None:
         """查询会话"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -498,8 +497,8 @@ class ConversationManager:
 
         cursor.execute(
             """
-            INSERT OR REPLACE INTO conversations 
-            (id, owner_id, owner_type, status, is_private, access_list, context, 
+            INSERT OR REPLACE INTO conversations
+            (id, owner_id, owner_type, status, is_private, access_list, context,
              summary, satisfaction_score, created_at, updated_at, ended_at, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -535,8 +534,8 @@ class ConversationManager:
 
         cursor.execute(
             """
-            INSERT INTO messages 
-            (id, conversation_id, role, content, intent, entities, sentiment, 
+            INSERT INTO messages
+            (id, conversation_id, role, content, intent, entities, sentiment,
              tool_calls, timestamp, quality, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -607,8 +606,8 @@ class ConversationManager:
 
         cursor.execute(
             """
-            INSERT INTO learning_outcomes 
-            (id, conversation_id, knowledge_type, content, confidence, 
+            INSERT INTO learning_outcomes
+            (id, conversation_id, knowledge_type, content, confidence,
              applicable_contexts, created_at, applied_count, effectiveness, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -631,7 +630,7 @@ class ConversationManager:
 
     async def search_all_conversations(
         self, owner_id: str, query: str, limit: int = 20
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         跨会话搜索历史消息
 
@@ -650,7 +649,7 @@ class ConversationManager:
             None, self._search_all_conversations, owner_id, query, limit
         )
 
-    def _search_all_conversations(self, owner_id: str, query: str, limit: int) -> List[Dict]:
+    def _search_all_conversations(self, owner_id: str, query: str, limit: int) -> list[dict]:
         """跨会话搜索实现"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -701,12 +700,12 @@ class ConversationManager:
             for row in rows
         ]
 
-    async def get_recent_conversations(self, owner_id: str, limit: int = 10) -> List[Dict]:
+    async def get_recent_conversations(self, owner_id: str, limit: int = 10) -> list[dict]:
         """获取用户最近的会话列表"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._get_recent_conversations, owner_id, limit)
 
-    def _get_recent_conversations(self, owner_id: str, limit: int) -> List[Dict]:
+    def _get_recent_conversations(self, owner_id: str, limit: int) -> list[dict]:
         """获取最近会话实现"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

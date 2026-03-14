@@ -2,7 +2,6 @@
 Demand-related Pydantic schemas.
 """
 
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,9 +13,9 @@ class DemandCreate(BaseModel):
     title: str
     description: str = ""
     category: str = ""
-    required_skills: List[str] = Field(default_factory=list)
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
+    required_skills: list[str] = Field(default_factory=list)
+    budget_min: float | None = None
+    budget_max: float | None = None
     deadline: str = ""
     priority: str = "medium"
     quality_requirements: str = ""
@@ -26,18 +25,18 @@ class SearchDemandsRequest(BaseModel):
     """Schema for searching demands."""
 
     agent_id: str
-    capabilities: List[str]
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
+    capabilities: list[str]
+    budget_min: float | None = None
+    budget_max: float | None = None
 
 
 class SearchSuppliersRequest(BaseModel):
     """Schema for searching suppliers."""
 
     agent_id: str
-    required_skills: List[str]
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
+    required_skills: list[str]
+    budget_min: float | None = None
+    budget_max: float | None = None
 
 
 class DemandResponse(BaseModel):
@@ -48,9 +47,9 @@ class DemandResponse(BaseModel):
     title: str
     description: str = ""
     category: str = ""
-    required_skills: List[str] = []
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
+    required_skills: list[str] = []
+    budget_min: float | None = None
+    budget_max: float | None = None
     deadline: str = ""
     priority: str = "medium"
     quality_requirements: str = ""

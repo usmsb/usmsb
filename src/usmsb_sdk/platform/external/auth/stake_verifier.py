@@ -7,7 +7,6 @@ Provides stake amount verification and tier management interfaces.
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
 
 from usmsb_sdk.platform.external.auth.base_auth import (
     IAuthProvider,
@@ -38,8 +37,8 @@ class StakeInfo:
     locked_stake: float = 0.0
     pending_stake: float = 0.0
     stake_tier: StakeTier = StakeTier.NONE
-    staked_at: Optional[datetime] = None
-    unlock_at: Optional[datetime] = None
+    staked_at: datetime | None = None
+    unlock_at: datetime | None = None
     rewards: float = 0.0
 
 
@@ -189,7 +188,7 @@ class IStakeVerifier(IAuthProvider):
     async def get_wallet_agents(
         self,
         wallet_address: str
-    ) -> List[AgentRegistration]:
+    ) -> list[AgentRegistration]:
         """
         Get all agents registered to a wallet.
 
@@ -228,7 +227,7 @@ class IStakeVerifier(IAuthProvider):
     async def unlock_stake(
         self,
         wallet_address: str,
-        amount: Optional[float] = None
+        amount: float | None = None
     ) -> StakeInfo:
         """
         Unlock staked tokens.
@@ -254,9 +253,9 @@ class MockStakeVerifier(IStakeVerifier):
     def __init__(self):
         """Initialize the mock stake verifier."""
         self._initialized: bool = False
-        self._stakes: Dict[str, StakeInfo] = {}  # wallet -> stake info
-        self._agent_registrations: Dict[str, List[AgentRegistration]] = {}  # wallet -> agents
-        self._agent_to_wallet: Dict[str, str] = {}  # agent_id -> wallet
+        self._stakes: dict[str, StakeInfo] = {}  # wallet -> stake info
+        self._agent_registrations: dict[str, list[AgentRegistration]] = {}  # wallet -> agents
+        self._agent_to_wallet: dict[str, str] = {}  # agent_id -> wallet
 
     async def initialize(self) -> bool:
         """Initialize the mock verifier."""
@@ -409,7 +408,7 @@ class MockStakeVerifier(IStakeVerifier):
     async def get_wallet_agents(
         self,
         wallet_address: str
-    ) -> List[AgentRegistration]:
+    ) -> list[AgentRegistration]:
         """Get all agents registered to a wallet."""
         wallet_address = wallet_address.lower()
         return list(self._agent_registrations.get(wallet_address, []))
@@ -440,7 +439,7 @@ class MockStakeVerifier(IStakeVerifier):
     async def unlock_stake(
         self,
         wallet_address: str,
-        amount: Optional[float] = None
+        amount: float | None = None
     ) -> StakeInfo:
         """Unlock staked tokens."""
         wallet_address = wallet_address.lower()

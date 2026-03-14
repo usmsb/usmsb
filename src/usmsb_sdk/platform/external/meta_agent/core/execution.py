@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,8 @@ class ExecutionService:
         self.tool_registry = tool_registry
 
     async def execute(
-        self, actions: List[Dict[str, Any]], context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, actions: list[dict[str, Any]], context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         执行行动
 
@@ -55,6 +55,6 @@ class ExecutionService:
             "results": results,
         }
 
-    async def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> Any:
+    async def execute_tool(self, tool_name: str, params: dict[str, Any]) -> Any:
         """执行单个工具"""
         return await self.tool_registry.execute(tool_name, **params)

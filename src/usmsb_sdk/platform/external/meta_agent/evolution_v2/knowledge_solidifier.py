@@ -4,18 +4,15 @@
 将临时知识转化为永久能力
 """
 
-import asyncio
-import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any
 
 from .models import (
-    KnowledgeUnit,
-    KnowledgeState,
     Capability,
+    KnowledgeState,
+    KnowledgeUnit,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,7 +23,7 @@ class SolidificationRule:
     """固化规则"""
 
     name: str
-    condition: Dict[str, Any]
+    condition: dict[str, Any]
     target_state: KnowledgeState
     priority: int = 0
 
@@ -66,11 +63,11 @@ class KnowledgeSolidifier:
         self.knowledge = knowledge_base
         self.capability_assessor = capability_assessor
 
-        self._knowledge_units: Dict[str, KnowledgeUnit] = {}
-        self._solidification_rules: List[SolidificationRule] = []
-        self._solidification_history: List[SolidificationResult] = []
+        self._knowledge_units: dict[str, KnowledgeUnit] = {}
+        self._solidification_rules: list[SolidificationRule] = []
+        self._solidification_history: list[SolidificationResult] = []
 
-        self._consolidation_queue: List[str] = []
+        self._consolidation_queue: list[str] = []
         self._last_consolidation: float = 0
 
         self._initialized = False
@@ -125,7 +122,7 @@ class KnowledgeSolidifier:
         self,
         content: str,
         source: str = "unknown",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         添加新知识
@@ -151,7 +148,7 @@ class KnowledgeSolidifier:
         self,
         knowledge_id: str,
         success: bool = True,
-    ) -> Optional[KnowledgeUnit]:
+    ) -> KnowledgeUnit | None:
         """
         访问知识并记录
 
@@ -290,7 +287,7 @@ class KnowledgeSolidifier:
                 self.capability_assessor.add_capability(new_capability)
                 logger.info(f"Created new capability: {capability_name}")
 
-    async def _extract_capability_name(self, unit: KnowledgeUnit) -> Optional[str]:
+    async def _extract_capability_name(self, unit: KnowledgeUnit) -> str | None:
         """从知识单元提取能力名称"""
         if self.llm:
             try:
@@ -306,7 +303,7 @@ class KnowledgeSolidifier:
         words = unit.content.split()[:3]
         return "_".join(words) if words else None
 
-    async def consolidate_knowledge(self) -> Dict[str, Any]:
+    async def consolidate_knowledge(self) -> dict[str, Any]:
         """
         批量固化知识
 
@@ -341,7 +338,7 @@ class KnowledgeSolidifier:
 
         return results
 
-    async def compress_knowledge(self) -> Dict[str, Any]:
+    async def compress_knowledge(self) -> dict[str, Any]:
         """
         压缩知识
 
@@ -372,7 +369,7 @@ class KnowledgeSolidifier:
 
         return results
 
-    async def _cluster_similar_knowledge(self) -> List[List[str]]:
+    async def _cluster_similar_knowledge(self) -> list[list[str]]:
         """聚类相似知识"""
         clusters = []
         visited = set()
@@ -424,14 +421,14 @@ class KnowledgeSolidifier:
 
     def _cosine_similarity(
         self,
-        vec1: List[float],
-        vec2: List[float],
+        vec1: list[float],
+        vec2: list[float],
     ) -> float:
         """计算余弦相似度"""
         if len(vec1) != len(vec2):
             return 0.0
 
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=False))
         norm1 = sum(a * a for a in vec1) ** 0.5
         norm2 = sum(b * b for b in vec2) ** 0.5
 
@@ -442,8 +439,8 @@ class KnowledgeSolidifier:
 
     async def _merge_knowledge_cluster(
         self,
-        cluster: List[str],
-    ) -> Optional[str]:
+        cluster: list[str],
+    ) -> str | None:
         """合并知识簇"""
         units = [self._knowledge_units[uid] for uid in cluster]
 
@@ -471,7 +468,7 @@ class KnowledgeSolidifier:
     async def validate_knowledge(
         self,
         knowledge_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """验证知识有效性"""
         await self._ensure_initialized()
 
@@ -509,7 +506,7 @@ class KnowledgeSolidifier:
     async def _validate_content_with_llm(
         self,
         unit: KnowledgeUnit,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """使用LLM验证内容"""
         if not self.llm:
             return {"valid": True}
@@ -525,7 +522,7 @@ class KnowledgeSolidifier:
         except Exception:
             return {"valid": True}
 
-    def get_knowledge_state_summary(self) -> Dict[str, Any]:
+    def get_knowledge_state_summary(self) -> dict[str, Any]:
         """获取知识状态摘要"""
         summary = {
             "total": len(self._knowledge_units),
@@ -557,16 +554,16 @@ class KnowledgeSolidifier:
         if not self._initialized:
             await self.initialize()
 
-    def get_knowledge(self, knowledge_id: str) -> Optional[KnowledgeUnit]:
+    def get_knowledge(self, knowledge_id: str) -> KnowledgeUnit | None:
         """获取知识单元"""
         return self._knowledge_units.get(knowledge_id)
 
     def search_knowledge(
         self,
         query: str,
-        state_filter: Optional[KnowledgeState] = None,
+        state_filter: KnowledgeState | None = None,
         top_k: int = 10,
-    ) -> List[KnowledgeUnit]:
+    ) -> list[KnowledgeUnit]:
         """搜索知识"""
         results = []
         query_lower = query.lower()

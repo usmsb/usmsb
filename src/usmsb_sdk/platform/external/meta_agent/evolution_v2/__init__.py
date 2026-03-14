@@ -4,62 +4,55 @@
 基于USMSB理论的AGI自主进化框架
 """
 
-from .models import (
-    EvolutionPhase,
-    EvolutionState,
-    KnowledgeState,
-    CapabilityLevel,
-    LearningType,
-    GoalPriority,
-    KnowledgeUnit,
-    Capability,
-    LearningGoal,
-    ExplorationResult,
-    MetaLearningRecord,
-    SelfReflection,
-    CapabilityTransfer,
-    PerformanceMetric,
-)
-
-from .meta_learner import (
-    MetaLearner,
-    LearningStrategy,
-    LearningContext,
-)
-
 from .capability_assessor import (
-    CapabilityAssessor,
     AssessmentContext,
+    CapabilityAssessor,
     WeaknessAnalysis,
 )
-
-from .knowledge_solidifier import (
-    KnowledgeSolidifier,
-    SolidificationRule,
-    SolidificationResult,
-)
-
 from .curiosity_engine import (
-    CuriosityEngine,
     CuriosityDomain,
+    CuriosityEngine,
     ExplorationPath,
 )
-
-from .self_optimizer import (
-    SelfOptimizer,
-    OptimizationParameter,
-    OptimizationResult,
-    StrategyAdjustment,
+from .engine import (
+    SelfEvolutionEngine,
+    create_evolution_engine,
 )
-
 from .goal_generator import (
     GoalGenerator,
     GoalTemplate,
 )
-
-from .engine import (
-    SelfEvolutionEngine,
-    create_evolution_engine,
+from .knowledge_solidifier import (
+    KnowledgeSolidifier,
+    SolidificationResult,
+    SolidificationRule,
+)
+from .meta_learner import (
+    LearningContext,
+    LearningStrategy,
+    MetaLearner,
+)
+from .models import (
+    Capability,
+    CapabilityLevel,
+    CapabilityTransfer,
+    EvolutionPhase,
+    EvolutionState,
+    ExplorationResult,
+    GoalPriority,
+    KnowledgeState,
+    KnowledgeUnit,
+    LearningGoal,
+    LearningType,
+    MetaLearningRecord,
+    PerformanceMetric,
+    SelfReflection,
+)
+from .self_optimizer import (
+    OptimizationParameter,
+    OptimizationResult,
+    SelfOptimizer,
+    StrategyAdjustment,
 )
 
 __all__ = [

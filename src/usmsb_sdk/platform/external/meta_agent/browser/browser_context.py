@@ -12,7 +12,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,8 @@ class BrowserResult:
     """Result of a browser operation."""
     success: bool
     message: str
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class BrowserContext:
@@ -164,7 +164,7 @@ class BrowserContext:
 
         return True
 
-    async def open(self, url: str, headless: bool = True) -> Dict:
+    async def open(self, url: str, headless: bool = True) -> dict:
         """
         Open browser and navigate to URL.
 
@@ -216,7 +216,7 @@ class BrowserContext:
                     "error": str(e),
                 }
 
-    async def click(self, selector: str, timeout: int = 30000) -> Dict:
+    async def click(self, selector: str, timeout: int = 30000) -> dict:
         """
         Click an element on the page.
 
@@ -257,7 +257,7 @@ class BrowserContext:
                     "error": str(e),
                 }
 
-    async def fill(self, selector: str, value: str, timeout: int = 30000) -> Dict:
+    async def fill(self, selector: str, value: str, timeout: int = 30000) -> dict:
         """
         Fill a form input field.
 
@@ -302,8 +302,8 @@ class BrowserContext:
                 }
 
     async def get_content(
-        self, selector: Optional[str] = None, format: str = "text"
-    ) -> Dict:
+        self, selector: str | None = None, format: str = "text"
+    ) -> dict:
         """
         Get page content.
 
@@ -361,7 +361,7 @@ class BrowserContext:
                     "error": str(e),
                 }
 
-    async def screenshot(self, path: Optional[str] = None) -> Dict:
+    async def screenshot(self, path: str | None = None) -> dict:
         """
         Take a screenshot of the current page.
 
@@ -420,7 +420,7 @@ class BrowserContext:
                     "error": str(e),
                 }
 
-    async def evaluate(self, script: str) -> Dict:
+    async def evaluate(self, script: str) -> dict:
         """
         Evaluate JavaScript in the browser context.
 
@@ -461,7 +461,7 @@ class BrowserContext:
 
     async def wait_for_selector(
         self, selector: str, timeout: int = 30000, state: str = "visible"
-    ) -> Dict:
+    ) -> dict:
         """
         Wait for a selector to appear in the DOM.
 
@@ -502,7 +502,7 @@ class BrowserContext:
                     "error": str(e),
                 }
 
-    async def get_url(self) -> Dict:
+    async def get_url(self) -> dict:
         """
         Get the current page URL.
 
@@ -538,7 +538,7 @@ class BrowserContext:
                     "error": str(e),
                 }
 
-    async def get_cookies(self) -> Dict:
+    async def get_cookies(self) -> dict:
         """
         Get all cookies for the current browser context.
 
@@ -656,7 +656,7 @@ class BrowserContextManager:
             data_dir: Base directory for user data
         """
         self.data_dir = data_dir
-        self._contexts: Dict[str, BrowserContext] = {}
+        self._contexts: dict[str, BrowserContext] = {}
         self._lock = asyncio.Lock()
 
     async def get_context(
@@ -737,7 +737,7 @@ class BrowserContextManager:
                     count += 1
             return count
 
-    async def get_all_contexts(self) -> Dict[str, Dict[str, Any]]:
+    async def get_all_contexts(self) -> dict[str, dict[str, Any]]:
         """
         Get status of all browser contexts.
 

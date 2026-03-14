@@ -8,13 +8,12 @@ Each user has their own SQLite databases for conversations, memory, and knowledg
 import asyncio
 import json
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 import aiosqlite
-
 
 # ============ Data Models ============
 
@@ -24,11 +23,11 @@ class Conversation:
     id: str
     owner_id: str
     status: str  # active, ended
-    context: Optional[str] = None
-    summary: Optional[str] = None
-    created_at: Optional[float] = None
-    updated_at: Optional[float] = None
-    ended_at: Optional[float] = None
+    context: str | None = None
+    summary: str | None = None
+    created_at: float | None = None
+    updated_at: float | None = None
+    ended_at: float | None = None
 
 
 @dataclass
@@ -38,18 +37,18 @@ class Message:
     conversation_id: str
     role: str  # user, assistant, tool
     content: str
-    tool_calls: Optional[str] = None
-    timestamp: Optional[float] = None
+    tool_calls: str | None = None
+    timestamp: float | None = None
 
 
 @dataclass
 class UserProfile:
     """User profile data model"""
     user_id: str
-    preferences: Optional[Dict] = None
-    commitments: Optional[Dict] = None
-    knowledge: Optional[Dict] = None
-    last_updated: Optional[float] = None
+    preferences: dict | None = None
+    commitments: dict | None = None
+    knowledge: dict | None = None
+    last_updated: float | None = None
 
 
 @dataclass
@@ -58,10 +57,10 @@ class ConversationSummary:
     id: str
     conversation_id: str
     summary: str
-    key_topics: Optional[str] = None
-    decisions: Optional[str] = None
-    created_at: Optional[float] = None
-    message_count: Optional[int] = None
+    key_topics: str | None = None
+    decisions: str | None = None
+    created_at: float | None = None
+    message_count: int | None = None
 
 
 @dataclass
@@ -70,9 +69,9 @@ class ImportantMemory:
     id: str
     user_id: str
     content: str
-    memory_type: Optional[str] = None
-    importance: Optional[float] = None
-    created_at: Optional[float] = None
+    memory_type: str | None = None
+    importance: float | None = None
+    created_at: float | None = None
 
 
 @dataclass
@@ -81,10 +80,10 @@ class KnowledgeItem:
     id: str
     user_id: str
     content: str
-    category: Optional[str] = None
-    source: Optional[str] = None
-    embedding: Optional[bytes] = None
-    created_at: Optional[float] = None
+    category: str | None = None
+    source: str | None = None
+    embedding: bytes | None = None
+    created_at: float | None = None
     is_private: bool = True
 
 
@@ -213,9 +212,9 @@ class UserDatabase:
         self.db_dir = Path(data_dir) / wallet_address
 
         # Database connections
-        self._conversations_db: Optional[aiosqlite.Connection] = None
-        self._memory_db: Optional[aiosqlite.Connection] = None
-        self._knowledge_db: Optional[aiosqlite.Connection] = None
+        self._conversations_db: aiosqlite.Connection | None = None
+        self._memory_db: aiosqlite.Connection | None = None
+        self._knowledge_db: aiosqlite.Connection | None = None
 
         # Connection locks for thread safety
         self._conv_lock = asyncio.Lock()
@@ -310,7 +309,7 @@ class UserDatabase:
 
     async def create_conversation(
         self,
-        context: Optional[str] = None
+        context: str | None = None
     ) -> Conversation:
         """
         Create a new conversation
@@ -345,7 +344,7 @@ class UserDatabase:
 
         return conv
 
-    async def get_conversation(self, conv_id: str) -> Optional[Conversation]:
+    async def get_conversation(self, conv_id: str) -> Conversation | None:
         """
         Get a conversation by ID
 
@@ -379,7 +378,7 @@ class UserDatabase:
             )
         return None
 
-    async def get_active_conversation(self) -> Optional[Conversation]:
+    async def get_active_conversation(self) -> Conversation | None:
         """
         Get the most recent active conversation
 
@@ -455,9 +454,9 @@ class UserDatabase:
 
     async def get_all_conversations(
         self,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 50
-    ) -> List[Conversation]:
+    ) -> list[Conversation]:
         """
         Get all conversations for the user
 
@@ -532,7 +531,7 @@ class UserDatabase:
         conv_id: str,
         limit: int = 50,
         offset: int = 0
-    ) -> List[Message]:
+    ) -> list[Message]:
         """
         Get messages from a conversation
 
@@ -590,7 +589,7 @@ class UserDatabase:
 
     # ============ Memory Methods ============
 
-    async def get_profile(self) -> Optional[UserProfile]:
+    async def get_profile(self) -> UserProfile | None:
         """
         Get the user profile
 
@@ -618,7 +617,7 @@ class UserDatabase:
             )
         return None
 
-    async def update_profile(self, profile: Dict) -> None:
+    async def update_profile(self, profile: dict) -> None:
         """
         Update the user profile
 
@@ -645,7 +644,7 @@ class UserDatabase:
                 (self.wallet_address, preferences_json, commitments_json, knowledge_json, now)
             )
 
-    async def add_memory(self, memory: Dict) -> None:
+    async def add_memory(self, memory: dict) -> None:
         """
         Add an important memory
 
@@ -675,9 +674,9 @@ class UserDatabase:
     async def get_memories(
         self,
         limit: int = 20,
-        memory_type: Optional[str] = None,
-        min_importance: Optional[float] = None
-    ) -> List[ImportantMemory]:
+        memory_type: str | None = None,
+        min_importance: float | None = None
+    ) -> list[ImportantMemory]:
         """
         Get important memories for the user
 
@@ -727,9 +726,9 @@ class UserDatabase:
         self,
         conv_id: str,
         summary: str,
-        key_topics: Optional[List[str]] = None,
-        decisions: Optional[List[str]] = None,
-        message_count: Optional[int] = None
+        key_topics: list[str] | None = None,
+        decisions: list[str] | None = None,
+        message_count: int | None = None
     ) -> ConversationSummary:
         """
         Add a conversation summary
@@ -778,9 +777,9 @@ class UserDatabase:
 
     async def get_conversation_summaries(
         self,
-        conv_id: Optional[str] = None,
+        conv_id: str | None = None,
         limit: int = 20
-    ) -> List[ConversationSummary]:
+    ) -> list[ConversationSummary]:
         """
         Get conversation summaries
 
@@ -824,7 +823,7 @@ class UserDatabase:
 
     # ============ Knowledge Methods ============
 
-    async def add_knowledge(self, item: Dict) -> KnowledgeItem:
+    async def add_knowledge(self, item: dict) -> KnowledgeItem:
         """
         Add a knowledge item
 
@@ -872,8 +871,8 @@ class UserDatabase:
         self,
         query: str,
         top_k: int = 5,
-        category: Optional[str] = None
-    ) -> List[Dict]:
+        category: str | None = None
+    ) -> list[dict]:
         """
         Search knowledge items
 
@@ -921,7 +920,7 @@ class UserDatabase:
             for row in rows
         ]
 
-    async def get_knowledge_by_id(self, item_id: str) -> Optional[KnowledgeItem]:
+    async def get_knowledge_by_id(self, item_id: str) -> KnowledgeItem | None:
         """
         Get a knowledge item by ID
 
@@ -976,9 +975,9 @@ class UserDatabase:
 
     async def get_all_knowledge(
         self,
-        category: Optional[str] = None,
+        category: str | None = None,
         limit: int = 50
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Get all knowledge items for the user
 
@@ -1022,7 +1021,7 @@ class UserDatabase:
 
     # ============ Data Import/Export ============
 
-    async def export_data(self) -> Dict[str, Any]:
+    async def export_data(self) -> dict[str, Any]:
         """
         Export all user data
 
@@ -1065,7 +1064,7 @@ class UserDatabase:
 
         return export
 
-    async def import_data(self, data: Dict[str, Any]) -> None:
+    async def import_data(self, data: dict[str, Any]) -> None:
         """
         Import user data
 
@@ -1138,7 +1137,7 @@ class UserDatabase:
 
     # ============ Utility Methods ============
 
-    async def get_db_info(self) -> Dict[str, Any]:
+    async def get_db_info(self) -> dict[str, Any]:
         """
         Get database information
 

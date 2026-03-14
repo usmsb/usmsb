@@ -4,21 +4,19 @@ Meta-Reasoning Engine
 元推理引擎：关于推理的推理
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
 import logging
 import time
+from dataclasses import dataclass, field
+from typing import Any
 
 from usmsb_sdk.reasoning.base import BaseReasoningEngine
 from usmsb_sdk.reasoning.interfaces import (
-    IReasoningEngine,
+    ConfidenceScore,
     IKnowledgeGraphAdapter,
-    ReasoningType,
+    IReasoningEngine,
     ReasoningResult,
     ReasoningStep,
-    ConfidenceScore,
-    UncertaintyMeasure,
-    UncertaintyType,
+    ReasoningType,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,9 +28,9 @@ class ReasoningStrategy:
 
     strategy_id: str
     name: str
-    applicable_types: List[ReasoningType]
+    applicable_types: list[ReasoningType]
     priority: int
-    conditions: Dict[str, Any] = field(default_factory=dict)
+    conditions: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -44,8 +42,8 @@ class ReasoningEvaluation:
     quality_score: float
     consistency_score: float
     completeness_score: float
-    issues: List[str] = field(default_factory=list)
-    recommendations: List[str] = field(default_factory=list)
+    issues: list[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
 
 
 class MetaReasoningEngine(BaseReasoningEngine):
@@ -61,14 +59,14 @@ class MetaReasoningEngine(BaseReasoningEngine):
 
     def __init__(
         self,
-        knowledge_adapter: Optional[IKnowledgeGraphAdapter] = None,
-        config: Optional[Dict[str, Any]] = None,
+        knowledge_adapter: IKnowledgeGraphAdapter | None = None,
+        config: dict[str, Any] | None = None,
     ):
         super().__init__(knowledge_adapter, config)
-        self._engines: Dict[ReasoningType, IReasoningEngine] = {}
-        self._strategies: Dict[str, ReasoningStrategy] = {}
-        self._evaluations: Dict[str, ReasoningEvaluation] = {}
-        self._reasoning_history: List[ReasoningResult] = []
+        self._engines: dict[ReasoningType, IReasoningEngine] = {}
+        self._strategies: dict[str, ReasoningStrategy] = {}
+        self._evaluations: dict[str, ReasoningEvaluation] = {}
+        self._reasoning_history: list[ReasoningResult] = []
         self._initialize_strategies()
 
     @property
@@ -112,7 +110,7 @@ class MetaReasoningEngine(BaseReasoningEngine):
     def register_engine(self, reasoning_type: ReasoningType, engine: IReasoningEngine) -> None:
         self._engines[reasoning_type] = engine
 
-    def select_strategy(self, context: Dict[str, Any]) -> List[ReasoningStrategy]:
+    def select_strategy(self, context: dict[str, Any]) -> list[ReasoningStrategy]:
         applicable = []
 
         for strategy in self._strategies.values():
@@ -124,7 +122,7 @@ class MetaReasoningEngine(BaseReasoningEngine):
         return [s[0] for s in applicable]
 
     def _calculate_strategy_match(
-        self, strategy: ReasoningStrategy, context: Dict[str, Any]
+        self, strategy: ReasoningStrategy, context: dict[str, Any]
     ) -> float:
         if not strategy.conditions:
             return 0.5
@@ -214,7 +212,7 @@ class MetaReasoningEngine(BaseReasoningEngine):
 
         return min(1.0, score)
 
-    def optimize_reasoning(self, reasoning_result: ReasoningResult) -> Dict[str, Any]:
+    def optimize_reasoning(self, reasoning_result: ReasoningResult) -> dict[str, Any]:
         evaluation = self.evaluate_reasoning(reasoning_result)
 
         optimizations = []
@@ -252,7 +250,7 @@ class MetaReasoningEngine(BaseReasoningEngine):
             "recommended_actions": evaluation.recommendations,
         }
 
-    def select_engine(self, context: Dict[str, Any]) -> Optional[IReasoningEngine]:
+    def select_engine(self, context: dict[str, Any]) -> IReasoningEngine | None:
         strategies = self.select_strategy(context)
 
         for strategy in strategies:
@@ -263,11 +261,11 @@ class MetaReasoningEngine(BaseReasoningEngine):
         return None
 
     async def reason(
-        self, premises: List[Any], context: Optional[Dict[str, Any]] = None
+        self, premises: list[Any], context: dict[str, Any] | None = None
     ) -> ReasoningResult:
         context = context or {}
 
-        reasoning_chain: List[ReasoningStep] = []
+        reasoning_chain: list[ReasoningStep] = []
 
         start_time = time.time()
 
@@ -345,7 +343,7 @@ class MetaReasoningEngine(BaseReasoningEngine):
         self._reasoning_history.append(final_result)
         return final_result
 
-    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> Tuple[bool, List[str]]:
+    async def validate_reasoning(self, reasoning_result: ReasoningResult) -> tuple[bool, list[str]]:
         evaluation = self.evaluate_reasoning(reasoning_result)
 
         return (
@@ -353,10 +351,10 @@ class MetaReasoningEngine(BaseReasoningEngine):
             evaluation.issues,
         )
 
-    def get_confidence(self, premises: List[Any], conclusion: Any) -> ConfidenceScore:
+    def get_confidence(self, premises: list[Any], conclusion: Any) -> ConfidenceScore:
         return ConfidenceScore(value=0.7)
 
-    def get_reasoning_stats(self) -> Dict[str, Any]:
+    def get_reasoning_stats(self) -> dict[str, Any]:
         if not self._evaluations:
             return {"count": 0}
 

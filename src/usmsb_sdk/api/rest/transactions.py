@@ -11,27 +11,25 @@ Implements the complete transaction flow:
 """
 import logging
 import secrets
-import uuid
 from datetime import datetime
-from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.database import (
-    create_transaction,
-    get_transaction,
-    get_transactions_by_user,
-    get_all_transactions,
-    update_transaction_status,
-    get_transaction_stats,
     TransactionStatus,
-    get_user_by_address,
+    create_transaction,
     get_agent,
-    update_user_stake,
+    get_all_transactions,
     get_db,
+    get_transaction,
+    get_transaction_stats,
+    get_transactions_by_user,
+    get_user_by_address,
+    update_transaction_status,
+    update_user_stake,
 )
-from usmsb_sdk.api.rest.auth import get_current_user, get_current_admin
+from usmsb_sdk.api.rest.auth import get_current_admin, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +41,8 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 class TransactionCreate(BaseModel):
     """Schema for creating a transaction."""
     seller_id: str
-    demand_id: Optional[str] = None
-    service_id: Optional[str] = None
+    demand_id: str | None = None
+    service_id: str | None = None
     amount: float = Field(..., gt=0)
     title: str
     description: str = ""
@@ -53,13 +51,13 @@ class TransactionCreate(BaseModel):
 
 class EscrowRequest(BaseModel):
     """Schema for escrowing funds."""
-    transaction_hash: Optional[str] = None
+    transaction_hash: str | None = None
 
 
 class DeliveryRequest(BaseModel):
     """Schema for submitting delivery."""
     description: str
-    files: List[str] = Field(default_factory=list)
+    files: list[str] = Field(default_factory=list)
 
 
 class AcceptRequest(BaseModel):
@@ -89,19 +87,19 @@ class TransactionResponse(BaseModel):
     status: str
     title: str
     description: str
-    delivery_description: Optional[str] = None
-    rating: Optional[int] = None
-    review: Optional[str] = None
+    delivery_description: str | None = None
+    rating: int | None = None
+    review: str | None = None
     created_at: float
     updated_at: float
-    escrowed_at: Optional[float] = None
-    delivered_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    escrowed_at: float | None = None
+    delivered_at: float | None = None
+    completed_at: float | None = None
 
 
 class TransactionListResponse(BaseModel):
     """Schema for transaction list response."""
-    transactions: List[dict]
+    transactions: list[dict]
     total: int
     stats: dict
 
@@ -185,8 +183,8 @@ async def create_new_transaction(
 
 @router.get("", response_model=TransactionListResponse)
 async def list_transactions(
-    status: Optional[str] = Query(None),
-    role: Optional[str] = Query(None),  # "buyer" or "seller"
+    status: str | None = Query(None),
+    role: str | None = Query(None),  # "buyer" or "seller"
     limit: int = Query(50, ge=1, le=100),
     user: dict = Depends(get_current_user)
 ):
@@ -213,7 +211,7 @@ async def list_transactions(
 
 @router.get("/all", response_model=TransactionListResponse)
 async def list_all_transactions(
-    status: Optional[str] = Query(None),
+    status: str | None = Query(None),
     limit: int = Query(100, ge=1, le=500),
     admin: dict = Depends(get_current_admin)
 ):

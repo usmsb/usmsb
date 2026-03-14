@@ -12,12 +12,13 @@ It implements the continuous cycle of:
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
-from usmsb_sdk.core.elements import Agent, Goal, GoalStatus, Information, Value
+from usmsb_sdk.core.elements import Agent, Goal, GoalStatus
 from usmsb_sdk.core.interfaces import (
     IDecisionService,
     IEvaluationService,
@@ -29,7 +30,7 @@ from usmsb_sdk.core.interfaces import (
 logger = logging.getLogger(__name__)
 
 
-class LoopStatus(str, Enum):
+class LoopStatus(StrEnum):
     """Status of the Goal-Action-Outcome loop."""
     IDLE = "idle"
     RUNNING = "running"
@@ -46,8 +47,8 @@ class ActionResult:
     success: bool
     outcome: Any
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
-    error: Optional[str] = None
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    metrics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -55,10 +56,10 @@ class LoopIteration:
     """Record of a single loop iteration."""
     iteration_number: int
     goal: Goal
-    selected_action: Dict[str, Any]
+    selected_action: dict[str, Any]
     execution_result: ActionResult
-    evaluation_result: Dict[str, Any]
-    feedback: Dict[str, Any]
+    evaluation_result: dict[str, Any]
+    feedback: dict[str, Any]
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -115,23 +116,23 @@ class GoalActionOutcomeLoop:
 
         self.status = LoopStatus.IDLE
         self.current_iteration = 0
-        self.iteration_history: List[LoopIteration] = []
+        self.iteration_history: list[LoopIteration] = []
         self._stop_flag = False
         self._pause_flag = False
 
         # Callbacks for hooks
-        self.on_goal_selected: Optional[Callable[[Goal], None]] = None
-        self.on_action_planned: Optional[Callable[[Dict[str, Any]], None]] = None
-        self.on_action_executed: Optional[Callable[[ActionResult], None]] = None
-        self.on_evaluation_complete: Optional[Callable[[Dict[str, Any]], None]] = None
-        self.on_feedback_processed: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.on_goal_selected: Callable[[Goal], None] | None = None
+        self.on_action_planned: Callable[[dict[str, Any]], None] | None = None
+        self.on_action_executed: Callable[[ActionResult], None] | None = None
+        self.on_evaluation_complete: Callable[[dict[str, Any]], None] | None = None
+        self.on_feedback_processed: Callable[[dict[str, Any]], None] | None = None
 
     async def run(
         self,
         agent: Agent,
         environment: Any = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Run the Goal-Action-Outcome loop for an agent.
 
@@ -189,7 +190,7 @@ class GoalActionOutcomeLoop:
         self,
         agent: Agent,
         environment: Any,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> LoopIteration:
         """Run a single iteration of the loop."""
         logger.debug(f"Starting iteration {self.current_iteration + 1}")
@@ -206,11 +207,6 @@ class GoalActionOutcomeLoop:
         logger.debug(f"Selected goal: {goal.name}")
 
         # Step 2: Perceive current state
-        perception_context = {
-            **context,
-            "environment": environment,
-            "agent_state": agent.state,
-        }
         # Get current information from environment
         # perception = await self.perception_service.perceive(environment, perception_context)
 
@@ -225,7 +221,7 @@ class GoalActionOutcomeLoop:
                 self.decision_service.decide(agent, goal, decision_context),
                 timeout=self.decision_timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Decision service timed out after {self.decision_timeout}s")
             raise TimeoutError(f"Decision service timed out after {self.decision_timeout}s")
         selected_action = decision.get("action", {})
@@ -253,7 +249,7 @@ class GoalActionOutcomeLoop:
                 success=True,
                 outcome=outcome,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Execution service timed out after {self.execution_timeout}s")
             action_result = ActionResult(
                 action_id=selected_action.get("id", "unknown"),
@@ -282,7 +278,7 @@ class GoalActionOutcomeLoop:
                 ),
                 timeout=self.evaluation_timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Evaluation service timed out after {self.evaluation_timeout}s")
             evaluation = {"goal_achieved": False, "error": "Evaluation timed out"}
 
@@ -302,7 +298,7 @@ class GoalActionOutcomeLoop:
                 ),
                 timeout=self.feedback_timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Feedback service timed out after {self.feedback_timeout}s")
             feedback = {"error": "Feedback generation timed out"}
 
@@ -336,7 +332,7 @@ class GoalActionOutcomeLoop:
         self.status = LoopStatus.IDLE
         logger.info("Goal-Action-Outcome loop stopped")
 
-    def _generate_summary(self, agent: Agent) -> Dict[str, Any]:
+    def _generate_summary(self, agent: Agent) -> dict[str, Any]:
         """Generate a summary of the loop execution."""
         completed_goals = [g for g in agent.goals if g.status == GoalStatus.COMPLETED]
         failed_goals = [g for g in agent.goals if g.status == GoalStatus.FAILED]
@@ -390,7 +386,7 @@ class GoalManager:
         name: str,
         description: str = "",
         priority: int = 0,
-        parent_goal_id: Optional[str] = None,
+        parent_goal_id: str | None = None,
     ) -> Goal:
         """
         Add a new goal to the agent.
@@ -417,8 +413,8 @@ class GoalManager:
     def decompose_goal(
         self,
         goal: Goal,
-        sub_goals: List[Dict[str, Any]],
-    ) -> List[Goal]:
+        sub_goals: list[dict[str, Any]],
+    ) -> list[Goal]:
         """
         Decompose a goal into sub-goals.
 
@@ -475,7 +471,7 @@ class GoalManager:
                 return True
         return False
 
-    def get_goal_tree(self, goal_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_goal_tree(self, goal_id: str | None = None) -> dict[str, Any]:
         """
         Get the goal tree starting from a specific goal or all root goals.
 
@@ -485,7 +481,7 @@ class GoalManager:
         Returns:
             Nested dictionary representing goal tree
         """
-        def build_tree(g: Goal) -> Dict[str, Any]:
+        def build_tree(g: Goal) -> dict[str, Any]:
             children = [
                 build_tree(cg)
                 for cg in self.agent.goals

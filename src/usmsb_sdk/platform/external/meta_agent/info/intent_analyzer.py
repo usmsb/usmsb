@@ -1,8 +1,7 @@
 import json
 import logging
-from typing import Optional, Dict, Any
 
-from .types import InfoNeed, RetrievalIntent, InfoNeedType
+from .types import InfoNeed, RetrievalIntent
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class IntentAnalyzer:
             tool_name=need.tool_name,
         )
 
-    async def analyze_from_question(self, question: str) -> Optional[RetrievalIntent]:
+    async def analyze_from_question(self, question: str) -> RetrievalIntent | None:
         prompt = f"""分析用户问题，判断用户想要从历史对话中检索什么信息。
 
 用户问题: {question}
@@ -63,7 +62,7 @@ class IntentAnalyzer:
             logger.warning(f"Intent analysis failed: {e}")
             return None
 
-    def _parse_json(self, response: str) -> Optional[Dict]:
+    def _parse_json(self, response: str) -> dict | None:
         try:
             if "```json" in response:
                 response = response.split("```json")[1].split("```")[0]

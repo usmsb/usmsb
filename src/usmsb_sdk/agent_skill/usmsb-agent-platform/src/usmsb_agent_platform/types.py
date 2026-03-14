@@ -4,7 +4,7 @@ Type definitions for USMSB Agent Platform Skill.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class StakeTier(Enum):
@@ -177,7 +177,7 @@ class StakeInfo:
     agent_id: str
     staked_amount: int
     tier: StakeTier
-    locked_until: Optional[int] = None
+    locked_until: int | None = None
     pending_rewards: int = 0
 
     @classmethod
@@ -223,7 +223,7 @@ class StakeInfo:
         }
         return discounts.get(self.tier, 0.0)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "agent_id": self.agent_id,
@@ -250,7 +250,7 @@ class WalletInfo:
         """Total assets including balance, stake, and rewards."""
         return self.balance + self.staked_amount + self.pending_rewards
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "balance": self.balance,
@@ -278,7 +278,7 @@ class ReputationInfo:
             return 0.0
         return self.successful_transactions / self.total_transactions
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "score": self.score,
@@ -296,10 +296,10 @@ class RewardInfo:
     agent_id: str
     pending_rewards: int
     total_claimed: int
-    last_claim_at: Optional[int]
+    last_claim_at: int | None
     apy: float  # Annual percentage yield
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "pending_rewards": self.pending_rewards,
@@ -316,13 +316,13 @@ class ExperienceGene:
     agent_id: str
     title: str
     description: str
-    skills: List[str]
+    skills: list[str]
     share_level: str  # public, semi_public, private, hidden
     verified: bool
     value_score: float
     created_at: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "experience_id": self.experience_id,
             "agent_id": self.agent_id,
@@ -340,7 +340,7 @@ class ExperienceGene:
 class Intent:
     """Parsed intent from natural language request."""
     action: ActionType
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     confidence: float = 1.0
     raw_request: str = ""
 
@@ -353,7 +353,7 @@ class StakeRequirement:
     shortfall: int
     action: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "required": self.required,
             "current": self.current,
@@ -368,7 +368,7 @@ class RetryConfig:
     max_retries: int = 3
     retry_delay: float = 1.0  # seconds
     retry_multiplier: float = 2.0  # exponential backoff
-    retry_on_errors: List[str] = field(default_factory=lambda: [
+    retry_on_errors: list[str] = field(default_factory=lambda: [
         ErrorCode.NETWORK_ERROR,
         ErrorCode.TIMEOUT,
         ErrorCode.SERVICE_UNAVAILABLE,
@@ -379,23 +379,23 @@ class RetryConfig:
 class PlatformResult:
     """Result from platform operation with detailed error info."""
     success: bool
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    code: Optional[str] = None
-    message: Optional[str] = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    code: str | None = None
+    message: str | None = None
 
     # Enhanced error details
-    stake_requirement: Optional[StakeRequirement] = None
-    retry_after: Optional[int] = None  # seconds until retry is allowed
-    recovery_suggestion: Optional[str] = None
+    stake_requirement: StakeRequirement | None = None
+    retry_after: int | None = None  # seconds until retry is allowed
+    recovery_suggestion: str | None = None
 
     # Request metadata
-    request_id: Optional[str] = None
-    timestamp: Optional[int] = None
+    request_id: str | None = None
+    timestamp: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        d: Dict[str, Any] = {"success": self.success}
+        d: dict[str, Any] = {"success": self.success}
         if self.result is not None:
             d["result"] = self.result
         if self.error is not None:
@@ -417,7 +417,7 @@ class PlatformResult:
         return self.success
 
     @classmethod
-    def success_result(cls, result: Dict[str, Any], message: str = None) -> "PlatformResult":
+    def success_result(cls, result: dict[str, Any], message: str = None) -> "PlatformResult":
         """Create a successful result."""
         return cls(success=True, result=result, message=message)
 
@@ -500,7 +500,7 @@ class HeartbeatStatus:
     def is_alive(self) -> bool:
         return self.ttl_remaining > 0 and self.status != "offline"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "status": self.status,

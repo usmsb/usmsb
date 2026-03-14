@@ -7,8 +7,8 @@ Provides secure API key generation, validation, and management.
 import hashlib
 import secrets
 import time
-from typing import Optional, Tuple, Dict, Any, List
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass
+from typing import Any
 
 # API Key Configuration
 API_KEY_PREFIX = "usmsb"
@@ -27,13 +27,13 @@ class APIKeyInfo:
     key_prefix: str
     name: str
     level: int
-    permissions: List[str]
-    expires_at: Optional[float]
-    last_used_at: Optional[float]
+    permissions: list[str]
+    expires_at: float | None
+    last_used_at: float | None
     created_at: float
     is_revoked: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             'id': self.id,
@@ -49,7 +49,7 @@ class APIKeyInfo:
         }
 
 
-def generate_api_key(agent_id: str) -> Tuple[str, str, str]:
+def generate_api_key(agent_id: str) -> tuple[str, str, str]:
     """
     Generate a new API key for an agent.
 
@@ -82,7 +82,7 @@ def generate_api_key(agent_id: str) -> Tuple[str, str, str]:
     return api_key, key_hash, key_prefix
 
 
-def generate_binding_code() -> Tuple[str, float]:
+def generate_binding_code() -> tuple[str, float]:
     """
     Generate a binding code for owner binding.
 
@@ -212,7 +212,7 @@ def get_stake_tier(staked_amount: float) -> str:
         return "NONE"
 
 
-def get_tier_benefits(tier: str) -> Dict[str, Any]:
+def get_tier_benefits(tier: str) -> dict[str, Any]:
     """
     Get benefits for a stake tier.
 
@@ -261,8 +261,8 @@ class APIKeyManager:
 
     @staticmethod
     def create_key_for_agent(agent_id: str, name: str = "Primary",
-                             expires_in_days: Optional[int] = None,
-                             level: int = 0) -> Dict[str, Any]:
+                             expires_in_days: int | None = None,
+                             level: int = 0) -> dict[str, Any]:
         """
         Create a new API key for an agent.
 
@@ -296,7 +296,7 @@ class APIKeyManager:
 
     @staticmethod
     def create_binding_request(agent_id: str, base_url: str,
-                               message: str = "") -> Dict[str, Any]:
+                               message: str = "") -> dict[str, Any]:
         """
         Create a new binding request.
 
@@ -329,7 +329,7 @@ class APIKeyManager:
         return verify_api_key(api_key, stored_hash)
 
     @staticmethod
-    def is_expired(expires_at: Optional[float]) -> bool:
+    def is_expired(expires_at: float | None) -> bool:
         """Check if a key has expired."""
         if expires_at is None:
             return False

@@ -8,17 +8,16 @@ This module defines configuration classes for node management, including:
 - Node capabilities and resources
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional
 import hashlib
 import socket
 import time
 import uuid
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 
-class NodeRole(str, Enum):
+class NodeRole(StrEnum):
     """Roles a node can assume in the network."""
     FULL_NODE = "full_node"           # Full participating node
     LIGHT_NODE = "light_node"         # Light client node
@@ -28,7 +27,7 @@ class NodeRole(str, Enum):
     OBSERVER = "observer"             # Observer-only node
 
 
-class TransportProtocol(str, Enum):
+class TransportProtocol(StrEnum):
     """Supported transport protocols."""
     WEBSOCKET = "websocket"
     GRPC = "grpc"
@@ -42,20 +41,20 @@ class NetworkConfig:
     """Network configuration for a node."""
     address: str = "0.0.0.0"
     port: int = 8080
-    external_address: Optional[str] = None
-    external_port: Optional[int] = None
+    external_address: str | None = None
+    external_port: int | None = None
     bind_address: str = "0.0.0.0"
     max_connections: int = 100
     connection_timeout: float = 30.0
     idle_timeout: float = 300.0
     enable_upnp: bool = False
     enable_nat_traversal: bool = True
-    protocols: List[TransportProtocol] = field(
+    protocols: list[TransportProtocol] = field(
         default_factory=lambda: [TransportProtocol.WEBSOCKET, TransportProtocol.TCP]
     )
     tls_enabled: bool = False
-    tls_cert_path: Optional[str] = None
-    tls_key_path: Optional[str] = None
+    tls_cert_path: str | None = None
+    tls_key_path: str | None = None
 
     def get_external_address(self) -> str:
         """Get the external address for this node."""
@@ -94,7 +93,7 @@ class NetworkConfig:
         except Exception:
             return "127.0.0.1"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "address": self.address,
@@ -127,10 +126,10 @@ class SyncConfig:
     enable_incremental: bool = True           # Enable incremental sync
     enable_grpc_batch: bool = True            # Enable gRPC for batch sync
     enable_ipfs_data: bool = False            # Enable IPFS for large data
-    ipfs_gateway: Optional[str] = None        # IPFS gateway URL
+    ipfs_gateway: str | None = None        # IPFS gateway URL
     conflict_resolution: str = "last_write_wins"  # Conflict resolution strategy
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "sync_interval": self.sync_interval,
@@ -153,19 +152,19 @@ class SyncConfig:
 @dataclass
 class SecurityConfig:
     """Security configuration for a node."""
-    private_key: Optional[str] = None
-    public_key: Optional[str] = None
+    private_key: str | None = None
+    public_key: str | None = None
     enable_encryption: bool = True
     enable_authentication: bool = True
     auth_token_expiry: float = 3600.0       # Token expiry in seconds
     max_auth_attempts: int = 5               # Max failed auth attempts
     auth_lockout_duration: float = 300.0    # Lockout duration in seconds
-    trusted_peers: List[str] = field(default_factory=list)
-    banned_peers: List[str] = field(default_factory=list)
+    trusted_peers: list[str] = field(default_factory=list)
+    banned_peers: list[str] = field(default_factory=list)
     rate_limit_requests: int = 100           # Max requests per minute
     rate_limit_window: float = 60.0          # Rate limit window in seconds
     enable_whitelist: bool = False
-    whitelist: List[str] = field(default_factory=list)
+    whitelist: list[str] = field(default_factory=list)
 
     def generate_keys(self) -> None:
         """Generate cryptographic keys for the node."""
@@ -181,7 +180,7 @@ class SecurityConfig:
             return peer_id in self.whitelist
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary (without sensitive data)."""
         return {
             "enable_encryption": self.enable_encryption,
@@ -206,13 +205,13 @@ class NodeCapabilities:
     bandwidth_mbps: float = 100.0
     gpu_available: bool = False
     gpu_memory_gb: float = 0.0
-    services: List[str] = field(default_factory=list)
-    supported_protocols: List[str] = field(
+    services: list[str] = field(default_factory=list)
+    supported_protocols: list[str] = field(
         default_factory=lambda: ["websocket", "grpc", "http"]
     )
     max_concurrent_tasks: int = 10
     max_storage_objects: int = 10000
-    features: Dict[str, bool] = field(default_factory=dict)
+    features: dict[str, bool] = field(default_factory=dict)
 
     def __post_init__(self):
         """Initialize default features."""
@@ -240,7 +239,7 @@ class NodeCapabilities:
         """Check if node can accept new tasks."""
         return self.get_load_factor() < 0.9
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "cpu_cores": self.cpu_cores,
@@ -278,11 +277,11 @@ class NodeConfig:
     capabilities: NodeCapabilities = field(default_factory=NodeCapabilities)
 
     # Seed nodes for discovery
-    seed_nodes: List[str] = field(default_factory=list)
+    seed_nodes: list[str] = field(default_factory=list)
 
     # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     last_updated: float = field(default_factory=time.time)
 
@@ -307,7 +306,7 @@ class NodeConfig:
         seed = f"{time.time()}{uuid.uuid4()}{self.network.address}{self.network.port}"
         return "node_" + hashlib.sha256(seed.encode()).hexdigest()[:16]
 
-    def get_identity_dict(self) -> Dict[str, Any]:
+    def get_identity_dict(self) -> dict[str, Any]:
         """Get identity information."""
         return {
             "node_id": self.node_id,
@@ -319,7 +318,7 @@ class NodeConfig:
             "port": self.network.get_external_port(),
         }
 
-    def add_seed_node(self, address: str, port: Optional[int] = None) -> None:
+    def add_seed_node(self, address: str, port: int | None = None) -> None:
         """Add a seed node."""
         if port:
             seed = f"{address}:{port}"
@@ -337,7 +336,7 @@ class NodeConfig:
         ]
         self.last_updated = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "node_id": self.node_id,
@@ -361,7 +360,7 @@ class NodeConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "NodeConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "NodeConfig":
         """Create config from dictionary."""
         network_data = data.get("network", {})
         sync_data = data.get("sync", {})

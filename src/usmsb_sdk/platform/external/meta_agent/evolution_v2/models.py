@@ -6,12 +6,12 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional, Callable
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
 
 
-class EvolutionPhase(str, Enum):
+class EvolutionPhase(StrEnum):
     """进化阶段"""
 
     EXPLORATION = "exploration"
@@ -21,7 +21,7 @@ class EvolutionPhase(str, Enum):
     MASTERY = "mastery"
 
 
-class KnowledgeState(str, Enum):
+class KnowledgeState(StrEnum):
     """知识状态"""
 
     EPISODIC = "episodic"
@@ -31,7 +31,7 @@ class KnowledgeState(str, Enum):
     CRYSTALLIZED = "crystallized"
 
 
-class CapabilityLevel(str, Enum):
+class CapabilityLevel(StrEnum):
     """能力等级"""
 
     NOVICE = "novice"
@@ -41,7 +41,7 @@ class CapabilityLevel(str, Enum):
     MASTER = "master"
 
 
-class LearningType(str, Enum):
+class LearningType(StrEnum):
     """学习类型"""
 
     SUPERVISED = "supervised"
@@ -52,7 +52,7 @@ class LearningType(str, Enum):
     TRANSFER = "transfer"
 
 
-class GoalPriority(str, Enum):
+class GoalPriority(StrEnum):
     """目标优先级"""
 
     CRITICAL = "critical"
@@ -75,9 +75,9 @@ class KnowledgeUnit:
     source: str = "unknown"
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     last_accessed: float = field(default_factory=lambda: datetime.now().timestamp())
-    associations: List[str] = field(default_factory=list)
-    embeddings: Optional[List[float]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    associations: list[str] = field(default_factory=list)
+    embeddings: list[float] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def consolidate_score(self) -> float:
         """计算固化得分 - 基于访问频率、成功率、时间衰减"""
@@ -101,15 +101,15 @@ class Capability:
     level: CapabilityLevel = CapabilityLevel.NOVICE
     score: float = 0.0
     experience_points: int = 0
-    prerequisite_ids: List[str] = field(default_factory=list)
-    derived_capability_ids: List[str] = field(default_factory=list)
-    performance_history: List[float] = field(default_factory=list)
+    prerequisite_ids: list[str] = field(default_factory=list)
+    derived_capability_ids: list[str] = field(default_factory=list)
+    performance_history: list[float] = field(default_factory=list)
     last_improvement: float = 0.0
     practice_count: int = 0
     success_count: int = 0
     failure_count: int = 0
-    strategies: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    strategies: list[dict[str, Any]] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def success_rate(self) -> float:
@@ -156,20 +156,20 @@ class LearningGoal:
     description: str = ""
     priority: GoalPriority = GoalPriority.MEDIUM
     progress: float = 0.0
-    target_capability: Optional[str] = None
-    related_knowledge: List[str] = field(default_factory=list)
-    sub_goals: List[str] = field(default_factory=list)
-    prerequisites: List[str] = field(default_factory=list)
-    deadline: Optional[float] = None
+    target_capability: str | None = None
+    related_knowledge: list[str] = field(default_factory=list)
+    sub_goals: list[str] = field(default_factory=list)
+    prerequisites: list[str] = field(default_factory=list)
+    deadline: float | None = None
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    started_at: float | None = None
+    completed_at: float | None = None
     attempts: int = 0
     max_attempts: int = 5
     learning_type: LearningType = LearningType.SELF_SUPERVISED
-    expected_outcomes: List[str] = field(default_factory=list)
-    success_criteria: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    expected_outcomes: list[str] = field(default_factory=list)
+    success_criteria: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -178,12 +178,12 @@ class ExplorationResult:
 
     id: str = field(default_factory=lambda: str(uuid4())[:8])
     domain: str = ""
-    discoveries: List[str] = field(default_factory=list)
+    discoveries: list[str] = field(default_factory=list)
     novelty_score: float = 0.0
     usefulness_score: float = 0.0
-    potential_goals: List[str] = field(default_factory=list)
-    knowledge_gained: List[str] = field(default_factory=list)
-    questions_raised: List[str] = field(default_factory=list)
+    potential_goals: list[str] = field(default_factory=list)
+    knowledge_gained: list[str] = field(default_factory=list)
+    questions_raised: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -198,9 +198,9 @@ class MetaLearningRecord:
     retention_rate: float = 0.0
     transfer_success: float = 0.0
     time_to_mastery: float = 0.0
-    optimal_conditions: Dict[str, Any] = field(default_factory=dict)
-    lessons_learned: List[str] = field(default_factory=list)
-    recommended_approaches: List[str] = field(default_factory=list)
+    optimal_conditions: dict[str, Any] = field(default_factory=dict)
+    lessons_learned: list[str] = field(default_factory=list)
+    recommended_approaches: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -210,11 +210,11 @@ class SelfReflection:
 
     id: str = field(default_factory=lambda: str(uuid4())[:8])
     type: str = "performance"
-    observations: List[str] = field(default_factory=list)
-    strengths: List[str] = field(default_factory=list)
-    weaknesses: List[str] = field(default_factory=list)
-    improvement_areas: List[str] = field(default_factory=list)
-    action_items: List[Dict[str, Any]] = field(default_factory=list)
+    observations: list[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
+    weaknesses: list[str] = field(default_factory=list)
+    improvement_areas: list[str] = field(default_factory=list)
+    action_items: list[dict[str, Any]] = field(default_factory=list)
     confidence_level: float = 0.0
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
@@ -228,8 +228,8 @@ class CapabilityTransfer:
     target_domain: str = ""
     adaptation_required: float = 0.0
     transfer_success: float = 0.0
-    knowledge_extracted: List[str] = field(default_factory=list)
-    new_capability_id: Optional[str] = None
+    knowledge_extracted: list[str] = field(default_factory=list)
+    new_capability_id: str | None = None
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
 
 
@@ -247,7 +247,7 @@ class EvolutionState:
     curiosity_index: float = 0.5
     self_awareness_score: float = 0.0
     last_evolution: float = field(default_factory=lambda: datetime.now().timestamp())
-    evolution_history: List[Dict[str, Any]] = field(default_factory=list)
+    evolution_history: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -258,7 +258,7 @@ class PerformanceMetric:
     value: float = 0.0
     target: float = 1.0
     trend: float = 0.0
-    history: List[float] = field(default_factory=list)
+    history: list[float] = field(default_factory=list)
     last_updated: float = field(default_factory=lambda: datetime.now().timestamp())
 
     def update(self, new_value: float):

@@ -12,12 +12,11 @@ project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 from usmsb_sdk.blockchain.config import (
-    NetworkType,
     BlockchainConfig,
-    get_default_config,
+    NetworkType,
 )
-from usmsb_sdk.blockchain.web3_client import Web3Client
 from usmsb_sdk.blockchain.contracts.base import BaseContractClient
+from usmsb_sdk.blockchain.web3_client import Web3Client
 
 
 def test_config():
@@ -57,9 +56,18 @@ def test_config():
     print(f"AgentRegistry地址: {testnet_config.get_contract_address('AgentRegistry')}")
 
     # 验证合约地址
-    assert testnet_config.get_contract_address("VIBEToken") == "0x91d8C3084b4fd21A04fA3584BFE357F378938dbc"
-    assert testnet_config.get_contract_address("VIBStaking") == "0xc3fbD1736a95f403A0569FcA8C84d7B85e2b4E53"
-    assert testnet_config.get_contract_address("AgentRegistry") == "0x54bEbDc40cc8B60b0922D8FA6463ab710B14dC69"
+    assert (
+        testnet_config.get_contract_address("VIBEToken")
+        == "0x91d8C3084b4fd21A04fA3584BFE357F378938dbc"
+    )
+    assert (
+        testnet_config.get_contract_address("VIBStaking")
+        == "0xc3fbD1736a95f403A0569FcA8C84d7B85e2b4E53"
+    )
+    assert (
+        testnet_config.get_contract_address("AgentRegistry")
+        == "0x54bEbDc40cc8B60b0922D8FA6463ab710B14dC69"
+    )
     print("合约地址验证通过!")
 
     # 测试网络类型判断

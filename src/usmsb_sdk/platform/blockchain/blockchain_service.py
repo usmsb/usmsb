@@ -11,20 +11,17 @@ In development mode, simulates blockchain operations.
 In production, connects to actual blockchain (Ethereum/Polygon).
 """
 import asyncio
-import hashlib
-import json
 import logging
 import secrets
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-from enum import Enum
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class ChainStatus(str, Enum):
+class ChainStatus(StrEnum):
     """Blockchain connection status."""
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
@@ -32,7 +29,7 @@ class ChainStatus(str, Enum):
     ERROR = "error"
 
 
-class TransactionStatus(str, Enum):
+class TransactionStatus(StrEnum):
     """On-chain transaction status."""
     PENDING = "pending"
     CONFIRMED = "confirmed"
@@ -46,10 +43,10 @@ class Block:
     hash: str
     parent_hash: str
     timestamp: float
-    transactions: List[Dict[str, Any]]
+    transactions: list[dict[str, Any]]
     miner: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "number": self.number,
             "hash": self.hash,
@@ -67,14 +64,14 @@ class OnChainTransaction:
     from_address: str
     to_address: str
     value: float
-    data: Dict[str, Any]
+    data: dict[str, Any]
     status: TransactionStatus
-    block_number: Optional[int]
+    block_number: int | None
     timestamp: float
     gas_used: int = 21000
     gas_price: float = 0.000001  # 1 Gwei in ETH
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "hash": self.hash,
             "from": self.from_address,
@@ -98,10 +95,10 @@ class EscrowContract:
     amount: float
     status: str  # "active", "released", "refunded"
     created_at: float
-    release_tx: Optional[str] = None
-    refund_tx: Optional[str] = None
+    release_tx: str | None = None
+    refund_tx: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "contractAddress": self.contract_address,
             "buyer": self.buyer,
@@ -141,7 +138,7 @@ class BlockchainService:
 
     def __init__(
         self,
-        rpc_url: Optional[str] = None,
+        rpc_url: str | None = None,
         chain_id: int = 1,
         simulation_mode: bool = True,
     ):
@@ -159,17 +156,17 @@ class BlockchainService:
         self.status = ChainStatus.DISCONNECTED
 
         # Simulated state
-        self._balances: Dict[str, float] = {}
-        self._escrows: Dict[str, EscrowContract] = {}
-        self._stakes: Dict[str, float] = {}
-        self._reputation: Dict[str, float] = {}
-        self._transactions: Dict[str, OnChainTransaction] = {}
-        self._blocks: List[Block] = []
-        self._pending_txs: List[OnChainTransaction] = []
+        self._balances: dict[str, float] = {}
+        self._escrows: dict[str, EscrowContract] = {}
+        self._stakes: dict[str, float] = {}
+        self._reputation: dict[str, float] = {}
+        self._transactions: dict[str, OnChainTransaction] = {}
+        self._blocks: list[Block] = []
+        self._pending_txs: list[OnChainTransaction] = []
 
         # Block production
         self._current_block = 0
-        self._block_task: Optional[asyncio.Task] = None
+        self._block_task: asyncio.Task | None = None
 
     async def connect(self) -> bool:
         """Connect to blockchain."""
@@ -305,7 +302,7 @@ class BlockchainService:
         from_address: str,
         to_address: str,
         amount: float,
-        private_key: Optional[str] = None,
+        private_key: str | None = None,
     ) -> str:
         """
         Transfer tokens between addresses.
@@ -462,7 +459,7 @@ class BlockchainService:
         logger.info(f"Refunded escrow {contract_address} to buyer")
         return tx.hash
 
-    def get_escrow(self, contract_address: str) -> Optional[EscrowContract]:
+    def get_escrow(self, contract_address: str) -> EscrowContract | None:
         """Get escrow contract details."""
         return self._escrows.get(contract_address)
 
@@ -578,7 +575,7 @@ class BlockchainService:
 
     # ==================== Transaction Operations ====================
 
-    async def get_transaction(self, tx_hash: str) -> Optional[OnChainTransaction]:
+    async def get_transaction(self, tx_hash: str) -> OnChainTransaction | None:
         """Get transaction by hash."""
         return self._transactions.get(tx_hash)
 
@@ -599,7 +596,7 @@ class BlockchainService:
 
     # ==================== Block Operations ====================
 
-    async def get_block(self, block_number: int) -> Optional[Block]:
+    async def get_block(self, block_number: int) -> Block | None:
         """Get block by number."""
         if 0 <= block_number < len(self._blocks):
             return self._blocks[block_number]
@@ -611,7 +608,7 @@ class BlockchainService:
 
     # ==================== Utility Methods ====================
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get blockchain status."""
         return {
             "status": self.status.value,
@@ -623,7 +620,7 @@ class BlockchainService:
             "totalStaked": sum(self._stakes.values()),
         }
 
-    def get_address_info(self, address: str) -> Dict[str, Any]:
+    def get_address_info(self, address: str) -> dict[str, Any]:
         """Get comprehensive info for an address."""
         addr = address.lower()
         return {
@@ -635,7 +632,7 @@ class BlockchainService:
 
 
 # Global blockchain service instance
-_blockchain_service: Optional[BlockchainService] = None
+_blockchain_service: BlockchainService | None = None
 
 
 async def get_blockchain_service() -> BlockchainService:

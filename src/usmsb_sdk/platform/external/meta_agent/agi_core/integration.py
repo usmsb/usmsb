@@ -9,29 +9,25 @@ AGI Core Integration System
 └── reasoning/                - 专业版（推理系统）
 """
 
-import asyncio
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-
-from .memory import AGIMemorySystem, MemoryLayer, MemoryItem, MemoryConfig
-from .knowledge_graph import DynamicKnowledgeGraph, KnowledgeNode, RelationType
+from dataclasses import dataclass
+from typing import Any
 
 from usmsb_sdk.platform.external.meta_agent.evolution_v2 import (
     SelfEvolutionEngine,
     create_evolution_engine,
 )
-
 from usmsb_sdk.reasoning import (
-    ReasoningChainManager,
-    ReasoningResult,
-    ReasoningType,
+    AbductiveEngine,
+    AnalogicalEngine,
+    CausalEngine,
     DeductiveEngine,
     InductiveEngine,
-    AbductiveEngine,
-    CausalEngine,
-    AnalogicalEngine,
+    ReasoningChainManager,
 )
+
+from .knowledge_graph import DynamicKnowledgeGraph, KnowledgeNode, RelationType
+from .memory import AGIMemorySystem, MemoryConfig, MemoryLayer
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +57,7 @@ class AGICoreSystem:
     """
 
     def __init__(
-        self, config: Optional[AGICoreConfig] = None, llm_manager=None, data_dir: str = "."
+        self, config: AGICoreConfig | None = None, llm_manager=None, data_dir: str = "."
     ):
         self.config = config or AGICoreConfig()
         self.llm = llm_manager
@@ -74,8 +70,8 @@ class AGICoreSystem:
         )
         self.knowledge = DynamicKnowledgeGraph(db_path=f"{data_dir}/{self.config.knowledge_db}")
 
-        self._evolution: Optional[SelfEvolutionEngine] = None
-        self._reasoning_manager: Optional[ReasoningChainManager] = None
+        self._evolution: SelfEvolutionEngine | None = None
+        self._reasoning_manager: ReasoningChainManager | None = None
 
         self._initialized = False
 
@@ -121,9 +117,9 @@ class AGICoreSystem:
         self,
         content: str,
         user_id: str = "",
-        context: Optional[Dict[str, Any]] = None,
-        usmsb_element: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+        usmsb_element: str | None = None,
+    ) -> dict[str, Any]:
         await self.init()
 
         memory = await self.memory.memorize(
@@ -195,7 +191,7 @@ class AGICoreSystem:
 
         if self._evolution:
             report = self._evolution.get_comprehensive_report()
-            parts.append(f"\n## 进化状态")
+            parts.append("\n## 进化状态")
             parts.append(f"- 阶段: {report['evolution_state']['phase']}")
             parts.append(f"- 知识量: {report['evolution_state']['total_knowledge']}")
 
@@ -207,7 +203,7 @@ class AGICoreSystem:
         return context
 
     async def add_usmsb_knowledge(
-        self, element: str, content: str, relations: Optional[List[Dict[str, str]]] = None
+        self, element: str, content: str, relations: list[dict[str, str]] | None = None
     ) -> KnowledgeNode:
         await self.init()
 
@@ -229,7 +225,7 @@ class AGICoreSystem:
 
     async def smart_recall(
         self, query: str, user_id: str = "", include_reasoning: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         await self.init()
 
         memories = await self.memory.recall(query, user_id, top_k=10)
@@ -276,7 +272,7 @@ class AGICoreSystem:
             },
         }
 
-    async def autonomous_learning(self) -> Dict[str, Any]:
+    async def autonomous_learning(self) -> dict[str, Any]:
         await self.init()
 
         if not self._evolution:
@@ -284,7 +280,7 @@ class AGICoreSystem:
 
         return await self._evolution.autonomous_learning()
 
-    async def self_reflect(self) -> Dict[str, Any]:
+    async def self_reflect(self) -> dict[str, Any]:
         await self.init()
 
         if not self._evolution:
@@ -299,7 +295,7 @@ class AGICoreSystem:
             "confidence_level": reflection.confidence_level,
         }
 
-    def get_system_stats(self) -> Dict[str, Any]:
+    def get_system_stats(self) -> dict[str, Any]:
         stats = {
             "memory": {"initialized": self.memory._initialized},
             "knowledge": self.knowledge.get_stats(),
@@ -310,7 +306,7 @@ class AGICoreSystem:
 
         return stats
 
-    async def export_knowledge(self) -> Dict[str, Any]:
+    async def export_knowledge(self) -> dict[str, Any]:
         await self.init()
 
         permanent = await self.memory.get_permanent()

@@ -3,11 +3,11 @@ Evolution Module - Meta Agent 自主进化模块
 """
 
 from .engine import (
+    CapabilityMetric,
     EvolutionEngine,
     EvolutionRecord,
-    EvolutionType,
     EvolutionStatus,
-    CapabilityMetric,
+    EvolutionType,
 )
 
 __all__ = [

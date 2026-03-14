@@ -4,19 +4,17 @@ Agent API Key Authentication
 Provides authentication dependency for agent API endpoints using X-API-Key and X-Agent-ID headers.
 """
 
-import time
 import json
-from typing import Optional, Dict, Any, Callable
-from fastapi import Header, HTTPException, Depends
+import time
+from typing import Any
+
+from fastapi import Depends, Header, HTTPException
 
 from ..database import (
     get_db,
-    get_api_key_by_hash,
-    get_api_keys_by_agent,
     update_api_key_last_used,
-    get_agent_binding_info,
 )
-from .api_key_manager import verify_api_key, get_stake_tier, get_tier_benefits
+from .api_key_manager import get_stake_tier, get_tier_benefits, verify_api_key
 
 
 class ErrorCode:
@@ -32,9 +30,9 @@ class ErrorCode:
 
 
 async def get_agent_by_api_key(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID")
-) -> Dict[str, Any]:
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_agent_id: str | None = Header(None, alias="X-Agent-ID")
+) -> dict[str, Any]:
     """
     Dependency to authenticate agent by API Key.
 
@@ -170,9 +168,9 @@ async def get_agent_by_api_key(
 
 
 async def get_optional_agent(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID")
-) -> Optional[Dict[str, Any]]:
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+    x_agent_id: str | None = Header(None, alias="X-Agent-ID")
+) -> dict[str, Any] | None:
     """
     Optional agent authentication - returns None if no credentials provided.
 
@@ -203,7 +201,7 @@ def require_stake(min_stake: int = 100):
     Returns:
         Dependency function that validates stake
     """
-    async def stake_checker(agent: Dict = Depends(get_agent_by_api_key)) -> Dict:
+    async def stake_checker(agent: dict = Depends(get_agent_by_api_key)) -> dict:
         if agent['staked_amount'] < min_stake:
             raise HTTPException(
                 status_code=403,
@@ -233,7 +231,7 @@ def require_bound():
     Returns:
         Dependency function that validates binding
     """
-    async def binding_checker(agent: Dict = Depends(get_agent_by_api_key)) -> Dict:
+    async def binding_checker(agent: dict = Depends(get_agent_by_api_key)) -> dict:
         if not agent['is_bound']:
             raise HTTPException(
                 status_code=403,
@@ -261,7 +259,7 @@ def require_tier(min_tier: str):
     """
     tier_order = ["NONE", "BRONZE", "SILVER", "GOLD", "PLATINUM"]
 
-    async def tier_checker(agent: Dict = Depends(get_agent_by_api_key)) -> Dict:
+    async def tier_checker(agent: dict = Depends(get_agent_by_api_key)) -> dict:
         current_idx = tier_order.index(agent['stake_tier']) if agent['stake_tier'] in tier_order else 0
         required_idx = tier_order.index(min_tier) if min_tier in tier_order else 0
 
@@ -269,7 +267,7 @@ def require_tier(min_tier: str):
             raise HTTPException(
                 status_code=403,
                 detail={
-                    "error": f"Insufficient stake tier",
+                    "error": "Insufficient stake tier",
                     "code": ErrorCode.INSUFFICIENT_STAKE,
                     "message": f"This action requires {min_tier} tier or higher. "
                               f"Current tier: {agent['stake_tier']}",
@@ -291,7 +289,7 @@ def require_permission(permission: str):
     Returns:
         Dependency function that validates permission
     """
-    async def permission_checker(agent: Dict = Depends(get_agent_by_api_key)) -> Dict:
+    async def permission_checker(agent: dict = Depends(get_agent_by_api_key)) -> dict:
         if permission not in agent['permissions'] and '*' not in agent['permissions']:
             raise HTTPException(
                 status_code=403,
@@ -306,7 +304,7 @@ def require_permission(permission: str):
     return permission_checker
 
 
-def verify_agent_access(agent: Dict[str, Any], target_agent_id: str) -> bool:
+def verify_agent_access(agent: dict[str, Any], target_agent_id: str) -> bool:
     """
     Verify that the authenticated agent/user has access to the target agent's resources.
 
@@ -364,31 +362,31 @@ def verify_agent_access(agent: Dict[str, Any], target_agent_id: str) -> bool:
 
 # Convenience functions for route handlers
 
-def agent_id_matches(agent: Dict[str, Any], target_id: str) -> bool:
+def agent_id_matches(agent: dict[str, Any], target_id: str) -> bool:
     """Check if agent ID matches the target ID."""
     return agent['agent_id'] == target_id
 
 
-def get_agent_id(agent: Dict[str, Any]) -> str:
+def get_agent_id(agent: dict[str, Any]) -> str:
     """Get agent ID from agent dict."""
     return agent['agent_id']
 
 
-def is_agent_bound(agent: Dict[str, Any]) -> bool:
+def is_agent_bound(agent: dict[str, Any]) -> bool:
     """Check if agent is bound to owner."""
     return agent.get('is_bound', False)
 
 
-def get_stake_amount(agent: Dict[str, Any]) -> float:
+def get_stake_amount(agent: dict[str, Any]) -> float:
     """Get staked amount from agent dict."""
     return agent.get('staked_amount', 0)
 
 
-def get_tier(agent: Dict[str, Any]) -> str:
+def get_tier(agent: dict[str, Any]) -> str:
     """Get stake tier from agent dict."""
     return agent.get('stake_tier', 'NONE')
 
 
-def has_minimum_stake(agent: Dict[str, Any], min_stake: float) -> bool:
+def has_minimum_stake(agent: dict[str, Any], min_stake: float) -> bool:
     """Check if agent has minimum stake."""
     return agent.get('staked_amount', 0) >= min_stake

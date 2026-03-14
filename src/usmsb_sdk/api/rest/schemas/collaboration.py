@@ -2,7 +2,6 @@
 Collaboration-related Pydantic schemas.
 """
 
-from typing import List
 
 from pydantic import BaseModel
 
@@ -11,7 +10,7 @@ class CollaborationCreateRequest(BaseModel):
     """Schema for creating a collaboration."""
 
     goal_description: str
-    required_skills: List[str]
+    required_skills: list[str]
     collaboration_mode: str = "hybrid"
     coordinator_agent_id: str
 
@@ -28,9 +27,9 @@ class CollaborationResponse(BaseModel):
 
     collaboration_id: str
     goal_description: str
-    required_skills: List[str]
+    required_skills: list[str]
     collaboration_mode: str = "hybrid"
     coordinator_agent_id: str
     status: str = "forming"
-    participants: List[str] = []
+    participants: list[str] = []
     created_at: float = 0.0

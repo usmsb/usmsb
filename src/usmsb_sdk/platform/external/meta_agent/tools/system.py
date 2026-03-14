@@ -6,16 +6,9 @@
 """
 
 import asyncio
-import hashlib
-import json
 import logging
 import os
-import re
-import shutil
-import subprocess
-import tempfile
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..session.user_session import UserSession
@@ -38,19 +31,18 @@ def _get_path(params: dict) -> str:
 
 if TYPE_CHECKING:
     from ..session.user_session import UserSession
-    from ..workspace.user_workspace import UserWorkspace
 
 from .registry import Tool
 from .security import (
+    SecurityLevel,
     check_command_whitelist,
     check_path_safety,
-    SecurityLevel,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def get_system_tools() -> List[Tool]:
+def get_system_tools() -> list[Tool]:
     """获取系统工具列表"""
     return [
         Tool(
@@ -173,7 +165,7 @@ async def register_tools(registry):
         registry.register(tool)
 
 
-async def execute_command(params: dict) -> Dict[str, Any]:
+async def execute_command(params: dict) -> dict[str, Any]:
     """
     执行命令行命令（全局版本，不需要用户会话）
 
@@ -230,7 +222,7 @@ async def execute_command(params: dict) -> Dict[str, Any]:
 
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
             return {
                 "status": "timeout",
@@ -253,7 +245,7 @@ async def execute_command(params: dict) -> Dict[str, Any]:
         }
 
 
-async def run_program(params: dict) -> Dict[str, Any]:
+async def run_program(params: dict) -> dict[str, Any]:
     """
     运行程序或脚本（全局版本，不需要用户会话）
 
@@ -306,9 +298,9 @@ async def run_program(params: dict) -> Dict[str, Any]:
 
         try:
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
-            return {"status": "timeout", "message": f"程序执行超时"}
+            return {"status": "timeout", "message": "程序执行超时"}
 
         return {
             "status": "success",
@@ -323,7 +315,7 @@ async def run_program(params: dict) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-async def read_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def read_file(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     读取文件内容（用户工作空间隔离版本）
 
@@ -345,7 +337,7 @@ async def read_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     path = _get_path(params)
     offset = params.get("offset", 0)
     limit = params.get("limit", 10000)
-    encoding = params.get("encoding", "utf-8")
+    params.get("encoding", "utf-8")
 
     try:
         # 使用用户工作空间读取文件
@@ -379,7 +371,7 @@ async def read_file(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def write_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def write_file(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     写入文件（用户工作空间隔离版本）
 
@@ -400,7 +392,7 @@ async def write_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     """
     path = _get_path(params)
     content = params.get("content", "")
-    mode = params.get("mode", "w")
+    params.get("mode", "w")
     user_confirmed = params.get("user_confirmed", False)
 
     try:
@@ -431,7 +423,7 @@ async def write_file(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def list_directory(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def list_directory(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     列出目录内容（用户工作空间隔离版本）
 
@@ -475,7 +467,7 @@ async def list_directory(session: "UserSession", params: dict) -> Dict[str, Any]
         }
 
 
-async def create_directory(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def create_directory(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     创建目录（用户工作空间隔离版本）
 
@@ -489,7 +481,7 @@ async def create_directory(session: "UserSession", params: dict) -> Dict[str, An
         创建结果
     """
     path = _get_path(params)
-    parents = params.get("parents", True)
+    params.get("parents", True)
 
     try:
         # 使用用户工作空间创建目录
@@ -508,7 +500,7 @@ async def create_directory(session: "UserSession", params: dict) -> Dict[str, An
         }
 
 
-async def delete_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def delete_file(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     删除文件或目录（用户工作空间隔离版本）
 
@@ -550,7 +542,7 @@ async def delete_file(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def search_files(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def search_files(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     搜索文件（用户工作空间隔离版本）
 
@@ -595,7 +587,7 @@ async def search_files(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def get_file_info(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def get_file_info(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     获取文件信息（用户工作空间隔离版本）
 
@@ -633,7 +625,7 @@ async def get_file_info(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def copy_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def copy_file(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     复制文件或目录（用户工作空间隔离版本）
 
@@ -649,7 +641,7 @@ async def copy_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     """
     source = params.get("source", "")
     destination = params.get("destination", "")
-    user_confirmed = params.get("user_confirmed", False)
+    params.get("user_confirmed", False)
 
     try:
         # 使用用户工作空间复制文件
@@ -669,7 +661,7 @@ async def copy_file(session: "UserSession", params: dict) -> Dict[str, Any]:
         }
 
 
-async def move_file(session: "UserSession", params: dict) -> Dict[str, Any]:
+async def move_file(session: "UserSession", params: dict) -> dict[str, Any]:
     """
     移动或重命名文件（用户工作空间隔离版本）
 
@@ -685,7 +677,7 @@ async def move_file(session: "UserSession", params: dict) -> Dict[str, Any]:
     """
     source = params.get("source", "")
     destination = params.get("destination", "")
-    user_confirmed = params.get("user_confirmed", False)
+    params.get("user_confirmed", False)
 
     try:
         # 使用用户工作空间移动文件

@@ -11,11 +11,11 @@ JointOrder 联合订单合约客户端
 """
 
 from enum import IntEnum
-from typing import List, Optional, Dict, Any, Union
+from typing import Any
 
-from .base import BaseContractClient, TransactionError, ContractError
 from ..config import BlockchainConfig
 from ..web3_client import Web3Client
+from .base import BaseContractClient, ContractError, TransactionError
 
 
 class PoolStatus(IntEnum):
@@ -53,10 +53,10 @@ class JointOrderClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Web3Client] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Union[List[Dict], str]] = None,
+        web3_client: Web3Client | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: list[dict] | str | None = None,
     ):
         """
         初始化 JointOrder 客户端
@@ -81,7 +81,7 @@ class JointOrderClient(BaseContractClient):
 
         self.set_contract(contract_address, abi)
 
-    def _get_default_abi(self) -> List[Dict]:
+    def _get_default_abi(self) -> list[dict]:
         """获取默认 ABI"""
         return [
             # 只读函数
@@ -243,10 +243,10 @@ class JointOrderClient(BaseContractClient):
         bidding_duration: int,
         from_address: str,
         private_key: str,
-        funding_duration: Optional[int] = None,
-        delivery_deadline: Optional[int] = None,
-        metadata_hash: Optional[bytes] = None,
-        gas_limit: Optional[int] = None,
+        funding_duration: int | None = None,
+        delivery_deadline: int | None = None,
+        metadata_hash: bytes | None = None,
+        gas_limit: int | None = None,
     ) -> str:
         """创建需求池
 
@@ -342,8 +342,8 @@ class JointOrderClient(BaseContractClient):
         from_address: str,
         private_key: str,
         proposal: str = "",
-        reputation_signature: Optional[bytes] = None,
-        gas_limit: Optional[int] = None,
+        reputation_signature: bytes | None = None,
+        gas_limit: int | None = None,
     ) -> str:
         """提交报价
 
@@ -414,7 +414,7 @@ class JointOrderClient(BaseContractClient):
         bid_id: str,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """接受报价（授标）
 
@@ -478,7 +478,7 @@ class JointOrderClient(BaseContractClient):
         from_address: str,
         private_key: str,
         reason: str = "",
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """取消需求池
 
@@ -529,7 +529,7 @@ class JointOrderClient(BaseContractClient):
         except Exception as e:
             raise TransactionError(f"Failed to cancel pool: {e}")
 
-    async def get_pool_info(self, pool_id: str) -> Dict[str, Any]:
+    async def get_pool_info(self, pool_id: str) -> dict[str, Any]:
         """获取需求池信息
 
         Args:
@@ -597,7 +597,7 @@ class JointOrderClient(BaseContractClient):
         except Exception as e:
             raise ContractError(f"Failed to get pool info: {e}")
 
-    async def get_bids(self, pool_id: str) -> List[Dict[str, Any]]:
+    async def get_bids(self, pool_id: str) -> list[dict[str, Any]]:
         """获取需求池的所有报价
 
         Args:
@@ -667,7 +667,7 @@ class JointOrderClient(BaseContractClient):
         rating: int,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """确认交付
 
@@ -714,7 +714,7 @@ class JointOrderClient(BaseContractClient):
         pool_id: str,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """提取收益
 
@@ -755,7 +755,7 @@ class JointOrderClient(BaseContractClient):
         pool_id: str,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """领取退款
 
@@ -793,7 +793,7 @@ class JointOrderClient(BaseContractClient):
         except Exception as e:
             raise TransactionError(f"Failed to claim refund: {e}")
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """获取联合订单统计信息
 
         Returns:

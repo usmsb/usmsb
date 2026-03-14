@@ -12,11 +12,11 @@ VIBGovernance 治理合约客户端
 """
 
 from enum import IntEnum
-from typing import Optional, Dict, Any, Union, List, Tuple
+from typing import Any
 
-from .base import BaseContractClient, TransactionError, ContractError
 from ..config import BlockchainConfig
 from ..web3_client import Web3Client
+from .base import BaseContractClient, ContractError, TransactionError
 
 
 class ProposalType(IntEnum):
@@ -97,10 +97,10 @@ class VIBGovernanceClient(BaseContractClient):
 
     def __init__(
         self,
-        web3_client: Optional[Web3Client] = None,
-        config: Optional[BlockchainConfig] = None,
-        contract_address: Optional[str] = None,
-        abi: Optional[Union[List[Dict], str]] = None,
+        web3_client: Web3Client | None = None,
+        config: BlockchainConfig | None = None,
+        contract_address: str | None = None,
+        abi: list[dict] | str | None = None,
     ):
         """
         初始化 VIBGovernance 客户端
@@ -125,7 +125,7 @@ class VIBGovernanceClient(BaseContractClient):
 
         self.set_contract(contract_address, abi)
 
-    def _get_default_abi(self) -> List[Dict]:
+    def _get_default_abi(self) -> list[dict]:
         """获取默认 ABI"""
         return [
             # 只读函数
@@ -276,8 +276,8 @@ class VIBGovernanceClient(BaseContractClient):
         data: bytes,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
-    ) -> Tuple[int, str]:
+        gas_limit: int | None = None,
+    ) -> tuple[int, str]:
         """创建提案
 
         Args:
@@ -332,7 +332,7 @@ class VIBGovernanceClient(BaseContractClient):
 
             # 从交易回执中获取提案ID（如果可能）
             # 对于新提案，ID通常是提案数量 - 1
-            receipt = self.wait_for_transaction(tx_hash, timeout=120)
+            self.wait_for_transaction(tx_hash, timeout=120)
 
             # 获取当前提案数量
             proposal_count = self.call_contract_function(
@@ -352,7 +352,7 @@ class VIBGovernanceClient(BaseContractClient):
         support: int,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """对提案投票
 
@@ -407,7 +407,7 @@ class VIBGovernanceClient(BaseContractClient):
         proposal_id: int,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """结算提案
 
@@ -457,7 +457,7 @@ class VIBGovernanceClient(BaseContractClient):
         proposal_id: int,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """执行提案
 
@@ -507,7 +507,7 @@ class VIBGovernanceClient(BaseContractClient):
         proposal_id: int,
         from_address: str,
         private_key: str,
-        gas_limit: Optional[int] = None,
+        gas_limit: int | None = None,
     ) -> str:
         """取消提案
 
@@ -543,7 +543,7 @@ class VIBGovernanceClient(BaseContractClient):
         except Exception as e:
             raise TransactionError(f"Failed to cancel proposal: {e}")
 
-    async def get_proposal(self, proposal_id: int) -> Dict[str, Any]:
+    async def get_proposal(self, proposal_id: int) -> dict[str, Any]:
         """获取提案详情
 
         Args:
@@ -723,7 +723,7 @@ class VIBGovernanceClient(BaseContractClient):
         }
         return durations.get(proposal_type, self.GENERAL_DURATION)
 
-    async def get_proposal_summary(self, proposal_id: int) -> Dict[str, Any]:
+    async def get_proposal_summary(self, proposal_id: int) -> dict[str, Any]:
         """获取提案摘要信息
 
         Args:

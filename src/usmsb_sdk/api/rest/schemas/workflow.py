@@ -2,7 +2,6 @@
 Workflow-related Pydantic schemas.
 """
 
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,7 +11,7 @@ class WorkflowCreate(BaseModel):
 
     task_description: str = Field(..., min_length=1)
     agent_id: str
-    available_tools: Optional[List[str]] = None
+    available_tools: list[str] | None = None
 
 
 class WorkflowResponse(BaseModel):
@@ -22,6 +21,6 @@ class WorkflowResponse(BaseModel):
     task_description: str
     agent_id: str
     status: str = "pending"
-    result: Optional[dict] = None
-    steps: List[dict] = []
+    result: dict | None = None
+    steps: list[dict] = []
     created_at: float = 0.0

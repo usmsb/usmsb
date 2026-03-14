@@ -6,12 +6,12 @@
 
 from .registry import (
     SensitiveInfoHandler,
+    SensitiveInfoMatch,
     SensitiveInfoRegistry,
     SensitiveInfoType,
-    SensitiveInfoMatch,
+    clear_sensitive_info_registry,
     get_sensitive_info_registry,
     register_sensitive_info_handler,
-    clear_sensitive_info_registry,
 )
 
 __all__ = [

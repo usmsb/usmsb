@@ -3,7 +3,7 @@ Knowledge Base - 知识库
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class KnowledgeBase:
 
     def __init__(self, config):
         self.config = config
-        self.knowledge: List[Dict[str, Any]] = []
+        self.knowledge: list[dict[str, Any]] = []
 
     async def init(self):
         logger.info("Knowledge Base initialized")
@@ -25,7 +25,7 @@ class KnowledgeBase:
     async def add_knowledge(
         self,
         content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         添加知识到知识库
@@ -62,6 +62,6 @@ class KnowledgeBase:
                     break
         return results
 
-    def get_all(self) -> List[Dict[str, Any]]:
+    def get_all(self) -> list[dict[str, Any]]:
         """获取所有知识"""
         return self.knowledge
