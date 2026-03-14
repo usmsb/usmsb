@@ -483,8 +483,21 @@ contract VIBGovernance is
     function _getCommunityWeight(address user) internal view returns (uint256) {
         if (!kycVerified[user] || kycUserCount == 0) return 0;
 
-        uint256 totalVP = _getTotalVotingPower();
-        uint256 totalCommunityWeight = (totalVP * 10) / 100;
+        // 使用缓存的总投票权避免循环依赖
+        uint256 totalVP;
+        if (cachedTotalVotingPower > 0 &&
+            block.timestamp < totalVotingPowerCacheTime + VOTE_POWER_CACHE_DURATION) {
+            totalVP = cachedTotalVotingPower;
+        } else {
+            // 独立计算社区权重（不含循环）
+            uint256 basePower = _getTotalStakedAmount();
+            uint256 estimatedProduction = contributionPointsContract != address(0) ?
+                (IContributionPoints(contributionPointsContract).totalContributionPoints() * 10) / 100 : 0;
+            // 社区权重 = (基础 + 生产) * 10%
+            totalVP = basePower + estimatedProduction;
+        }
+
+        uint256 totalCommunityWeight = (totalVP * COMMUNITY_WEIGHT_RATIO) / 100;
 
         return totalCommunityWeight / kycUserCount;
     }
