@@ -65,10 +65,10 @@ export default function Sidebar() {
       className={clsx(
         'fixed left-0 top-0 h-full transition-all duration-300 ease-out z-30',
         'flex flex-col',
-        // Light Mode
-        'bg-white border-r border-gray-200',
-        // Dark Mode - Cyberpunk card style
-        isDark && 'bg-cyber-card/95 backdrop-blur-xl border-r border-neon-blue/20',
+        // Background - Light/Dark mode (must be mutually exclusive)
+        isDark
+          ? 'bg-cyber-card/95 backdrop-blur-xl border-r border-neon-blue/20'
+          : 'bg-white border-r border-gray-200',
         sidebarOpen ? 'w-64' : 'w-20'
       )}
     >
