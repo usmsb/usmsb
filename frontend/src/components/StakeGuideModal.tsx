@@ -64,20 +64,20 @@ export function StakeGuideModal({
       <div
         className={clsx(
           'relative rounded-2xl shadow-xl max-w-md w-full overflow-hidden',
-          // Light mode
-          'bg-white border border-gray-200',
-          // Dark mode - cyberpunk style
-          isDark && 'bg-cyber-card border border-neon-blue/30'
+          // Background - Light/Dark mode (must be mutually exclusive)
+          isDark
+            ? 'bg-cyber-card border border-neon-blue/30'
+            : 'bg-white border border-gray-200'
         )}
       >
         {/* Header */}
         <div
           className={clsx(
             'relative px-6 py-8',
-            // Light mode
-            'bg-gradient-to-r from-blue-500 to-blue-600',
-            // Dark mode - cyberpunk gradient
-            isDark && 'bg-gradient-to-r from-neon-blue/20 to-neon-purple/20'
+            // Gradient background - Light/Dark mode (must be mutually exclusive)
+            isDark
+              ? 'bg-gradient-to-r from-neon-blue/20 to-neon-purple/20'
+              : 'bg-gradient-to-r from-blue-500 to-blue-600'
           )}
         >
           {/* Cyberpunk border effect */}
