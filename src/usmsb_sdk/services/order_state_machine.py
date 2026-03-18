@@ -49,6 +49,13 @@ class OrderEvent(Enum):
 
 
 # State transition table: (current_status, event) -> new_status
+#
+# Invariant rules:
+# - COMPLETED is always terminal (funds already released, no going back)
+# - REFUNDED is always terminal (funds returned, no further transitions)
+# - EXPIRED is always terminal
+# - CANCELLED is terminal (funds held until manual resolution, not auto-refunded)
+# - DISPUTED can only: accept (→ COMPLETED) or refund (→ REFUNDED), NOT cancel
 TRANSITIONS: dict[tuple[OrderStatus, OrderEvent], OrderStatus] = {
     # From CREATED
     (OrderStatus.CREATED, OrderEvent.both_confirmed): OrderStatus.CONFIRMED,
@@ -71,13 +78,18 @@ TRANSITIONS: dict[tuple[OrderStatus, OrderEvent], OrderStatus] = {
     (OrderStatus.DELIVERED, OrderEvent.dispute_raised): OrderStatus.DISPUTED,
     (OrderStatus.DELIVERED, OrderEvent.deadline_missed): OrderStatus.EXPIRED,
 
-    # From DISPUTED
+    # From DISPUTED — only resolve, never cancel
+    # Accept dispute resolution → funds released to provider → COMPLETED
     (OrderStatus.DISPUTED, OrderEvent.accepted): OrderStatus.COMPLETED,
+    # Refund after dispute → funds returned to demand → REFUNDED
     (OrderStatus.DISPUTED, OrderEvent.refund_processed): OrderStatus.REFUNDED,
-    (OrderStatus.DISPUTED, OrderEvent.cancelled): OrderStatus.CANCELLED,
+    # NOTE: DISPUTED → CANCELLED removed (disputed orders cannot be unilaterally cancelled)
+    # NOTE: DISPUTED → EXPIRED removed
 
-    # From CANCELLED
-    (OrderStatus.CANCELLED, OrderEvent.refund_processed): OrderStatus.REFUNDED,
+    # COMPLETED is terminal — no transitions out (funds already released)
+    # EXPIRED is terminal — deadline passed without delivery
+    # CANCELLED is terminal — cancelled before work started, no auto-refund
+    # REFUNDED is terminal — funds returned after dispute
 }
 
 
@@ -86,9 +98,12 @@ VALID_TRANSITIONS: dict[OrderStatus, list[OrderEvent]] = {
     OrderStatus.CONFIRMED: [OrderEvent.work_started, OrderEvent.cancelled, OrderEvent.expired],
     OrderStatus.IN_PROGRESS: [OrderEvent.deliverable_submitted, OrderEvent.dispute_raised, OrderEvent.cancelled, OrderEvent.deadline_missed],
     OrderStatus.DELIVERED: [OrderEvent.accepted, OrderEvent.dispute_raised, OrderEvent.deadline_missed],
-    OrderStatus.DISPUTED: [OrderEvent.accepted, OrderEvent.refund_processed, OrderEvent.cancelled],
+    # DISPUTED: only accept (resolve dispute in provider's favor) or refund
+    OrderStatus.DISPUTED: [OrderEvent.accepted, OrderEvent.refund_processed],
+    # CANCELLED: no transitions (terminal — requires manual dispute resolution)
+    OrderStatus.CANCELLED: [],
+    # Terminal states
     OrderStatus.COMPLETED: [],
-    OrderStatus.CANCELLED: [OrderEvent.refund_processed],
     OrderStatus.EXPIRED: [],
     OrderStatus.REFUNDED: [],
 }

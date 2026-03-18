@@ -211,12 +211,25 @@ class PreMatchNegotiationService:
         demand_id: str,
         initial_message: str | None = None,
         expiration_hours: int = DEFAULT_EXPIRATION_HOURS,
+        initiator_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Initiate a pre-match negotiation.
 
-        Creates a negotiation session between demand and supply agents.
+        Args:
+            demand_agent_id: The demand side agent
+            supply_agent_id: The supply side agent
+            demand_id: Associated demand ID
+            initial_message: Optional opening message
+            expiration_hours: Hours until negotiation expires
+            initiator_id: The agent initiating this (must be demand or supply)
         """
+        # Participant validation: initiator must be one of the parties
+        if initiator_id and initiator_id not in [demand_agent_id, supply_agent_id]:
+            raise PermissionError(
+                f"Initiator {initiator_id} is not a party to this negotiation"
+            )
+
         negotiation_id = f"neg-{uuid4().hex[:12]}"
 
         # Create negotiation record
@@ -499,39 +512,78 @@ class PreMatchNegotiationService:
     ) -> dict[str, Any]:
         """
         Confirm the match - both parties must confirm.
+
+        Uses atomic UPDATE to prevent TOCTOU race condition:
+        Only one confirmation can succeed if mutual_interest is currently NULL.
         """
         negotiation = self._get_and_validate_negotiation(negotiation_id)
         if not negotiation:
             raise ValueError(f"Negotiation {negotiation_id} not found or expired")
 
-        # Check if this is the first or second confirmation
-        if negotiation.mutual_interest is None:
-            # First confirmation
-            negotiation.mutual_interest = True
-            negotiation.last_updated = datetime.utcnow()
-            self.db.commit()
+        # Validate confirmer is a party
+        if confirmer_id not in [negotiation.demand_agent_id, negotiation.supply_agent_id]:
+            raise PermissionError(f"Confirmer {confirmer_id} is not a party to this negotiation")
 
-            self.logger.info(f"First confirmation for negotiation {negotiation_id}")
+        # Atomic update: only succeeds if mutual_interest is still NULL
+        # This prevents TOCTOU race (two simultaneous confirms)
+        rows_updated = self.db.query(PreMatchNegotiationDB).filter(
+            PreMatchNegotiationDB.negotiation_id == negotiation_id,
+            PreMatchNegotiationDB.mutual_interest.is_(None),
+        ).update(
+            {
+                "mutual_interest": True,
+                "last_updated": datetime.utcnow(),
+            },
+            synchronize_session=False,
+        )
+        self.db.commit()
 
-            return {
-                "status": "pending_counterpart",
-                "message": "Waiting for counterpart confirmation",
-            }
-        elif negotiation.mutual_interest:
-            # Second confirmation - match confirmed
-            negotiation.status = NegotiationStatus.CONFIRMED.value
-            negotiation.last_updated = datetime.utcnow()
-            self.db.commit()
+        if rows_updated == 0:
+            # Either already confirmed (mutual_interest = True) or declined (False)
+            re_check = self.db.query(PreMatchNegotiationDB).filter(
+                PreMatchNegotiationDB.negotiation_id == negotiation_id
+            ).first()
+            if re_check and re_check.mutual_interest:
+                return {
+                    "status": "confirmed",
+                    "message": "Match already confirmed by both parties",
+                    "negotiation": self._negotiation_to_dict(re_check),
+                }
+            raise ValueError("Match was already declined or another confirmation was processed")
 
+        self.logger.info(f"First confirmation for negotiation {negotiation_id}")
+
+        # Re-fetch to get updated state
+        re_check = self.db.query(PreMatchNegotiationDB).filter(
+            PreMatchNegotiationDB.negotiation_id == negotiation_id
+        ).first()
+
+        # Now do the second confirmation atomically as well
+        rows_updated2 = self.db.query(PreMatchNegotiationDB).filter(
+            PreMatchNegotiationDB.negotiation_id == negotiation_id,
+            PreMatchNegotiationDB.mutual_interest == True,
+            PreMatchNegotiationDB.status == NegotiationStatus.INITIATED.value,
+        ).update(
+            {
+                "status": NegotiationStatus.CONFIRMED.value,
+                "last_updated": datetime.utcnow(),
+            },
+            synchronize_session=False,
+        )
+        self.db.commit()
+
+        if rows_updated2 > 0:
             self.logger.info(f"Match confirmed for negotiation {negotiation_id}")
-
             return {
                 "status": "confirmed",
                 "message": "Match confirmed by both parties",
-                "negotiation": self._negotiation_to_dict(negotiation),
+                "negotiation": self._negotiation_to_dict(re_check),
             }
-        else:
-            raise ValueError("Match was already declined")
+
+        return {
+            "status": "pending_counterpart",
+            "message": "Waiting for counterpart confirmation",
+        }
 
     async def decline_match(
         self,
