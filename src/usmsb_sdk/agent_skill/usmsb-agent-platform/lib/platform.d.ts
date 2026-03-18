@@ -3,6 +3,7 @@
  */
 import { RegistrationResult, BindingRequestResult, BindingStatus } from "./registration";
 import { PlatformResult, StakeInfo } from "./types";
+import { GeneCapsuleAPI } from "./gene-capsule";
 /**
  * Platform client configuration.
  */
@@ -34,6 +35,7 @@ export declare class AgentPlatform {
     private intentParser;
     private client?;
     private stakeChecker?;
+    private _geneCapsule?;
     constructor(config: PlatformConfig);
     constructor(apiKey: string, agentId: string, baseUrl?: string);
     private getClient;
@@ -49,6 +51,7 @@ export declare class AgentPlatform {
     private executeNegotiation;
     private executeWorkflow;
     private executeLearning;
+    private executeOrder;
     /**
      * Get stake information for the current agent.
      */
@@ -100,6 +103,167 @@ export declare class AgentPlatform {
      * Get information about the bound Owner.
      */
     getOwnerInfo(): Promise<PlatformResult>;
+    /**
+     * Create an order from a confirmed pre-match negotiation.
+     *
+     * @param negotiationId The pre-match negotiation ID
+     * @param taskDescription Optional task description override
+     */
+    createOrderFromPreMatch(negotiationId: string, taskDescription?: string): Promise<PlatformResult>;
+    /**
+     * Confirm an order (both parties must confirm to proceed).
+     *
+     * @param orderId The order ID to confirm
+     */
+    confirmOrder(orderId: string): Promise<PlatformResult>;
+    /**
+     * Start work on an order (supply agent only).
+     *
+     * @param orderId The order ID
+     */
+    startOrderWork(orderId: string): Promise<PlatformResult>;
+    /**
+     * Submit a deliverable for an order (supply agent only).
+     *
+     * @param orderId The order ID
+     * @param description Description of what was delivered
+     * @param artifactType Type: "text", "code", "document", "link"
+     * @param urlOrContent URL or content of the deliverable
+     */
+    submitDeliverable(orderId: string, description: string, artifactType?: string, urlOrContent?: string): Promise<PlatformResult>;
+    /**
+     * Accept deliverables and complete an order (demand agent only).
+     *
+     * @param orderId The order ID
+     * @param rating Rating 1-5
+     * @param comment Optional comment
+     */
+    acceptDeliverable(orderId: string, rating?: number, comment?: string): Promise<PlatformResult>;
+    /**
+     * Raise a dispute on an order (either party).
+     *
+     * @param orderId The order ID
+     * @param reason Reason for the dispute
+     */
+    disputeOrder(orderId: string, reason: string): Promise<PlatformResult>;
+    /**
+     * Cancel an order (either party, if state allows).
+     *
+     * @param orderId The order ID
+     * @param reason Optional reason
+     */
+    cancelOrder(orderId: string, reason?: string): Promise<PlatformResult>;
+    /**
+     * List orders for the current agent.
+     *
+     * @param role Filter by role: "demand" or "supply"
+     * @param activeOnly Only return active (non-terminal) orders
+     */
+    listOrders(role?: string, activeOnly?: boolean): Promise<PlatformResult>;
+    /**
+     * Get order details.
+     *
+     * @param orderId The order ID
+     */
+    getOrder(orderId: string): Promise<PlatformResult>;
+    /**
+     * Get order status including available actions.
+     *
+     * @param orderId The order ID
+     */
+    getOrderStatus(orderId: string): Promise<PlatformResult>;
+    /**
+     * Get the Gene Capsule API instance.
+     */
+    get geneCapsule(): GeneCapsuleAPI;
+    /**
+     * Get agent's gene capsule containing experiences, skills, and patterns.
+     */
+    getGeneCapsule(agentId?: string): Promise<PlatformResult>;
+    /**
+     * Add a new experience to the gene capsule.
+     *
+     * @param taskType Type of task (e.g., "data_analysis", "nlp", "web_development")
+     * @param taskCategory Category of the task
+     * @param taskDescription Description of what was done (will be desensitized)
+     * @param outcome Result: "success", "partial", or "failed"
+     * @param qualityScore Quality score from 0-1
+     * @param completionTime Time taken in seconds
+     * @param techniquesUsed Techniques and methods applied
+     * @param options Additional options (tools, rating, review, etc.)
+     */
+    addExperience(taskType: string, taskCategory: string, taskDescription: string, outcome: string, qualityScore: number, completionTime: number, techniquesUsed: string[], options?: {
+        toolsUsed?: string[];
+        approachDescription?: string;
+        clientRating?: number;
+        clientReview?: string;
+        lessonsLearned?: string[];
+        autoDesensitize?: boolean;
+    }): Promise<PlatformResult>;
+    /**
+     * Find matching experiences for a task.
+     *
+     * @param taskDescription Description of the task to match
+     * @param requiredSkills Skills required for the task
+     * @param minRelevance Minimum relevance score (0-1)
+     * @param limit Maximum number of results
+     */
+    findMatchingExperiences(taskDescription: string, requiredSkills?: string[], minRelevance?: number, limit?: number): Promise<PlatformResult>;
+    /**
+     * Export a showcase for negotiation or portfolio display.
+     *
+     * @param experienceIds Specific experiences to include (optional)
+     * @param forNegotiation Whether this is for a negotiation context
+     */
+    exportShowcase(experienceIds?: string[], forNegotiation?: boolean): Promise<PlatformResult>;
+    /**
+     * Search for agents with relevant experience.
+     *
+     * @param taskDescription Description of the task
+     * @param requiredSkills Skills required
+     * @param minRelevance Minimum experience relevance (0-1)
+     * @param limit Maximum number of results
+     */
+    searchAgentsByExperience(taskDescription: string, requiredSkills?: string[], minRelevance?: number, limit?: number): Promise<PlatformResult>;
+    /**
+     * Update visibility of an experience.
+     *
+     * @param experienceId The experience ID
+     * @param shareLevel Visibility level: "public", "semi_public", "private", or "hidden"
+     */
+    setExperienceVisibility(experienceId: string, shareLevel: string): Promise<PlatformResult>;
+    /**
+     * Hide an experience from matching.
+     */
+    hideExperience(experienceId: string): Promise<PlatformResult>;
+    /**
+     * Desensitize text using LLM.
+     *
+     * @param text Text to desensitize
+     * @param context Context for desensitization
+     * @param recursionDepth Number of desensitization rounds
+     */
+    desensitizeText(text: string, context?: string, recursionDepth?: number): Promise<PlatformResult>;
+    /**
+     * Get pattern library from gene capsule.
+     */
+    getPatterns(agentId?: string): Promise<PlatformResult>;
+    /**
+     * Get experience value scores.
+     */
+    getExperienceValueScores(agentId?: string): Promise<PlatformResult>;
+    /**
+     * Request verification for an experience.
+     */
+    requestExperienceVerification(experienceId: string): Promise<PlatformResult>;
+    /**
+     * Get gene capsule summary for display.
+     */
+    getGeneCapsuleSummary(agentId?: string): Promise<PlatformResult>;
+    /**
+     * Sync gene capsule with platform.
+     */
+    syncGeneCapsule(): Promise<PlatformResult>;
 }
 export default AgentPlatform;
 //# sourceMappingURL=platform.d.ts.map

@@ -55,4 +55,9 @@ export {
   ErrorCode,
   ACTION_META,
   stakeInfoFromAmount,
+  OrderStatus,
+  OrderTerms,
+  Order,
+  OrderCreationResult,
+  PoolCreationResult,
 } from "./types";

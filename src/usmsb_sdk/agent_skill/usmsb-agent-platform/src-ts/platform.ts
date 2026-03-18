@@ -18,6 +18,9 @@ import {
   ErrorCode,
   ACTION_META,
   stakeInfoFromAmount,
+  Order,
+  OrderTerms,
+  OrderStatus,
 } from "./types";
 import {
   GeneCapsuleAPI,
@@ -239,6 +242,9 @@ export class AgentPlatform {
         case "learning":
           result = await this.executeLearning(client, meta.action, params);
           break;
+        case "order":
+          result = await this.executeOrder(client, meta.action, params);
+          break;
         default:
           return {
             success: false,
@@ -394,6 +400,83 @@ export class AgentPlatform {
         return client.get("/api/learning/insights", params);
       default:
         return client.get(`/api/learning/${action}`, params);
+    }
+  }
+
+  private async executeOrder(client: PlatformClient, action: string, params: any): Promise<any> {
+    switch (action) {
+      case "from_pre_match":
+        // POST /api/orders/from-pre-match
+        return client.post("/api/orders/from-pre-match", {
+          negotiation_id: params.negotiationId || params.prematchId || params.id,
+          task_description: params.taskDescription,
+        });
+
+      case "create":
+        // POST /api/orders/from-negotiation
+        return client.post("/api/orders/from-negotiation", {
+          negotiation_session_id: params.negotiationSessionId || params.negotiationId,
+          price: params.price,
+          delivery_time: params.deliveryTime,
+          delivery_description: params.deliveryDescription || params.taskDescription,
+          payment_terms: params.paymentTerms || "escrow",
+          milestones: params.milestones || [],
+          task_description: params.taskDescription,
+          demand_agent_id: params.demandAgentId,
+          supply_agent_id: params.supplyAgentId,
+        });
+
+      case "confirm":
+        // POST /api/orders/{id}/confirm
+        return client.post(`/api/orders/${params.orderId || params.id}/confirm`, {});
+
+      case "start":
+        // POST /api/orders/{id}/start
+        return client.post(`/api/orders/${params.orderId || params.id}/start`, {});
+
+      case "deliver":
+        // POST /api/orders/{id}/deliver
+        return client.post(`/api/orders/${params.orderId || params.id}/deliver`, {
+          description: params.description,
+          artifact_type: params.artifactType || "text",
+          url_or_content: params.urlOrContent || params.content || "",
+        });
+
+      case "accept":
+        // POST /api/orders/{id}/accept
+        return client.post(`/api/orders/${params.orderId || params.id}/accept`, {
+          rating: params.rating || 5,
+          comment: params.comment || "",
+        });
+
+      case "dispute":
+        // POST /api/orders/{id}/dispute
+        return client.post(`/api/orders/${params.orderId || params.id}/dispute`, {
+          reason: params.reason || "Dispute raised",
+        });
+
+      case "cancel":
+        // POST /api/orders/{id}/cancel
+        return client.post(`/api/orders/${params.orderId || params.id}/cancel`, {
+          reason: params.reason || "",
+        });
+
+      case "list":
+        // GET /api/orders
+        return client.get("/api/orders", {
+          status: params.status,
+          role: params.role,
+          active_only: params.activeOnly || false,
+          limit: params.limit || 50,
+        });
+
+      case "get":
+      case "status":
+        // GET /api/orders/{id} or /api/orders/{id}/status
+        return client.get(`/api/orders/${params.orderId || params.id}`, {});
+
+      default:
+        return client.get("/api/orders", params);
     }
   }
 
@@ -576,6 +659,184 @@ export class AgentPlatform {
     const client = this.getClient();
     try {
       const result = await client.get("/api/agents/v2/owner");
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  // === Order Management ===
+
+  /**
+   * Create an order from a confirmed pre-match negotiation.
+   *
+   * @param negotiationId The pre-match negotiation ID
+   * @param taskDescription Optional task description override
+   */
+  async createOrderFromPreMatch(
+    negotiationId: string,
+    taskDescription?: string
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_FROM_PRE_MATCH, {
+        negotiationId,
+        taskDescription,
+      });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Confirm an order (both parties must confirm to proceed).
+   *
+   * @param orderId The order ID to confirm
+   */
+  async confirmOrder(orderId: string): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_CONFIRM, { orderId });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Start work on an order (supply agent only).
+   *
+   * @param orderId The order ID
+   */
+  async startOrderWork(orderId: string): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_START, { orderId });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Submit a deliverable for an order (supply agent only).
+   *
+   * @param orderId The order ID
+   * @param description Description of what was delivered
+   * @param artifactType Type: "text", "code", "document", "link"
+   * @param urlOrContent URL or content of the deliverable
+   */
+  async submitDeliverable(
+    orderId: string,
+    description: string,
+    artifactType: string = "text",
+    urlOrContent: string = ""
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_DELIVER, {
+        orderId,
+        description,
+        artifactType,
+        urlOrContent,
+      });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Accept deliverables and complete an order (demand agent only).
+   *
+   * @param orderId The order ID
+   * @param rating Rating 1-5
+   * @param comment Optional comment
+   */
+  async acceptDeliverable(
+    orderId: string,
+    rating: number = 5,
+    comment: string = ""
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_ACCEPT, {
+        orderId,
+        rating,
+        comment,
+      });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Raise a dispute on an order (either party).
+   *
+   * @param orderId The order ID
+   * @param reason Reason for the dispute
+   */
+  async disputeOrder(orderId: string, reason: string): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_DISPUTE, { orderId, reason });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Cancel an order (either party, if state allows).
+   *
+   * @param orderId The order ID
+   * @param reason Optional reason
+   */
+  async cancelOrder(orderId: string, reason: string = ""): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_CANCEL, { orderId, reason });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * List orders for the current agent.
+   *
+   * @param role Filter by role: "demand" or "supply"
+   * @param activeOnly Only return active (non-terminal) orders
+   */
+  async listOrders(
+    role?: string,
+    activeOnly: boolean = false
+  ): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_LIST, { role, activeOnly });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Get order details.
+   *
+   * @param orderId The order ID
+   */
+  async getOrder(orderId: string): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_GET, { orderId });
+      return { success: true, result };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * Get order status including available actions.
+   *
+   * @param orderId The order ID
+   */
+  async getOrderStatus(orderId: string): Promise<PlatformResult> {
+    try {
+      const result = await this.execute(ActionType.ORDER_STATUS, { orderId });
       return { success: true, result };
     } catch (e: any) {
       return { success: false, error: e.message };

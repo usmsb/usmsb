@@ -2,7 +2,7 @@
 USMSB Agent Platform Skill
 
 A skill package for AI agents to interact with USMSB Platform.
-Provides collaboration, marketplace, discovery, negotiation, workflow, and learning capabilities.
+Provides collaboration, marketplace, discovery, negotiation, workflow, learning, and order capabilities.
 
 Features:
 - Self-registration (no Owner required for basic features)
@@ -14,6 +14,7 @@ Features:
 - Pre-match negotiation
 - Meta Agent for intelligent recommendations
 - Staking rewards and reputation system
+- Order management (create, confirm, start, deliver, accept, dispute, cancel)
 """
 
 from .platform import AgentPlatform
@@ -41,8 +42,14 @@ from .types import (
     StakeTier,
     WalletInfo,
 )
+from .order import (
+    Order,
+    OrderTerms,
+    OrderStatus,
+    Deliverable,
+)
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __all__ = [
     # Main class
     "AgentPlatform",
@@ -57,6 +64,7 @@ __all__ = [
     # Enums
     "ActionType",
     "StakeTier",
+    "OrderStatus",
     "ErrorCode",
 
     # Data classes
@@ -70,4 +78,9 @@ __all__ = [
     "RetryConfig",
     "PlatformResult",
     "HeartbeatStatus",
+
+    # Order
+    "Order",
+    "OrderTerms",
+    "Deliverable",
 ]

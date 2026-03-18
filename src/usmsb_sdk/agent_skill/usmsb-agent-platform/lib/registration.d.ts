@@ -48,10 +48,10 @@ export declare class RegistrationClient {
     /**
      * Request Owner binding.
      */
-    requestBinding(apiKey: string, message?: string): Promise<BindingRequestResult>;
+    requestBinding(apiKey: string, agentId: string, message?: string): Promise<BindingRequestResult>;
     /**
      * Get Agent's binding status.
      */
-    getBindingStatus(apiKey: string): Promise<BindingStatus>;
+    getBindingStatus(apiKey: string, agentId: string): Promise<BindingStatus>;
 }
 //# sourceMappingURL=registration.d.ts.map

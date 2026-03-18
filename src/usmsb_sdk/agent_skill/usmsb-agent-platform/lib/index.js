@@ -36,7 +36,7 @@
  * ```
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stakeInfoFromAmount = exports.ACTION_META = exports.ErrorCode = exports.StakeTier = exports.ActionType = exports.RegistrationClient = exports.StakeChecker = exports.IntentParser = exports.AgentPlatform = void 0;
+exports.OrderStatus = exports.stakeInfoFromAmount = exports.ACTION_META = exports.ErrorCode = exports.StakeTier = exports.ActionType = exports.RegistrationClient = exports.StakeChecker = exports.IntentParser = exports.AgentPlatform = void 0;
 var platform_1 = require("./platform");
 Object.defineProperty(exports, "AgentPlatform", { enumerable: true, get: function () { return platform_1.AgentPlatform; } });
 var intent_parser_1 = require("./intent-parser");
@@ -51,4 +51,5 @@ Object.defineProperty(exports, "StakeTier", { enumerable: true, get: function ()
 Object.defineProperty(exports, "ErrorCode", { enumerable: true, get: function () { return types_1.ErrorCode; } });
 Object.defineProperty(exports, "ACTION_META", { enumerable: true, get: function () { return types_1.ACTION_META; } });
 Object.defineProperty(exports, "stakeInfoFromAmount", { enumerable: true, get: function () { return types_1.stakeInfoFromAmount; } });
+Object.defineProperty(exports, "OrderStatus", { enumerable: true, get: function () { return types_1.OrderStatus; } });
 //# sourceMappingURL=index.js.map

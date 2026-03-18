@@ -67,6 +67,7 @@ from usmsb_sdk.api.rest.routers import (
     matching_router,
     meta_agent_matching_router,
     network_router,
+    orders_router,
     pre_match_negotiation_router,
     predictions_router,
     registration_router,
@@ -260,6 +261,36 @@ async def lifespan(app: FastAPI):
     set_workflow_service(workflow_service)
     set_matching_engine(matching_engine)
 
+    # ========== Initialize OrderService ==========
+    try:
+        from usmsb_sdk.services.order_service import OrderService
+        from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
+        from usmsb_sdk.api.rest.routers.orders import set_order_service, set_pre_match_service
+
+        # Initialize PreMatchNegotiationService if available
+        pre_match_service = None
+        try:
+            pre_match_service = PreMatchNegotiationService()
+        except Exception as e:
+            logger.warning(f"PreMatchNegotiationService not available: {e}")
+
+        # Initialize OrderService
+        order_service = OrderService(
+            db_session=None,  # Uses in-memory storage if no DB
+            pre_match_negotiation=pre_match_service,
+        )
+
+        # Set service references in routers
+        set_order_service(order_service)
+        if pre_match_service:
+            set_pre_match_service(pre_match_service)
+
+        logger.info("OrderService initialized")
+    except Exception as e:
+        import traceback
+        logger.warning(f"OrderService not available: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
+
     # Initialize Permission Manager first
     from usmsb_sdk.api.rest.meta_agent import set_meta_agent, set_permission_manager
     from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
@@ -404,6 +435,7 @@ app.include_router(workflows_router, prefix="/api")
 app.include_router(matching_router, prefix="/api")
 app.include_router(network_router, prefix="/api")
 app.include_router(collaborations_router, prefix="/api")
+app.include_router(orders_router, prefix="/api")
 app.include_router(learning_router, prefix="/api")
 app.include_router(registration_router, prefix="/api")
 app.include_router(services_router, prefix="/api")
