@@ -173,7 +173,21 @@ class JointOrderPoolManager:
 
             # Get pool info to retrieve the pool_id
             # The pool_id is returned from the transaction events
+            # Verify transaction success on-chain
             receipt = self._client.wait_for_transaction(tx_hash, timeout=120)
+            if not receipt or receipt.get("status") != 1:
+                tx_hash_str = str(tx_hash) if tx_hash else "unknown"
+                self.logger.error(
+                    f"create_pool transaction failed on-chain: tx={tx_hash_str}, "
+                    f"receipt={receipt}"
+                )
+                return PoolCreationResult(
+                    success=False,
+                    pool_id=None,
+                    chain_order_id=None,
+                    tx_hash=tx_hash_str,
+                    message=f"Transaction failed on-chain (status={receipt.get('status') if receipt else 'none'}). Check tx {tx_hash_str}.",
+                )
 
             pool_id = None
             chain_order_id = None
@@ -270,8 +284,20 @@ class JointOrderPoolManager:
                 gas_limit=gas_limit,
             )
 
-            # Extract bid_id from transaction logs if available
+            # Verify transaction success on-chain
             receipt = self._client.wait_for_transaction(tx_hash, timeout=60)
+            if not receipt or receipt.get("status") != 1:
+                tx_hash_str = str(tx_hash) if tx_hash else "unknown"
+                self.logger.error(
+                    f"submit_bid transaction failed on-chain: tx={tx_hash_str}"
+                )
+                return BidSubmissionResult(
+                    success=False,
+                    bid_id=None,
+                    tx_hash=tx_hash_str,
+                    message=f"Transaction failed on-chain (status={receipt.get('status') if receipt else 'none'})",
+                )
+
             bid_id = None
             if receipt.get("logs"):
                 for log in receipt["logs"]:

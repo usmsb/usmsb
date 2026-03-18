@@ -2,9 +2,16 @@
 API Key Management for Agents
 
 Provides secure API key generation, validation, and management.
+Security fixes:
+- HMAC-SHA256 with pepper (secret key from env) instead of plain SHA-256
+- Brute force protection: lockout after 5 failed attempts for 15 minutes
+- 128-bit entropy for binding codes (was 48-bit)
+- API key format uses random bytes (no timestamp enumeration)
 """
 
 import hashlib
+import hmac
+import os
 import secrets
 import time
 from dataclasses import dataclass
@@ -12,12 +19,101 @@ from typing import Any
 
 # API Key Configuration
 API_KEY_PREFIX = "usmsb"
-API_KEY_HASH_LENGTH = 16  # 8 bytes = 16 hex chars
-API_KEY_TIMESTAMP_LENGTH = 8  # 4 bytes = 8 hex chars
+API_KEY_RANDOM_LENGTH = 16  # 16 bytes = 32 hex chars (was hash+timestamp)
 API_KEY_BINDING_CODE_PREFIX = "bind-"
+API_KEY_BINDING_CODE_ENTROPY = 16  # 16 bytes = 32 hex chars = 128 bits (was 48 bits)
 API_KEY_BINDING_EXPIRY_SECONDS = 600  # 10 minutes
 API_KEY_DEFAULT_EXPIRY_DAYS = 365
 
+# Brute force protection
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_DURATION_SECONDS = 900  # 15 minutes
+
+
+# ==================== Pepper for HMAC ====================
+
+def _get_pepper() -> bytes:
+    """
+    Get the API key pepper from environment variable.
+    Lazily loaded to avoid forcing env var at import time.
+    Raises ValueError if not set when first needed.
+    """
+    pepper = os.environ.get("USMSB_API_KEY_PEPPER")
+    if not pepper:
+        # For development, use a default derived from JWT_SECRET if available
+        jwt_secret = os.environ.get("JWT_SECRET", "")
+        if jwt_secret:
+            return hashlib.sha256(jwt_secret.encode()).digest()
+        # Still no pepper — raise so caller can handle gracefully
+        raise ValueError(
+            "USMSB_API_KEY_PEPPER environment variable not set. "
+            "Set it to a secure random string (min 32 chars)."
+        )
+    return pepper.encode()
+
+
+# ==================== Brute Force Tracking ====================
+
+# In-memory failed attempt tracker (per-agent)
+# In production, this should be Redis or similar for distributed deployments
+_failed_attempts: dict[str, dict[str, Any]] = {}
+
+
+def _record_failed_attempt(agent_id: str) -> dict[str, Any]:
+    """Record a failed API key attempt. Returns lockout info."""
+    now = time.time()
+    if agent_id not in _failed_attempts:
+        _failed_attempts[agent_id] = {
+            "count": 0,
+            "first_attempt": now,
+            "locked_until": 0,
+        }
+
+    record = _failed_attempts[agent_id]
+
+    # If previous lockout has expired, reset
+    if now > record.get("locked_until", 0):
+        record["count"] = 0
+        record["first_attempt"] = now
+        record["locked_until"] = 0
+
+    record["count"] += 1
+
+    if record["count"] >= MAX_FAILED_ATTEMPTS:
+        record["locked_until"] = now + LOCKOUT_DURATION_SECONDS
+        _failed_attempts[agent_id] = record
+        return {
+            "locked": True,
+            "locked_until": record["locked_until"],
+            "attempts": record["count"],
+            "retry_after": LOCKOUT_DURATION_SECONDS,
+        }
+
+    _failed_attempts[agent_id] = record
+    return {
+        "locked": False,
+        "attempts": record["count"],
+        "remaining": MAX_FAILED_ATTEMPTS - record["count"],
+    }
+
+
+def _clear_failed_attempts(agent_id: str) -> None:
+    """Clear failed attempts on successful auth."""
+    if agent_id in _failed_attempts:
+        del _failed_attempts[agent_id]
+
+
+def _is_locked_out(agent_id: str) -> tuple[bool, float]:
+    """Check if agent is locked out. Returns (locked, retry_after_seconds)."""
+    now = time.time()
+    record = _failed_attempts.get(agent_id, {})
+    locked_until = record.get("locked_until", 0)
+    if locked_until > now:
+        return True, locked_until - now
+    return False, 0
+
+
+# ==================== Dataclass ====================
 
 @dataclass
 class APIKeyInfo:
@@ -49,35 +145,37 @@ class APIKeyInfo:
         }
 
 
+# ==================== API Key Generation ====================
+
 def generate_api_key(agent_id: str) -> tuple[str, str, str]:
     """
     Generate a new API key for an agent.
 
-    The API key format is: usmsb_{16-char-hash}_{8-char-timestamp}
+    Format: usmsb_{32-char-random-hex}
+    No timestamp in the key itself (prevents enumeration).
 
     Args:
         agent_id: The agent's ID
 
     Returns:
         Tuple of (api_key, key_hash, key_prefix)
-        - api_key: The full key to return to agent (usmsb_xxx_xxx)
-        - key_hash: SHA-256 hash for storage
-        - key_prefix: First 16 chars for identification
+        - api_key: The full key to return to agent
+        - key_hash: HMAC-SHA256(key, pepper) for storage
+        - key_prefix: First 12 chars for identification
     """
-    # Generate random hash (8 bytes = 16 hex chars)
-    random_hash = secrets.token_hex(8)
+    # Generate 16 bytes = 32 hex chars of randomness (128 bits entropy)
+    random_bytes = secrets.token_bytes(16)
+    random_hex = random_bytes.hex()
 
-    # Generate timestamp (4 bytes = 8 hex chars)
-    timestamp = hex(int(time.time()))[2:].zfill(API_KEY_TIMESTAMP_LENGTH)
+    # Build API key: usmsb_{32-hex-chars}
+    api_key = f"{API_KEY_PREFIX}_{random_hex}"
 
-    # Build API key: usmsb_{hash}_{timestamp}
-    api_key = f"{API_KEY_PREFIX}_{random_hash}_{timestamp}"
+    # Hash with pepper for storage (HMAC prevents rainbow table attacks)
+    pepper = _get_pepper()
+    key_hash = hmac.new(pepper, api_key.encode(), hashlib.sha256).hexdigest()
 
-    # Hash for storage (never store plain key)
-    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-
-    # Prefix for identification (first 16 chars including prefix)
-    key_prefix = api_key[:16]
+    # Prefix for identification (first 12 chars)
+    key_prefix = api_key[:12]
 
     return api_key, key_hash, key_prefix
 
@@ -86,12 +184,14 @@ def generate_binding_code() -> tuple[str, float]:
     """
     Generate a binding code for owner binding.
 
-    The binding code format is: bind-{12-char-random}
+    Format: bind-{32-char-random-hex}
+    128 bits entropy (was 48 bits).
 
     Returns:
         Tuple of (binding_code, expires_at)
     """
-    random_part = secrets.token_hex(6)  # 6 bytes = 12 hex chars
+    # 16 bytes = 32 hex chars = 128 bits entropy
+    random_part = secrets.token_hex(API_KEY_BINDING_CODE_ENTROPY)
     binding_code = f"{API_KEY_BINDING_CODE_PREFIX}{random_part}"
     expires_at = time.time() + API_KEY_BINDING_EXPIRY_SECONDS
 
@@ -109,8 +209,17 @@ def generate_binding_id() -> str:
 
 
 def hash_api_key(api_key: str) -> str:
-    """Hash an API key using SHA-256."""
-    return hashlib.sha256(api_key.encode()).hexdigest()
+    """
+    Hash an API key using HMAC-SHA256 with pepper.
+
+    Args:
+        api_key: The raw API key
+
+    Returns:
+        HMAC-SHA256 hex digest
+    """
+    pepper = _get_pepper()
+    return hmac.new(pepper, api_key.encode(), hashlib.sha256).hexdigest()
 
 
 def verify_api_key(api_key: str, stored_hash: str) -> bool:
@@ -119,7 +228,7 @@ def verify_api_key(api_key: str, stored_hash: str) -> bool:
 
     Args:
         api_key: The API key to verify
-        stored_hash: The stored SHA-256 hash
+        stored_hash: The stored HMAC hash
 
     Returns:
         True if the key matches, False otherwise
@@ -127,38 +236,35 @@ def verify_api_key(api_key: str, stored_hash: str) -> bool:
     if not api_key or not stored_hash:
         return False
 
-    computed_hash = hash_api_key(api_key)
-    return secrets.compare_digest(computed_hash, stored_hash)
+    pepper = _get_pepper()
+    computed_hash = hmac.new(pepper, api_key.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(computed_hash, stored_hash)
 
 
 def validate_api_key_format(api_key: str) -> bool:
     """
     Validate API key format.
 
-    Expected format: usmsb_{16-hex-chars}_{8-hex-chars}
+    Expected format: usmsb_{32-hex-chars}
     """
     if not api_key:
         return False
 
     parts = api_key.split('_')
-    if len(parts) != 3:
+    if len(parts) != 2:
         return False
 
-    prefix, hash_part, timestamp_part = parts
+    prefix, random_part = parts
 
     if prefix != API_KEY_PREFIX:
         return False
 
-    if len(hash_part) != API_KEY_HASH_LENGTH:
+    # Must be exactly 32 hex chars (16 bytes)
+    if len(random_part) != API_KEY_RANDOM_LENGTH:
         return False
 
-    if len(timestamp_part) != API_KEY_TIMESTAMP_LENGTH:
-        return False
-
-    # Check if hash and timestamp are valid hex
     try:
-        int(hash_part, 16)
-        int(timestamp_part, 16)
+        int(random_part, 16)
     except ValueError:
         return False
 
@@ -169,7 +275,7 @@ def validate_binding_code_format(binding_code: str) -> bool:
     """
     Validate binding code format.
 
-    Expected format: bind-{12-hex-chars}
+    Expected format: bind-{32-hex-chars} (was 12)
     """
     if not binding_code:
         return False
@@ -179,7 +285,8 @@ def validate_binding_code_format(binding_code: str) -> bool:
 
     code_part = binding_code[len(API_KEY_BINDING_CODE_PREFIX):]
 
-    if len(code_part) != 12:
+    # Now 32 hex chars (128 bits)
+    if len(code_part) != API_KEY_BINDING_CODE_ENTROPY * 2:
         return False
 
     try:
@@ -190,16 +297,10 @@ def validate_binding_code_format(binding_code: str) -> bool:
     return True
 
 
+# ==================== Stake Tier ====================
+
 def get_stake_tier(staked_amount: float) -> str:
-    """
-    Get stake tier based on staked amount.
-
-    Args:
-        staked_amount: Amount of VIBE staked
-
-    Returns:
-        Tier name: NONE, BRONZE, SILVER, GOLD, or PLATINUM
-    """
+    """Get stake tier based on staked amount."""
     if staked_amount >= 10000:
         return "PLATINUM"
     elif staked_amount >= 5000:
@@ -213,15 +314,7 @@ def get_stake_tier(staked_amount: float) -> str:
 
 
 def get_tier_benefits(tier: str) -> dict[str, Any]:
-    """
-    Get benefits for a stake tier.
-
-    Args:
-        tier: Tier name
-
-    Returns:
-        Dict with max_agents and discount
-    """
+    """Get benefits for a stake tier."""
     benefits = {
         "NONE": {"max_agents": 0, "discount": 0.0, "min_stake": 0},
         "BRONZE": {"max_agents": 1, "discount": 0.0, "min_stake": 100},
@@ -233,48 +326,26 @@ def get_tier_benefits(tier: str) -> dict[str, Any]:
 
 
 def calculate_reputation(staked_amount: float) -> float:
-    """
-    Calculate reputation based on staked amount.
-
-    Formula: min(0.5 + staked_amount/1000, 1.0)
-
-    Args:
-        staked_amount: Amount of VIBE staked
-
-    Returns:
-        Reputation score between 0.5 and 1.0
-    """
+    """Calculate reputation based on staked amount."""
     return min(0.5 + (staked_amount / 1000), 1.0)
 
 
-class APIKeyManager:
-    """
-    Manager class for API key operations.
+# ==================== APIKeyManager ====================
 
-    This class provides a high-level interface for API key management,
-    including creation, validation, and revocation.
-    """
+class APIKeyManager:
+    """Manager class for API key operations."""
 
     def __init__(self):
-        """Initialize the API Key Manager."""
         pass
 
     @staticmethod
-    def create_key_for_agent(agent_id: str, name: str = "Primary",
-                             expires_in_days: int | None = None,
-                             level: int = 0) -> dict[str, Any]:
-        """
-        Create a new API key for an agent.
-
-        Args:
-            agent_id: The agent's ID
-            name: Human-readable name for the key
-            expires_in_days: Number of days until expiration (None = never)
-            level: Permission level (0=unbound, 1+=bound)
-
-        Returns:
-            Dict with api_key, key_hash, key_prefix, and metadata
-        """
+    def create_key_for_agent(
+        agent_id: str,
+        name: str = "Primary",
+        expires_in_days: int | None = None,
+        level: int = 0
+    ) -> dict[str, Any]:
+        """Create a new API key for an agent."""
         api_key, key_hash, key_prefix = generate_api_key(agent_id)
         key_id = generate_key_id()
 
@@ -285,7 +356,7 @@ class APIKeyManager:
         return {
             'id': key_id,
             'agent_id': agent_id,
-            'api_key': api_key,  # This is the only time the full key is available
+            'api_key': api_key,
             'key_hash': key_hash,
             'key_prefix': key_prefix,
             'name': name,
@@ -295,19 +366,12 @@ class APIKeyManager:
         }
 
     @staticmethod
-    def create_binding_request(agent_id: str, base_url: str,
-                               message: str = "") -> dict[str, Any]:
-        """
-        Create a new binding request.
-
-        Args:
-            agent_id: The agent's ID
-            base_url: Base URL for the binding page
-            message: Optional message to the owner
-
-        Returns:
-            Dict with binding_code, binding_url, and expiration info
-        """
+    def create_binding_request(
+        agent_id: str,
+        base_url: str,
+        message: str = ""
+    ) -> dict[str, Any]:
+        """Create a new binding request."""
         binding_code, expires_at = generate_binding_code()
         binding_id = generate_binding_id()
         binding_url = f"{base_url}/bind/{binding_code}"

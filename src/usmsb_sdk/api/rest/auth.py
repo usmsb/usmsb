@@ -43,12 +43,24 @@ from usmsb_sdk.api.database import (
     update_user_stake,
 )
 
+def _get_jwt_secret() -> str:
+    """
+    Lazily get JWT_SECRET. Only raises if it's actually used but not set.
+    This avoids requiring the env var at module load time.
+    """
+    secret = os.environ.get("JWT_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "JWT_SECRET environment variable is required but not set. "
+            "Set it before using authentication features."
+        )
+    return secret
+
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # Configuration
-JWT_SECRET = os.environ.get("JWT_SECRET")
-if not JWT_SECRET:
-    raise OSError("JWT_SECRET environment variable is required")
+# NOTE: JWT_SECRET is now lazy-loaded (no OSError at import time)
 SESSION_DURATION_HOURS = 24 * 7  # 7 days
 NONCE_EXPIRY_SECONDS = 300  # 5 minutes
 
@@ -208,7 +220,8 @@ class UpdateWhitelistRequest(BaseModel):
 
 def generate_access_token(session_id: str, address: str) -> str:
     """Generate a simple access token (in production, use proper JWT)"""
-    data = f"{session_id}:{address}:{datetime.now().timestamp()}:{JWT_SECRET}"
+    secret = _get_jwt_secret()
+    data = f"{session_id}:{address}:{datetime.now().timestamp()}:{secret}"
     return hashlib.sha256(data.encode()).hexdigest()
 
 
@@ -315,6 +328,31 @@ async def verify_signature(request: VerifyRequest):
         user = create_user({
             'wallet_address': address,
         })
+
+    # Auto-register user to Meta Agent permission system (if first time or not registered)
+    try:
+        from usmsb_sdk.api.rest.meta_agent import get_permission_manager
+        from usmsb_sdk.platform.external.meta_agent.permission.models import UserRole
+
+        permission_manager = get_permission_manager()
+        if permission_manager:
+            existing_perm = await permission_manager.get_user(address)
+            if not existing_perm:
+                # Register with default HUMAN role
+                await permission_manager.register_user(
+                    wallet_address=address,
+                    role=UserRole.HUMAN,
+                    initial_stake=user.get('stake', 0) or 0,
+                    initial_balance=user.get('vibe_balance', 0) or 0,
+                )
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Auto-registered user {address} to Meta Agent permission system")
+    except Exception as e:
+        # Don't fail the login if permission registration fails
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to auto-register user to Meta Agent: {e}")
 
     # Delete old sessions for this address
     delete_sessions_by_address(address)
