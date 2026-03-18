@@ -212,9 +212,20 @@ async def create_order_from_pre_match_endpoint(
     request: CreateOrderFromPreMatchRequest,
     user: dict[str, Any] = Depends(get_current_user_unified),
 ):
-    """Create an order from a confirmed pre-match negotiation."""
+    """Create an order from a confirmed pre-match negotiation.
+
+    Idempotent: if an order already exists for this negotiation, return it instead.
+    This prevents duplicate creation when both parties manually call this endpoint
+    after the on_match_confirmed callback already auto-created the order.
+    """
     svc = _require_order_service()
     agent_id = _require_agent(user)
+
+    # Idempotency check: search for existing order with same negotiation source
+    existing = await svc.get_orders_for_agent(agent_id, role=None, limit=100)
+    for o in existing:
+        if o.source_session_id == request.negotiation_id:
+            return _order_to_response(o)
 
     result = await svc.create_order_from_pre_match(
         negotiation_id=request.negotiation_id,

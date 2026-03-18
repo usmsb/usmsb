@@ -208,6 +208,11 @@ class PreMatchNegotiationService:
         # In-memory cache for active negotiations
         self._active_negotiations: dict[str, dict] = {}
 
+        # FIX断层1+9: Callback when both parties confirm match.
+        # Allows automatic triggering of downstream flow (e.g. order creation).
+        # Set by application: pre_match_service.on_match_confirmed = async fn
+        self.on_match_confirmed: Callable[["PreMatchNegotiationService", str, dict], None] | None = None
+
     async def initiate(
         self,
         demand_agent_id: str,
@@ -350,6 +355,9 @@ class PreMatchNegotiationService:
         """
         Supply agent confirms consent to proceed with negotiation.
 
+        FIX断层7: Uses atomic UPDATE to prevent TOCTOU race.
+        The UPDATE only succeeds if supply_consent is still NULL and supply_agent_id matches.
+
         Args:
             negotiation_id: The negotiation ID
             supply_agent_id: Supply agent confirming (must be the supply party)
@@ -365,25 +373,52 @@ class PreMatchNegotiationService:
         if not negotiation:
             raise ValueError(f"Negotiation {negotiation_id} not found or expired")
 
-        # FIX: Validate supply agent
-        if supply_agent_id != negotiation.supply_agent_id:
-            raise PermissionError(
-                f"Only the supply agent can confirm consent. "
-                f"Supplier: {negotiation.supply_agent_id}, Caller: {supply_agent_id}"
-            )
-
-        if negotiation.supply_consent is False:
-            raise ValueError("Negotiation was already declined by supply agent")
-
-        negotiation.supply_consent = True
-        negotiation.last_updated = datetime.utcnow()
+        # FIX断层7: Atomic UPDATE prevents TOCTOU double-consent race.
+        # Only succeeds if supply_consent is still NULL and supply_agent_id matches.
+        rows_updated = self.db.query(PreMatchNegotiationDB).filter(
+            PreMatchNegotiationDB.negotiation_id == negotiation_id,
+            PreMatchNegotiationDB.supply_consent.is_(None),
+            PreMatchNegotiationDB.supply_agent_id == supply_agent_id,
+        ).update(
+            {
+                "supply_consent": True,
+                "last_updated": datetime.utcnow(),
+            },
+            synchronize_session=False,
+        )
         self.db.commit()
+
+        if rows_updated == 0:
+            # Re-fetch to give accurate error message
+            re_check = self.db.query(PreMatchNegotiationDB).filter(
+                PreMatchNegotiationDB.negotiation_id == negotiation_id
+            ).first()
+            if re_check and re_check.supply_consent is False:
+                raise ValueError("Negotiation was already declined by supply agent")
+            if re_check and re_check.supply_consent is True:
+                return {
+                    "negotiation_id": negotiation_id,
+                    "status": negotiation.status,
+                    "supply_consent": True,
+                    "message": "Supply agent already consented",
+                }
+            if re_check and re_check.supply_agent_id != supply_agent_id:
+                raise PermissionError(
+                    f"Only the supply agent can confirm consent. "
+                    f"Supplier: {re_check.supply_agent_id}, Caller: {supply_agent_id}"
+                )
+            raise ValueError("Consent update failed — already processed or expired")
 
         self.logger.info(f"Supply agent {supply_agent_id} consented to negotiation {negotiation_id}")
 
+        # Re-fetch for response
+        re_check = self.db.query(PreMatchNegotiationDB).filter(
+            PreMatchNegotiationDB.negotiation_id == negotiation_id
+        ).first()
+
         return {
             "negotiation_id": negotiation_id,
-            "status": negotiation.status,
+            "status": re_check.status if re_check else negotiation.status,
             "supply_consent": True,
             "message": "Consent confirmed. Negotiation can now proceed.",
         }
@@ -409,18 +444,24 @@ class PreMatchNegotiationService:
         if not negotiation:
             raise ValueError(f"Negotiation {negotiation_id} not found or expired")
 
-        # FIX: Validate supply agent
-        if supply_agent_id != negotiation.supply_agent_id:
-            raise PermissionError(
-                f"Only the supply agent can decline consent. "
-                f"Supplier: {negotiation.supply_agent_id}, Caller: {supply_agent_id}"
-            )
-
-        negotiation.supply_consent = False
-        negotiation.outcome_reason = reason or "Supply agent declined"
-        negotiation.status = NegotiationStatus.DECLINED.value
-        negotiation.last_updated = datetime.utcnow()
+        # FIX断层7: Atomic UPDATE to prevent TOCTOU race
+        rows_updated = self.db.query(PreMatchNegotiationDB).filter(
+            PreMatchNegotiationDB.negotiation_id == negotiation_id,
+            PreMatchNegotiationDB.supply_consent.is_(None),
+            PreMatchNegotiationDB.supply_agent_id == supply_agent_id,
+        ).update(
+            {
+                "supply_consent": False,
+                "outcome_reason": reason or "Supply agent declined",
+                "status": NegotiationStatus.DECLINED.value,
+                "last_updated": datetime.utcnow(),
+            },
+            synchronize_session=False,
+        )
         self.db.commit()
+
+        if rows_updated == 0:
+            raise ValueError("Consent already processed or caller not supply agent")
 
         self.logger.info(f"Supply agent {supply_agent_id} declined negotiation {negotiation_id}")
 
@@ -733,6 +774,17 @@ class PreMatchNegotiationService:
 
         if rows_updated2 > 0:
             self.logger.info(f"Match confirmed for negotiation {negotiation_id}")
+
+            # FIX断层1+9: Fire callback so downstream (e.g. order creation) can be auto-triggered
+            if self.on_match_confirmed is not None:
+                try:
+                    neg_dict = self._negotiation_to_dict(re_check)
+                    await self.on_match_confirmed(self, negotiation_id, neg_dict)
+                except Exception as e:
+                    self.logger.error(
+                        f"on_match_confirmed callback failed for {negotiation_id}: {e}"
+                    )
+
             return {
                 "status": "confirmed",
                 "message": "Match confirmed by both parties",

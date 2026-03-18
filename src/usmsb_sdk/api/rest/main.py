@@ -170,6 +170,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting USMSB SDK API...")
 
+    # Module-level service singletons (for use in startup event)
+    global _order_service_singleton, _pre_match_service_singleton
+    _order_service_singleton = None
+    _pre_match_service_singleton = None
+
     # Initialize database
     logger.info("Initializing SQLite database...")
     init_db()
@@ -261,37 +266,94 @@ async def lifespan(app: FastAPI):
     set_workflow_service(workflow_service)
     set_matching_engine(matching_engine)
 
+    # ========== Initialize Shared Services ==========
+    # These are lazy singletons — import and get/create on demand
+    joint_order_service = None
+    reputation_service = None
+
+    try:
+        from usmsb_sdk.services.joint_order_service import get_joint_order_service
+        joint_order_service = await get_joint_order_service()
+        logger.info("JointOrderService initialized")
+    except Exception as e:
+        logger.warning(f"JointOrderService not available: {e}")
+
+    try:
+        from usmsb_sdk.services.reputation_service import get_reputation_service
+        reputation_service = await get_reputation_service()
+        logger.info("ReputationService initialized")
+    except Exception as e:
+        logger.warning(f"ReputationService not available: {e}")
+
+    # ========== Initialize PreMatchNegotiationService + wire callback ==========
+    pre_match_service = None
+    try:
+        from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
+
+        pre_match_service = PreMatchNegotiationService()
+
+        # FIX断层1+9: Wire PreMatch → Order automatic bridge.
+        # When both parties confirm a pre-match, auto-create the order.
+        # Import here to avoid circular dependency at module level.
+        async def on_match_confirmed(pre_match_svc, negotiation_id, negotiation_dict):
+            """Auto-creates an order when pre-match is confirmed."""
+            try:
+                order_svc = _order_service_singleton
+                if order_svc and pre_match_svc:
+                    # Determine demand vs supply based on negotiation dict
+                    demand_id = negotiation_dict.get("demand_agent_id", "")
+                    supply_id = negotiation_dict.get("supply_agent_id", "")
+                    if demand_id and supply_id:
+                        task_desc = (
+                            negotiation_dict.get("scope_confirmation", {})
+                            .get("deliverables", [f"Pre-match {negotiation_id}"])
+                        )
+                        order = await order_svc.create_order_from_pre_match(
+                            negotiation_id=negotiation_id,
+                            agent_id=demand_id,
+                            task_description=task_desc[0] if isinstance(task_desc, list) else str(task_desc),
+                        )
+                        logger.info(
+                            f"Auto-created order {order.order_id} from confirmed pre-match {negotiation_id}"
+                        )
+            except Exception as e:
+                logger.error(f"on_match_confirmed callback failed: {e}")
+
+        pre_match_service.on_match_confirmed = on_match_confirmed
+        logger.info("PreMatchNegotiationService + on_match_confirmed callback wired")
+    except Exception as e:
+        logger.warning(f"PreMatchNegotiationService not available: {e}")
+        import traceback
+        logger.debug(f"Traceback: {traceback.format_exc()}")
+
     # ========== Initialize OrderService ==========
     try:
         from usmsb_sdk.services.order_service import OrderService
-        from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
         from usmsb_sdk.api.rest.routers.orders import set_order_service, set_pre_match_service
 
-        # Initialize PreMatchNegotiationService if available
-        pre_match_service = None
-        try:
-            pre_match_service = PreMatchNegotiationService()
-        except Exception as e:
-            logger.warning(f"PreMatchNegotiationService not available: {e}")
-
-        # Initialize OrderService
         order_service = OrderService(
             db_session=None,  # Uses in-memory storage if no DB
-            pre_match_negotiation=pre_match_service,
+            joint_order_service=joint_order_service,      # FIX断层2: creates pool on CONFIRMED
+            pre_match_negotiation=pre_match_service,    # FIX断层1: for pre-match → order bridge
+            reputation_service=reputation_service,       # FIX断层5: updates reputation on COMPLETED
         )
+
+        # Also expose as module-level singleton for the on_match_confirmed callback above
+        _order_service_singleton = order_service
 
         # Set service references in routers
         set_order_service(order_service)
         if pre_match_service:
             set_pre_match_service(pre_match_service)
 
-        logger.info("OrderService initialized")
+        logger.info("OrderService initialized with full service injection")
     except Exception as e:
         import traceback
         logger.warning(f"OrderService not available: {e}")
         logger.debug(f"Traceback: {traceback.format_exc()}")
+        _order_service_singleton = None
 
-    # Initialize Permission Manager first
+    # ========== Initialize Permission Manager ==========
     from usmsb_sdk.api.rest.meta_agent import set_meta_agent, set_permission_manager
     from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
 
