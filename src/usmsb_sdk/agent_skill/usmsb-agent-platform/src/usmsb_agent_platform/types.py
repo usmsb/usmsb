@@ -118,6 +118,19 @@ class ActionType(Enum):
     PROFILE_GET = ("profile", "get", False)
     PROFILE_UPDATE = ("profile", "update", False)
 
+    # ==================== Order (NEW) ====================
+    ORDER_FROM_PRE_MATCH = ("order", "from_pre_match", False)
+    ORDER_CREATE = ("order", "create", False)
+    ORDER_CONFIRM = ("order", "confirm", False)
+    ORDER_START = ("order", "start", False)
+    ORDER_DELIVER = ("order", "deliver", False)
+    ORDER_ACCEPT = ("order", "accept", False)
+    ORDER_DISPUTE = ("order", "dispute", False)
+    ORDER_CANCEL = ("order", "cancel", False)
+    ORDER_LIST = ("order", "list", False)
+    ORDER_GET = ("order", "get", False)
+    ORDER_STATUS = ("order", "status", False)
+
     def __init__(self, category: str, action: str, requires_stake: bool):
         self.category = category
         self.action = action

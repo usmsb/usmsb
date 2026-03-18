@@ -15,6 +15,7 @@ from usmsb_sdk.api.rest.routers.learning import router as learning_router
 from usmsb_sdk.api.rest.routers.matching import router as matching_router
 from usmsb_sdk.api.rest.routers.meta_agent_matching import router as meta_agent_matching_router
 from usmsb_sdk.api.rest.routers.network import router as network_router
+from usmsb_sdk.api.rest.routers.orders import router as orders_router
 from usmsb_sdk.api.rest.routers.pre_match_negotiation import router as pre_match_negotiation_router
 from usmsb_sdk.api.rest.routers.predictions import router as predictions_router
 from usmsb_sdk.api.rest.routers.registration import router as registration_router
@@ -34,6 +35,7 @@ __all__ = [
     "matching_router",
     "network_router",
     "collaborations_router",
+    "orders_router",
     "learning_router",
     "registration_router",
     "services_router",

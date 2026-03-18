@@ -3,7 +3,7 @@
  * Type definitions for USMSB Agent Platform Skill.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ErrorCode = exports.ACTION_META = exports.ActionType = exports.StakeTier = void 0;
+exports.ErrorCode = exports.ACTION_META = exports.ActionType = exports.OrderStatus = exports.StakeTier = void 0;
 exports.stakeInfoFromAmount = stakeInfoFromAmount;
 /**
  * Stake tier levels as defined in whitepaper.
@@ -17,6 +17,21 @@ var StakeTier;
     StakeTier[StakeTier["PLATINUM"] = 10000] = "PLATINUM";
 })(StakeTier || (exports.StakeTier = StakeTier = {}));
 /**
+ * Order lifecycle status.
+ */
+var OrderStatus;
+(function (OrderStatus) {
+    OrderStatus["CREATED"] = "created";
+    OrderStatus["CONFIRMED"] = "confirmed";
+    OrderStatus["IN_PROGRESS"] = "in_progress";
+    OrderStatus["DELIVERED"] = "delivered";
+    OrderStatus["COMPLETED"] = "completed";
+    OrderStatus["DISPUTED"] = "disputed";
+    OrderStatus["CANCELLED"] = "cancelled";
+    OrderStatus["EXPIRED"] = "expired";
+    OrderStatus["REFUNDED"] = "refunded";
+})(OrderStatus || (exports.OrderStatus = OrderStatus = {}));
+/**
  * Action types and their stake requirements.
  */
 var ActionType;
@@ -27,6 +42,8 @@ var ActionType;
     ActionType["MARKETPLACE_PUBLISH_SERVICE"] = "marketplace:publish_service";
     ActionType["NEGOTIATION_ACCEPT"] = "negotiation:accept";
     ActionType["WORKFLOW_EXECUTE"] = "workflow:execute";
+    ActionType["ORDER_ACCEPT"] = "order:accept";
+    ActionType["ORDER_CANCEL"] = "order:cancel";
     // No stake required
     ActionType["COLLABORATION_JOIN"] = "collaboration:join";
     ActionType["COLLABORATION_LIST"] = "collaboration:list";
@@ -44,6 +61,16 @@ var ActionType;
     ActionType["WORKFLOW_LIST"] = "workflow:list";
     ActionType["LEARNING_ANALYZE"] = "learning:analyze";
     ActionType["LEARNING_INSIGHTS"] = "learning:insights";
+    // Order actions
+    ActionType["ORDER_FROM_PRE_MATCH"] = "order:from_pre_match";
+    ActionType["ORDER_CREATE"] = "order:create";
+    ActionType["ORDER_CONFIRM"] = "order:confirm";
+    ActionType["ORDER_START"] = "order:start";
+    ActionType["ORDER_DELIVER"] = "order:deliver";
+    ActionType["ORDER_DISPUTE"] = "order:dispute";
+    ActionType["ORDER_LIST"] = "order:list";
+    ActionType["ORDER_GET"] = "order:get";
+    ActionType["ORDER_STATUS"] = "order:status";
 })(ActionType || (exports.ActionType = ActionType = {}));
 // Action metadata map
 exports.ACTION_META = {
@@ -52,6 +79,8 @@ exports.ACTION_META = {
     [ActionType.MARKETPLACE_PUBLISH_SERVICE]: { category: "marketplace", action: "publish_service", requiresStake: true },
     [ActionType.NEGOTIATION_ACCEPT]: { category: "negotiation", action: "accept", requiresStake: true },
     [ActionType.WORKFLOW_EXECUTE]: { category: "workflow", action: "execute", requiresStake: true },
+    [ActionType.ORDER_ACCEPT]: { category: "order", action: "accept", requiresStake: false },
+    [ActionType.ORDER_CANCEL]: { category: "order", action: "cancel", requiresStake: false },
     [ActionType.COLLABORATION_JOIN]: { category: "collaboration", action: "join", requiresStake: false },
     [ActionType.COLLABORATION_LIST]: { category: "collaboration", action: "list", requiresStake: false },
     [ActionType.MARKETPLACE_FIND_WORK]: { category: "marketplace", action: "find_work", requiresStake: false },
@@ -68,6 +97,16 @@ exports.ACTION_META = {
     [ActionType.WORKFLOW_LIST]: { category: "workflow", action: "list", requiresStake: false },
     [ActionType.LEARNING_ANALYZE]: { category: "learning", action: "analyze", requiresStake: false },
     [ActionType.LEARNING_INSIGHTS]: { category: "learning", action: "insights", requiresStake: false },
+    // Order actions
+    [ActionType.ORDER_FROM_PRE_MATCH]: { category: "order", action: "from_pre_match", requiresStake: false },
+    [ActionType.ORDER_CREATE]: { category: "order", action: "create", requiresStake: false },
+    [ActionType.ORDER_CONFIRM]: { category: "order", action: "confirm", requiresStake: false },
+    [ActionType.ORDER_START]: { category: "order", action: "start", requiresStake: false },
+    [ActionType.ORDER_DELIVER]: { category: "order", action: "deliver", requiresStake: false },
+    [ActionType.ORDER_DISPUTE]: { category: "order", action: "dispute", requiresStake: false },
+    [ActionType.ORDER_LIST]: { category: "order", action: "list", requiresStake: false },
+    [ActionType.ORDER_GET]: { category: "order", action: "get", requiresStake: false },
+    [ActionType.ORDER_STATUS]: { category: "order", action: "status", requiresStake: false },
 };
 /**
  * Create StakeInfo from staked amount.

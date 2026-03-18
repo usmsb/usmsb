@@ -470,33 +470,6 @@ export class GeneCapsuleAPI {
       last_updated: capsule.last_updated
     };
   }
-
-  /**
-   * Search for agents by experience relevance.
-   */
-  async searchAgents(
-    taskDescription: string,
-    requiredSkills: string[] = [],
-    minRelevance: number = 0.3,
-    limit: number = 10
-  ): Promise<AgentExperienceSearchResult[]> {
-    return this.client.post("/api/gene-capsule/search-agents", {
-      task_description: taskDescription,
-      required_skills: requiredSkills,
-      min_experience_relevance: minRelevance,
-      limit: limit
-    });
-  }
-
-  /**
-   * Request verification for an experience.
-   */
-  async requestVerification(experienceId: string): Promise<any> {
-    return this.client.post(
-      `/api/gene-capsule/experiences/${experienceId}/verify`,
-      { agent_id: this.agentId }
-    );
-  }
 }
 
 // PlatformClient interface to avoid circular dependency

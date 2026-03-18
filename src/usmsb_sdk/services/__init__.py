@@ -79,6 +79,27 @@ from usmsb_sdk.services.joint_order_service import (
     PoolStatus,
     ServiceStats,
 )
+from usmsb_sdk.services.order_service import (
+    Order,
+    OrderService,
+    OrderTerms,
+    OrderSource,
+    OrderPriority,
+    Deliverable,
+    OrderDB,
+)
+from usmsb_sdk.services.order_state_machine import (
+    OrderStatus,
+    OrderEvent,
+    OrderStateMachine,
+    OrderTransition,
+)
+from usmsb_sdk.services.joint_order_pool_manager import (
+    JointOrderPoolManager,
+    PoolCreationResult,
+    BidSubmissionResult,
+    BidAcceptanceResult,
+)
 from usmsb_sdk.services.proactive_learning_service import (
     InsightCategory,
     LearningInsight,
@@ -209,6 +230,24 @@ __all__ = [
     "Bid",
     "PoolStatus",
     "ServiceStats",
+    # Order Service
+    "OrderService",
+    "Order",
+    "OrderTerms",
+    "OrderSource",
+    "OrderPriority",
+    "Deliverable",
+    "OrderDB",
+    # Order State Machine
+    "OrderStatus",
+    "OrderEvent",
+    "OrderStateMachine",
+    "OrderTransition",
+    # Joint Order Pool Manager
+    "JointOrderPoolManager",
+    "PoolCreationResult",
+    "BidSubmissionResult",
+    "BidAcceptanceResult",
     # Asset Fractionalization
     "AssetFractionalizationService",
     "AssetInfo",

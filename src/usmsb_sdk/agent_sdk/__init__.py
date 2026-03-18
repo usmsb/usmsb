@@ -138,6 +138,11 @@ from usmsb_sdk.agent_sdk.negotiation import (
     NegotiationTerms,
     ProposalResult,
 )
+from usmsb_sdk.agent_sdk.negotiated_order_manager import (
+    NegotiatedOrderManager,
+    OrderCreationResult,
+    NegotiationToOrderConfig,
+)
 from usmsb_sdk.agent_sdk.p2p_server import (
     DHT,
     P2PServer,
@@ -290,6 +295,10 @@ __all__ = [
     "NegotiationContext",
     "NegotiationRound",
     "ProposalResult",
+    # Negotiated Order
+    "NegotiatedOrderManager",
+    "OrderCreationResult",
+    "NegotiationToOrderConfig",
     # Collaboration
     "CollaborationManager",
     "CollaborationSession",

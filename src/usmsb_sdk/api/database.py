@@ -228,6 +228,37 @@ def init_db():
             )
         ''')
 
+        # Orders table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id TEXT PRIMARY KEY,
+                source TEXT NOT NULL,
+                source_session_id TEXT,
+                demand_agent_id TEXT NOT NULL,
+                supply_agent_id TEXT NOT NULL,
+                task_description TEXT,
+                agreed_terms TEXT,
+                pool_id TEXT,
+                status TEXT DEFAULT 'created',
+                priority TEXT DEFAULT 'normal',
+                delivery_deadline REAL,
+                completed_at REAL,
+                completion_reason TEXT,
+                deliverables TEXT,
+                acceptance_data TEXT,
+                chain_order_id TEXT,
+                chain_tx_hash TEXT,
+                vibe_locked REAL DEFAULT 0,
+                metadata TEXT,
+                is_cancelled INTEGER DEFAULT 0,
+                created_at REAL,
+                updated_at REAL
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_demand ON orders(demand_agent_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_supply ON orders(supply_agent_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)')
+
         # Network table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS network_nodes (

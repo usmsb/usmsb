@@ -61,7 +61,7 @@ class RegistrationClient {
             };
         }
         try {
-            const response = await (0, node_fetch_1.default)(`${this.baseUrl}/api/agents/register`, {
+            const response = await (0, node_fetch_1.default)(`${this.baseUrl}/api/agents/v2/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, description, capabilities }),
@@ -99,13 +99,14 @@ class RegistrationClient {
     /**
      * Request Owner binding.
      */
-    async requestBinding(apiKey, message = "") {
+    async requestBinding(apiKey, agentId, message = "") {
         try {
-            const response = await (0, node_fetch_1.default)(`${this.baseUrl}/api/agents/request-binding`, {
+            const response = await (0, node_fetch_1.default)(`${this.baseUrl}/api/agents/v2/${agentId}/request-binding`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "X-API-Key": apiKey,
+                    "X-Agent-ID": agentId,
                 },
                 body: JSON.stringify({ message }),
             });
@@ -141,11 +142,14 @@ class RegistrationClient {
     /**
      * Get Agent's binding status.
      */
-    async getBindingStatus(apiKey) {
+    async getBindingStatus(apiKey, agentId) {
         try {
-            const response = await (0, node_fetch_1.default)(`${this.baseUrl}/api/agents/binding-status`, {
+            const response = await (0, node_fetch_1.default)(`${this.baseUrl}/api/agents/v2/${agentId}/binding-status`, {
                 method: "GET",
-                headers: { "X-API-Key": apiKey },
+                headers: {
+                    "X-API-Key": apiKey,
+                    "X-Agent-ID": agentId,
+                },
             });
             const data = await response.json();
             return {

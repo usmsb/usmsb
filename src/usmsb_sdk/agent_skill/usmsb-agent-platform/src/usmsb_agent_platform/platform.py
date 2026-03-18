@@ -22,6 +22,7 @@ from .types import (
     StakeInfo,
     StakeRequirement,
 )
+from .order import Order, OrderTerms, OrderStatus, Deliverable
 
 
 class PlatformClient:
@@ -54,6 +55,7 @@ class PlatformClient:
         self.reputation = ReputationAPI(self)
         self.wallet = WalletAPI(self)
         self.heartbeat = HeartbeatAPI(self)
+        self.order = OrderAPI(self)
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create HTTP session."""
@@ -810,6 +812,92 @@ class HeartbeatAPI(BaseAPI):
         return await self.client.get(f"/api/agents/{target_id}/status")
 
 
+# ==================== Order API ====================
+class OrderAPI(BaseAPI):
+    """Order API handler."""
+
+    async def from_pre_match(self, negotiation_id: str = "", task_description: str = "", **kwargs) -> dict:
+        """Create order from a confirmed pre-match negotiation."""
+        return await self.client.post("/orders/from-pre-match", {
+            "negotiation_id": negotiation_id,
+            "task_description": task_description,
+            **kwargs
+        })
+
+    async def create(self, negotiation_session_id: str = "", price: float = 0,
+                    delivery_time: str = "", delivery_description: str = "",
+                    payment_terms: str = "escrow", milestones: list = None,
+                    task_description: str = "", demand_agent_id: str = "",
+                    supply_agent_id: str = "", **kwargs) -> dict:
+        """Create order from formal negotiation."""
+        return await self.client.post("/orders/from-negotiation", {
+            "negotiation_session_id": negotiation_session_id,
+            "price": price,
+            "delivery_time": delivery_time,
+            "delivery_description": delivery_description,
+            "payment_terms": payment_terms,
+            "milestones": milestones or [],
+            "task_description": task_description,
+            "demand_agent_id": demand_agent_id,
+            "supply_agent_id": supply_agent_id,
+            **kwargs
+        })
+
+    async def confirm(self, order_id: str = "", **kwargs) -> dict:
+        """Confirm an order (both parties must confirm)."""
+        return await self.client.post(f"/orders/{order_id}/confirm", kwargs)
+
+    async def start(self, order_id: str = "", **kwargs) -> dict:
+        """Start work on an order (supply agent only)."""
+        return await self.client.post(f"/orders/{order_id}/start", kwargs)
+
+    async def deliver(self, order_id: str = "", description: str = "",
+                      artifact_type: str = "text", url_or_content: str = "", **kwargs) -> dict:
+        """Submit a deliverable for an order."""
+        return await self.client.post(f"/orders/{order_id}/deliver", {
+            "description": description,
+            "artifact_type": artifact_type,
+            "url_or_content": url_or_content,
+            **kwargs
+        })
+
+    async def accept(self, order_id: str = "", rating: int = 5, comment: str = "", **kwargs) -> dict:
+        """Accept deliverables and complete the order (demand agent only)."""
+        return await self.client.post(f"/orders/{order_id}/accept", {
+            "rating": rating,
+            "comment": comment,
+            **kwargs
+        })
+
+    async def dispute(self, order_id: str = "", reason: str = "", **kwargs) -> dict:
+        """Raise a dispute on an order."""
+        return await self.client.post(f"/orders/{order_id}/dispute", {
+            "reason": reason,
+            **kwargs
+        })
+
+    async def cancel(self, order_id: str = "", reason: str = "", **kwargs) -> dict:
+        """Cancel an order."""
+        return await self.client.post(f"/orders/{order_id}/cancel", {
+            "reason": reason,
+            **kwargs
+        })
+
+    async def list(self, status: str = "", role: str = "",
+                   active_only: bool = False, limit: int = 50, **kwargs) -> dict:
+        """List orders for the current agent."""
+        params = {"status": status, "role": role, "active_only": active_only, "limit": limit, **kwargs}
+        return await self.client.get("/orders", params)
+
+    async def get(self, order_id: str = "", **kwargs) -> dict:
+        """Get order details."""
+        return await self.client.get(f"/orders/{order_id}", kwargs)
+
+    async def get_status(self, order_id: str = "", **kwargs) -> dict:
+        """Get order status including available actions."""
+        return await self.client.get(f"/orders/{order_id}/status", kwargs)
+
+
 # ==================== Main AgentPlatform Class ====================
 class AgentPlatform:
     """
@@ -1176,6 +1264,67 @@ class AgentPlatform:
     async def discover_agents(self, capability: str) -> PlatformResult:
         """Discover agents by capability."""
         return await self.call(f"找有 {capability} 能力的Agent")
+
+    # ==================== Order Methods ====================
+
+    async def create_order_from_pre_match(
+        self,
+        negotiation_id: str,
+        task_description: str = ""
+    ) -> PlatformResult:
+        """Create an order from a confirmed pre-match negotiation."""
+        return await self.call(f"创建订单从预匹配 {negotiation_id}")
+
+    async def confirm_order(self, order_id: str) -> PlatformResult:
+        """Confirm an order (both parties must confirm)."""
+        return await self.call(f"确认订单 {order_id}")
+
+    async def start_order_work(self, order_id: str) -> PlatformResult:
+        """Start work on an order (supply agent only)."""
+        return await self.call(f"开始订单工作 {order_id}")
+
+    async def submit_deliverable(
+        self,
+        order_id: str,
+        description: str,
+        artifact_type: str = "text",
+        url_or_content: str = ""
+    ) -> PlatformResult:
+        """Submit a deliverable for an order."""
+        return await self.call(f"提交交付物 {description}，订单 {order_id}")
+
+    async def accept_deliverable(
+        self,
+        order_id: str,
+        rating: int = 5,
+        comment: str = ""
+    ) -> PlatformResult:
+        """Accept deliverables and complete an order."""
+        return await self.call(f"接受交付物，订单 {order_id}，评分 {rating}星")
+
+    async def dispute_order(self, order_id: str, reason: str) -> PlatformResult:
+        """Raise a dispute on an order."""
+        return await self.call(f"争议订单 {order_id}，原因：{reason}")
+
+    async def cancel_order(self, order_id: str, reason: str = "") -> PlatformResult:
+        """Cancel an order."""
+        return await self.call(f"取消订单 {order_id}")
+
+    async def list_orders(
+        self,
+        role: str = "",
+        active_only: bool = False
+    ) -> PlatformResult:
+        """List orders for the current agent."""
+        return await self.call(f"列出我的订单")
+
+    async def get_order(self, order_id: str) -> PlatformResult:
+        """Get order details."""
+        return await self.call(f"查询订单 {order_id}")
+
+    async def get_order_status(self, order_id: str) -> PlatformResult:
+        """Get order status including available actions."""
+        return await self.call(f"订单状态 {order_id}")
 
     async def close(self):
         """Close the platform connection."""

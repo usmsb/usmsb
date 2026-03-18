@@ -38,5 +38,5 @@ export { AgentPlatform, PlatformConfig } from "./platform";
 export { IntentParser } from "./intent-parser";
 export { StakeChecker } from "./stake-checker";
 export { RegistrationClient, RegistrationResult, BindingRequestResult, BindingStatus, APIKeyInfo, } from "./registration";
-export { ActionType, StakeTier, StakeInfo, Intent, PlatformResult, ErrorCode, ACTION_META, stakeInfoFromAmount, } from "./types";
+export { ActionType, StakeTier, StakeInfo, Intent, PlatformResult, ErrorCode, ACTION_META, stakeInfoFromAmount, OrderStatus, OrderTerms, Order, OrderCreationResult, PoolCreationResult, } from "./types";
 //# sourceMappingURL=index.d.ts.map

@@ -78,6 +78,41 @@ const PATTERNS = new Map([
     [types_1.ActionType.LEARNING_INSIGHTS, [
             /获取.*洞察/, /get.*insights/i, /改进.*建议/
         ]],
+    // Order
+    [types_1.ActionType.ORDER_FROM_PRE_MATCH, [
+            /创建.*订单.*从.*预匹配/, /从.*预匹配.*创建.*订单/, /create.*order.*from.*pre.?match/i,
+            /订单.*预匹配/, /order.*from.*prematch/i
+        ]],
+    [types_1.ActionType.ORDER_CREATE, [
+            /创建.*订单/, /新建.*订单/, /create.*order/i, /new.*order/i, /发起.*订单/
+        ]],
+    [types_1.ActionType.ORDER_CONFIRM, [
+            /确认.*订单/, /confirm.*order/i, /订单.*确认/
+        ]],
+    [types_1.ActionType.ORDER_START, [
+            /开始.*工作/, /start.*work/i, /开始.*订单/, /order.*start/i, /启动.*工作/
+        ]],
+    [types_1.ActionType.ORDER_DELIVER, [
+            /提交.*交付/, /submit.*deliver/i, /交付.*成果/, /order.*deliver/i, /提交.*成果/
+        ]],
+    [types_1.ActionType.ORDER_ACCEPT, [
+            /接受.*交付/, /accept.*deliver/i, /验收.*订单/, /order.*accept/i
+        ]],
+    [types_1.ActionType.ORDER_DISPUTE, [
+            /争议.*订单/, /dispute.*order/i, /订单.*争议/, /投诉.*订单/
+        ]],
+    [types_1.ActionType.ORDER_CANCEL, [
+            /取消.*订单/, /cancel.*order/i, /订单.*取消/
+        ]],
+    [types_1.ActionType.ORDER_LIST, [
+            /列出.*订单/, /查看.*订单/, /list.*order/i, /我的订单/, /show.*order/i
+        ]],
+    [types_1.ActionType.ORDER_GET, [
+            /查询.*订单/, /get.*order/i, /订单.*详情/
+        ]],
+    [types_1.ActionType.ORDER_STATUS, [
+            /订单.*状态/, /order.*status/i
+        ]],
 ]);
 /**
  * Common skill keywords to extract.
@@ -133,19 +168,82 @@ class IntentParser {
         if (skills.length > 0) {
             params.skills = skills;
         }
-        // Extract IDs (collab-id, workflow-id, etc.)
-        const idMatch = request.match(/(collab|workflow|negotiation|service|agent)[-:_]?([a-zA-Z0-9-]+)/i);
+        // Extract IDs (collab-id, workflow-id, negotiation-id, order-id, etc.)
+        const idMatch = request.match(/(collab|workflow|negotiation|service|agent|order|prematch)[-_]?([a-zA-Z0-9-]+)/i);
         if (idMatch) {
-            params.id = `${idMatch[1]}-${idMatch[2]}`;
-            // Map to specific ID parameter based on category
-            if (meta.category === "collaboration") {
-                params.collabId = params.id;
+            const prefix = idMatch[1].toLowerCase();
+            const idValue = `${idMatch[1]}-${idMatch[2]}`;
+            params.id = idValue;
+            if (prefix === "collab" || prefix === "collaboration") {
+                params.collabId = idValue;
             }
-            else if (meta.category === "workflow") {
-                params.workflowId = params.id;
+            else if (prefix === "workflow") {
+                params.workflowId = idValue;
             }
-            else if (meta.category === "negotiation") {
-                params.negotiationId = params.id;
+            else if (prefix === "negotiation" || prefix === "neg") {
+                params.negotiationId = idValue;
+            }
+            else if (prefix === "order") {
+                params.orderId = idValue;
+            }
+            else if (prefix === "prematch" || prefix === "pre-match") {
+                params.negotiationId = idValue; // reuse negotiationId
+            }
+        }
+        // Extract rating (for accept)
+        if (action === types_1.ActionType.ORDER_ACCEPT) {
+            const ratingMatch = request.match(/(\d+)\s*(?:星|star|分|rating)/i);
+            if (ratingMatch) {
+                params.rating = parseInt(ratingMatch[1], 10);
+            }
+            else {
+                params.rating = 5; // default
+            }
+            const commentMatch = request.match(/(?:评价|comment|备注)[:：]?\s*(.+)/i);
+            if (commentMatch) {
+                params.comment = commentMatch[1].trim();
+            }
+        }
+        // Extract reason (for dispute/cancel)
+        if (action === types_1.ActionType.ORDER_DISPUTE || action === types_1.ActionType.ORDER_CANCEL) {
+            const reasonMatch = request.match(/(?:原因|reason|理由)[:：]?\s*(.+)/i);
+            if (reasonMatch) {
+                params.reason = reasonMatch[1].trim();
+            }
+            else {
+                // Use the whole request after the action as reason
+                params.reason = request;
+            }
+        }
+        // Extract deliverable info (for deliver)
+        if (action === types_1.ActionType.ORDER_DELIVER) {
+            const descMatch = request.match(/(?:交付|成果|内容|description)[:：]?\s*(.+)/i);
+            params.description = descMatch ? descMatch[1].trim() : request;
+            // Extract artifact type
+            if (/代码|code/i.test(request))
+                params.artifactType = "code";
+            else if (/文档|doc/i.test(request))
+                params.artifactType = "document";
+            else if (/链接|link|url/i.test(request))
+                params.artifactType = "link";
+            else
+                params.artifactType = "text";
+        }
+        // Extract price (for order create)
+        if (action === types_1.ActionType.ORDER_CREATE) {
+            const priceMatch = request.match(/(\d+)\s*(?:VIBE|vibe|元|块)/i);
+            if (priceMatch) {
+                params.price = parseInt(priceMatch[1], 10);
+            }
+        }
+        // Extract goal/description for order create
+        if (action === types_1.ActionType.ORDER_CREATE || action === types_1.ActionType.ORDER_FROM_PRE_MATCH) {
+            const goalMatch = request.match(/(?:任务|目标|任务描述|goal|description)[:：]?\s*(.+)/i);
+            if (goalMatch) {
+                params.taskDescription = goalMatch[1].trim();
+            }
+            else {
+                params.taskDescription = request;
             }
         }
         // Extract goal/description for collaboration create
