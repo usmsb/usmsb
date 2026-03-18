@@ -163,6 +163,10 @@ class PreMatchNegotiationDB(Base):
     # Mutual interest
     mutual_interest = Column(Boolean, default=None)
 
+    # FIX: Supply agent consent — negotiation cannot proceed without this
+    # None = not yet asked, True = accepted, False = declined
+    supply_consent = Column(Boolean, default=None)
+
     # Terms
     proposed_terms = Column(Text)  # JSON
     agreed_terms = Column(Text)  # JSON
@@ -264,6 +268,7 @@ class PreMatchNegotiationService:
             "supply_agent_id": supply_agent_id,
             "demand_id": demand_id,
             "status": NegotiationStatus.INITIATED.value,
+            "supply_consent": None,  # FIX: supply must consent before proceeding
             "initiated_at": negotiation.initiated_at.isoformat(),
             "expires_at": negotiation.expires_at.isoformat(),
             "gene_capsule_match": gene_capsule_match,
@@ -280,6 +285,152 @@ class PreMatchNegotiationService:
 
         return self._negotiation_to_dict(negotiation)
 
+    # FIX: Supply agent consent — negotiation cannot proceed without consent
+    async def request_consent(
+        self,
+        negotiation_id: str,
+        requester_id: str,
+    ) -> dict[str, Any]:
+        """
+        Request supply agent's consent to proceed with negotiation.
+
+        This is typically called by the demand agent to formally request
+        the supply agent's agreement before proceeding with Q&A.
+
+        Args:
+            negotiation_id: The negotiation ID
+            requester_id: Agent requesting consent (must be demand or supply)
+
+        Returns:
+            Negotiation dict with consent status
+        """
+        negotiation = self._get_and_validate_negotiation(negotiation_id)
+        if not negotiation:
+            raise ValueError(f"Negotiation {negotiation_id} not found or expired")
+
+        # FIX: Only demand agent can request consent
+        if requester_id != negotiation.demand_agent_id:
+            raise PermissionError(
+                f"Only the demand agent can request consent. "
+                f"Requester: {requester_id}, Demand: {negotiation.demand_agent_id}"
+            )
+
+        # Already declined
+        if negotiation.supply_consent is False:
+            raise ValueError("Supply agent already declined this negotiation")
+
+        # Already consented
+        if negotiation.supply_consent is True:
+            return {
+                "negotiation_id": negotiation_id,
+                "status": negotiation.status,
+                "supply_consent": True,
+                "message": "Supply agent already consented",
+            }
+
+        # Ask for consent
+        self.logger.info(
+            f"Consent requested for negotiation {negotiation_id} "
+            f"from supply {negotiation.supply_agent_id}"
+        )
+
+        return {
+            "negotiation_id": negotiation_id,
+            "status": negotiation.status,
+            "supply_consent": negotiation.supply_consent,
+            "message": "Consent request sent to supply agent. "
+                       "Supply agent must call confirm_consent() or decline_consent().",
+        }
+
+    async def confirm_consent(
+        self,
+        negotiation_id: str,
+        supply_agent_id: str,
+    ) -> dict[str, Any]:
+        """
+        Supply agent confirms consent to proceed with negotiation.
+
+        Args:
+            negotiation_id: The negotiation ID
+            supply_agent_id: Supply agent confirming (must be the supply party)
+
+        Returns:
+            Negotiation dict
+
+        Raises:
+            PermissionError: If supply_agent_id doesn't match
+            ValueError: If already declined or expired
+        """
+        negotiation = self._get_and_validate_negotiation(negotiation_id)
+        if not negotiation:
+            raise ValueError(f"Negotiation {negotiation_id} not found or expired")
+
+        # FIX: Validate supply agent
+        if supply_agent_id != negotiation.supply_agent_id:
+            raise PermissionError(
+                f"Only the supply agent can confirm consent. "
+                f"Supplier: {negotiation.supply_agent_id}, Caller: {supply_agent_id}"
+            )
+
+        if negotiation.supply_consent is False:
+            raise ValueError("Negotiation was already declined by supply agent")
+
+        negotiation.supply_consent = True
+        negotiation.last_updated = datetime.utcnow()
+        self.db.commit()
+
+        self.logger.info(f"Supply agent {supply_agent_id} consented to negotiation {negotiation_id}")
+
+        return {
+            "negotiation_id": negotiation_id,
+            "status": negotiation.status,
+            "supply_consent": True,
+            "message": "Consent confirmed. Negotiation can now proceed.",
+        }
+
+    async def decline_consent(
+        self,
+        negotiation_id: str,
+        supply_agent_id: str,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        """
+        Supply agent declines to participate in negotiation.
+
+        Args:
+            negotiation_id: The negotiation ID
+            supply_agent_id: Supply agent declining (must be the supply party)
+            reason: Optional reason for declining
+
+        Returns:
+            Negotiation dict
+        """
+        negotiation = self._get_and_validate_negotiation(negotiation_id)
+        if not negotiation:
+            raise ValueError(f"Negotiation {negotiation_id} not found or expired")
+
+        # FIX: Validate supply agent
+        if supply_agent_id != negotiation.supply_agent_id:
+            raise PermissionError(
+                f"Only the supply agent can decline consent. "
+                f"Supplier: {negotiation.supply_agent_id}, Caller: {supply_agent_id}"
+            )
+
+        negotiation.supply_consent = False
+        negotiation.outcome_reason = reason or "Supply agent declined"
+        negotiation.status = NegotiationStatus.DECLINED.value
+        negotiation.last_updated = datetime.utcnow()
+        self.db.commit()
+
+        self.logger.info(f"Supply agent {supply_agent_id} declined negotiation {negotiation_id}")
+
+        return {
+            "negotiation_id": negotiation_id,
+            "status": NegotiationStatus.DECLINED.value,
+            "supply_consent": False,
+            "reason": reason,
+        }
+
     async def ask_question(
         self,
         negotiation_id: str,
@@ -290,10 +441,18 @@ class PreMatchNegotiationService:
         Ask a clarification question.
 
         Either agent can ask questions to clarify requirements or capabilities.
+        FIX: Requires supply_consent before proceeding.
         """
         negotiation = self._get_and_validate_negotiation(negotiation_id)
         if not negotiation:
             raise ValueError(f"Negotiation {negotiation_id} not found or expired")
+
+        # FIX: Supply agent must have consented before Q&A can begin
+        if negotiation.supply_consent is not True:
+            raise PermissionError(
+                "Supply agent must consent before Q&A can begin. "
+                "Call confirm_consent() first."
+            )
 
         qa = ClarificationQA(
             question_id=f"qa-{uuid4().hex[:8]}",

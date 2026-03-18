@@ -155,6 +155,45 @@ class ReputationService:
         # Last recalculation time
         self._last_recalc: float = 0
 
+        # FIX: Automatic decay configuration
+        self._decay_task: asyncio.Task | None = None
+        self._running = True
+        self.DECAY_INTERVAL_HOURS = 24  # Run decay check every 24 hours
+        self.DECAY_RATE = 0.05  # 5% decay per day of inactivity
+        # Start background decay loop
+        try:
+            self._decay_task = asyncio.create_task(self._decay_loop())
+        except RuntimeError:
+            # No event loop running — skip background task (will apply decay on demand)
+            pass
+
+    async def _decay_loop(self) -> None:
+        """
+        Background loop: applies reputation decay every 24 hours.
+
+        Agents with no recent activity (24h+) have their scores
+        gradually decay toward neutral (0.5), simulating reduced confidence
+        in stale data. This prevents old high scores from persisting forever.
+        """
+        import asyncio as _asyncio
+        while True:
+            try:
+                await _asyncio.sleep(self.DECAY_INTERVAL_HOURS * 3600)
+                if not self._running:
+                    break
+                self.apply_decay(days=1.0)
+            except _asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Reputation decay error: {e}")
+
+    def stop(self) -> None:
+        """Stop the reputation service background tasks."""
+        self._running = False
+        if self._decay_task:
+            self._decay_task.cancel()
+            self._decay_task = None
+
     def initialize_agent(self, agent_id: str, initial_stake: float = 0) -> ReputationScore:
         """
         Initialize reputation for a new agent.
@@ -265,33 +304,75 @@ class ReputationService:
     def record_transaction_completed(
         self,
         agent_id: str,
-        as_role: str,  # "buyer" or "seller"
+        transaction_id: str | None = None,
         rating: int | None = None,
+        was_successful: bool = True,
+        as_role: str = "provider",
         amount: float = 0,
         on_time: bool = True,
     ) -> None:
-        """Record a completed transaction."""
-        # Reliability boost
-        reliability_impact = 0.1 if on_time else -0.05
+        """
+        Record a completed transaction for an agent.
+
+        FIX: Signature updated to match JointOrderService caller.
+             Added transaction_id, was_successful params.
+             was_successful is validated: negative ratings imply failure.
+
+        Args:
+            agent_id: Agent completing the transaction
+            transaction_id: Associated transaction/pool ID (optional)
+            rating: 1-5 rating given by the other party
+            was_successful: Whether the transaction succeeded (can be inferred from rating < 3)
+            as_role: Role in transaction: "provider" or "demander"
+            amount: Transaction amount for weight calculation
+            on_time: Whether delivery was on time
+        """
+        # FIX: Validate was_successful — low ratings imply failure
+        if rating is not None and rating < 3:
+            was_successful = False
+
+        # Reliability impact
+        if was_successful:
+            reliability_impact = 0.1 if on_time else 0.02
+        else:
+            reliability_impact = -0.15
+
         self.record_event(
             agent_id=agent_id,
             event_type="transaction_completed",
             dimension=ReputationDimension.RELIABILITY.value,
             impact=reliability_impact,
-            weight=min(amount / 100, 2.0),  # Weight by amount
-            metadata={"role": as_role, "onTime": on_time},
+            weight=min(amount / 100, 2.0),
+            metadata={
+                "role": as_role,
+                "on_time": on_time,
+                "was_successful": was_successful,
+                "transaction_id": transaction_id,
+            },
         )
 
-        # Quality from rating
+        # Quality from rating (only if provided)
         if rating is not None:
-            quality_impact = (rating - 3) / 10  # -0.3 to +0.2
+            # FIX: rating 1-2 = negative, 3 = neutral, 4-5 = positive
+            quality_impact = (rating - 3) / 10  # -0.2 to +0.2
             self.record_event(
                 agent_id=agent_id,
                 event_type="rating_received",
                 dimension=ReputationDimension.QUALITY.value,
                 impact=quality_impact,
                 weight=min(amount / 100, 2.0),
-                metadata={"rating": rating},
+                metadata={"rating": rating, "transaction_id": transaction_id},
+            )
+
+        # Fairness: successful transactions without dispute imply fairness
+        if was_successful:
+            self.record_event(
+                agent_id=agent_id,
+                event_type="transaction_completed",
+                dimension=ReputationDimension.FAIRNESS.value,
+                impact=0.05,  # Small fairness boost for successful completion
+                weight=min(amount / 100, 1.0),
+                metadata={"transaction_id": transaction_id},
             )
 
     def record_response_time(
