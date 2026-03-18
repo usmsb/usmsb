@@ -186,6 +186,8 @@ class AgentTransactionService(IAgentTransactionService):
     Implementation of agent transaction service.
 
     Provides transaction capabilities with blockchain integration.
+
+    FIX: Per-wallet asyncio.Lock prevents double-spend from concurrent transfers.
     """
 
     def __init__(self, blockchain_adapter=None):
@@ -200,6 +202,8 @@ class AgentTransactionService(IAgentTransactionService):
         self._transactions: dict[str, AgentTransaction] = {}
         self._escrows: dict[str, AgentTransaction] = {}
         self._escrow_handlers: dict[str, Callable] = {}
+        # FIX: Per-wallet locks to prevent concurrent double-spend
+        self._wallet_locks: dict[str, asyncio.Lock] = {}
 
     async def create_wallet(self, agent_id: str, chain: str = "custom") -> AgentWallet:
         """Create a wallet for an agent."""
@@ -243,7 +247,24 @@ class AgentTransactionService(IAgentTransactionService):
         token: str = "USMSB",
         metadata: dict[str, Any] | None = None,
     ) -> AgentTransaction:
-        """Transfer tokens between agents."""
+        """
+        Transfer tokens between agents with double-spend protection.
+
+        FIX: Per-wallet asyncio.Lock prevents concurrent double-spend.
+        """
+        wallet_lock = self._wallet_locks.setdefault(from_agent, asyncio.Lock())
+        async with wallet_lock:
+            return await self._do_transfer(from_agent, to_agent, amount, token, metadata)
+
+    async def _do_transfer(
+        self,
+        from_agent: str,
+        to_agent: str,
+        amount: Decimal,
+        token: str,
+        metadata: dict[str, Any] | None,
+    ) -> AgentTransaction:
+        """Internal transfer (called within wallet lock)."""
         # Get wallets
         from_wallet = self._wallets.get(from_agent)
         to_wallet = self._wallets.get(to_agent)

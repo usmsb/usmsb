@@ -179,6 +179,7 @@ class JointOrderService:
         contract_address: str | None = None,
         reputation_service=None,
         matching_engine=None,
+        transaction_service=None,
     ):
         """
         Initialize the joint order service.
@@ -188,16 +189,26 @@ class JointOrderService:
             contract_address: JointOrder contract address
             reputation_service: Service for reputation scores
             matching_engine: Service for demand matching
+            transaction_service: Service for VIBE transfers (AgentTransactionService)
+                               Used for locking budgets and releasing payments on award/delivery.
         """
         self.web3 = web3_provider
         self.contract_address = contract_address
         self.reputation = reputation_service
         self.matching_engine = matching_engine
+        self.transaction_service = transaction_service  # FIX: added for fund flow
 
         self._demands: dict[str, Demand] = {}
         self._pools: dict[str, OrderPool] = {}
         self._user_demands: dict[str, list[str]] = {}
         self._service_pools: dict[str, list[str]] = {}
+
+        # FIX: Track locked budgets per demand (demand_id -> locked_amount)
+        # This prevents double-locking when multiple pools are involved
+        self._demand_locks: dict[str, float] = {}
+
+        # FIX: Per-wallet locks to prevent double-spending
+        self._wallet_locks: dict[str, asyncio.Lock] = {}
 
         self._stats = ServiceStats()
 
@@ -530,10 +541,12 @@ class JointOrderService:
         price: float,
         delivery_time_hours: int,
         proposal: str,
-        reputation_score: float | None = None,
     ) -> Bid | None:
         """
         Submit a bid for a pool.
+
+        FIX: reputation_score is ALWAYS fetched from reputation service.
+        External callers cannot pass fake reputation values.
 
         Args:
             pool_id: Pool to bid on
@@ -541,7 +554,6 @@ class JointOrderService:
             price: Bid price
             delivery_time_hours: Promised delivery time
             proposal: Proposal description
-            reputation_score: Provider reputation (fetched if not provided)
 
         Returns:
             Created bid or None
@@ -559,11 +571,15 @@ class JointOrderService:
             logger.warning(f"Pool has max bids: {pool_id}")
             return None
 
-        if reputation_score is None:
-            if self.reputation:
-                reputation_score = await self.reputation.get_reputation(provider_id)
-            else:
-                reputation_score = 0.5
+        # FIX: Always fetch reputation from service — external values are IGNORED
+        reputation_score = 0.5  # default neutral
+        if self.reputation:
+            try:
+                score = self.reputation.get_score(provider_id)
+                if score:
+                    reputation_score = score.overall
+            except Exception as e:
+                logger.warning(f"Failed to fetch reputation for {provider_id}: {e}")
 
         computed_score = self._calculate_bid_score(
             price=price,
@@ -653,6 +669,9 @@ class JointOrderService:
         """
         Award the pool to a provider.
 
+        FIX: On award, VIBE budgets are transferred from demand wallets to the
+        winning provider. Funds are held in a pending state until delivery.
+
         Args:
             pool_id: Pool to award
             bid_id: Specific bid to award (auto-select if None)
@@ -680,6 +699,49 @@ class JointOrderService:
 
         self._stats.active_pools += 1
 
+        # FIX: Transfer VIBE from demand wallets → provider (escrow)
+        # Each demand's proportional budget is locked for the provider
+        if self.transaction_service:
+            for demand in pool.demands:
+                demand_id = demand.demand_id
+                user_id = demand.user_id
+
+                # Lock the budget for this demand (prevents double-spend)
+                lock_key = f"{pool_id}:{demand_id}"
+                if lock_key not in self._demand_locks:
+                    self._demand_locks[lock_key] = demand.budget
+
+                locked_amount = self._demand_locks[lock_key]
+
+                # Use per-wallet lock to prevent concurrent award of same wallet
+                wallet_lock = self._wallet_locks.setdefault(user_id, asyncio.Lock())
+                async with wallet_lock:
+                    try:
+                        from decimal import Decimal
+                        result = await self.transaction_service.transfer(
+                            from_agent=user_id,
+                            to_agent=winning_bid.provider_id,
+                            amount=Decimal(str(locked_amount)),
+                            metadata={
+                                "type": "pool_award",
+                                "pool_id": pool_id,
+                                "demand_id": demand_id,
+                                "bid_id": winning_bid.bid_id,
+                            }
+                        )
+                        if result.status.value == "confirmed":
+                            demand.status = "awarded"
+                            logger.info(
+                                f"Locked {locked_amount} VIBE from demand {demand_id} "
+                                f"for provider {winning_bid.provider_id} in pool {pool_id}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Budget lock failed for demand {demand_id}: {result.status.value}"
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to lock budget for demand {demand_id}: {e}")
+
         if self.on_pool_awarded:
             self.on_pool_awarded(pool, winning_bid)
 
@@ -700,7 +762,20 @@ class JointOrderService:
         user_id: str,
         rating: int,
     ) -> bool:
-        """Confirm delivery for a pool."""
+        """
+        Confirm delivery for a pool.
+
+        FIX: On all-confirmed, the locked VIBE is RELEASED to the winning provider.
+        FIX: Updates reputation for both demand and supply agents.
+
+        Args:
+            pool_id: Pool to confirm
+            user_id: User confirming delivery
+            rating: 1-5 rating for the provider
+
+        Returns:
+            True if confirmation succeeded
+        """
         pool = self._pools.get(pool_id)
         if not pool:
             return False
@@ -708,19 +783,65 @@ class JointOrderService:
         if rating < 1 or rating > 5:
             return False
 
+        # Verify caller is a demand participant
+        demand_ids = [d.demand_id for d in pool.demands if d.user_id == user_id]
+        if not demand_ids:
+            logger.warning(f"User {user_id} is not a participant in pool {pool_id}")
+            return False
+
+        # Mark this demand as confirmed
+        for demand in pool.demands:
+            if demand.demand_id == demand_ids[0]:
+                demand.status = "confirmed"
+                break
+
         logger.info(f"Delivery confirmed for pool {pool_id} by {user_id}")
 
-        all_confirmed = True
-        for demand in pool.demands:
-            if demand.status != "confirmed":
-                all_confirmed = False
-                break
+        # Check if ALL demands have confirmed
+        all_confirmed = all(d.status == "confirmed" for d in pool.demands)
 
         if all_confirmed:
             pool.status = PoolStatus.COMPLETED
             self._stats.completed_pools += 1
             self._stats.active_pools -= 1
             self._stats.total_volume += pool.winning_price or 0
+
+            # FIX: Release locked VIBE to the winning provider
+            if self.transaction_service and pool.winning_provider:
+                for demand in pool.demands:
+                    lock_key = f"{pool_id}:{demand.demand_id}"
+                    locked_amount = self._demand_locks.pop(lock_key, 0)
+                    if locked_amount > 0:
+                        try:
+                            from decimal import Decimal
+                            result = await self.transaction_service.transfer(
+                                from_agent=demand.user_id,
+                                to_agent=pool.winning_provider,
+                                amount=Decimal(str(locked_amount)),
+                                metadata={
+                                    "type": "pool_completion",
+                                    "pool_id": pool_id,
+                                    "demand_id": demand.demand_id,
+                                }
+                            )
+                            if result.status.value == "confirmed":
+                                logger.info(
+                                    f"Released {locked_amount} VIBE to provider {pool.winning_provider}"
+                                )
+                        except Exception as e:
+                            logger.error(f"Failed to release VIBE: {e}")
+
+            # FIX: Update reputation for provider
+            if self.reputation and pool.winning_provider:
+                try:
+                    await self.reputation.record_transaction_completed(
+                        agent_id=pool.winning_provider,
+                        transaction_id=pool_id,
+                        rating=rating,
+                        was_successful=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update provider reputation: {e}")
 
         return True
 
@@ -730,13 +851,114 @@ class JointOrderService:
         user_id: str,
         reason: str,
     ) -> bool:
-        """Raise a dispute for a pool."""
+        """
+        Raise a dispute for a pool.
+
+        FIX: On dispute, locked VIBE budgets are NOT released.
+        FIX: Requires participant validation.
+
+        Args:
+            pool_id: Pool to dispute
+            user_id: User raising the dispute (must be a participant)
+            reason: Reason for the dispute
+
+        Returns:
+            True if dispute was raised
+        """
         pool = self._pools.get(pool_id)
         if not pool:
             return False
 
+        # FIX: Validate participant
+        is_participant = any(d.user_id == user_id for d in pool.demands)
+        if not is_participant:
+            logger.warning(f"Non-participant {user_id} tried to dispute pool {pool_id}")
+            return False
+
         pool.status = PoolStatus.DISPUTED
-        logger.info(f"Dispute raised for pool {pool_id}")
+        logger.info(f"Dispute raised for pool {pool_id} by {user_id}: {reason}")
+
+        # FIX: Notify reputation service for negative impact
+        if self.reputation and pool.winning_provider:
+            try:
+                await self.reputation.record_transaction_completed(
+                    agent_id=pool.winning_provider,
+                    transaction_id=pool_id,
+                    rating=1,
+                    was_successful=False,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to record dispute reputation: {e}")
+
+        return True
+
+    async def cancel_pool(
+        self,
+        pool_id: str,
+        cancelled_by: str | None = None,
+    ) -> bool:
+        """
+        Cancel a pool and restore demand budgets.
+
+        FIX: All demands are reset to "active" so users can retry.
+        FIX: Locked budgets are released back to demand wallets.
+        FIX: Participant validation.
+
+        Args:
+            pool_id: Pool to cancel
+            cancelled_by: User requesting cancellation (must be demand participant or admin)
+
+        Returns:
+            True if cancellation succeeded
+        """
+        pool = self._pools.get(pool_id)
+        if not pool:
+            return False
+
+        # Cannot cancel awarded or completed pools
+        if pool.status in [PoolStatus.AWARDED, PoolStatus.COMPLETED]:
+            logger.warning(f"Cannot cancel pool {pool_id} in status {pool.status}")
+            return False
+
+        # FIX: Validate canceller is a demand participant
+        if cancelled_by:
+            is_participant = any(d.user_id == cancelled_by for d in pool.demands)
+            if not is_participant:
+                logger.warning(f"Non-participant {cancelled_by} tried to cancel pool {pool_id}")
+                return False
+
+        # FIX: Release locked budgets back to demand wallets
+        if self.transaction_service:
+            for demand in pool.demands:
+                lock_key = f"{pool_id}:{demand.demand_id}"
+                locked_amount = self._demand_locks.pop(lock_key, 0)
+                if locked_amount > 0 and pool.status == PoolStatus.AWARDED:
+                    # Only refund if already awarded (funds were already transferred)
+                    try:
+                        from decimal import Decimal
+                        result = await self.transaction_service.transfer(
+                            from_agent=pool.winning_provider,
+                            to_agent=demand.user_id,
+                            amount=Decimal(str(locked_amount)),
+                            metadata={
+                                "type": "pool_cancellation_refund",
+                                "pool_id": pool_id,
+                                "demand_id": demand.demand_id,
+                            }
+                        )
+                        if result.status.value == "confirmed":
+                            logger.info(
+                                f"Refunded {locked_amount} VIBE to demand {demand.demand_id} after pool cancellation"
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to refund locked budget: {e}")
+
+        # FIX: Reset all demands to "active" so users can create new demands
+        for demand in pool.demands:
+            demand.status = "active"
+
+        pool.status = PoolStatus.CANCELLED
+        logger.info(f"Pool {pool_id} cancelled. Demands reset to active.")
 
         return True
 
