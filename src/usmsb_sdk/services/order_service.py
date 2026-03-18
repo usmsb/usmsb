@@ -294,31 +294,196 @@ class OrderService:
     def __init__(
         self,
         db_session=None,
-        joint_order_service: JointOrderService | None = None,
-        pre_match_negotiation: PreMatchNegotiationService | None = None,
-        logger: logging.Logger | None = None,
+        joint_order_service=None,           # FIX断层2: inject for pool creation
+        pre_match_negotiation=None,        # FIX断层1: inject for order creation from pre-match
+        reputation_service=None,           # FIX断层5: inject for reputation updates
+        logger=None,
     ):
         self.db = db_session
+        # FIX断层2: JointOrder integration — creates pool on CONFIRMED
         self.joint_order = joint_order_service
+        # FIX断层1: Pre-match integration — reads negotiation details
         self.pre_match_negotiation = pre_match_negotiation
+        # FIX断层5: Reputation integration — records completion
+        self.reputation_service = reputation_service
         self.logger = logger or logging.getLogger(__name__)
 
         # In-memory cache
         self._orders: dict[str, Order] = {}
 
-        # Event callbacks
-        self.on_order_created: Callable[[Order], None] | None = None
-        self.on_order_confirmed: Callable[[Order], None] | None = None
-        self.on_order_completed: Callable[[Order], None] | None = None
-        self.on_order_disputed: Callable[[Order, str], None] | None = None
-        self.on_order_cancelled: Callable[[Order, str], None] | None = None
+        # FIX断层3: Wire up callbacks — these replace the None stubs
+        self.on_order_created: Callable | None = None
+        self.on_order_confirmed: Callable | None = None
+        self.on_order_completed: Callable | None = None
+        self.on_order_disputed: Callable | None = None
+        self.on_order_cancelled: Callable | None = None
 
-    # ==================== Order Creation ====================
+        # Auto-wire callbacks so the full flow runs automatically
+        self._wire_callbacks()
+
+    def _wire_callbacks(self) -> None:
+        """
+        Wire up the event callbacks to create a fully automatic business flow.
+
+        Flow:
+            Order.CREATED → (both confirm) → CONFIRMED
+                                         → create_joint_order_pool() ← FIX断层2+3+6
+                                           (locks VIBE from demand wallets)
+
+            Order.DELIVERED → (demand accepts) → COMPLETED
+                                         → JointOrder.confirm_delivery() ← FIX断层3+5
+                                           (releases VIBE to provider)
+                                         → reputation_service.record() ← FIX断层5
+        """
+        async def on_confirmed(order: Order) -> None:
+            """FIX断层2+3+6: On CONFIRMED, automatically create a JointOrder pool."""
+            if not self.joint_order:
+                self.logger.warning(
+                    f"JointOrderService not available, skipping pool creation for order {order.order_id}"
+                )
+                return
+
+            # FIX断层8: Get service_type from negotiation metadata or metadata field
+            service_type = (
+                order.metadata.get("service_type")
+                or order.metadata.get("serviceType")
+                or order.source_session_id  # Fallback to negotiation ID
+            )
+            if not service_type:
+                service_type = "general"
+
+            try:
+                pool_id = await self.create_joint_order_pool(
+                    order_id=order.order_id,
+                    service_type=str(service_type),
+                    from_address=None,  # Will use demand agent's wallet
+                    private_key=None,
+                )
+                if pool_id:
+                    order.pool_id = pool_id
+                    order.metadata["pool_created"] = True
+                    self.logger.info(
+                        f"JointOrder pool {pool_id} created for order {order.order_id}"
+                    )
+                else:
+                    self.logger.warning(
+                        f"Pool creation returned None for order {order.order_id}"
+                    )
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to create JointOrder pool for order {order.order_id}: {e}"
+                )
+
+        async def on_completed(order: Order) -> None:
+            """FIX断层3+5: On COMPLETED, release VIBE and update reputation."""
+            if self.joint_order and order.pool_id:
+                try:
+                    # FIX断层5: Confirm delivery in JointOrder → releases VIBE to provider
+                    await self.joint_order.confirm_delivery(
+                        pool_id=order.pool_id,
+                        user_id=order.demand_agent_id,
+                        rating=int(order.acceptance_data.get("rating", 5)),
+                    )
+                    self.logger.info(
+                        f"JointOrder delivery confirmed for pool {order.pool_id}"
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to confirm JointOrder delivery for pool {order.pool_id}: {e}"
+                    )
+
+            # FIX断层5: Update reputation for both parties
+            if self.reputation_service:
+                try:
+                    rating = int(order.acceptance_data.get("rating", 5))
+                    await self.reputation_service.record_transaction_completed(
+                        agent_id=order.supply_agent_id,
+                        transaction_id=order.order_id,
+                        rating=rating,
+                        was_successful=True,
+                        as_role="provider",
+                        amount=order.terms.price,
+                        on_time=True,
+                    )
+                    await self.reputation_service.record_transaction_completed(
+                        agent_id=order.demand_agent_id,
+                        transaction_id=order.order_id,
+                        rating=rating,
+                        was_successful=True,
+                        as_role="demander",
+                        amount=order.terms.price,
+                        on_time=True,
+                    )
+                    self.logger.info(
+                        f"Reputation updated for order {order.order_id}"
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to update reputation for order {order.order_id}: {e}"
+                    )
+
+        async def on_disputed(order: Order, reason: str) -> None:
+            """On DISPUTED, record negative reputation impact."""
+            if self.reputation_service and order.pool_id:
+                try:
+                    await self.reputation_service.record_transaction_completed(
+                        agent_id=order.supply_agent_id,
+                        transaction_id=order.order_id,
+                        rating=1,
+                        was_successful=False,
+                        as_role="provider",
+                        amount=order.terms.price,
+                        on_time=False,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to record dispute reputation for order {order.order_id}: {e}"
+                    )
+
+        async def on_cancelled(order: Order, reason: str) -> None:
+            """On CANCELLED, cancel the JointOrder pool if one exists."""
+            if self.joint_order and order.pool_id:
+                try:
+                    await self.joint_order.cancel_pool(
+                        pool_id=order.pool_id,
+                        cancelled_by=order.demand_agent_id,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to cancel JointOrder pool {order.pool_id}: {e}"
+                    )
+
+        # Assign the wired callbacks
+        self.on_order_confirmed = on_confirmed
+        self.on_order_completed = on_completed
+        self.on_order_disputed = on_disputed
+        self.on_order_cancelled = on_cancelled
+
+    def _fire_callback(self, callback: Callable | None, *args, **kwargs) -> None:
+        """
+        Fire a callback, supporting both sync and async callbacks.
+
+        Sync callbacks run immediately in-place.
+        Async callbacks are scheduled as background tasks (fire-and-forget).
+        """
+        if not callback:
+            return
+        try:
+            import asyncio
+            if asyncio.iscoroutinefunction(callback):
+                # Schedule async callback as background task (non-blocking)
+                asyncio.create_task(callback(*args, **kwargs))
+            else:
+                # Run sync callback immediately
+                callback(*args, **kwargs)
+        except Exception as e:
+            self.logger.error(f"Callback {callback.__name__} failed: {e}")
 
     async def create_order_from_pre_match(
         self,
         negotiation_id: str,
         agent_id: str,
+        task_description: str | None = None,  # FIX断层8: allow override
     ) -> Order | None:
         """
         Create an order from a confirmed pre-match negotiation.
@@ -326,9 +491,12 @@ class OrderService:
         This is called after pre_match_negotiation.confirm_match() returns confirmed.
         It reads the negotiation's agreed_terms and creates a formal order.
 
+        FIX断层8: task_description can be passed in (from demand record) or auto-filled.
+
         Args:
             negotiation_id: The pre-match negotiation ID
             agent_id: The agent requesting order creation (must be a party)
+            task_description: Override task description (e.g. from demand's task_description)
 
         Returns:
             Created Order or None
@@ -377,17 +545,40 @@ class OrderService:
 
         order_id = f"order-{uuid.uuid4().hex[:12]}"
 
+        # FIX断层8: Use provided task_description, or fall back to negotiation scope
+        if not task_description:
+            scope = neg.get("scope_confirmation") or {}
+            if isinstance(scope, dict):
+                deliverables = scope.get("deliverables")
+                if deliverables:
+                    task_description = deliverables[0] if isinstance(deliverables, list) else deliverables
+                else:
+                    task_description = scope.get("task_description", f"Pre-match negotiation {negotiation_id}")
+            else:
+                task_description = f"Pre-match negotiation {negotiation_id}"
+
+        # FIX断层8: Extract service_type from negotiation's demand_id or skills
+        service_type = "general"
+        if neg.get("demand_id"):
+            service_type = neg["demand_id"].replace("-", "_")
+        if neg.get("skills") and isinstance(neg["skills"], list) and neg["skills"]:
+            service_type = neg["skills"][0]
+
         order = Order(
             order_id=order_id,
             source=OrderSource.PRE_MATCH_NEGOTIATION,
             source_session_id=negotiation_id,
             demand_agent_id=demand_agent_id,
             supply_agent_id=supply_agent_id,
-            task_description=neg.get("scope_confirmation", {}).get("deliverables", ["Task"]) or ["Task"],
+            task_description=task_description,
             terms=terms,
             priority=OrderPriority.NORMAL,
             delivery_deadline=delivery_deadline,
         )
+        # FIX断层8: Store service_type in metadata so create_joint_order_pool() can use it
+        order.metadata["service_type"] = service_type
+        order.metadata["pre_match_negotiation_id"] = negotiation_id
+        order.metadata["demand_id"] = neg.get("demand_id")
 
         # Persist to DB
         await self._save_order(order)
@@ -395,8 +586,7 @@ class OrderService:
         self._orders[order_id] = order
         self.logger.info(f"Order {order_id} created from pre-match negotiation {negotiation_id}")
 
-        if self.on_order_created:
-            self.on_order_created(order)
+        self._fire_callback(self.on_order_created, order)
 
         return order
 
@@ -446,8 +636,7 @@ class OrderService:
 
         self.logger.info(f"Order {order_id} created from negotiation {negotiation_session_id}")
 
-        if self.on_order_created:
-            self.on_order_created(order)
+        self._fire_callback(self.on_order_created, order)
 
         return order
 
@@ -487,8 +676,7 @@ class OrderService:
 
             self.logger.info(f"Order {order_id} confirmed by both parties")
 
-            if self.on_order_confirmed:
-                self.on_order_confirmed(order)
+            self._fire_callback(self.on_order_confirmed, order)
         else:
             self.logger.info(
                 f"Order {order_id} partial confirmation: "
@@ -587,8 +775,7 @@ class OrderService:
 
         self.logger.info(f"Order {order_id} accepted (rating: {rating})")
 
-        if self.on_order_completed:
-            self.on_order_completed(order)
+        self._fire_callback(self.on_order_completed, order)
 
         return order
 
@@ -620,8 +807,7 @@ class OrderService:
 
         self.logger.warning(f"Dispute raised on order {order_id}: {reason}")
 
-        if self.on_order_disputed:
-            self.on_order_disputed(order, reason)
+        self._fire_callback(self.on_order_disputed, order, reason)
 
         return order
 
@@ -652,8 +838,7 @@ class OrderService:
 
         self.logger.info(f"Order {order_id} cancelled by {agent_id}: {reason}")
 
-        if self.on_order_cancelled:
-            self.on_order_cancelled(order, reason)
+        self._fire_callback(self.on_order_cancelled, order, reason)
 
         return order
 
