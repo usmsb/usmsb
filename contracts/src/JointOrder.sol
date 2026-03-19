@@ -477,7 +477,6 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         require(block.timestamp >= pool.biddingEndsAt, "JointOrder: bidding not ended");
         require(winningBid.poolId == poolId, "JointOrder: bid not in pool");
 
-        pool.status = PoolStatus.AWARDED;
         pool.winningProvider = winningBid.provider;
         pool.winningBid = winningBid.price;
         pool.platformFee = (winningBid.price * PLATFORM_FEE_RATE) / 10000;
@@ -486,7 +485,7 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
 
         emit PoolAwarded(poolId, bidId, winningBid.provider, winningBid.price);
 
-        // 自动进入执行中状态
+        // 直接进入执行中状态（AWARDED 状态被立即覆盖，无实际意义）
         pool.status = PoolStatus.IN_PROGRESS;
     }
 
@@ -631,8 +630,7 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         Participant storage participant = participants[poolId][msg.sender];
 
         require(
-            pool.status == PoolStatus.IN_PROGRESS || 
-            pool.status == PoolStatus.AWARDED ||
+            pool.status == PoolStatus.IN_PROGRESS ||
             pool.status == PoolStatus.DELIVERED,
             "JointOrder: invalid status"
         );
@@ -911,7 +909,7 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         
         // 只允许在特定状态下处理超时
         require(
-            pool.status == PoolStatus.IN_PROGRESS || pool.status == PoolStatus.AWARDED,
+            pool.status == PoolStatus.IN_PROGRESS,
             "JointOrder: invalid status for timeout"
         );
         

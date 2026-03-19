@@ -587,14 +587,13 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      * @notice 协议基金提取代币
      * @param to 接收者地址
      * @param amount 提取数量
-     * @dev 安全增强: 添加零地址检查和额度验证
+     * @dev 协议基金合约需先授权 VIBEToken 提取 (approve)，然后调用此函数
      */
     function protocolFundWithdraw(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "VIBEToken: invalid recipient");
         require(amount > 0, "VIBEToken: amount must be greater than 0");
         require(protocolFundContract != address(0), "VIBEToken: protocol fund not set");
-        // 从协议基金合约转移代币到接收者
-        // 注意: protocolFundContract 需要先授权本合约 (VIBEToken) 为 spender
+        // 协议基金合约需先调用 approve(VIBEToken, amount) 授权
         IERC20(address(this)).safeTransferFrom(protocolFundContract, to, amount);
     }
 
