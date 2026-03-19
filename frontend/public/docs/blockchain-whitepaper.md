@@ -574,7 +574,7 @@ Total Voting Power = Capital Weight × Stake Duration Factor + Production Weight
 
 | Parameter | Allowed Range | Single Adjustment Limit |
 |-----------|--------------|------------------------|
-| Staking APY | 3-7% | ±20% |
+| Staking APY | 3%-10% (base 3%, max 10% in extreme market, see §4.6.2) | ±20% |
 | Transaction Fee | 0.5-5% | ±20% |
 | Burn Ratio | 30-70% | ±20% |
 | Dividend Ratio | 20-50% | ±10% |

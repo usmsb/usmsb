@@ -104,7 +104,7 @@ async function main() {
   console.log("\n各池余额:");
   console.log("   VIBVesting:", hre.ethers.formatEther(await token.balanceOf(contracts.VIBVesting)), "VIBE");
   console.log("   CommunityStableFund:", hre.ethers.formatEther(await token.balanceOf(contracts.CommunityStableFund)), "VIBE");
-  console.log("   LiquidityManager/占位:", hre.ethers.formatEther(await token.balanceOf(contracts.LiquidityManager || liquidityManagerAddr), "VIBE");
+  console.log("   LiquidityManager/占位:", hre.ethers.formatEther(await token.balanceOf(contracts.LiquidityManager || liquidityManagerAddr), "VIBE"));
   console.log("   AirdropDistributor:", hre.ethers.formatEther(await token.balanceOf(contracts.AirdropDistributor), "VIBE");
   console.log("   EmissionController:", hre.ethers.formatEther(await token.balanceOf(contracts.EmissionController), "VIBE");
   console.log("   部署者剩余:", hre.ethers.formatEther(await token.balanceOf(deployer.address)), "VIBE");
