@@ -30,9 +30,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     /// @notice 代币总供应量 (10 亿 * 10^18)
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000 * 10**18;
 
-    /// @notice 国库保留比例（用于mintTreasury旧方案，不推荐使用）
-    /// @dev 推荐使用 distributeToPools() 进行完全去中心化分配
-    uint256 public constant TREASURY_RATIO = 92; // 92%
+
 
     /// @notice 交易手续费比例 (0.8%)
     uint256 public constant TRANSACTION_TAX_RATE = 80; // 0.8% = 80/10000
@@ -53,9 +51,6 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     uint256 public constant TAX_PRECISION = 10000;
 
     // ========== 状态变量 ==========
-
-    /// @notice 国库地址，持有剩余 92% 代币
-    address public treasury;
 
     /// @notice 质押合约地址，允许铸造奖励
     address public stakingContract;
@@ -80,9 +75,6 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
     /// @notice 已销毁代币总量
     uint256 public totalBurned;
-
-    /// @notice 国库是否已铸造
-    bool public treasuryMinted;
 
     /// @notice 代币是否已分配到各池
     bool public tokensDistributed;
@@ -151,12 +143,6 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     /// @notice 身份合约地址更新
     event IdentityContractUpdated(address indexed oldAddress, address indexed newAddress);
 
-    /// @notice 国库地址更新
-    event TreasuryUpdated(address indexed oldAddress, address indexed newAddress);
-
-    /// @notice 向国库铸造剩余代币
-    event TreasuryMinted(address indexed treasury, uint256 amount);
-
     /// @notice 代币销毁事件
     event TokensBurned(address indexed from, uint256 amount);
 
@@ -195,52 +181,22 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      * @notice 构造函数，初始化 VIBE 代币
      * @param _name 代币名称
      * @param _symbol 代币符号
-     * @param _treasury 国库地址
      * @dev 注意: 所有代币通过 distributeToPools() 分配，构造函数不再预铸造
      */
     constructor(
         string memory _name,
-        string memory _symbol,
-        address _treasury
+        string memory _symbol
     ) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(msg.sender) {
-        require(_treasury != address(0), "VIBEToken: invalid treasury address");
-
-        treasury = _treasury;
-
         // 注意: 不再在构造函数中预铸造代币
         // 所有代币通过 distributeToPools() 分配到各池
         // 这样确保团队8%通过归属合约锁定
 
-        // 默认免税地址：owner、treasury、合约自己
+        // 默认免税地址：owner 和合约自己
         taxExemptedAddresses[msg.sender] = true;
-        taxExemptedAddresses[_treasury] = true;
         taxExemptedAddresses[address(this)] = true;
     }
 
     // ========== 外部函数 ==========
-
-    /**
-     * @notice 将剩余代币铸造给国库
-     * @dev 只能由 owner 调用一次，调用后国库获得 92% 代币
-     * @notice 注意: 推荐使用 distributeToPools() 替代此函数，实现完全去中心化分配
-     */
-    function mintTreasury() external onlyOwner {
-        // 检查是否已经铸造过
-        require(!treasuryMinted, "VIBEToken: treasury already minted");
-        require(!tokensDistributed, "VIBEToken: tokens already distributed");
-
-        uint256 treasuryAmount = (TOTAL_SUPPLY * TREASURY_RATIO) / 100;
-
-        // 确保总供应量不超过硬顶
-        require(
-            totalSupply() + treasuryAmount <= TOTAL_SUPPLY,
-            "VIBEToken: exceeds total supply cap"
-        );
-
-        _mint(treasury, treasuryAmount);
-        treasuryMinted = true;
-        emit TreasuryMinted(treasury, treasuryAmount);
-    }
 
     // ========== 代币分配（完全去中心化） ==========
 
@@ -283,7 +239,6 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     ) external onlyOwner {
         // 检查是否已分配
         require(!tokensDistributed, "VIBEToken: tokens already distributed");
-        require(!treasuryMinted, "VIBEToken: treasury already minted, use distributeFromTreasury instead");
 
         // 验证地址不为零
         require(teamVestingContract != address(0), "VIBEToken: invalid team vesting");
@@ -437,16 +392,6 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         emit EmissionControllerUpdated(emissionController, _emissionController);
         emissionController = _emissionController;
         taxExemptedAddresses[_emissionController] = true;
-    }
-
-    /**
-     * @notice 更新国库地址
-     * @param _treasury 新的国库地址
-     */
-    function setTreasury(address _treasury) external onlyOwner {
-        require(_treasury != address(0), "VIBEToken: invalid treasury address");
-        emit TreasuryUpdated(treasury, _treasury);
-        treasury = _treasury;
     }
 
     /**
