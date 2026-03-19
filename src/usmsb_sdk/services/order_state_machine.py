@@ -3,6 +3,9 @@ Order State Machine
 
 Defines the lifecycle states and transitions for a negotiated order.
 This is the bridge between "negotiation accepted" and "task completed".
+
+DEPRECATED: Use ValueContract.status field instead.
+The ValueContract has built-in status management (draft/proposed/active/completed).
 """
 
 import logging
