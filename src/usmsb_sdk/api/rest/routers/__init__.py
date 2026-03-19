@@ -10,6 +10,7 @@ from usmsb_sdk.api.rest.routers.collaborations import router as collaborations_r
 from usmsb_sdk.api.rest.routers.contracts import router as contracts_router
 from usmsb_sdk.api.rest.routers.demands import router as demands_router
 from usmsb_sdk.api.rest.routers.environments import router as environments_router
+from usmsb_sdk.api.rest.routers.feedback import router as feedback_router
 from usmsb_sdk.api.rest.routers.gene_capsule import router as gene_capsule_router
 from usmsb_sdk.api.rest.routers.heartbeat import router as heartbeat_router
 from usmsb_sdk.api.rest.routers.learning import router as learning_router
@@ -56,4 +57,5 @@ __all__ = [
     "souls_router",
     "negotiations_router",
     "usmsb_matching_router",
+    "feedback_router",
 ]
