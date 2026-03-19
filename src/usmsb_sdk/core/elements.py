@@ -391,6 +391,23 @@ class Agent:
     updated_at: float = field(default_factory=get_timestamp)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    # ========== Soul 相关字段 (Phase 0 - USMSB Agent Platform) ==========
+    # Soul 数据属于 Agent，平台只是托管
+    # 声明为主的 Soul 机制：declared 是 Agent 主动声明，inferred 是平台从行为中推断
+    soul_declared_at: float | None = None       # Soul 首次声明时间
+    soul_updated_at: float | None = None        # Soul 最后更新时间
+    soul_version: int = 1                       # Soul 版本号（乐观锁，用于并发更新保护）
+    # Inferred Soul 存储在 metadata 中（避免破坏现有结构）:
+    # metadata["inferred_soul"] = {
+    #     "actual_success_rate": float,
+    #     "avg_response_time_minutes": float,
+    #     "collaboration_count": int,
+    #     "strength_areas": list[str],
+    #     "weak_areas": list[str],
+    #     "value_alignment_score": float,
+    #     "last_updated": float
+    # }
+
     def __post_init__(self):
         if isinstance(self.type, str):
             self.type = AgentType(self.type)
@@ -570,6 +587,56 @@ class Agent:
         # Higher reputation = can charge more
         reputation_factor = 0.8 + (reputation * 0.4)  # 1.2 to 1.2
         return base_price * reputation_factor
+
+    # ========== Soul 相关方法 (Phase 0) ==========
+
+    def declare_soul(self) -> None:
+        """标记 Soul 已被声明（首次声明时调用）"""
+        if self.soul_declared_at is None:
+            self.soul_declared_at = get_timestamp()
+        self.soul_updated_at = get_timestamp()
+        self.soul_version = 1
+
+    def update_soul_timestamp(self) -> bool:
+        """
+        更新 Soul 时间戳（乐观锁保护）
+        返回 True 表示更新成功，False 表示版本冲突
+        """
+        self.soul_updated_at = get_timestamp()
+        self.soul_version += 1
+        return True
+
+    def get_inferred_soul(self) -> dict[str, Any] | None:
+        """获取推断 Soul（从 metadata 中读取）"""
+        return self.metadata.get("inferred_soul")
+
+    def set_inferred_soul(self, inferred: dict[str, Any]) -> None:
+        """设置推断 Soul（存储到 metadata）"""
+        inferred["last_updated"] = get_timestamp()
+        self.metadata["inferred_soul"] = inferred
+        self.updated_at = get_timestamp()
+
+    def get_soul_dict(self) -> dict[str, Any]:
+        """
+        导出完整的 Soul 数据字典（用于退出时带走）
+        包含声明部分 + 推断部分
+        """
+        return {
+            "agent_id": self.id,
+            "agent_name": self.name,
+            "agent_type": self.type.value if isinstance(self.type, AgentType) else str(self.type),
+            "declared": {
+                "capabilities": self.capabilities,
+                "soul_declared_at": self.soul_declared_at,
+                "soul_updated_at": self.soul_updated_at,
+                "soul_version": self.soul_version,
+            },
+            "inferred": self.get_inferred_soul(),
+            "environment_state": self.state,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            # 不包含敏感信息如 private keys, tokens 等
+        }
 
     def __repr__(self) -> str:
         return f"Agent(id={self.id}, name={self.name}, type={self.type})"
