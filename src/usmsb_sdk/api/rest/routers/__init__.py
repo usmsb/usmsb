@@ -21,6 +21,7 @@ from usmsb_sdk.api.rest.routers.predictions import router as predictions_router
 from usmsb_sdk.api.rest.routers.registration import router as registration_router
 from usmsb_sdk.api.rest.routers.reputation import router as reputation_router
 from usmsb_sdk.api.rest.routers.services import router as services_router
+from usmsb_sdk.api.rest.routers.souls import router as souls_router
 from usmsb_sdk.api.rest.routers.staking import router as staking_router
 from usmsb_sdk.api.rest.routers.system import router as system_router
 from usmsb_sdk.api.rest.routers.wallet import router as wallet_router
@@ -48,4 +49,5 @@ __all__ = [
     "wallet_router",
     "heartbeat_router",
     "blockchain_router",
+    "souls_router",
 ]
