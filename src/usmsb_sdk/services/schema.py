@@ -247,6 +247,60 @@ class FeedbackEventDB(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+# ============== Emergence Broadcast Tables ==============
+
+
+class BroadcastDB(Base):
+    """
+    Agent broadcast for decentralized opportunity discovery.
+
+    D4 Fix: Persist broadcasts to DB so they survive restarts.
+    """
+
+    __tablename__ = "broadcasts"
+
+    broadcast_id = Column(String(64), primary_key=True)
+    agent_id = Column(String(64), nullable=False, index=True)
+
+    # Broadcast type: seeking | offering
+    broadcast_type = Column(String(16), nullable=False)
+
+    # Content: {goal, capability, requirements}
+    content = Column(JSON, nullable=False)
+
+    # Response count
+    response_count = Column(Integer, default=0)
+
+    # Status: active | expired | fulfilled
+    status = Column(String(16), default="active")
+
+    # Timestamps
+    timestamp = Column(Float, nullable=False)
+    expires_at = Column(Float, nullable=False)
+    fulfilled_at = Column(Float, nullable=True)
+
+
+class BroadcastResponseDB(Base):
+    """Response to a broadcast."""
+
+    __tablename__ = "broadcast_responses"
+
+    response_id = Column(String(64), primary_key=True)
+    broadcast_id = Column(
+        String(64), ForeignKey("broadcasts.broadcast_id"), nullable=False, index=True
+    )
+    responding_agent_id = Column(String(64), nullable=False)
+
+    # Match score and proposed terms
+    match_score = Column(Float, default=0.0)
+    proposed_terms = Column(JSON, nullable=True)
+
+    # Agent soul snapshot at time of response
+    agent_soul_snapshot = Column(JSON, nullable=True)
+
+    timestamp = Column(Float, nullable=False)
+
+
 # ============== Database Utilities ==============
 
 

@@ -243,6 +243,40 @@ class ValueContractService:
 
         return await self._db_to_contract(db_record)
 
+    # Valid state transitions
+    STATE_TRANSITIONS = {
+        "draft": ["proposed", "cancelled"],
+        "proposed": ["accepted", "declined", "cancelled"],
+        "accepted": ["active", "cancelled"],
+        "active": ["completed", "disputed", "cancelled"],
+        "completed": [],  # Terminal state
+        "disputed": ["completed", "cancelled"],
+        "cancelled": [],  # Terminal state
+        "declined": [],  # Terminal state
+    }
+
+    def _validate_state_transition(
+        self,
+        contract_id: str,
+        current_status: str,
+        target_status: str,
+    ) -> None:
+        """
+        Validate that a state transition is allowed.
+
+        D7 Fix: Added state machine validation.
+
+        Raises ValueError if transition is not allowed.
+        """
+        valid_targets = self.STATE_TRANSITIONS.get(current_status, [])
+
+        if target_status not in valid_targets:
+            raise ValueError(
+                f"Invalid state transition for contract {contract_id}: "
+                f"{current_status} -> {target_status}. "
+                f"Allowed transitions: {valid_targets}"
+            )
+
     async def propose_contract(
         self,
         contract_id: str,
@@ -267,6 +301,9 @@ class ValueContractService:
 
         if contract.status != "draft":
             raise ValueError(f"Contract {contract_id} is not in draft status")
+
+        # D7 Fix: Validate state transition
+        self._validate_state_transition(contract_id, contract.status, "proposed")
 
         contract.status = "proposed"
         contract.updated_at = time.time()
@@ -300,6 +337,9 @@ class ValueContractService:
         if contract.status != "proposed":
             raise ValueError(f"Contract {contract_id} is not in proposed status")
 
+        # D7 Fix: Validate state transition
+        self._validate_state_transition(contract_id, contract.status, "active")
+
         contract.status = "active"
         contract.updated_at = time.time()
         contract.version += 1
@@ -326,8 +366,11 @@ class ValueContractService:
         if not contract:
             raise ValueError(f"Contract {contract_id} not found")
 
-        if contract.status in ("completed", "cancelled", "disputed"):
+        if contract.status in ("completed", "cancelled"):
             raise ValueError(f"Contract {contract_id} cannot be declined in status {contract.status}")
+
+        # D7 Fix: Validate state transition
+        self._validate_state_transition(contract_id, contract.status, "cancelled")
 
         contract.status = "cancelled"
         contract.updated_at = time.time()
@@ -361,6 +404,9 @@ class ValueContractService:
 
         if contract.status != "active":
             raise ValueError(f"Contract {contract_id} is not active")
+
+        # D7 Fix: Validate state transition (deliver doesn't change status, just marks delivery)
+        # Status stays active until confirmed
 
         # Store deliverables in task_definition
         if hasattr(contract, "task_definition"):
@@ -399,6 +445,10 @@ class ValueContractService:
 
         if contract.status != "active":
             raise ValueError(f"Contract {contract_id} is not active")
+
+        # D7 Fix: Validate state transition
+        target_status = "disputed" if not quality_approved else "completed"
+        self._validate_state_transition(contract_id, contract.status, target_status)
 
         if not quality_approved:
             contract.status = "disputed"

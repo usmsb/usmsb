@@ -296,7 +296,15 @@ class CollaborationFeedbackLoop:
         Record adaptation experience for USMSB Core's AdaptationEvolutionEngine.
 
         This sends data to the Core engine for platform-wide learning.
+
+        D3 Fix: Now actually calls the USMSB Core AdaptationEvolutionEngine.
         """
+        from usmsb_sdk.core.logic.core_engines import (
+            AdaptationRecord,
+            AdaptationEvolutionEngine,
+        )
+        from usmsb_sdk.core.logic.core_engines import LogicEngineRegistry
+
         for party_id in contract.parties:
             record = AdaptationRecord(
                 record_id=f"adapt-{int(time.time())}-{party_id[:8]}",
@@ -308,6 +316,7 @@ class CollaborationFeedbackLoop:
                     "quality_score": evaluation.quality_score,
                     "value_match": evaluation.value_match_score,
                     "on_time": evaluation.on_time_score > 0.8,
+                    "overall_score": evaluation.overall_score,
                 },
                 outcome={
                     "success": evaluation.success,
@@ -316,13 +325,111 @@ class CollaborationFeedbackLoop:
                 timestamp=time.time(),
             )
 
-            # In production, this would call:
-            # await core_engine_registry.adaptation_engine.record(record)
+            # D3 Fix: Actually call the Core Engine instead of just logging
+            try:
+                # Get the global engine registry
+                engine_registry = LogicEngineRegistry()
+                adaptation_engine = engine_registry.get("adaptation_evolution")
 
-            logger.info(
-                f"Adaptation record created for {party_id}: "
-                f"type={record.adaptation_type}, score={evaluation.overall_score:.2f}"
-            )
+                if adaptation_engine is not None:
+                    await adaptation_engine.record(record)
+                    logger.info(
+                        f"Adaptation record sent to Core engine for {party_id}: "
+                        f"type={record.adaptation_type}, score={evaluation.overall_score:.2f}"
+                    )
+                else:
+                    # Fallback: record locally if Core engine not initialized
+                    logger.warning(
+                        f"AdaptationEvolutionEngine not available, recording locally for {party_id}"
+                    )
+                    self._record_adaptation_locally(record)
+
+            except Exception as e:
+                logger.error(f"Failed to send adaptation record to Core engine: {e}")
+                # Fallback: record locally
+                self._record_adaptation_locally(record)
+
+    def _record_adaptation_locally(self, record) -> None:
+        """
+        Fallback: Record adaptation locally when Core engine unavailable.
+
+        This stores adaptation records in memory for later sync.
+        """
+        if not hasattr(self, "_local_adaptation_records"):
+            self._local_adaptation_records = []
+
+        self._local_adaptation_records.append({
+            "record_id": record.record_id,
+            "agent_id": record.agent_id,
+            "contract_id": record.contract_id,
+            "adaptation_type": record.adaptation_type,
+            "experience": record.experience,
+            "outcome": record.outcome,
+            "timestamp": record.timestamp,
+            "synced": False,
+        })
+
+        # Keep last 1000 local records
+        if len(self._local_adaptation_records) > 1000:
+            self._local_adaptation_records = self._local_adaptation_records[-1000:]
+
+        logger.info(f"Adaptation record stored locally: {record.record_id}")
+
+    def sync_local_adaptation_records(self) -> int:
+        """
+        Sync locally stored adaptation records to Core engine.
+
+        Returns number of records synced.
+        """
+        from usmsb_sdk.core.logic.core_engines import (
+            AdaptationRecord,
+            AdaptationEvolutionEngine,
+        )
+        from usmsb_sdk.core.logic.core_engines import LogicEngineRegistry
+
+        if not hasattr(self, "_local_adaptation_records"):
+            return 0
+
+        synced_count = 0
+        engine_registry = LogicEngineRegistry()
+        adaptation_engine = engine_registry.get_engine("adaptation_evolution")
+
+        if adaptation_engine is None:
+            logger.warning("Cannot sync: AdaptationEvolutionEngine not available")
+            return 0
+
+        for local_record in self._local_adaptation_records:
+            if local_record.get("synced"):
+                continue
+
+            try:
+                record = AdaptationRecord(
+                    record_id=local_record["record_id"],
+                    agent_id=local_record["agent_id"],
+                    contract_id=local_record["contract_id"],
+                    adaptation_type=local_record["adaptation_type"],
+                    experience=local_record["experience"],
+                    outcome=local_record["outcome"],
+                    timestamp=local_record["timestamp"],
+                )
+
+                import asyncio
+                loop = asyncio.get_event_loop()
+                loop.run_until_complete(adaptation_engine.record(record))
+
+                local_record["synced"] = True
+                synced_count += 1
+
+            except Exception as e:
+                logger.error(f"Failed to sync adaptation record {local_record['record_id']}: {e}")
+
+        # Remove synced records
+        self._local_adaptation_records = [
+            r for r in self._local_adaptation_records if not r.get("synced")
+        ]
+
+        logger.info(f"Synced {synced_count} adaptation records to Core engine")
+        return synced_count
 
     async def _update_reputation_snapshot(
         self,

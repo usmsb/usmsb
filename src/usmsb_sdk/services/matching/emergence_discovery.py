@@ -7,6 +7,7 @@ Provides hybrid emergence mechanism:
 - Simple tasks (complexity < threshold) → centralized matching
 - Complex tasks (complexity >= threshold) → decentralized discovery
 
+D4 Fix: Broadcasts are now persisted to DB, not just in-memory.
 Emergence is NOT automatic. It requires:
 1. Minimum active agents (100)
 2. Minimum collaboration rate (30%)
@@ -22,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from usmsb_sdk.services.agent_soul import AgentSoulManager
-from usmsb_sdk.services.schema import create_session
+from usmsb_sdk.services.schema import BroadcastDB, BroadcastResponseDB, create_session
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +92,15 @@ class EmergenceDiscovery:
     BROADCAST_TIMEOUT_SECONDS = 300  # 5 minutes
     MAX_BROADCAST_RESPONSES = 20
 
-    def __init__(self):
+    def __init__(self, db_session=None):
         self.soul_manager = None
-        self._active_broadcasts: dict[str, AgentBroadcast] = {}
+        self._db_session = db_session  # Optional DB session
+
+    def _get_db_session(self):
+        """Get or create DB session."""
+        if self._db_session is None:
+            self._db_session = create_session()
+        return self._db_session
 
     def _get_soul_manager(self) -> AgentSoulManager:
         if self.soul_manager is None:
@@ -359,10 +366,15 @@ class EmergenceDiscovery:
 
         This enables other agents to discover collaboration opportunities.
 
+        D4 Fix: Now persists to DB instead of in-memory.
+
         Returns broadcast_id.
         """
+        db = self._get_db_session()
+
         broadcast_id = f"bc-goal-{int(time.time())}-{agent_id[:8]}"
-        broadcast = AgentBroadcast(
+
+        db_broadcast = BroadcastDB(
             broadcast_id=broadcast_id,
             agent_id=agent_id,
             broadcast_type="seeking",
@@ -370,11 +382,16 @@ class EmergenceDiscovery:
                 "goal": goal,
                 "requirements": requirements,
             },
+            response_count=0,
+            status="active",
             timestamp=time.time(),
             expires_at=time.time() + self.BROADCAST_TIMEOUT_SECONDS,
         )
 
-        self._active_broadcasts[broadcast_id] = broadcast
+        db.add(db_broadcast)
+        db.commit()
+
+        logger.info(f"Persisted broadcast_goal {broadcast_id} for agent {agent_id}")
         return broadcast_id
 
     async def broadcast_capability(
@@ -388,10 +405,15 @@ class EmergenceDiscovery:
 
         This enables agents seeking this capability to respond.
 
+        D4 Fix: Now persists to DB instead of in-memory.
+
         Returns broadcast_id.
         """
+        db = self._get_db_session()
+
         broadcast_id = f"bc-cap-{int(time.time())}-{agent_id[:8]}"
-        broadcast = AgentBroadcast(
+
+        db_broadcast = BroadcastDB(
             broadcast_id=broadcast_id,
             agent_id=agent_id,
             broadcast_type="offering",
@@ -399,26 +421,36 @@ class EmergenceDiscovery:
                 "capability": capability,
                 "offering": offering,
             },
+            response_count=0,
+            status="active",
             timestamp=time.time(),
             expires_at=time.time() + self.BROADCAST_TIMEOUT_SECONDS,
         )
 
-        self._active_broadcasts[broadcast_id] = broadcast
+        db.add(db_broadcast)
+        db.commit()
+
+        logger.info(f"Persisted broadcast_capability {broadcast_id} for agent {agent_id}")
         return broadcast_id
 
     def get_active_broadcasts(self, agent_id: str | None = None) -> list[dict]:
-        """Get active broadcasts, optionally filtered by agent."""
-        broadcasts = list(self._active_broadcasts.values())
+        """
+        Get active broadcasts from DB.
 
-        # Filter expired
+        D4 Fix: Now reads from DB, not in-memory.
+        """
+        db = self._get_db_session()
         now = time.time()
-        active = [
-            b for b in broadcasts
-            if b.expires_at > now
-        ]
+
+        query = db.query(BroadcastDB).filter(
+            BroadcastDB.status == "active",
+            BroadcastDB.expires_at > now,
+        )
 
         if agent_id:
-            active = [b for b in active if b.agent_id == agent_id]
+            query = query.filter(BroadcastDB.agent_id == agent_id)
+
+        broadcasts = query.all()
 
         return [
             {
@@ -426,11 +458,53 @@ class EmergenceDiscovery:
                 "agent_id": b.agent_id,
                 "broadcast_type": b.broadcast_type,
                 "content": b.content,
+                "response_count": b.response_count,
                 "expires_at": b.expires_at,
-                "response_count": len(b.responses),
             }
-            for b in active
+            for b in broadcasts
         ]
+
+    def cleanup_expired_broadcasts(self) -> int:
+        """
+        Clean up expired broadcasts.
+
+        L1 Fix: Prevents memory leak by removing expired broadcasts from DB.
+
+        Returns:
+            Number of broadcasts cleaned up
+        """
+        db = self._get_db_session()
+        now = time.time()
+
+        # Mark expired broadcasts as expired
+        result = db.query(BroadcastDB).filter(
+            BroadcastDB.status == "active",
+            BroadcastDB.expires_at <= now,
+        ).update({"status": "expired"})
+
+        db.commit()
+        return result
+
+    def fulfill_broadcast(self, broadcast_id: str) -> bool:
+        """
+        Mark a broadcast as fulfilled (opportunity found).
+
+        D4 Fix: Persist fulfillment status to DB.
+
+        Returns:
+            True if broadcast was found and updated
+        """
+        db = self._get_db_session()
+
+        result = db.query(BroadcastDB).filter(
+            BroadcastDB.broadcast_id == broadcast_id
+        ).update({
+            "status": "fulfilled",
+            "fulfilled_at": time.time(),
+        })
+
+        db.commit()
+        return result > 0
 
     def get_emergence_threshold(self) -> dict:
         """Return current emergence trigger thresholds."""
