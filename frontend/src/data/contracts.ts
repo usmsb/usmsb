@@ -1,6 +1,8 @@
 // Contract deployment data
 // Network: baseSepolia (Testnet)
 // Explorer: https://sepolia.basescan.org
+// Deployed: 2026-03-19
+// VIBEToken: 0x93C52dF000317e12F891474B46d8B05652430bDC
 
 export interface ContractInfo {
   name: string
@@ -23,187 +25,187 @@ export const deploymentData: DeploymentData = {
   networkName: 'Base Sepolia Testnet',
   explorerUrl: 'https://sepolia.basescan.org',
   deployer: '0x382B71e8b425CFAaD1B1C6D970481F440458Abf8',
-  timestamp: '2026-03-02T13:47:13.304Z',
+  timestamp: '2026-03-19T15:43:00.000Z',
   contracts: [
-    // Core Contracts
+    // Core Token
     {
       name: 'VIBEToken',
-      address: '0x91d8C3084B4fd21A04fA3584BFE357F378938dbc',
-      description: 'VIBE Utility Token - Main governance and utility token',
+      address: '0x93C52dF000317e12F891474B46d8B05652430bDC',
+      description: 'VIBE Utility Token - 1B total supply, whitepaper 10000bps distribution',
       category: 'core',
     },
-    {
-      name: 'AgentRegistry',
-      address: '0x54bEbDc40cc8B60b0922D8FA6463ab710B14dC69',
-      description: 'Registry for AI agents on the platform',
-      category: 'core',
-    },
-    {
-      name: 'VIBIdentity',
-      address: '0x6b72711045b3a384E26eD9039CFF4cA12b856952',
-      description: 'Identity management for users and agents',
-      category: 'core',
-    },
-    // Staking
+    // Staking & Vesting
     {
       name: 'VIBStaking',
-      address: '0xc3fbD1736a95f403A0569FcA8C84d7B85e2b4E53',
-      description: 'Staking contract for VIBE token',
+      address: '0x1901Ab56eA38cBeFc7a3F0Ed188B7108d27f4c05',
+      description: 'Staking contract - receives 28.35% = 283.5M VIBE',
       category: 'staking',
     },
     {
-      name: 'VIBVEPoints',
-      address: '0xF6Jg578J7A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4',
-      description: 'Vote-escrow points system',
+      name: 'VIBVesting',
+      address: '0x4d3008550fc164ccf0e1C0C4f666E77FC14dE924',
+      description: 'Vesting for team (8%) + early supporters (4%)',
+      category: 'staking',
+    },
+    {
+      name: 'VIBReserve',
+      address: '0x56AbAf5fc5d58c92C0A51F79251BF3A3002f4263',
+      description: 'Reserve pool - receives 6.3% = 63M VIBE',
       category: 'staking',
     },
     // Governance
     {
       name: 'VIBGovernance',
-      address: '0xD866536154154a378544E9dc295DD510a0fe29236',
-      description: 'Governance contract for protocol decisions',
+      address: '0x27475aea1eEba485005B1717a35a7D411d144a1d',
+      description: 'Governance - receives 9.45% = 94.5M VIBE',
       category: 'governance',
     },
     {
       name: 'VIBGovernanceDelegation',
-      address: '0x28Li790L9A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6',
+      address: '0x47428bAB428966B32F246a3e9456f10dc70141A5',
       description: 'Governance delegation proxy',
+      category: 'governance',
+    },
+    {
+      name: 'VIBContributionPoints',
+      address: '0x60D9244bF262bF85Fd3057C95Ca00fEa1622f3E5',
+      description: 'Contribution points tracking',
+      category: 'governance',
+    },
+    {
+      name: 'VIBVEPoints',
+      address: '0xB2b56dce955ab200E0c1888C22Ac711803e607F1',
+      description: 'Vote-escrowed points system',
+      category: 'governance',
+    },
+    {
+      name: 'VIBDispute',
+      address: '0xE32d99daDBd4443423EfDc590af7591f84FAFE7e',
+      description: 'Dispute resolution contract',
       category: 'governance',
     },
     // Token & Distribution
     {
+      name: 'VIBDividend',
+      address: '0xa820F9E9Caa90e405452Fc3f24DC5DF7f7d70E9D',
+      description: 'Dividend distribution contract',
+      category: 'token',
+    },
+    {
       name: 'EmissionController',
-      address: '0xe4a31e600D2DeB3297f3732aE509B1C1d7eAAaD6',
+      address: '0xaeD496480c9668dc90Dc309fCD8Fd9aE4268dF39',
       description: 'Controls token emissions and rewards',
       category: 'token',
     },
     {
-      name: 'VIBVesting',
-      address: '0x3d476714B8B78488CEF6B795eF6A2C5167625BEf',
-      description: 'Vesting schedule for team and investors',
+      name: 'VIBEcosystemPool',
+      address: '0x20A25378DB87a94E19A8b51ED638F67d6e9BfE06',
+      description: 'Ecosystem pool - receives 18.9% = 189M VIBE',
       category: 'token',
     },
     {
-      name: 'VIBDividend',
-      address: '0x324571F84C092a958eB46b3478742C58a7beaE7B',
-      description: 'Dividend distribution contract',
+      name: 'AirdropDistributor',
+      address: '0x01cdC2C7C3Deb071e6C7B42ED66884DDd3CADDf6',
+      description: 'Airdrop distribution - receives 7% = 70M VIBE',
+      category: 'token',
+    },
+    {
+      name: 'CommunityStableFund',
+      address: '0x6e616E6B1d63709dA849074bb7cd5A6936350563',
+      description: 'Community stable fund - receives 6% = 60M VIBE',
+      category: 'token',
+    },
+    {
+      name: 'LiquidityManager',
+      address: '0x5c11b7f74bBb2dbBE232C6A456eCa64DA4722D42',
+      description: 'DEX liquidity management - receives 12% = 120M VIBE',
       category: 'token',
     },
     // Rewards
     {
-      name: 'VIBEcosystemPool',
-      address: '0x7B8d9eF0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6',
-      description: 'Ecosystem development rewards pool',
-      category: 'rewards',
-    },
-    {
       name: 'VIBBuilderReward',
-      address: '0xAe1Fc023F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9',
+      address: '0x397Faf7D727db190fB677362B15c091f1d94F7b3',
       description: 'Builder reward distribution',
       category: 'rewards',
     },
     {
       name: 'VIBDevReward',
-      address: '0xBf2Gd134F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0',
+      address: '0x1a5E99b52e87E718906e8516fDD9c8775Ee0351E',
       description: 'Developer reward distribution',
       category: 'rewards',
     },
     {
       name: 'VIBNodeReward',
-      address: '0x6cPm134P3A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8M9N0',
+      address: '0xc417b180F3b743A51e86c16A8319Eac353fDC29b',
       description: 'Node operator rewards',
       category: 'rewards',
     },
     {
       name: 'VIBOutputReward',
-      address: '0xE5If467I6A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3',
+      address: '0x7b3CEB40CFb093e66EcD5b49F835586Ba7Ef428b',
       description: 'Output reward distribution',
       category: 'rewards',
     },
     // Funds
     {
-      name: 'VIBReserve',
-      address: '0x5A7C8e9dBC4C8B9E3C1f58d01C9d7f8E8e9dBC4C',
-      description: 'Protocol reserve fund',
-      category: 'infrastructure',
-    },
-    {
       name: 'VIBProtocolFund',
-      address: '0x8C9dAe01D2E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7',
+      address: '0x0F39011e7E542D939C1dce40754a86b01BB3fA5a',
       description: 'Protocol development fund',
       category: 'infrastructure',
     },
     {
       name: 'VIBInfrastructurePool',
-      address: '0x9D0eBf12E3F4A5B6C7D8E9F0A1B2C3D4E5F6A7B8',
+      address: '0xFc2943d6D426D4D6433944e1ADa4D475F3552500',
       description: 'Infrastructure development pool',
       category: 'infrastructure',
     },
+    // Core System
     {
-      name: 'CommunityStableFund',
-      address: '0xC3Gd245G4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1',
-      description: 'Community stable fund',
-      category: 'infrastructure',
+      name: 'VIBIdentity',
+      address: '0x978eddDf11728B4e6A6C461D8806eD5f4339D466',
+      description: 'Identity management for users and agents',
+      category: 'core',
     },
     {
-      name: 'AirdropDistributor',
-      address: '0xD4He356H5A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2',
-      description: 'Airdrop distribution contract',
-      category: 'infrastructure',
+      name: 'VIBCollaboration',
+      address: '0xe568c56f467E27Cb38d4B132B02318C81EC29D78',
+      description: 'Collaboration management contract',
+      category: 'core',
     },
-    // Additional Contracts
     {
-      name: 'VIBContributionPoints',
-      address: '0x17Kh689K8A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5',
-      description: 'Contribution points tracking',
-      category: 'governance',
+      name: 'AgentRegistry',
+      address: '0xC5AbAE9f580C48D645bDE9904712891AE8FcDec6',
+      description: 'Registry for AI agents on the platform',
+      category: 'core',
+    },
+    {
+      name: 'AgentWallet',
+      address: '0xeAd5FCC931493F702208B737528578718D681243',
+      description: 'Smart contract wallet for agents',
+      category: 'core',
     },
     {
       name: 'ZKCredential',
-      address: '0x39Mj801M0A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7',
+      address: '0x59EE17f1E914ba2de89F080CF44FC46Ee46DF874',
       description: 'Zero-knowledge credential system',
       category: 'core',
     },
     {
       name: 'AssetVault',
-      address: '0x4aNk912N1A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8',
+      address: '0x0F5C6Ae463f78aD30De1C9c6BF180423F0A39897',
       description: 'Asset vault for collateral',
       category: 'core',
     },
     {
       name: 'JointOrder',
-      address: '0x5bOl023O2A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8M9',
+      address: '0x55f4b49c9C269Fccf6d90e16304654b7F69138d0',
       description: 'Joint order execution contract',
       category: 'core',
     },
     {
-      name: 'VIBCollaboration',
-      address: '0x7dQn245Q4A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1',
-      description: 'Collaboration management contract',
-      category: 'core',
-    },
-    {
-      name: 'VIBDispute',
-      address: '0x8eRo356R5A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2',
-      description: 'Dispute resolution contract',
-      category: 'core',
-    },
-    {
       name: 'PriceOracle',
-      address: '0x9fSp467S6A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2Q3',
+      address: '0x20306509a6b2f0b56ad55C193b4505CA5E62bc48',
       description: 'Price oracle for token pricing',
-      category: 'infrastructure',
-    },
-    {
-      name: 'AgentWallet',
-      address: '0x0aTq578T7A5B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2G3H4I5J6K7L8M9N0O1P2Q3R4',
-      description: 'Smart contract wallet for agents',
-      category: 'core',
-    },
-    {
-      name: 'LiquidityManager',
-      address: '0x3c8f396A9cD25ee3bF15A173167c90a5aA2a9117',
-      description: 'DEX liquidity management',
       category: 'infrastructure',
     },
   ],
