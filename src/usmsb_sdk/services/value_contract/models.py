@@ -42,7 +42,7 @@ class ValueFlow:
     resource: Resource | None = None  # USMSB Resource
     value: Value | None = None  # USMSB Value
     trigger: str = "on_delivery"  # on_delivery | on_completion | on_milestone
-    status: str = "pending"  # pending | executed | failed
+    status: str = "pending"  # pending | in_progress | executed | failed
     executed_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
