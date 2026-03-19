@@ -86,10 +86,50 @@ router = APIRouter(tags=["AI Agent Registration"])
 # ==================== New Request Models ====================
 
 class SelfRegistrationRequest(BaseModel):
-    """Request for self-registration (no owner required)."""
+    """Request for self-registration (no owner required).
+
+    Phase 1 USMSB: Optional Soul declaration during registration.
+    Agent can declare its Soul at registration time, or later via /agents/soul/register.
+    """
     name: str = Field(..., description="Agent name")
     description: str = Field(default="", description="Agent description")
     capabilities: list[str] = Field(default_factory=list, description="Agent capabilities")
+
+    # ========== Soul Declaration (Phase 1 USMSB) ==========
+    # Optional: Declare Soul during registration
+    # If provided, Soul will be automatically registered after agent creation
+    soul_goals: list[dict] = Field(
+        default_factory=list,
+        description="Soul goals: [{name, description, priority}]"
+    )
+    soul_value_seeking: list[dict] = Field(
+        default_factory=list,
+        description="Value seeking: [{name, type, metric}]"
+    )
+    soul_capabilities: list[str] = Field(
+        default_factory=list,
+        description="Soul capabilities (can extend above capabilities)"
+    )
+    soul_risk_tolerance: float = Field(
+        default=0.5, ge=0.0, le=1.0,
+        description="Risk tolerance (0.0=averse, 1.0=tolerant)"
+    )
+    soul_collaboration_style: str = Field(
+        default="balanced",
+        description="conservative | balanced | aggressive"
+    )
+    soul_preferred_contract_type: str = Field(
+        default="any",
+        description="task | project | any"
+    )
+    soul_pricing_strategy: str = Field(
+        default="negotiable",
+        description="fixed | negotiable | market"
+    )
+    soul_base_price_vibe: float | None = Field(
+        default=None, ge=0.0,
+        description="Base price reference in VIBE"
+    )
 
 
 class BindingRequestRequest(BaseModel):
@@ -154,6 +194,64 @@ async def register_agent_v2(request: SelfRegistrationRequest):
     }
     db_create_agent(agent_data)
 
+    # Phase 1 USMSB: Register Soul if provided
+    soul_registered = False
+    soul_version = None
+    if (
+        request.soul_goals
+        or request.soul_value_seeking
+        or request.soul_capabilities
+        or request.soul_risk_tolerance != 0.5
+        or request.soul_collaboration_style != "balanced"
+        or request.soul_preferred_contract_type != "any"
+        or request.soul_pricing_strategy != "negotiable"
+        or request.soul_base_price_vibe is not None
+    ):
+        # Import here to avoid circular imports
+        from usmsb_sdk.core.elements import Goal, Value
+        from usmsb_sdk.services.agent_soul import AgentSoulManager, DeclaredSoul
+        from usmsb_sdk.services.schema import create_session
+
+        session = create_session()
+        manager = AgentSoulManager(session)
+
+        declared = DeclaredSoul(
+            goals=[
+                Goal(
+                    id=str(time.time()) + f"-{i}",
+                    name=g.get("name", ""),
+                    description=g.get("description", ""),
+                    priority=g.get("priority", 0),
+                )
+                for i, g in enumerate(request.soul_goals)
+            ],
+            value_seeking=[
+                Value(
+                    id=str(time.time()) + f"-{i}",
+                    name=v.get("name", ""),
+                    type=v.get("type", "economic"),
+                    metric=v.get("metric"),
+                )
+                for i, v in enumerate(request.soul_value_seeking)
+            ],
+            capabilities=list(set(request.capabilities + request.soul_capabilities)),
+            risk_tolerance=request.soul_risk_tolerance,
+            collaboration_style=request.soul_collaboration_style,
+            preferred_contract_type=request.soul_preferred_contract_type,
+            pricing_strategy=request.soul_pricing_strategy,
+            base_price_vibe=request.soul_base_price_vibe,
+        )
+
+        try:
+            soul = await manager.register_soul(agent_id, declared)
+            soul_registered = True
+            soul_version = soul.soul_version
+        except Exception as e:
+            # Soul registration failed, but agent is still registered
+            # Log the error but don't fail the registration
+            import logging
+            logging.getLogger(__name__).warning(f"Soul registration failed for {agent_id}: {e}")
+
     # Generate API Key
     api_key, key_hash, key_prefix = generate_api_key(agent_id)
     key_id = generate_key_id()
@@ -176,7 +274,10 @@ async def register_agent_v2(request: SelfRegistrationRequest):
         "api_key": api_key,  # Only returned once!
         "level": 0,
         "binding_status": "unbound",
+        "soul_registered": soul_registered,
+        "soul_version": soul_version,
         "message": "Agent registered successfully. Save your API key securely - it won't be shown again!"
+                + (" Soul declared and registered." if soul_registered else " Consider declaring your Soul via /agents/soul/register for better matching."),
     }
 
 
@@ -653,12 +754,62 @@ async def register_ai_agent(request: AgentRegistrationRequest):
     }
     # Save to database using unified function
     db_create_agent(agent_data)
+
+    # Phase 1 USMSB: Register Soul if provided in metadata
+    soul_registered = False
+    soul_version = None
+    soul_metadata = request.metadata.get("soul") if request.metadata else None
+    if soul_metadata:
+        from usmsb_sdk.core.elements import Goal, Value
+        from usmsb_sdk.services.agent_soul import AgentSoulManager, DeclaredSoul
+        from usmsb_sdk.services.schema import create_session
+
+        session = create_session()
+        manager = AgentSoulManager(session)
+
+        declared = DeclaredSoul(
+            goals=[
+                Goal(
+                    id=str(time.time()) + f"-{i}",
+                    name=g.get("name", ""),
+                    description=g.get("description", ""),
+                    priority=g.get("priority", 0),
+                )
+                for i, g in enumerate(soul_metadata.get("goals", []))
+            ],
+            value_seeking=[
+                Value(
+                    id=str(time.time()) + f"-{i}",
+                    name=v.get("name", ""),
+                    type=v.get("type", "economic"),
+                    metric=v.get("metric"),
+                )
+                for i, v in enumerate(soul_metadata.get("value_seeking", []))
+            ],
+            capabilities=list(set(request.capabilities + soul_metadata.get("capabilities", []))),
+            risk_tolerance=soul_metadata.get("risk_tolerance", 0.5),
+            collaboration_style=soul_metadata.get("collaboration_style", "balanced"),
+            preferred_contract_type=soul_metadata.get("preferred_contract_type", "any"),
+            pricing_strategy=soul_metadata.get("pricing_strategy", "negotiable"),
+            base_price_vibe=soul_metadata.get("base_price_vibe"),
+        )
+
+        try:
+            soul = await manager.register_soul(agent_id, declared)
+            soul_registered = True
+            soul_version = soul.soul_version
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Soul registration failed for {agent_id}: {e}")
+
     return {
         "success": True,
         "agent_id": agent_id,
         "message": "Agent registered successfully",
         "heartbeat_interval": request.heartbeat_interval,
         "ttl": ttl,
+        "soul_registered": soul_registered,
+        "soul_version": soul_version,
     }
 
 
@@ -689,12 +840,62 @@ async def register_via_mcp(request: MCPRegistrationRequest):
     }
     # Save to database using unified function
     db_create_agent(agent_data)
+
+    # Phase 1 USMSB: Register Soul if provided in metadata
+    soul_registered = False
+    soul_version = None
+    soul_metadata = request.metadata.get("soul") if request.metadata else None
+    if soul_metadata:
+        from usmsb_sdk.core.elements import Goal, Value
+        from usmsb_sdk.services.agent_soul import AgentSoulManager, DeclaredSoul
+        from usmsb_sdk.services.schema import create_session
+
+        session = create_session()
+        manager = AgentSoulManager(session)
+
+        declared = DeclaredSoul(
+            goals=[
+                Goal(
+                    id=str(time.time()) + f"-{i}",
+                    name=g.get("name", ""),
+                    description=g.get("description", ""),
+                    priority=g.get("priority", 0),
+                )
+                for i, g in enumerate(soul_metadata.get("goals", []))
+            ],
+            value_seeking=[
+                Value(
+                    id=str(time.time()) + f"-{i}",
+                    name=v.get("name", ""),
+                    type=v.get("type", "economic"),
+                    metric=v.get("metric"),
+                )
+                for i, v in enumerate(soul_metadata.get("value_seeking", []))
+            ],
+            capabilities=list(set(request.capabilities + soul_metadata.get("capabilities", []))),
+            risk_tolerance=soul_metadata.get("risk_tolerance", 0.5),
+            collaboration_style=soul_metadata.get("collaboration_style", "balanced"),
+            preferred_contract_type=soul_metadata.get("preferred_contract_type", "any"),
+            pricing_strategy=soul_metadata.get("pricing_strategy", "negotiable"),
+            base_price_vibe=soul_metadata.get("base_price_vibe"),
+        )
+
+        try:
+            soul = await manager.register_soul(agent_id, declared)
+            soul_registered = True
+            soul_version = soul.soul_version
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Soul registration failed for {agent_id}: {e}")
+
     return {
         "success": True,
         "agent_id": agent_id,
         "message": "Agent registered via MCP protocol",
         "heartbeat_interval": request.heartbeat_interval,
         "ttl": ttl,
+        "soul_registered": soul_registered,
+        "soul_version": soul_version,
     }
 
 
@@ -726,12 +927,64 @@ async def register_via_a2a(request: A2ARegistrationRequest):
     }
     # Save to database using unified function
     db_create_agent(agent_data)
+    # Save to database using unified function
+    db_create_agent(agent_data)
+
+    # Phase 1 USMSB: Register Soul if provided in agent_card
+    soul_registered = False
+    soul_version = None
+    soul_metadata = agent_card.get("soul")
+    if soul_metadata:
+        from usmsb_sdk.core.elements import Goal, Value
+        from usmsb_sdk.services.agent_soul import AgentSoulManager, DeclaredSoul
+        from usmsb_sdk.services.schema import create_session
+
+        session = create_session()
+        manager = AgentSoulManager(session)
+
+        declared = DeclaredSoul(
+            goals=[
+                Goal(
+                    id=str(time.time()) + f"-{i}",
+                    name=g.get("name", ""),
+                    description=g.get("description", ""),
+                    priority=g.get("priority", 0),
+                )
+                for i, g in enumerate(soul_metadata.get("goals", []))
+            ],
+            value_seeking=[
+                Value(
+                    id=str(time.time()) + f"-{i}",
+                    name=v.get("name", ""),
+                    type=v.get("type", "economic"),
+                    metric=v.get("metric"),
+                )
+                for i, v in enumerate(soul_metadata.get("value_seeking", []))
+            ],
+            capabilities=list(set(agent_card.get("capabilities", []) + soul_metadata.get("capabilities", []))),
+            risk_tolerance=soul_metadata.get("risk_tolerance", 0.5),
+            collaboration_style=soul_metadata.get("collaboration_style", "balanced"),
+            preferred_contract_type=soul_metadata.get("preferred_contract_type", "any"),
+            pricing_strategy=soul_metadata.get("pricing_strategy", "negotiable"),
+            base_price_vibe=soul_metadata.get("base_price_vibe"),
+        )
+
+        try:
+            soul = await manager.register_soul(agent_id, declared)
+            soul_registered = True
+            soul_version = soul.soul_version
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Soul registration failed for {agent_id}: {e}")
+
     return {
         "success": True,
         "agent_id": agent_id,
         "message": "Agent registered via A2A protocol",
         "heartbeat_interval": request.heartbeat_interval,
         "ttl": ttl,
+        "soul_registered": soul_registered,
+        "soul_version": soul_version,
     }
 
 
@@ -766,12 +1019,62 @@ async def register_via_skill_md(request: SkillMDRegistrationRequest):
     }
     # Save to database using unified function
     db_create_agent(agent_data)
+
+    # Phase 1 USMSB: Register Soul if provided in metadata
+    soul_registered = False
+    soul_version = None
+    soul_metadata = request.metadata.get("soul") if hasattr(request, "metadata") and request.metadata else None
+    if soul_metadata:
+        from usmsb_sdk.core.elements import Goal, Value
+        from usmsb_sdk.services.agent_soul import AgentSoulManager, DeclaredSoul
+        from usmsb_sdk.services.schema import create_session
+
+        session = create_session()
+        manager = AgentSoulManager(session)
+
+        declared = DeclaredSoul(
+            goals=[
+                Goal(
+                    id=str(time.time()) + f"-{i}",
+                    name=g.get("name", ""),
+                    description=g.get("description", ""),
+                    priority=g.get("priority", 0),
+                )
+                for i, g in enumerate(soul_metadata.get("goals", []))
+            ],
+            value_seeking=[
+                Value(
+                    id=str(time.time()) + f"-{i}",
+                    name=v.get("name", ""),
+                    type=v.get("type", "economic"),
+                    metric=v.get("metric"),
+                )
+                for i, v in enumerate(soul_metadata.get("value_seeking", []))
+            ],
+            capabilities=soul_metadata.get("capabilities", []),
+            risk_tolerance=soul_metadata.get("risk_tolerance", 0.5),
+            collaboration_style=soul_metadata.get("collaboration_style", "balanced"),
+            preferred_contract_type=soul_metadata.get("preferred_contract_type", "any"),
+            pricing_strategy=soul_metadata.get("pricing_strategy", "negotiable"),
+            base_price_vibe=soul_metadata.get("base_price_vibe"),
+        )
+
+        try:
+            soul = await manager.register_soul(agent_id, declared)
+            soul_registered = True
+            soul_version = soul.soul_version
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Soul registration failed for {agent_id}: {e}")
+
     return {
         "success": True,
         "agent_id": agent_id,
         "message": "Agent registered via skill.md",
         "heartbeat_interval": request.heartbeat_interval,
         "ttl": ttl,
+        "soul_registered": soul_registered,
+        "soul_version": soul_version,
     }
 
 
