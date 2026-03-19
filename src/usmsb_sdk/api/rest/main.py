@@ -78,6 +78,7 @@ from usmsb_sdk.api.rest.routers import (
     souls_router,
     staking_router,
     system_router,
+    usmsb_matching_router,
     wallet_router,
     workflows_router,
 )
@@ -515,6 +516,7 @@ app.include_router(heartbeat_router, prefix="/api")
 app.include_router(blockchain_router, prefix="/api")
 app.include_router(contracts_router, prefix="/api")
 app.include_router(negotiations_router, prefix="/api")
+app.include_router(usmsb_matching_router, prefix="/api")
 app.include_router(souls_router, prefix="/api")
 
 

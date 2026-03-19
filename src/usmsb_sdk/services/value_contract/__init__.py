@@ -6,6 +6,7 @@ Phase 2 of USMSB Agent Platform implementation.
 Exports:
 - TaskValueContract, ProjectValueContract, ValueFlow, ContractRisk, ContractMilestone
 - ValueContractService for lifecycle management
+- ValueNegotiationService for negotiation
 - ContractTemplate and TEMPLATES registry
 """
 
@@ -16,6 +17,11 @@ from usmsb_sdk.services.value_contract.models import (
     ProjectValueContract,
     TaskValueContract,
     ValueFlow,
+)
+from usmsb_sdk.services.value_contract.negotiation import (
+    NegotiationRound,
+    ValueNegotiationSession,
+    ValueNegotiationService,
 )
 from usmsb_sdk.services.value_contract.service import ValueContractService
 from usmsb_sdk.services.value_contract.templates import (
@@ -36,6 +42,10 @@ __all__ = [
     "ValueFlow",
     "ContractRisk",
     "ContractMilestone",
+    # Negotiation
+    "ValueNegotiationSession",
+    "ValueNegotiationService",
+    "NegotiationRound",
     # Service
     "ValueContractService",
     # Templates
