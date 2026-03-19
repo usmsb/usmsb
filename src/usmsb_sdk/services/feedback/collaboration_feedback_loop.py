@@ -193,7 +193,8 @@ class CollaborationFeedbackLoop:
         # Calculate scores
         if evaluation.success:
             # Quality assessment
-            quality = delivery_data.get("quality_score", 0.8)
+            # D7 Fix: Use conservative default 0.5 instead of 0.8 when missing
+            quality = delivery_data.get("quality_score", 0.5)
             evaluation.quality_score = min(1.0, max(0.0, quality))
 
             # On-time assessment
@@ -329,7 +330,7 @@ class CollaborationFeedbackLoop:
             try:
                 # Get the global engine registry
                 engine_registry = LogicEngineRegistry()
-                adaptation_engine = engine_registry.get("adaptation_evolution")
+                adaptation_engine = engine_registry.get("adaptation")
 
                 if adaptation_engine is not None:
                     await adaptation_engine.record(record)
@@ -392,7 +393,7 @@ class CollaborationFeedbackLoop:
 
         synced_count = 0
         engine_registry = LogicEngineRegistry()
-        adaptation_engine = engine_registry.get_engine("adaptation_evolution")
+        adaptation_engine = engine_registry.get("adaptation")
 
         if adaptation_engine is None:
             logger.warning("Cannot sync: AdaptationEvolutionEngine not available")

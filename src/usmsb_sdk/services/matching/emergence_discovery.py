@@ -229,11 +229,35 @@ class EmergenceDiscovery:
         4. Rank and return opportunities
 
         This is the emergence mechanism - agents self-organize.
+
+        D4 Fix: Now persists broadcast to DB instead of in-memory.
         """
         start_time = time.time()
+        db = self._get_db_session()
 
         # Create broadcast
         broadcast_id = f"bc-{int(time.time())}-{agent_id[:8]}"
+        now = time.time()
+
+        # D4 Fix: Persist to DB instead of in-memory
+        db_broadcast = BroadcastDB(
+            broadcast_id=broadcast_id,
+            agent_id=agent_id,
+            broadcast_type="seeking",
+            content={
+                "task_def": task_def,
+                "goal": task_def.get("title", "Complex task"),
+            },
+            response_count=0,
+            status="active",
+            timestamp=now,
+            expires_at=now + self.BROADCAST_TIMEOUT_SECONDS,
+        )
+
+        db.add(db_broadcast)
+        db.commit()
+
+        # Create in-memory broadcast object for _collect_responses
         broadcast = AgentBroadcast(
             broadcast_id=broadcast_id,
             agent_id=agent_id,
@@ -242,11 +266,9 @@ class EmergenceDiscovery:
                 "task_def": task_def,
                 "goal": task_def.get("title", "Complex task"),
             },
-            timestamp=time.time(),
-            expires_at=time.time() + self.BROADCAST_TIMEOUT_SECONDS,
+            timestamp=now,
+            expires_at=now + self.BROADCAST_TIMEOUT_SECONDS,
         )
-
-        self._active_broadcasts[broadcast_id] = broadcast
 
         try:
             # Simulate collecting responses (in real impl, this would wait for async responses)
@@ -266,9 +288,8 @@ class EmergenceDiscovery:
             )
 
         finally:
-            # Cleanup broadcast
-            if broadcast_id in self._active_broadcasts:
-                del self._active_broadcasts[broadcast_id]
+            # Mark broadcast as fulfilled in DB
+            self.fulfill_broadcast(broadcast_id)
 
     async def _collect_responses(self, broadcast: AgentBroadcast) -> list[dict]:
         """Collect responses to a broadcast from other agents."""

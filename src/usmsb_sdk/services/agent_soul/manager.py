@@ -51,6 +51,61 @@ class AgentSoulManager:
 
     # ============== Registration ==============
 
+    # Valid values for enum-like fields
+    VALID_COLLABORATION_STYLES = {"conservative", "balanced", "aggressive"}
+    VALID_CONTRACT_TYPES = {"task", "project", "any"}
+    VALID_PRICING_STRATEGIES = {"fixed", "negotiable", "market"}
+
+    def _validate_declared_soul(self, declared: DeclaredSoul) -> None:
+        """
+        Validate DeclaredSoul fields.
+
+        L2 Fix: Added basic validation to prevent malicious or invalid declarations.
+
+        Raises:
+            ValueError: If any field is invalid
+        """
+        # Validate risk_tolerance
+        if not isinstance(declared.risk_tolerance, (int, float)):
+            raise ValueError(f"risk_tolerance must be a number, got {type(declared.risk_tolerance)}")
+        if not 0.0 <= declared.risk_tolerance <= 1.0:
+            raise ValueError(f"risk_tolerance must be between 0.0 and 1.0, got {declared.risk_tolerance}")
+
+        # Validate collaboration_style
+        if declared.collaboration_style not in self.VALID_COLLABORATION_STYLES:
+            raise ValueError(
+                f"collaboration_style must be one of {self.VALID_COLLABORATION_STYLES}, "
+                f"got {declared.collaboration_style}"
+            )
+
+        # Validate preferred_contract_type
+        if declared.preferred_contract_type not in self.VALID_CONTRACT_TYPES:
+            raise ValueError(
+                f"preferred_contract_type must be one of {self.VALID_CONTRACT_TYPES}, "
+                f"got {declared.preferred_contract_type}"
+            )
+
+        # Validate pricing_strategy
+        if declared.pricing_strategy not in self.VALID_PRICING_STRATEGIES:
+            raise ValueError(
+                f"pricing_strategy must be one of {self.VALID_PRICING_STRATEGIES}, "
+                f"got {declared.pricing_strategy}"
+            )
+
+        # Validate capabilities is a list of strings
+        if not isinstance(declared.capabilities, list):
+            raise ValueError(f"capabilities must be a list, got {type(declared.capabilities)}")
+        for cap in declared.capabilities:
+            if not isinstance(cap, str):
+                raise ValueError(f"capabilities must contain strings, got {type(cap)}")
+
+        # Validate base_price_vibe if provided
+        if declared.base_price_vibe is not None:
+            if not isinstance(declared.base_price_vibe, (int, float)):
+                raise ValueError(f"base_price_vibe must be a number or None, got {type(declared.base_price_vibe)}")
+            if declared.base_price_vibe < 0:
+                raise ValueError(f"base_price_vibe must be non-negative, got {declared.base_price_vibe}")
+
     async def register_soul(
         self,
         agent_id: str,
@@ -70,8 +125,11 @@ class AgentSoulManager:
             The created AgentSoul
 
         Raises:
-            ValueError: If Agent already has a Soul registered
+            ValueError: If Agent already has a Soul registered or if validation fails
         """
+        # L2 Fix: Validate declared soul before registration
+        self._validate_declared_soul(declared)
+
         # Check if Soul already exists
         existing = self.db.query(AgentSoulDB).filter(
             AgentSoulDB.agent_id == agent_id
