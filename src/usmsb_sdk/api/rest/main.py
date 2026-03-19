@@ -171,7 +171,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting USMSB SDK API...")
 
     # Module-level service singletons (for use in startup event)
-    global _order_service_singleton, _pre_match_service_singleton
     _order_service_singleton = None
     _pre_match_service_singleton = None
 
