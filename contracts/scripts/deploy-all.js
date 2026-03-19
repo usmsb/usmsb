@@ -78,7 +78,7 @@ async function main() {
     // 1. VIBEToken
     console.log("\n[1] VIBEToken...");
     const VIBEToken = await hre.ethers.getContractFactory("VIBEToken");
-    const vibeToken = await VIBEToken.deploy("VIBE Token", "VIBE", deployer.address);
+    const vibeToken = await VIBEToken.deploy("VIBE Token", "VIBE");
     await vibeToken.waitForDeployment();
     deployed.VIBEToken = await vibeToken.getAddress();
     console.log("   =>", deployed.VIBEToken);
