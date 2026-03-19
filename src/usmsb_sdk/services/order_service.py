@@ -94,7 +94,7 @@ if SQLALCHEMY_AVAILABLE:
         chain_order_id = Column(String(256))
         chain_tx_hash = Column(String(256))
         vibe_locked = Column(Float, default=0.0)
-        metadata = Column(Text)
+        order_metadata = Column(Text)
         is_cancelled = Column(Boolean, default=False)
 else:
     # Dummy class when SQLAlchemy not available
@@ -242,7 +242,7 @@ class Order:
             chain_order_id=row.chain_order_id,
             chain_tx_hash=row.chain_tx_hash,
             vibe_locked=row.vibe_locked,
-            metadata=json.loads(row.metadata) if row.metadata else {},
+            metadata=json.loads(row.order_metadata) if row.order_metadata else {},
             _state_machine=state_machine,
         )
 
@@ -278,7 +278,7 @@ class Order:
             "chain_order_id": self.chain_order_id,
             "chain_tx_hash": self.chain_tx_hash,
             "vibe_locked": self.vibe_locked,
-            "metadata": self.metadata,
+            "order_metadata": self.order_metadata,
             "state_machine": self._state_machine.to_dict(),
         }
 
@@ -353,8 +353,8 @@ class OrderService:
 
             # FIX断层8: Get service_type from negotiation metadata or metadata field
             service_type = (
-                order.metadata.get("service_type")
-                or order.metadata.get("serviceType")
+                order.order_metadata.get("service_type")
+                or order.order_metadata.get("serviceType")
                 or order.source_session_id  # Fallback to negotiation ID
             )
             if not service_type:
@@ -369,7 +369,7 @@ class OrderService:
                 )
                 if pool_id:
                     order.pool_id = pool_id
-                    order.metadata["pool_created"] = True
+                    order.order_metadata["pool_created"] = True
                     self.logger.info(
                         f"JointOrder pool {pool_id} created for order {order.order_id}"
                     )
@@ -584,9 +584,9 @@ class OrderService:
             delivery_deadline=delivery_deadline,
         )
         # FIX断层8: Store service_type in metadata so create_joint_order_pool() can use it
-        order.metadata["service_type"] = service_type
-        order.metadata["pre_match_negotiation_id"] = negotiation_id
-        order.metadata["demand_id"] = neg.get("demand_id")
+        order.order_metadata["service_type"] = service_type
+        order.order_metadata["pre_match_negotiation_id"] = negotiation_id
+        order.order_metadata["demand_id"] = neg.get("demand_id")
 
         # Persist to DB
         await self._save_order(order)
@@ -662,15 +662,15 @@ class OrderService:
             raise PermissionError(f"Agent {confirming_agent_id} is not a party to order {order_id}")
 
         # Determine which confirmation this is
-        already_confirmed = order.metadata.get("_demand_confirmed") and order.metadata.get("_supply_confirmed")
+        already_confirmed = order.order_metadata.get("_demand_confirmed") and order.order_metadata.get("_supply_confirmed")
         is_demand = confirming_agent_id == order.demand_agent_id
 
         if is_demand:
-            order.metadata["_demand_confirmed"] = True
+            order.order_metadata["_demand_confirmed"] = True
         else:
-            order.metadata["_supply_confirmed"] = True
+            order.order_metadata["_supply_confirmed"] = True
 
-        both_confirmed = order.metadata.get("_demand_confirmed") and order.metadata.get("_supply_confirmed")
+        both_confirmed = order.order_metadata.get("_demand_confirmed") and order.order_metadata.get("_supply_confirmed")
 
         if both_confirmed and not already_confirmed:
             # First time both confirmed → transition state
@@ -688,8 +688,8 @@ class OrderService:
         else:
             self.logger.info(
                 f"Order {order_id} partial confirmation: "
-                f"demand={order.metadata.get('_demand_confirmed')}, "
-                f"supply={order.metadata.get('_supply_confirmed')}"
+                f"demand={order.order_metadata.get('_demand_confirmed')}, "
+                f"supply={order.order_metadata.get('_supply_confirmed')}"
             )
 
         return order
@@ -808,8 +808,8 @@ class OrderService:
             reason=reason,
         )
         order.status = new_status
-        order.metadata["dispute_reason"] = reason
-        order.metadata["dispute_raised_by"] = agent_id
+        order.order_metadata["dispute_reason"] = reason
+        order.order_metadata["dispute_raised_by"] = agent_id
 
         await self._save_order(order)
 
@@ -879,7 +879,7 @@ class OrderService:
         from usmsb_sdk.services.joint_order_service import Demand
         demand = await self.joint_order.create_demand(
             user_id=order.demand_agent_id,
-            service_type=order.metadata.get("service_type", "general"),
+            service_type=order.order_metadata.get("service_type", "general"),
             budget=order.terms.price,
             requirements={
                 "task_description": order.task_description,
@@ -1012,7 +1012,7 @@ class OrderService:
                 chain_order_id=order.chain_order_id,
                 chain_tx_hash=order.chain_tx_hash,
                 vibe_locked=order.vibe_locked,
-                metadata=json.dumps(order.metadata),
+                metadata=json.dumps(order.order_metadata),
             )
             self.db.add(row)
         else:
@@ -1036,6 +1036,6 @@ class OrderService:
             row.chain_order_id = order.chain_order_id
             row.chain_tx_hash = order.chain_tx_hash
             row.vibe_locked = order.vibe_locked
-            row.metadata = json.dumps(order.metadata)
+            row.order_metadata = json.dumps(order.metadata)
 
         self.db.commit()
