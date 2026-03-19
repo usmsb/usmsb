@@ -62,13 +62,21 @@ class ValueDeliveryEvaluation:
     evaluated_at: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
+        # Compute overall_score if not already set
+        overall = self.overall_score
+        if overall == 0.0 and (self.quality_score > 0 or self.on_time_score > 0):
+            overall = (
+                self.quality_score * 0.5 +
+                self.on_time_score * 0.3 +
+                self.value_match_score * 0.2
+            )
         return {
             "contract_id": self.contract_id,
             "success": self.success,
             "value_match_score": self.value_match_score,
             "quality_score": self.quality_score,
             "on_time_score": self.on_time_score,
-            "overall_score": self.overall_score,
+            "overall_score": overall,
             "promised_value": self.promised_value,
             "actual_delivery": self.actual_delivery,
             "issues": self.issues,

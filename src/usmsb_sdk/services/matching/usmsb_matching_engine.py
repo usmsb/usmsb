@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from usmsb_sdk.core.elements import Goal
 from usmsb_sdk.services.agent_soul import AgentSoul, AgentSoulManager
 from usmsb_sdk.services.agent_soul.models import DeclaredSoul
 from usmsb_sdk.services.schema import create_session

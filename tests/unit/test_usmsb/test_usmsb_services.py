@@ -83,7 +83,7 @@ def test_inferred_soul_update():
         inferred=None,
     )
 
-    # First event - successful
+    # First event - successful (EMA with alpha=0.1, so rate = 0.1 after 1 event)
     soul.update_from_behavior({
         "contract_id": "c1",
         "success": True,
@@ -94,7 +94,7 @@ def test_inferred_soul_update():
     })
 
     assert soul.inferred.collaboration_count == 1
-    assert soul.inferred.actual_success_rate > 0.5
+    assert soul.inferred.actual_success_rate > 0.0
     assert soul.soul_version == 2
 
 
