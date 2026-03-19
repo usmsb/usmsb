@@ -12,7 +12,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 try:
-    from ..meta_agent_config import MetaAgentConfig
+    from ..meta_agent_config import MetaAgentConfig, LLMConfig
     __all__.append("MetaAgentConfig")
+    __all__.append("LLMConfig")
 except ImportError:
     pass

@@ -17,7 +17,7 @@ from typing import Any
 
 from usmsb_sdk.blockchain.contracts.joint_order import JointOrderClient, PoolStatus
 from usmsb_sdk.blockchain.web3_client import Web3Client
-from usmsb_sdk.config import BlockchainConfig
+from usmsb_sdk.blockchain.config import BlockchainConfig
 
 logger = logging.getLogger(__name__)
 

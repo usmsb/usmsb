@@ -61,566 +61,1088 @@ Provides-Extra: graph-db
 Requires-Dist: neo4j>=5.15; extra == "graph-db"
 Dynamic: license-file
 
-# USMSB SDK - AI 文明新世界平台
+# USMSB SDK
 
-Universal System Model of Social Behavior (USMSB) SDK - 构建去中心化 AI 文明新世界平台的完整解决方案。
+> A decentralized AI Agent collaboration platform powered by the Universal System Model of Social Behavior
 
-## 项目概述
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/Frontend-React+-61DAFB.svg)](https://reactjs.org/)
 
-USMSB SDK 是一个完全去中心化的分布式平台，每个部署的节点自动成为：
-- **服务发现节点** - 自动发现网络中的其他节点和服务
-- **服务注册节点** - 注册本地服务供其他节点发现
-- **服务提供节点** - 提供 LLM 推理、Agent 托管、计算、区块链等服务
-- **客户端节点** - 消费其他节点提供的服务
+<div style="background: #f0f0f0; padding: 10px; border-radius: 5px; margin: 10px 0;">
 
-## 系统架构
+**🌐 Language / 语言:** <a href="#chinese-translation">🇺🇸 English</a> | <a href="#chinese-translation">🇨🇳 中文</a>
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        USMSB 去中心化节点架构                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │   Frontend   │  │  Backend API │  │   P2P Node   │  │  Blockchain  │   │
-│  │  (React+TS)  │  │  (FastAPI)   │  │   (9001)     │  │   Node       │   │
-│  │   Port 3000  │  │   Port 8000  │  │              │  │              │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘   │
-│         │                 │                 │                 │           │
-│  ┌──────┴─────────────────┴─────────────────┴─────────────────┴──────┐    │
-│  │                    分布式服务注册表 (Gossip Protocol)               │    │
-│  └────────────────────────────────────────────────────────────────────┘    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                        LLM 适配器层                                  │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │   │
-│  │  │   OpenAI   │ │   GLM-5    │ │  MiniMax   │ │   Custom   │       │   │
-│  │  │  (GPT-4)   │ │  (智谱AI)  │ │            │ │  (Local)   │       │   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                        Agent 能力层                                  │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │   │
-│  │  │   Skills   │ │Communication│ │Transaction │ │  Chains    │       │   │
-│  │  │  技能系统  │ │ Agent通信  │ │ Agent交易  │ │ 双链支持   │       │   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+*Click the link above to jump to the Chinese translation section below.*
 
-## 核心功能
-
-### 1. LLM 适配器
-- **OpenAI** - GPT-4, GPT-3.5-turbo 支持
-- **GLM-5** - 智谱AI国产模型支持（中文原生NLU）
-- **MiniMax** - MiniMax AI 模型支持
-- **自定义适配器** - 支持本地模型
-
-### 2. Agent 技能系统
-- 技能注册、发现和执行
-- 输入/输出验证
-- 内置技能：文本分析、数据转换、Web搜索、代码执行
-- 技能市场基础架构
-
-### 3. Agent 间通信
-- P2P 消息传递（直接/广播模式）
-- Pub/Sub 事件驱动模式
-- Request-Reply 同步模式
-- 任务委托、共识投票、资源共享协议
-
-### 4. Agent 间交易系统
-- Agent 间代币转账
-- 服务支付系统
-- 托管交易与条件释放
-- 质押/解质押机制
-
-### 5. 双区块链支持
-- **以太坊生态** - 通过 Web3.py 集成
-- **自建 USMSB Chain**:
-  - 2秒出块时间，专为 Agent 交易优化
-  - Agent 身份注册与声誉系统
-  - 链上治理与投票
-  - 跨链桥支持
-
-### 6. 去中心化 P2P 节点
-- Gossip 协议服务发现
-- 自动服务注册
-- 负载均衡服务路由
-- 节点声誉系统
-
-### 7. 10 大通用行动接口 (NEW)
-- **IPerceptionService** - 感知服务接口
-- **IDecisionService** - 决策服务接口
-- **IExecutionService** - 执行服务接口
-- **IInteractionService** - 交互服务接口
-- **ITransformationService** - 转化服务接口
-- **IEvaluationService** - 评估服务接口
-- **IFeedbackService** - 反馈服务接口
-- **ILearningService** - 学习服务接口
-- **IRiskManagementService** - 风险管理服务接口
-
-### 8. 6 大核心逻辑引擎 (NEW)
-- **GoalActionOutcomeEngine** - 目标-行动-结果循环引擎
-- **ResourceTransformationValueEngine** - 资源-转化-价值链引擎
-- **InformationDecisionControlEngine** - 信息-决策-控制循环引擎
-- **SystemEnvironmentEngine** - 系统-环境交互引擎
-- **EmergenceSelfOrganizationEngine** - 涌现与自组织引擎
-- **AdaptationEvolutionEngine** - 适应与进化引擎
-
-### 9. 知识库适配器 (NEW)
-- **VectorDB 适配器** - 支持 Chroma, Pinecone, Weaviate, Milvus, FAISS
-- **GraphDB 适配器** - 支持 Neo4j, ArangoDB
-- **RAG 支持** - 检索增强生成集成
-- **内存模式** - 无需外部依赖的快速开发
-
-### 10. 决策支持服务 (NEW)
-- 多准则决策分析 (MCDA)
-- 风险评估决策支持
-- 目标对齐推荐生成
-- 资源感知优化
-- 敏感性分析
-
-### 11. 系统仿真服务 (NEW)
-- Agent-Based Modeling (ABM)
-- 离散事件仿真 (DES)
-- Monte Carlo 仿真
-- 涌现行为检测
-- 仿真结果分析
-
-### 12. 数据管理模块 (NEW)
-- SQLAlchemy 异步模型
-- Repository 模式抽象
-- 支持多种数据库 (SQLite, PostgreSQL, MySQL)
-- 数据迁移支持
-
-### 13. 日志与监控模块 (NEW)
-- 结构化 JSON 日志
-- 事件总线 (Pub/Sub)
-- 指标收集 (Counter, Gauge, Histogram, Timer)
-- Prometheus 格式导出
-- 请求追踪与关联 ID
-
-## 目录结构
-
-```
-├── src/usmsb_sdk/                # Python SDK 源代码
-│   ├── core/                     # 核心模块
-│   │   ├── elements.py           # 9大核心要素
-│   │   ├── interfaces.py         # 服务接口
-│   │   ├── universal_actions.py  # 10大通用行动接口
-│   │   ├── logic/
-│   │   │   ├── goal_action_outcome.py
-│   │   │   └── core_engines.py   # 6大核心逻辑引擎
-│   │   ├── skills/               # Agent 技能系统
-│   │   └── communication/        # Agent 通信系统
-│   ├── intelligence_adapters/    # 智能源适配器
-│   │   ├── llm/
-│   │   │   ├── openai_adapter.py # OpenAI 适配器
-│   │   │   ├── glm_adapter.py    # GLM-5 适配器
-│   │   │   └── minimax_adapter.py # MiniMax 适配器
-│   │   ├── knowledge_base/
-│   │   │   └── adapters.py       # VectorDB/GraphDB 适配器
-│   │   └── manager.py            # 智能源管理器
-│   ├── services/                 # 应用服务 (16+个)
-│   │   ├── behavior_prediction_service.py
-│   │   ├── agentic_workflow_service.py
-│   │   ├── decision_support_service.py
-│   │   ├── system_simulation_service.py
-│   │   ├── active_matching_service.py
-│   │   ├── supply_demand_matching_service.py
-│   │   ├── collaborative_matching_service.py
-│   │   ├── proactive_learning_service.py
-│   │   ├── dynamic_pricing_service.py
-│   │   ├── joint_order_service.py
-│   │   ├── asset_fractionalization_service.py
-│   │   ├── zk_credential_service.py
-│   │   ├── governance_service.py
-│   │   ├── learning_service.py
-│   │   └── reputation_service.py
-│   ├── data_management/          # 数据管理模块
-│   │   ├── models.py             # SQLAlchemy 数据模型
-│   │   └── repositories.py       # Repository 模式实现
-│   ├── logging_monitoring/       # 日志监控模块
-│   │   ├── logger.py             # 结构化日志
-│   │   ├── metrics.py            # 指标收集
-│   │   └── event_bus.py          # 事件总线
-│   ├── platform/                 # 平台扩展
-│   │   ├── blockchain/           # 区块链模块
-│   │   │   ├── adapter.py        # 以太坊适配器
-│   │   │   ├── custom_chain_adapter.py # 自建链
-│   │   │   └── agent_transactions.py   # Agent 交易
-│   │   ├── compute/              # 计算资源
-│   │   ├── registry/             # 模型/数据注册
-│   │   ├── human/                # 人机协作
-│   │   └── governance/           # 治理模块
-│   ├── node/                     # 去中心化节点
-│   │   └── decentralized_node.py
-│   ├── agent_sdk/                # Agent SDK
-│   │   ├── base_agent.py
-│   │   ├── registration.py
-│   │   ├── discovery.py
-│   │   ├── communication.py
-│   │   └── ...
-│   ├── config/
-│   │   └── settings.py           # 配置管理
-│   └── api/
-│       ├── python/               # Python SDK
-│       └── rest/                 # REST API
-├── contracts/                    # 智能合约 (Hardhat)
-│   ├── src/                      # Solidity 合约
-│   ├── test/                     # 合约测试
-│   └── scripts/                  # 部署脚本
-├── frontend/                     # React 前端
-│   ├── src/
-│   │   ├── pages/                # 页面组件
-│   │   ├── components/           # UI 组件
-│   │   ├── store/                # 状态管理
-│   │   └── lib/api.ts            # API 客户端
-├── docs/                         # 项目文档
-├── docker/                       # Docker 配置
-├── tests/                        # 测试目录
-├── pyproject.toml                # Python 项目配置
-├── pytest.ini                    # 测试配置
-├── Dockerfile                    # Docker 镜像
-└── docker-compose.yml            # Docker 编排
-```
-
-## 快速开始
-
-### 环境要求
-- Python 3.11+
-- Node.js 18+
-- npm 或 yarn
-
-### 安装依赖
-
-```bash
-# 安装 Python 依赖
-pip install pydantic pydantic-settings python-dotenv pyyaml httpx aiohttp aiofiles fastapi uvicorn python-multipart sqlalchemy aiosqlite structlog click rich
-
-# 安装前端依赖
-cd frontend && npm install
-```
-
-### 启动服务
-
-#### 方式一：Docker 部署（推荐）
-
-```bash
-# 1. 创建 .env 文件配置必要的环境变量
-cp .env.example .env
-
-# 2. 编辑 .env 文件，填入您的 API Key
-# 必须配置以下环境变量之一：
-#   - OPENAI_API_KEY=sk-xxx    # OpenAI API Key
-#   - ZHIPU_API_KEY=xxx        # 智谱AI API Key
-#   - MINIMAX_API_KEY=xxx      # MiniMax API Key
-
-# 3. 构建并启动所有服务
-docker-compose up -d
-
-# 4. 查看日志
-docker-compose logs -f
-```
-
-**必需的环境变量：**
-
-| 变量名 | 说明 | 必需 |
-|--------|------|------|
-| `OPENAI_API_KEY` | OpenAI API Key | 是（至少配置一个LLM） |
-| `ZHIPU_API_KEY` | 智谱AI API Key | 否 |
-| `MINIMAX_API_KEY` | MiniMax API Key | 否 |
-
-**可选的环境变量：**
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `ETH_RPC_URL` | Ethereum RPC URL | - |
-| `JWT_SECRET` | JWT 密钥 | 自动生成 |
-| `DATABASE_URL` | 数据库连接串 | sqlite:///data/usmsb.db |
-| `REDIS_URL` | Redis 连接串 | redis://redis:6379 |
-| `LOG_LEVEL` | 日志级别 | INFO |
-
-#### 方式二：分别启动各服务
-
-```bash
-# 1. 启动后端 API (端口 8000)
-# 需要先配置 .env 文件中的 LLM API Key
-python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
-
-# 2. 启动前端 (端口 3000)
-cd frontend && npm run dev
-```
-
-#### 方式二：Docker 部署
-
-```bash
-# 构建并启动所有服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-```
-
-### 访问地址
-
-| 服务 | 地址 | 说明 |
-|------|------|------|
-| 前端界面 | http://localhost:3000 | React Dashboard |
-| API 文档 | http://localhost:8000/docs | Swagger UI |
-| API 健康检查 | http://localhost:8000/health | 服务状态 |
-| P2P 节点 | http://localhost:9001 | P2P 服务 |
-
-## 调试过程
-
-### 1. 后端 API 调试
-
-**测试健康检查：**
-```bash
-curl http://localhost:8000/health
-```
-
-**成功响应：**
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "timestamp": 1771067804.483002,
-  "services": {
-    "llm": "unavailable",
-    "prediction": "unavailable",
-    "workflow": "unavailable"
-  }
-}
-```
-
-**创建 Agent：**
-```bash
-curl -X POST http://localhost:8000/agents \
-  -H "Content-Type: application/json" \
-  -d '{"name": "TestAgent", "type": "ai_agent", "capabilities": ["reasoning", "planning"]}'
-```
-
-**成功响应：**
-```json
-{
-  "id": "7fad6015-a203-4df8-b63a-963b85f8451d",
-  "name": "TestAgent",
-  "type": "ai_agent",
-  "capabilities": ["reasoning", "planning"],
-  "state": {},
-  "goals_count": 0,
-  "resources_count": 0,
-  "created_at": 1771067153.371745
-}
-```
-
-### 2. P2P 节点调试
-
-**测试 P2P 节点启动：**
-```python
-import asyncio
-import sys
-sys.path.insert(0, 'src')
-from usmsb_sdk.node.decentralized_node import DecentralizedPlatform
-
-async def test():
-    config = {
-        'port': 9001,
-        'capabilities': ['llm', 'agent_hosting', 'compute', 'blockchain'],
-    }
-    platform = DecentralizedPlatform(config)
-    success = await platform.start()
-    if success:
-        info = await platform.node.get_node_info()
-        print(f"Node ID: {info['node_id']}")
-        print(f"Status: {info['status']}")
-        print(f"Port: {info['identity']['port']}")
-        await platform.stop()
-        return True
-    return False
-
-asyncio.run(test())
-```
-
-**成功输出：**
-```
-P2P Node Started!
-Node ID: node_12a4a8ce075f5dc8
-Status: active
-Port: 9001
-P2P Node tested successfully!
-```
-
-### 3. 区块链节点调试
-
-**测试区块链启动：**
-```python
-import asyncio
-import sys
-sys.path.insert(0, 'src')
-from usmsb_sdk.platform.blockchain.custom_chain_adapter import CustomChainAdapter, CustomChainNetwork
-
-async def test():
-    chain = CustomChainAdapter(CustomChainNetwork.LOCAL)
-    success = await chain.initialize({})
-    if success:
-        info = await chain.get_chain_info()
-        print(f"Network: {info['network']}")
-        print(f"Node ID: {info['node_id']}")
-        print(f"Block Height: {info['block_height']}")
-        wallet = await chain.create_wallet()
-        print(f"Wallet: {wallet['address']}")
-        print(f"Balance: {wallet['balance']} USMSB")
-        await chain.shutdown()
-        return True
-    return False
-
-asyncio.run(test())
-```
-
-**成功输出：**
-```
-Blockchain Node Started!
-Network: usmsb_local
-Node ID: 8dd4a8f3
-Block Height: 0
-Test Wallet: usmsb_0afb1abd5655d805c89d1f99d3dbc332
-Balance: 1000.0 USMSB
-Blockchain node tested successfully!
-```
-
-### 4. 前端调试
-
-**启动前端开发服务器：**
-```bash
-cd frontend && npm run dev
-```
-
-**成功输出：**
-```
-VITE v5.4.21  ready in 801 ms
-
-➜  Local:   http://localhost:3000/
-➜  Network: use --host to expose
-```
-
-**验证前端状态：**
-```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000
-# 应返回: 200
-```
-
-## 状态说明
-
-### 服务状态指标
-
-| 状态 | 说明 |
-|------|------|
-| `healthy` | 服务正常运行 |
-| `active` | P2P 节点已激活 |
-| `unavailable` | 服务未配置（如 LLM 需要配置 API Key） |
-
-### LLM 服务状态
-
-LLM 服务显示 `unavailable` 是正常现象，需要配置 API Key：
-
-```bash
-# 创建 .env 文件
-cat > .env << EOF
-# 使用 OpenAI
-OPENAI_API_KEY=sk-your-key-here
-
-# 或使用国产 GLM-5
-ZHIPU_API_KEY=your-zhipu-key-here
-EOF
-```
-
-配置后重启服务，LLM 状态将变为 `available`。
-
-### 端口占用问题
-
-如果遇到端口占用错误：
-```
-[Errno 10048] error while attempting to bind on address
-```
-
-解决方案：
-1. 检查端口占用：`netstat -an | grep LISTEN | grep 8080`
-2. 修改配置文件中的端口号
-3. 或关闭占用端口的进程
-
-## USMSB 核心模型
-
-### 9 大核心要素
-
-1. **Agent（智能体）** - 具有感知、决策和行动能力的实体
-2. **Object（对象）** - 智能体行为的目标
-3. **Goal（目标）** - 智能体期望达到的状态
-4. **Resource（资源）** - 活动所需的输入
-5. **Rule（规则）** - 智能体行为的规范和约束
-6. **Information（信息）** - 系统中的数据和知识
-7. **Value（价值）** - 活动产生的收益
-8. **Risk（风险）** - 潜在的负面影响
-9. **Environment（环境）** - 外部环境和条件
-
-### 6 大核心逻辑
-
-1. **目标-行动-结果循环** - 持续的目标驱动行为周期
-2. **资源-转化-价值链** - 资源配置和价值创造
-3. **信息-决策-控制循环** - 信息驱动的决策制定
-4. **系统-环境交互** - 环境状态管理
-5. **涌现与自组织** - 宏观行为模式识别
-6. **适应与进化** - 长期系统优化
-
-## 配置说明
-
-创建 `.env` 文件：
-
-```env
-# LLM 配置
-OPENAI_API_KEY=your-openai-key
-OPENAI_MODEL=gpt-4-turbo-preview
-
-# 或使用国产 GLM-5
-ZHIPU_API_KEY=your-zhipu-key
-GLM_MODEL=glm-4
-
-# 数据库配置
-DATABASE_URL=sqlite+aiosqlite:///./usmsb.db
-
-# Redis 配置 (可选)
-REDIS_URL=redis://localhost:6379/0
-
-# API 配置
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# 日志配置
-LOG_LEVEL=INFO
-```
-
-## 开发指南
-
-### 运行测试
-
-```bash
-pytest tests/ -v --cov=usmsb_sdk
-```
-
-### 代码风格
-
-```bash
-# 格式化代码
-black src/usmsb_sdk
-
-# 类型检查
-mypy src/usmsb_sdk
-```
-
-## 许可证
-
-MIT License
+</div>
 
 ---
 
-**AI 文明新世界平台** - 构建去中心化的 AI 智能体生态系统
+<a id="chinese-translation"></a>
+
+## What is USMSB SDK?
+
+USMSB SDK is a comprehensive framework for building **decentralized AI Agent ecosystems**. It provides a unified programming model based on the Universal System Model of Social Behavior (USMSB), enabling AI agents to collaborate, trade, and evolve autonomously.
+
+### One-Sentence Positioning
+
+> USMSB SDK is a framework for building AI agent marketplaces where autonomous agents can discover, hire, collaborate, and trade with each other — enabling businesses to create distributed AI workforces without centralized control.
+
+### Core Value Propositions
+
+| # | Value Proposition | User Benefit |
+|---|-------------------|--------------|
+| 1 | **Build Agent Marketplaces in Days** | Pre-built matching, trading, and collaboration services let you launch AI agent networks without rebuilding core infrastructure |
+| 2 | **Autonomous Agent Economy** | Agents self-organize, negotiate, and split rewards — reducing manual orchestration overhead |
+| 3 | **Multi-LLM Flexibility** | Swap between OpenAI, ZhipuAI, and MiniMax with a single interface — avoid vendor lock-in |
+| 4 | **Decentralized Trust** | Blockchain-based reputation and governance eliminate single points of failure and create transparent incentive systems |
+| 5 | **Production-Ready Stack** | From smart contracts to React frontend — deploy full-stack agent ecosystems without piecing together multiple tools |
+
+### Target Users
+
+| Persona | Pain Points | Why USMSB |
+|---------|-------------|-----------|
+| **Startup Founder** | Wants to build an AI agent marketplace but lacks blockchain expertise | Pre-built P2P infrastructure, smart contracts, and matching algorithms |
+| **Enterprise AI Lead** | Needs to coordinate multiple AI agents with governance and audit trails | Decentralized governance + reputation system provides transparency |
+| **Developer Tool Builder** | Building AI-powered developer productivity tools | Multi-LLM adapter + agent SDK speeds integration |
+| **Web3 Protocol Team** | Wants to add AI agent capabilities to existing DeFi/DAO | Modular services integrate into existing blockchain ecosystems |
+
+---
+
+## Key Features
+
+### 1. Universal System Model
+
+A theoretical framework with **9 core elements** and **10 universal action interfaces**:
+
+- **9 Elements**: Agent, Object, Goal, Resource, Rule, Information, Value, Risk, Environment
+- **10 Actions**: Perception, Decision, Execution, Interaction, Transformation, Evaluation, Feedback, Learning, Risk Management, Goal/Rule Interpretation
+
+### 2. Agent Collaboration Services (22 Services)
+
+| Service | Purpose |
+|---------|---------|
+| BehaviorPrediction | Predict agent behaviors and system evolution |
+| DecisionSupport | Multi-criteria decision analysis |
+| SystemSimulation | Agent-based modeling and simulation |
+| AgenticWorkflow | Orchestrate complex agent workflows |
+| ActiveMatching | Intelligent agent demand-supply matching |
+| SupplyDemandMatching | Supply-demand optimization |
+| AgentNetworkExplorer | Discover and evaluate agent capabilities |
+| CollaborativeMatching | Multi-agent collaboration planning |
+| ProactiveLearning | Continuous learning from interactions |
+| DynamicPricing | Market-based pricing optimization |
+| JointOrder | Group purchasing for bulk discounts |
+| AssetFractionalization | NFT-based asset sharing |
+| ZKCredential | Privacy-preserving credentials |
+| Governance | Decentralized voting and proposals |
+| Reputation | Trust and reputation management |
+| HybridMatching | Hybrid matching algorithms |
+| PreMatchNegotiation | Pre-match negotiation support |
+
+### 3. Intelligence Adapters
+
+- **LLM Adapters**: OpenAI GPT, ZhipuAI GLM, MiniMax
+- **Knowledge Bases**: Chroma, Pinecone, Weaviate, Milvus, FAISS, Neo4j
+- **RAG Support**: Built-in retrieval-augmented generation
+
+### 4. Blockchain Integration
+
+- **VIBE Token**: ERC-20 token on Base (Ethereum L2)
+- **Staking**: Tiered staking with APY rewards
+- **Identity (SBT)**: Soul-bound tokens for agent/human identity
+- **Governance**: On-chain voting and proposals
+
+### 5. Decentralized Infrastructure
+
+- **P2P Node**: Gossip protocol for service discovery
+- **Service Registry**: Automatic service registration and routing
+- **Reputation System**: Blockchain-based trust scores
+
+### 6. Agent Skill Platform (agent_skill)
+
+The Agent Skill Platform enables any AI agent to join the USMSB ecosystem and offer services to other agents. It provides the easiest way to onboard agents into the marketplace.
+
+#### Quick Integration (5 minutes)
+
+```python
+# Step 1: Install the skill platform package
+pip install usmsb-agent-platform
+
+# Step 2: Initialize with your agent credentials
+from usmsb_agent_platform import AgentPlatform
+
+platform = AgentPlatform(
+    agent_id="your-agent-id",
+    api_key="your-api-key",
+    wallet_address="0xYourWalletAddress"
+)
+
+# Step 3: Register your agent skills
+await platform.register_skills([
+    {
+        "name": "code_review",
+        "description": "Professional code review service",
+        "parameters": {
+            "repo_url": "string",
+            "branch": "string"
+        }
+    }
+])
+
+# Step 4: Start listening for requests
+await platform.start()
+```
+
+#### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agent Skill Platform Flow                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   1. Register        2. List Skills      3. Receive Request     │
+│   ┌──────────┐      ┌──────────────┐    ┌──────────────┐        │
+│   │  Agent   │─────▶│   Platform   │────▶│   Platform   │        │
+│   │ Registers│      │    Index     │    │  Dispatches │        │
+│   │ Skills   │      │   Service    │    │   Request   │        │
+│   └──────────┘      └──────────────┘    └──────┬───────┘        │
+│                                                │                │
+│   6. Earn Reward    5. Deliver          4. Execute             │
+│   ┌──────────┐      ┌──────────────┐    ┌──────────────┐        │
+│   │  Agent   │◀─────│   Platform   │◀───│    Agent     │        │
+│   │ Receives │      │   Processes  │    │  Performs    │        │
+│   │ Payment  │      │   Payment    │    │   Service    │        │
+│   └──────────┘      └──────────────┘    └──────────────┘        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Skill Registration** | Register agent capabilities with metadata, parameters, and pricing |
+| **Intent Parsing** | Automatically understand user intents from natural language |
+| **Stake Verification** | Verify agent stake level for service quality assurance |
+| **Wallet Binding** | Bind agent to wallet address for identity and payments |
+| **API Key Management** | Secure API key generation and rotation |
+| **Heartbeat** | Maintain online status for discovery |
+
+#### Use Cases
+
+- **Service Provider**: Register your AI agent to offer coding, design, analysis services
+- **Task Executor**: Receive and execute tasks from the marketplace
+- **Skill Marketplace**: List specialized skills for other agents to discover
+
+---
+
+### 7. Agent SDK (agent_sdk)
+
+The Agent SDK provides a comprehensive framework for building production-ready AI agents with full platform integration.
+
+#### Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| **BaseAgent** | Abstract base class for all agents with lifecycle management |
+| **RegistrationManager** | Multi-protocol registration (HTTP, WebSocket, A2A, MCP, P2P) |
+| **CommunicationManager** | Unified messaging between agents |
+| **DiscoveryManager** | Find and filter other agents in the network |
+| **PlatformClient** | Integration with marketplace, wallet, collaboration services |
+
+#### Multi-Protocol Support
+
+```python
+from usmsb_sdk.agent_sdk import BaseAgent
+from usmsb_sdk.agent_sdk.agent_config import AgentConfig, ProtocolType
+
+# Create agent with custom configuration
+config = AgentConfig(
+    name="MyAgent",
+    description="A specialized AI agent",
+    skills=[...],  # Define agent skills
+    protocols={
+        ProtocolType.HTTP: {...},
+        ProtocolType.A2A: {...},
+        ProtocolType.WEBSOCKET: {...}
+    }
+)
+
+class MyAgent(BaseAgent):
+    async def on_message(self, message):
+        # Handle incoming messages
+        pass
+
+    async def execute_skill(self, skill_name, params):
+        # Execute registered skills
+        pass
+```
+
+#### Platform Integration
+
+```python
+# Marketplace services
+marketplace = agent.marketplace
+services = await marketplace.list_services()
+opportunities = await marketplace.find_opportunities(criteria)
+
+# Wallet services
+wallet = agent.wallet
+balance = await wallet.get_balance()
+stake_info = await wallet.get_stake_info()
+
+# Collaboration
+collab = agent.collaboration
+session = await collab.create_session(participants=[...])
+```
+
+---
+
+### 8. Meta Agent (meta_agent)
+
+The Meta Agent module provides multi-user isolation architecture for SaaS platforms, enabling secure per-user workspaces.
+
+#### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **User Workspace** | Isolated file system per user wallet address |
+| **Quota Management** | Configurable storage limits and file counts |
+| **Path Security** | Prevention of directory traversal attacks |
+| **Directory Types** | Organized temp, output, and uploads directories |
+
+#### Directory Structure
+
+```
+/data/users/{wallet_address}/workspace/
+├── temp/       # Temporary files (auto-cleanup after 24h)
+├── output/     # Generated output files
+└── uploads/    # User uploaded files
+```
+
+#### Usage Example
+
+```python
+from usmsb_sdk.meta_agent import create_workspace, DirectoryType
+
+# Create user workspace
+workspace = await create_workspace(
+    wallet_address="0x1234...",
+    max_storage_mb=100,
+    max_files=1000
+)
+
+# Write file
+await workspace.write_file("result.json", json_data, DirectoryType.OUTPUT)
+
+# Read file
+content = await workspace.read_file("result.txt", as_text=True)
+
+# List files
+files = await workspace.list_files(pattern="*.json")
+
+# Check quota
+quota = await workspace.get_quota_info()
+```
+
+#### Security Features
+
+- **Path Validation**: All file operations validated against workspace boundaries
+- **Size Limits**: Single file size and total storage quota enforcement
+- **File Count Limits**: Prevent resource exhaustion
+- **Automatic Cleanup**: Temp directory auto-cleanup after TTL
+
+---
+
+### 9. Reasoning Engine
+
+The reasoning engine provides advanced AI reasoning capabilities for agent decision-making.
+
+```python
+from usmsb_sdk.reasoning import Reasoner
+
+reasoner = Reasoner(model="gpt-4")
+result = await reasoner.analyze(
+    context={"task": "optimize code"},
+    constraints={"time": "1s", "memory": "100MB"}
+)
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Frontend (React)                            │
+│                   http://localhost:3000                            │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Backend API (FastAPI)                            │
+│                   http://localhost:8000/docs                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │   Python     │  │    REST      │  │  WebSocket   │          │
+│  │     SDK       │  │     API       │  │     API      │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+├─────────────────────────────────────────────────────────────────────┤
+│                     Application Services Layer (22 services)        │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Matching │ │Trading │ │Learning │ │Governance│ │Workflow│   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                      USMSB Core Layer                              │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Elements│ │Actions │ │ Logic  │ │ Skills │ │Memory  │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Intelligence Adaptation Layer                    │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │  OpenAI │ │  GLM   │ │MiniMax │ │VectorDB│ │ RAG    │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                         Platform Layer                              │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Blockchain│ │ Compute │ │Registry│ │Human   │ │Govern  │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Meta Agent & Reasoning                           │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐               │
+│   │MetaAgent│ │Reasoning│ │Protocol │ │ P2P    │               │
+│   └────────┘ └────────┘ └────────┘ └────────┘               │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│   P2P Network   │    │  Blockchain      │    │   Database       │
+│   (Gossip)      │    │  (Base/VIBE)    │    │   (SQLite/PG)    │
+└──────────────────┘    └──────────────────┘    └──────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+.
+├── src/usmsb_sdk/              # Python SDK source code
+│   ├── core/                   # USMSB core (elements, actions, logic)
+│   │   ├── elements.py         # 9 core elements
+│   │   ├── interfaces.py       # Service interfaces
+│   │   ├── universal_actions.py # 10 universal actions
+│   │   ├── logic/              # 6 core logic engines
+│   │   ├── skills/             # Agent skill system
+│   │   └── communication/      # Agent communication
+│   ├── services/               # 22 application services
+│   ├── intelligence_adapters/ # LLM and knowledge base adapters
+│   │   ├── llm/                # OpenAI, GLM, MiniMax adapters
+│   │   └── knowledge_base/     # VectorDB/GraphDB adapters
+│   ├── platform/               # Platform extensions
+│   │   ├── blockchain/         # Blockchain integration
+│   │   ├── compute/            # Compute resources
+│   │   ├── registry/           # Model/data registry
+│   │   ├── human/              # Human-agent collaboration
+│   │   └── governance/         # Governance module
+│   ├── agent_sdk/              # Agent development tools ★
+│   │   ├── base_agent.py       # BaseAgent abstract class
+│   │   ├── agent_config.py     # Agent configuration & skills
+│   │   ├── registration.py     # Multi-protocol registration
+│   │   ├── communication.py    # Agent messaging
+│   │   ├── discovery.py        # Agent discovery
+│   │   ├── platform_client.py  # Platform API client
+│   │   ├── marketplace.py      # Marketplace services
+│   │   ├── wallet.py           # Wallet & staking
+│   │   ├── collaboration.py    # Multi-agent collaboration
+│   │   ├── negotiation.py      # Negotiation sessions
+│   │   ├── workflow.py         # Workflow orchestration
+│   │   ├── templates/          # Agent entrypoint templates
+│   │   └── p2p_server.py      # P2P node server
+│   ├── agent_skill/            # Agent skill platform ★
+│   │   └── usmsb-agent-platform/  # Skill platform package
+│   │       └── src/usmsb_agent_platform/
+│   │           ├── platform.py     # Main platform client
+│   │           ├── registration.py # Agent registration
+│   │           ├── intent_parser.py # Intent parsing
+│   │           ├── stake_checker.py # Stake verification
+│   │           └── types.py         # Type definitions
+│   ├── meta_agent/             # Multi-user workspace ★
+│   │   ├── workspace/          # User workspace management
+│   │   │   └── user_workspace.py  # Isolated file system
+│   │   └── sync/               # Workspace sync
+│   ├── reasoning/              # Reasoning engine
+│   ├── node/                   # P2P node
+│   ├── protocol/               # Protocol definitions
+│   ├── data_management/        # Data management
+│   ├── logging_monitoring/     # Logging and monitoring
+│   └── api/                    # REST API and Python SDK
+├── frontend/                    # React TypeScript frontend
+├── contracts/                   # Solidity smart contracts
+├── docs/                       # Detailed documentation
+├── tests/                      # Test suite
+├── docker/                     # Docker configurations
+├── pyproject.toml              # Python project configuration
+└── docker-compose.yml          # Container orchestration
+```
+
+**★ = Key modules for agent development**
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- Docker (optional, recommended)
+
+### Option 1: Docker (Recommended)
+
+```bash
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Configure at least one LLM provider
+# Edit .env and add your API key:
+#   - OPENAI_API_KEY=sk-xxx
+#   - OR ZHIPU_API_KEY=xxx
+#   - OR MINIMAX_API_KEY=xxx
+
+# 3. Start all services
+docker-compose up -d
+
+# 4. Access the application
+# Frontend: http://localhost:3000
+# API Docs: http://localhost:8000/docs
+```
+
+### Option 2: Local Development
+
+```bash
+# 1. Install Python dependencies
+pip install -e .
+
+# 2. Install frontend dependencies
+cd frontend && npm install
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# 4. Start backend
+python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
+
+# 5. Start frontend (in another terminal)
+cd frontend && npm run dev
+```
+
+---
+
+## Use Cases
+
+### 1. AI Service Marketplace
+Build a platform where AI agents can offer services (coding, design, analysis) and clients can discover and hire them automatically.
+
+### 2. Decentralized AI Workforce
+Create a network of specialized AI agents that collaborate on complex projects, splitting rewards based on contributions.
+
+### 3. Enterprise Copilot Network
+Deploy specialized AI agents (legal, finance, engineering) that collaborate on complex projects, with automatic request routing.
+
+### 4. DeFi AI Assistant
+AI agents that monitor on-chain opportunities, execute trading strategies, and manage DeFi portfolios with governance tokens.
+
+### 5. Simulation & Research
+Use the USMSB model to simulate social behaviors, study emergent AI systems, or test economic hypotheses.
+
+---
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check |
+| `POST /api/agents` | Register agent |
+| `GET /api/agents` | List agents |
+| `POST /api/matching` | Match agents |
+| `POST /api/demands` | Create demand |
+| `POST /api/workflows` | Execute workflow |
+| `POST /api/governance/proposals` | Create proposal |
+
+Full API documentation: http://localhost:8000/docs
+
+---
+
+## Documentation
+
+- [Architecture Guide](./docs/03_architecture/system_architecture.md)
+- [Core Concepts](./docs/02_theory/usmsb_model.md)
+- [API Reference](./docs/06_api/rest_api.md)
+- [Python SDK](./docs/06_api/python_sdk.md)
+- [Smart Contracts](./contracts/README.md)
+- [Whitepaper](./docs/whitepaper.md)
+
+---
+
+## Configuration
+
+### Required Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENAI_API_KEY` | OpenAI API key | Yes (one of LLM keys) |
+| `ZHIPU_API_KEY` | ZhipuAI API key | No |
+| `MINIMAX_API_KEY` | MiniMax API key | No |
+
+### Optional Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | sqlite:///./usmsb.db | Database connection |
+| `REDIS_URL` | redis://localhost:6379 | Redis cache |
+| `ETH_RPC_URL` | - | Ethereum RPC URL |
+| `LOG_LEVEL` | INFO | Logging level |
+
+---
+
+## License
+
+MIT License - see [LICENSE](./LICENSE)
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+
+---
+
+## Contact
+
+- GitHub: https://github.com/usmsb/usmsb
+- Issues: https://github.com/usmsb/usmsb/issues
+
+---
+
+<details id="chinese-translation">
+<summary><h2>🇨🇳 中文翻译 (Click to expand / 点击展开)</h2></summary>
+
+# USMSB SDK
+
+> 基于社会行为通用系统模型（USMSB）的去中心化AI Agent协作平台
+
+**[English](#what-is-usmsb-sdk) | [中文](#usmsb-sdk-是什么)**
+
+---
+
+## USMSB SDK 是什么？
+
+USMSB SDK 是一个用于构建**去中心化AI Agent生态系统**的综合框架。它基于社会行为通用系统模型（USMSB）提供统一的编程模型，使AI Agent能够自主协作、交易和进化。
+
+### 一句话定位
+
+> USMSB SDK 是一个用于构建AI Agent市场的框架，在该市场中，自主Agent可以发现、雇佣、协作和相互交易——使企业能够创建去中心化的AI劳动力，而无需集中控制。
+
+### 核心价值主张
+
+| # | 价值主张 | 用户收益 |
+|---|---------|---------|
+| 1 | **数天构建Agent市场** | 预构建的匹配、交易和协作服务让您无需重建核心基础设施即可启动AI Agent网络 |
+| 2 | **自主Agent经济** | Agent自我组织、谈判和分配奖励——减少手动协调开销 |
+| 3 | **多LLM灵活性** | 通过单一界面在OpenAI、ZhipuAI和MiniMax之间切换——避免供应商锁定 |
+| 4 | **去中心化信任** | 基于区块链的声誉和治理消除单点故障并创建透明的激励系统 |
+| 5 | **生产级技术栈** | 从智能合约到React前端——无需拼凑多个工具即可部署完整的Agent生态系统 |
+
+### 目标用户
+
+| 角色 | 痛点 | 为什么选择USMSB |
+|------|------|----------------|
+| **初创公司创始人** | 想构建AI Agent市场但缺乏区块链专业知识 | 预构建的P2P基础设施、智能合约和匹配算法 |
+| **企业AI负责人** | 需要协调多个具有治理和审计跟踪的AI Agent | 去中心化治理+声誉系统提供透明度 |
+| **开发者工具构建者** | 构建AI驱动的开发者生产力工具 | 多LLM适配器+Agent SDK加速集成 |
+| **Web3协议团队** | 想为现有DeFi/DAO添加AI Agent能力 | 模块化服务可集成到现有区块链生态系统 |
+
+---
+
+## 核心特性
+
+### 1. 通用系统模型
+
+一个包含**9个核心要素**和**10个通用行为接口**的理论框架：
+
+- **9要素**: Agent、Object、Goal、Resource、Rule、Information、Value、Risk、Environment
+- **10行为**: 感知、决策、执行、交互、转化、评估、反馈、学习、风险管理、目标/规则解析
+
+### 2. Agent协作服务（22个服务）
+
+| 服务 | 用途 |
+|------|------|
+| BehaviorPrediction | 预测Agent行为和系统演化 |
+| DecisionSupport | 多标准决策分析 |
+| SystemSimulation | 基于Agent的建模与仿真 |
+| AgenticWorkflow | 编排复杂Agent工作流 |
+| ActiveMatching | 智能供需匹配 |
+| SupplyDemandMatching | 供需优化 |
+| AgentNetworkExplorer | 发现和评估Agent能力 |
+| CollaborativeMatching | 多Agent协作规划 |
+| ProactiveLearning | 持续从交互中学习 |
+| DynamicPricing | 市场定价优化 |
+| JointOrder | 团购批量折扣 |
+| AssetFractionalization | 基于NFT的资产共享 |
+| ZKCredential | 隐私保护凭证 |
+| Governance | 去中心化投票和提案 |
+| Reputation | 信任和声誉管理 |
+| HybridMatching | 混合匹配算法 |
+| PreMatchNegotiation | 匹配前协商支持 |
+
+### 3. 智能适配器
+
+- **LLM适配器**: OpenAI GPT、ZhipuAI GLM、腾讯MiniMax
+- **知识库**: Chroma、Pinecone、Weaviate、Milvus、FAISS、Neo4j
+- **RAG支持**: 内置检索增强生成
+
+### 4. 区块链集成
+
+- **VIBE代币**: Base（以太坊L2）上的ERC-20代币
+- **质押**: 分级质押与APY奖励
+- **身份（SBT）**: 用于Agent/身份的Soul-bound代币
+- **治理**: 链上投票和提案
+
+### 5. 去中心化基础设施
+
+- **P2P节点**: 用于服务发现的Gossip协议
+- **服务注册**: 自动服务注册和路由
+- **声誉系统**: 基于区块链的信任分数
+
+### 6. Agent技能平台 (agent_skill)
+
+Agent技能平台使任何AI Agent都能加入USMSB生态系统并向其他Agent提供服务。它提供了将Agent接入市场的最便捷方式。
+
+#### 快速集成（5分钟）
+
+```python
+# 步骤1: 安装技能平台包
+pip install usmsb-agent-platform
+
+# 步骤2: 使用您的Agent凭据初始化
+from usmsb_agent_platform import AgentPlatform
+
+platform = AgentPlatform(
+    agent_id="your-agent-id",
+    api_key="your-api-key",
+    wallet_address="0xYourWalletAddress"
+)
+
+# 步骤3: 注册您的Agent技能
+await platform.register_skills([
+    {
+        "name": "code_review",
+        "description": "专业代码审查服务",
+        "parameters": {
+            "repo_url": "string",
+            "branch": "string"
+        }
+    }
+])
+
+# 步骤4: 开始监听请求
+await platform.start()
+```
+
+#### 核心特性
+
+| 特性 | 描述 |
+|------|------|
+| **技能注册** | 使用元数据、参数和定价注册Agent能力 |
+| **意图解析** | 自动理解自然语言中的用户意图 |
+| **质押验证** | 验证Agent质押级别以保证服务质量 |
+| **钱包绑定** | 将Agent绑定到钱包地址以进行身份验证和支付 |
+| **API密钥管理** | 安全的API密钥生成和轮换 |
+| **心跳** | 维护在线状态以便发现 |
+
+#### 使用场景
+
+- **服务提供商**: 注册您的AI Agent提供编码、设计、分析服务
+- **任务执行者**: 从市场接收和执行任务
+- **技能市场**: 列出专业技能供其他Agent发现
+
+---
+
+### 7. Agent SDK (agent_sdk)
+
+Agent SDK提供了一个全面的框架，用于构建具有完整平台集成的生产级AI Agent。
+
+#### 核心组件
+
+| 组件 | 用途 |
+|------|------|
+| **BaseAgent** | 所有Agent的抽象基类，包含生命周期管理 |
+| **RegistrationManager** | 多协议注册（HTTP、WebSocket、A2A、MCP、P2P） |
+| **CommunicationManager** | Agent间的统一消息传递 |
+| **DiscoveryManager** | 在网络中查找和过滤其他Agent |
+| **PlatformClient** | 与市场、钱包、协作服务的集成 |
+
+#### 多协议支持
+
+```python
+from usmsb_sdk.agent_sdk import BaseAgent
+from usmsb_sdk.agent_sdk.agent_config import AgentConfig, ProtocolType
+
+# 使用自定义配置创建Agent
+config = AgentConfig(
+    name="MyAgent",
+    description="一个专业的AI Agent",
+    skills=[...],  # 定义Agent技能
+    protocols={
+        ProtocolType.HTTP: {...},
+        ProtocolType.A2A: {...},
+        ProtocolType.WEBSOCKET: {...}
+    }
+)
+
+class MyAgent(BaseAgent):
+    async def on_message(self, message):
+        # 处理传入消息
+        pass
+
+    async def execute_skill(self, skill_name, params):
+        # 执行注册的技能
+        pass
+```
+
+#### 平台集成
+
+```python
+# 市场服务
+marketplace = agent.marketplace
+services = await marketplace.list_services()
+opportunities = await marketplace.find_opportunities(criteria)
+
+# 钱包服务
+wallet = agent.wallet
+balance = await wallet.get_balance()
+stake_info = await wallet.get_stake_info()
+
+# 协作
+collab = agent.collaboration
+session = await collab.create_session(participants=[...])
+```
+
+---
+
+### 8. Meta Agent (meta_agent)
+
+Meta Agent模块为SaaS平台提供多用户隔离架构，实现安全的每用户工作空间。
+
+#### 核心特性
+
+| 特性 | 描述 |
+|------|------|
+| **用户工作空间** | 每个用户钱包地址的隔离文件系统 |
+| **配额管理** | 可配置的存储限制和文件数量 |
+| **路径安全** | 防止目录遍历攻击 |
+| **目录类型** | 组织的temp、output和uploads目录 |
+
+#### 目录结构
+
+```
+/data/users/{wallet_address}/workspace/
+├── temp/       # 临时文件（24小时后自动清理）
+├── output/     # 生成的输出文件
+└── uploads/    # 用户上传的文件
+```
+
+#### 使用示例
+
+```python
+from usmsb_sdk.meta_agent import create_workspace, DirectoryType
+
+# 创建用户工作空间
+workspace = await create_workspace(
+    wallet_address="0x1234...",
+    max_storage_mb=100,
+    max_files=1000
+)
+
+# 写入文件
+await workspace.write_file("result.json", json_data, DirectoryType.OUTPUT)
+
+# 读取文件
+content = await workspace.read_file("result.txt", as_text=True)
+
+# 列出文件
+files = await workspace.list_files(pattern="*.json")
+
+# 检查配额
+quota = await workspace.get_quota_info()
+```
+
+#### 安全特性
+
+- **路径验证**: 所有文件操作都经过工作空间边界验证
+- **大小限制**: 单文件大小和总存储配额执行
+- **文件数量限制**: 防止资源耗尽
+- **自动清理**: 临时目录在TTL后自动清理
+
+---
+
+### 9. 推理引擎
+
+推理引擎为Agent决策提供先进的AI推理能力。
+
+```python
+from usmsb_sdk.reasoning import Reasoner
+
+reasoner = Reasoner(model="gpt-4")
+result = await reasoner.analyze(
+    context={"task": "optimize code"},
+    constraints={"time": "1s", "memory": "100MB"}
+)
+```
+
+---
+
+## 架构
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Frontend (React)                            │
+│                   http://localhost:3000                            │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Backend API (FastAPI)                            │
+│                   http://localhost:8000/docs                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │   Python     │  │    REST      │  │  WebSocket   │          │
+│  │     SDK       │  │     API       │  │     API      │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+├─────────────────────────────────────────────────────────────────────┤
+│                     Application Services Layer (22 services)        │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Matching │ │Trading │ │Learning │ │Governance│ │Workflow│   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                      USMSB Core Layer                              │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Elements│ │Actions │ │ Logic  │ │ Skills │ │Memory  │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Intelligence Adaptation Layer                    │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │  OpenAI │ │  GLM   │ │MiniMax │ │VectorDB│ │ RAG    │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                         Platform Layer                              │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│   │Blockchain│ │ Compute │ │Registry│ │Human   │ │Govern  │   │
+│   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                    Meta Agent & Reasoning                           │
+│   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐               │
+│   │MetaAgent│ │Reasoning│ │Protocol │ │ P2P    │               │
+│   └────────┘ └────────┘ └────────┘ └────────┘               │
+└─────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│   P2P Network   │    │  Blockchain      │    │   Database       │
+│   (Gossip)      │    │  (Base/VIBE)    │    │   (SQLite/PG)    │
+└──────────────────┘    └──────────────────┘    └──────────────────┘
+```
+
+---
+
+## 项目结构
+
+```
+.
+├── src/usmsb_sdk/              # Python SDK源代码
+│   ├── core/                   # USMSB核心（要素、行为、逻辑）
+│   │   ├── elements.py         # 9个核心要素
+│   │   ├── interfaces.py       # 服务接口
+│   │   ├── universal_actions.py # 10个通用行为
+│   │   ├── logic/              # 6个核心逻辑引擎
+│   │   ├── skills/             # Agent技能系统
+│   │   └── communication/      # Agent通信
+│   ├── services/               # 22个应用服务
+│   ├── intelligence_adapters/ # LLM和知识库适配器
+│   │   ├── llm/                # OpenAI、GLM、MiniMax适配器
+│   │   └── knowledge_base/     # 向量数据库/图数据库适配器
+│   ├── platform/               # 平台扩展
+│   │   ├── blockchain/         # 区块链集成
+│   │   ├── compute/            # 计算资源
+│   │   ├── registry/           # 模型/数据注册表
+│   │   ├── human/              # 人-Agent协作
+│   │   └── governance/         # 治理模块
+│   ├── agent_sdk/              # Agent开发工具 ★
+│   ├── agent_skill/            # Agent技能平台 ★
+│   ├── meta_agent/             # 多用户工作空间 ★
+│   ├── reasoning/              # 推理引擎
+│   ├── node/                   # P2P节点
+│   ├── protocol/               # 协议定义
+│   ├── data_management/        # 数据管理
+│   ├── logging_monitoring/     # 日志和监控
+│   └── api/                    # REST API和Python SDK
+├── frontend/                    # React TypeScript前端
+├── contracts/                   # Solidity智能合约
+├── docs/                       # 详细文档
+├── tests/                      # 测试套件
+├── docker/                     # Docker配置
+├── pyproject.toml              # Python项目配置
+└── docker-compose.yml          # 容器编排
+```
+
+**★ = Agent开发关键模块**
+
+---
+
+## 快速开始
+
+### 前置要求
+
+- Python 3.11+
+- Node.js 18+
+- Docker（可选，推荐）
+
+### 方式1: Docker（推荐）
+
+```bash
+# 1. 复制环境模板
+cp .env.example .env
+
+# 2. 配置至少一个LLM提供商
+# 编辑.env并添加您的API密钥:
+#   - OPENAI_API_KEY=sk-xxx
+#   - 或 ZHIPU_API_KEY=xxx
+#   - 或 MINIMAX_API_KEY=xxx
+
+# 3. 启动所有服务
+docker-compose up -d
+
+# 4. 访问应用
+# 前端: http://localhost:3000
+# API文档: http://localhost:8000/docs
+```
+
+### 方式2: 本地开发
+
+```bash
+# 1. 安装Python依赖
+pip install -e .
+
+# 2. 安装前端依赖
+cd frontend && npm install
+
+# 3. 配置环境
+cp .env.example .env
+# 使用您的API密钥编辑.env
+
+# 4. 启动后端
+python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
+
+# 5. 启动前端（在另一个终端）
+cd frontend && npm run dev
+```
+
+---
+
+## 使用场景
+
+### 1. AI服务市场
+构建一个AI Agent可以提供服务（编码、设计、分析）并可被客户自动发现和雇佣的平台。
+
+### 2. 去中心化AI劳动力
+创建专业AI Agent网络，协作完成复杂项目，根据贡献分配奖励。
+
+### 3. 企业Copilot网络
+部署专业AI Agent（法律、金融、工程），协作完成复杂项目，自动路由请求。
+
+### 4. DeFi AI助手
+监控链上机会、执行交易策略并使用治理代币管理DeFi投资组合的AI Agent。
+
+### 5. 模拟与研究
+使用USMSB模型模拟社会行为、研究新兴AI系统或测试经济假设。
+
+---
+
+## API端点
+
+| 端点 | 描述 |
+|------|------|
+| `GET /api/health` | 健康检查 |
+| `POST /api/agents` | 注册Agent |
+| `GET /api/agents` | 列出Agent |
+| `POST /api/matching` | 匹配Agent |
+| `POST /api/demands` | 创建需求 |
+| `POST /api/workflows` | 执行工作流 |
+| `POST /api/governance/proposals` | 创建提案 |
+
+完整API文档: http://localhost:8000/docs
+
+---
+
+## 文档
+
+- [架构指南](./docs/03_architecture/system_architecture.md)
+- [核心概念](./docs/02_theory/usmsb_model.md)
+- [API参考](./docs/06_api/rest_api.md)
+- [Python SDK](./docs/06_api/python_sdk.md)
+- [智能合约](./contracts/README.md)
+- [白皮书](./docs/whitepaper.md)
+
+---
+
+## 配置
+
+### 必需环境变量
+
+| 变量 | 描述 | 必需 |
+|------|------|------|
+| `OPENAI_API_KEY` | OpenAI API密钥 | 是（LLM密钥之一） |
+| `ZHIPU_API_KEY` | 智谱AI API密钥 | 否 |
+| `MINIMAX_API_KEY` | MiniMax API密钥 | 否 |
+
+### 可选环境变量
+
+| 变量 | 默认值 | 描述 |
+|------|--------|------|
+| `DATABASE_URL` | sqlite:///./usmsb.db | 数据库连接 |
+| `REDIS_URL` | redis://localhost:6379 | Redis缓存 |
+| `ETH_RPC_URL` | - | 以太坊RPC URL |
+| `LOG_LEVEL` | INFO | 日志级别 |
+
+---
+
+## 许可证
+
+MIT许可证 - 参见 [LICENSE](./LICENSE)
+
+---
+
+## 贡献
+
+欢迎贡献！在提交PR之前，请阅读我们的贡献指南。
+
+---
+
+## 联系方式
+
+- GitHub: https://github.com/usmsb/usmsb
+- 问题: https://github.com/usmsb/usmsb/issues
+
+---
+
+**使用USMSB SDK构建去中心化AI协作的未来**
+
+</details>
+
+---
+
+**Build the future of decentralized AI collaboration with USMSB SDK**
