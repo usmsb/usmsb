@@ -26,6 +26,7 @@ from usmsb_sdk.api.rest.routers.services import router as services_router
 from usmsb_sdk.api.rest.routers.souls import router as souls_router
 from usmsb_sdk.api.rest.routers.staking import router as staking_router
 from usmsb_sdk.api.rest.routers.system import router as system_router
+from usmsb_sdk.api.rest.routers.usmsb_matching import router as usmsb_matching_router
 from usmsb_sdk.api.rest.routers.wallet import router as wallet_router
 from usmsb_sdk.api.rest.routers.workflows import router as workflows_router
 
@@ -54,4 +55,5 @@ __all__ = [
     "blockchain_router",
     "souls_router",
     "negotiations_router",
+    "usmsb_matching_router",
 ]
