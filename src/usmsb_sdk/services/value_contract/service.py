@@ -482,16 +482,28 @@ class ValueContractService:
         self,
         contract_id: str,
         flow_index: int,
+        demand_wallet_address: str,
+        demand_private_key: str,
+        service_type: str = "usmsb_service",
+        delivery_hours: int = 72,
+        joint_order_pool_manager: Any = None,
     ) -> ValueFlow | None:
         """
-        Execute a value flow (trigger VIBE transfer).
+        Execute a value flow by creating an on-chain JointOrder pool.
 
-        This method handles the actual VIBE transfer via the blockchain integration.
-        Currently stubs the transfer - real implementation would call joint_order_pool_manager.
+        This locks the demand agent's VIBE budget in the JointOrder contract.
+        After pool creation, the status changes from "pending" to "in_progress".
+        Providers can then submit bids, and the demand agent accepts one.
+        When delivery is confirmed, VIBE transfers to the winning provider.
 
         Args:
             contract_id: Contract ID
             flow_index: Index of the value_flow to execute
+            demand_wallet_address: Demand agent's wallet address (for creating pool)
+            demand_private_key: Demand agent's private key (for signing transaction)
+            service_type: Service type identifier for the pool
+            delivery_hours: Hours until delivery deadline (default 72)
+            joint_order_pool_manager: JointOrderPoolManager instance (optional)
 
         Returns:
             Updated ValueFlow or None
@@ -506,19 +518,136 @@ class ValueContractService:
         flow = contract.value_flows[flow_index]
 
         if flow.status != "pending":
-            logger.warning(f"Flow {flow.flow_id} is not pending, skipping")
+            logger.warning(f"Flow {flow.flow_id} is not pending (status={flow.status}), skipping")
             return flow
 
-        # TODO: Integrate with joint_order_pool_manager for actual VIBE transfer
-        # For now, mark as executed
-        flow.status = "executed"
-        flow.executed_at = time.time()
+        if not joint_order_pool_manager:
+            raise ValueError(
+                "joint_order_pool_manager is required for real VIBE transfer. "
+                "Pass joint_order_pool_manager=JointOrderPoolManager(...) to enable on-chain execution."
+            )
+
+        # Determine budget from flow value
+        budget = flow.value.metric if flow.value else 0.0
+        if budget <= 0:
+            raise ValueError(f"Flow {flow.flow_id} has invalid budget: {budget}")
+
+        # Build a meaningful order_id from contract and flow
+        order_id = f"{contract_id}:{flow.flow_id}"
+
+        logger.info(
+            f"Creating JointOrder pool for flow {flow.flow_id}: "
+            f"{flow.from_agent_id} -> {flow.to_agent_id}, "
+            f"budget={budget} VIBE, service_type={service_type}"
+        )
+
+        # Create the on-chain pool
+        result = await joint_order_pool_manager.create_pool_from_order(
+            order_id=order_id,
+            service_type=service_type,
+            total_budget=budget,
+            delivery_hours=delivery_hours,
+            from_address=demand_wallet_address,
+            private_key=demand_private_key,
+        )
+
+        if not result.success:
+            logger.error(f"Pool creation failed for flow {flow.flow_id}: {result.message}")
+            flow.status = "failed"
+            flow.executed_at = time.time()
+        else:
+            logger.info(
+                f"JointOrder pool created for flow {flow.flow_id}: "
+                f"pool_id={result.pool_id}, chain_order_id={result.chain_order_id}, "
+                f"tx={result.tx_hash}"
+            )
+            flow.status = "in_progress"
+            flow.executed_at = time.time()
+
+            # Store pool reference in the flow metadata
+            flow._pool_id = result.pool_id
+            flow._chain_order_id = result.chain_order_id
+            flow._tx_hash = result.tx_hash
 
         # Update contract
         contract.updated_at = time.time()
         await self._save_contract(contract)
 
-        logger.info(f"ValueFlow {flow.flow_id} executed: {flow.from_agent_id} -> {flow.to_agent_id}, {flow.value.metric if flow.value else 0} VIBE")
+        logger.info(
+            f"ValueFlow {flow.flow_id} status: {flow.status} "
+            f"({flow.from_agent_id} -> {flow.to_agent_id}, {budget} VIBE)"
+        )
+        return flow
+
+    async def confirm_value_flow_delivery(
+        self,
+        contract_id: str,
+        flow_index: int,
+        provider_wallet_address: str,
+        provider_private_key: str,
+        joint_order_pool_manager: Any = None,
+    ) -> ValueFlow | None:
+        """
+        Confirm delivery of a value flow, triggering VIBE release to the provider.
+
+        This should be called after the provider has delivered and the demand agent
+        confirms acceptance. VIBE is transferred from the JointOrder pool to the provider.
+
+        Args:
+            contract_id: Contract ID
+            flow_index: Index of the value_flow
+            provider_wallet_address: Provider's wallet address
+            provider_private_key: Provider's private key (for signing transaction)
+            joint_order_pool_manager: JointOrderPoolManager instance
+
+        Returns:
+            Updated ValueFlow or None
+        """
+        contract = await self.get_contract(contract_id)
+        if not contract:
+            raise ValueError(f"Contract {contract_id} not found")
+
+        if flow_index < 0 or flow_index >= len(contract.value_flows):
+            raise ValueError(f"Invalid flow index {flow_index}")
+
+        flow = contract.value_flows[flow_index]
+
+        if flow.status != "in_progress":
+            logger.warning(f"Flow {flow.flow_id} is not in_progress (status={flow.status}), cannot confirm delivery")
+            return flow
+
+        pool_id = getattr(flow, "_pool_id", None)
+        chain_order_id = getattr(flow, "_chain_order_id", None)
+        if not pool_id:
+            raise ValueError(f"Flow {flow.flow_id} has no pool_id, cannot confirm delivery")
+
+        if not joint_order_pool_manager:
+            raise ValueError("joint_order_pool_manager is required for VIBE release")
+
+        logger.info(
+            f"Confirming delivery for flow {flow.flow_id}, pool_id={pool_id}, "
+            f"chain_order_id={chain_order_id}"
+        )
+
+        result = await joint_order_pool_manager.confirm_delivery(
+            pool_id=pool_id,
+            chain_pool_id=chain_order_id,
+            rating=5,
+            from_address=provider_wallet_address,
+            private_key=provider_private_key,
+        )
+
+        if not result.success:
+            logger.error(f"Confirm delivery failed for flow {flow.flow_id}: {result.message}")
+            flow.status = "failed"
+            flow.executed_at = time.time()
+        else:
+            logger.info(f"Delivery confirmed for flow {flow.flow_id}, tx={result.tx_hash}")
+            flow.status = "executed"
+            flow.executed_at = time.time()
+
+        contract.updated_at = time.time()
+        await self._save_contract(contract)
         return flow
 
     # ============== Risk Management ==============

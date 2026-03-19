@@ -26,7 +26,8 @@
     "VIBVEPoints": "0x6803A33fccE80CC590904e8Bd478F152ef688e0C",
     "VIBDispute": "0x3a61228c22C3360D39866e7a288f185e838b6779",
     "AgentWallet": "0x27E8a52c53a2ab16e78B8FF99aaEDB59c19F9409",
-    "EmissionController": "0xE56Af4725865329C155Cf0941BeD48C8094Fd033"
+    "EmissionController": "0xE56Af4725865329C155Cf0941BeD48C8094Fd033",
+    "VIBEcosystemPool": "0x670EF78306E9AD7e540e89A9A6B7A167BE4a88F9"
   },
   "wiring": {
     "VIBGovernance.initialized": true,
