@@ -4,6 +4,14 @@ Order Service
 Core order management service that bridges negotiation results
 into executable orders with full lifecycle management.
 
+DEPRECATED: This service is deprecated and will be removed.
+Use services.value_contract.ValueContractService instead.
+
+Migration Guide:
+- create_order() -> ValueContractService.create_task_contract()
+- Order lifecycle -> ValueContract lifecycle
+- See Phase 5 migration docs
+
 Key Responsibilities:
 1. Create Order from negotiation session (pre-match or formal negotiation)
 2. Manage order state transitions via OrderStateMachine

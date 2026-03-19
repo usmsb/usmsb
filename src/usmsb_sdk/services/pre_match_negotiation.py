@@ -7,6 +7,9 @@ Provides:
 - Clarification Q&A
 - Capability verification requests
 - Match confirmation/decline
+
+DEPRECATED: Use services.value_contract.negotiation.ValueNegotiationService instead.
+Migration: PreMatchNegotiation -> ValueNegotiationService
 """
 
 import json
