@@ -62,6 +62,7 @@ from usmsb_sdk.api.rest.routers import (
     contracts_router,
     demands_router,
     environments_router,
+    feedback_router,
     gene_capsule_router,
     heartbeat_router,
     learning_router,
@@ -517,6 +518,7 @@ app.include_router(blockchain_router, prefix="/api")
 app.include_router(contracts_router, prefix="/api")
 app.include_router(negotiations_router, prefix="/api")
 app.include_router(usmsb_matching_router, prefix="/api")
+app.include_router(feedback_router, prefix="/api")
 app.include_router(souls_router, prefix="/api")
 
 
