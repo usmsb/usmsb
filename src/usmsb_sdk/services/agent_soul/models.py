@@ -236,6 +236,9 @@ class AgentSoul:
 
         This is called by the Feedback Loop when a contract completes.
 
+        NOTE: This method only updates in-memory state. The caller is responsible
+        for persisting changes to the database via AgentSoulManager.update_inferred_from_event().
+
         Args:
             event: Behavior event containing outcome data
                 {

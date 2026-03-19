@@ -1469,6 +1469,65 @@ class AdaptationEvolutionEngine(ILogicEngine):
         """Add a custom adaptation rule."""
         self._adaptation_rules.append(rule)
 
+    async def record(self, record: Any) -> None:
+        """
+        Record an adaptation from external source (e.g., feedback loop).
+
+        This allows the feedback loop to send adaptation data to the Core engine
+        for platform-wide learning.
+
+        Args:
+            record: Adaptation record, typically a dict with fields:
+                - record_id: Unique identifier
+                - agent_id: Agent identifier
+                - adaptation_type: Type of adaptation (e.g., "soul_update")
+                - experience: Dict with adaptation experience data
+                - outcome: Dict with adaptation outcome
+                - timestamp: When the adaptation occurred
+        """
+        adaptation_id = getattr(record, 'record_id', None) or getattr(record, 'adaptation_id', str(uuid.uuid4())[:8])
+        agent_id = getattr(record, 'agent_id', 'unknown')
+        adaptation_type = getattr(record, 'adaptation_type', 'unknown')
+
+        # Convert experience/outcome to before_state/after_state format
+        experience = getattr(record, 'experience', {})
+        outcome = getattr(record, 'outcome', {})
+
+        before_state = {
+            "experience": experience,
+            "timestamp": getattr(record, 'timestamp', time.time()),
+        }
+        after_state = {
+            "outcome": outcome,
+            "recorded_at": time.time(),
+        }
+
+        # Create core AdaptationRecord
+        core_record = AdaptationRecord(
+            adaptation_id=adaptation_id,
+            agent_id=agent_id,
+            adaptation_type=adaptation_type,
+            before_state=before_state,
+            after_state=after_state,
+            trigger="feedback_loop",
+            effectiveness=outcome.get("overall_score") if isinstance(outcome, dict) else None,
+            created_at=getattr(record, 'timestamp', time.time()),
+        )
+
+        # Store in internal dict
+        self._adaptations[core_record.adaptation_id] = core_record
+
+        # Also track performance data if available
+        if isinstance(outcome, dict) and "overall_score" in outcome:
+            if agent_id not in self._agent_performance:
+                self._agent_performance[agent_id] = []
+            self._agent_performance[agent_id].append(outcome["overall_score"])
+
+        logger.info(
+            f"Recorded adaptation {adaptation_id} for agent {agent_id}: "
+            f"type={adaptation_type}, score={outcome.get('overall_score') if isinstance(outcome, dict) else 'N/A'}"
+        )
+
     def get_adaptation_history(self, agent_id: str | None = None) -> list[AdaptationRecord]:
         """Get adaptation history."""
         if agent_id:

@@ -165,44 +165,10 @@ class USMSBMatchingEngine:
         Example: Agent has Goal "analyze market data" but lacks capability "data analysis"
         → Find agents who can provide "data analysis"
         """
-        opportunities = []
-        manager = self._get_soul_manager()
-
-        # Get all agents who might supply what this agent needs
-        all_agents = await self._get_all_agent_souls()
-        agent_needs = self._extract_agent_needs(agent_soul)
-
-        for supply_soul in all_agents:
-            if supply_soul.agent_id == agent_soul.agent_id:
-                continue
-
-            # Calculate match score
-            match_result = await self._calculate_match_score(
-                demand_soul=agent_soul,
-                supply_soul=supply_soul,
-                match_type="demand",
-            )
-
-            if match_result["overall_score"] >= self.MIN_OVERALL_SCORE:
-                opp = CollaborationOpportunity(
-                    opportunity_id=f"opp-demand-{agent_soul.agent_id}-{supply_soul.agent_id}",
-                    opportunity_type="task",
-                    demand_agent_id=agent_soul.agent_id,
-                    supply_agent_id=supply_soul.agent_id,
-                    goal_match_score=match_result["goal_match"],
-                    capability_match_score=match_result["capability_match"],
-                    value_alignment_score=match_result["value_alignment"],
-                    overall_score=match_result["overall_score"],
-                    value_chain_potential=match_result["value_potential"],
-                    match_reasons=match_result["reasons"],
-                    identified_risks=match_result["risks"],
-                    recommended_terms=match_result["recommended_terms"],
-                    discovered_at=time.time(),
-                    expires_at=time.time() + 3600,
-                )
-                opportunities.append(opp)
-
-        return opportunities
+        return await self._find_matches(
+            agent_soul=agent_soul,
+            match_type="demand",
+        )
 
     async def _find_supply_matches(
         self,
@@ -214,33 +180,69 @@ class USMSBMatchingEngine:
         Example: Agent has capability "code generation"
         → Find agents who have Goals that need "code generation"
         """
+        return await self._find_matches(
+            agent_soul=agent_soul,
+            match_type="supply",
+        )
+
+    async def _find_matches(
+        self,
+        agent_soul: AgentSoul,
+        match_type: str,  # "demand" | "supply"
+    ) -> list[CollaborationOpportunity]:
+        """
+        Common helper to find demand or supply matches.
+
+        DRY Fix: Extracted common logic from _find_demand_matches and _find_supply_matches.
+
+        Args:
+            agent_soul: The agent to find matches for
+            match_type: "demand" (agent needs something) or "supply" (agent provides something)
+
+        Returns:
+            List of CollaborationOpportunities
+        """
         opportunities = []
-        manager = self._get_soul_manager()
 
+        # Get all agents
         all_agents = await self._get_all_agent_souls()
-        agent_capabilities = self._extract_agent_capabilities(agent_soul)
 
-        for demand_soul in all_agents:
-            if demand_soul.agent_id == agent_soul.agent_id:
+        for other_soul in all_agents:
+            if other_soul.agent_id == agent_soul.agent_id:
                 continue
 
+            # Determine demand and supply based on match_type
+            if match_type == "demand":
+                demand_soul = agent_soul
+                supply_soul = other_soul
+            else:  # supply
+                demand_soul = other_soul
+                supply_soul = agent_soul
+
+            # Calculate match score
             match_result = await self._calculate_match_score(
                 demand_soul=demand_soul,
-                supply_soul=agent_soul,
-                match_type="supply",
+                supply_soul=supply_soul,
+                match_type=match_type,
             )
 
             if match_result["overall_score"] >= self.MIN_OVERALL_SCORE:
+                task_def = self._synthesize_task_def(
+                    demand_soul=demand_soul,
+                    supply_soul=supply_soul,
+                    match_type=match_type,
+                )
                 opp = CollaborationOpportunity(
-                    opportunity_id=f"opp-supply-{agent_soul.agent_id}-{demand_soul.agent_id}",
+                    opportunity_id=f"opp-{match_type}-{agent_soul.agent_id}-{other_soul.agent_id}",
                     opportunity_type="task",
                     demand_agent_id=demand_soul.agent_id,
-                    supply_agent_id=agent_soul.agent_id,
+                    supply_agent_id=supply_soul.agent_id,
                     goal_match_score=match_result["goal_match"],
                     capability_match_score=match_result["capability_match"],
                     value_alignment_score=match_result["value_alignment"],
                     overall_score=match_result["overall_score"],
                     value_chain_potential=match_result["value_potential"],
+                    task_def=task_def,
                     match_reasons=match_result["reasons"],
                     identified_risks=match_result["risks"],
                     recommended_terms=match_result["recommended_terms"],
@@ -278,6 +280,11 @@ class USMSBMatchingEngine:
                 score = self._calculate_collaboration_score(agent_soul, other_soul, shared_goals)
 
                 if score >= self.MIN_OVERALL_SCORE:
+                    task_def = self._synthesize_task_def(
+                        demand_soul=agent_soul,
+                        supply_soul=other_soul,
+                        match_type="collaboration",
+                    )
                     opp = CollaborationOpportunity(
                         opportunity_id=f"opp-collab-{agent_soul.agent_id}-{other_soul.agent_id}",
                         opportunity_type="collaboration",
@@ -288,6 +295,7 @@ class USMSBMatchingEngine:
                         value_alignment_score=score * 0.9,
                         overall_score=score,
                         value_chain_potential=score * 1.5,  # Collaboration has higher potential
+                        task_def=task_def,
                         match_reasons=[f"Shared goals: {g}" for g in shared_goals[:3]],
                         discovered_at=time.time(),
                         expires_at=time.time() + 86400,  # Collaborations expire slower
@@ -593,6 +601,62 @@ class USMSBMatchingEngine:
         from usmsb_sdk.services.schema import AgentSoulDB
 
         return session.query(AgentSoulDB).count()
+
+    def _synthesize_task_def(
+        self,
+        demand_soul: AgentSoul,
+        supply_soul: AgentSoul,
+        match_type: str,
+    ) -> dict[str, Any]:
+        """
+        Synthesize a task definition based on matched agents.
+
+        This creates a task_def that represents the potential collaboration
+        between demand and supply agents.
+
+        Args:
+            demand_soul: The agent seeking something
+            supply_soul: The agent providing something
+            match_type: "demand" | "supply" | "collaboration"
+
+        Returns:
+            Synthesized task definition dict
+        """
+        task_def: dict[str, Any] = {
+            "title": "",
+            "description": "",
+            "requirements": [],
+            "synthesized_from_matching": True,
+        }
+
+        if match_type in ("demand", "supply"):
+            # Demand agent needs something that supply agent can provide
+            supply_caps = supply_soul.declared.capabilities
+            demand_goals = [g.name for g in demand_soul.declared.goals]
+
+            task_def["title"] = f"Task for: {', '.join(demand_goals[:2])}"
+            task_def["description"] = (
+                f"Supply agent {supply_soul.agent_id} can provide: "
+                f"{', '.join(supply_caps[:3])}. "
+                f"Demand agent {demand_soul.agent_id} needs: "
+                f"{', '.join(demand_goals[:2])}."
+            )
+            task_def["requirements"] = supply_caps[:5] if supply_caps else []
+            task_def["demand_agent_id"] = demand_soul.agent_id
+            task_def["supply_agent_id"] = supply_soul.agent_id
+
+        elif match_type == "collaboration":
+            # Shared goals - collaboration opportunity
+            shared = self._find_shared_goals(demand_soul, supply_soul)
+            task_def["title"] = f"Collaboration: {', '.join(shared[:2])}" if shared else "Collaboration opportunity"
+            task_def["description"] = (
+                f"Agents {demand_soul.agent_id} and {supply_soul.agent_id} "
+                f"share goals: {', '.join(shared[:3])}."
+            )
+            task_def["requirements"] = shared[:5] if shared else []
+            task_def["collaborating_agents"] = [demand_soul.agent_id, supply_soul.agent_id]
+
+        return task_def
 
     def _extract_agent_needs(self, soul: AgentSoul) -> list[str]:
         """Extract what an agent needs based on their goals."""
