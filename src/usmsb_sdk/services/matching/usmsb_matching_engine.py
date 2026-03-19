@@ -296,6 +296,70 @@ class USMSBMatchingEngine:
 
         return opportunities
 
+    def _text_similarity(self, text1: str, text2: str) -> float:
+        """
+        Calculate word-level similarity between two texts.
+
+        D5 Fix: Replaces naive 'keyword in' with proper word overlap similarity.
+
+        Uses Jaccard similarity on word sets.
+        Returns 0.0 (no overlap) to 1.0 (identical word sets).
+        """
+        if not text1 or not text2:
+            return 0.0
+
+        # Tokenize by whitespace and punctuation
+        words1 = set(text1.lower().replace(",", " ").replace(".", " ").split())
+        words2 = set(text2.lower().replace(",", " ").replace(".", " ").split())
+
+        if not words1 or not words2:
+            return 0.0
+
+        # Jaccard similarity: intersection / union
+        intersection = words1 & words2
+        union = words1 | words2
+
+        return len(intersection) / len(union) if union else 0.0
+
+    def _capability_goal_similarity(
+        self,
+        capabilities: list[str],
+        goals: list[Goal],
+    ) -> float:
+        """
+        Calculate how well capabilities match goal descriptions.
+
+        D5 Fix: Uses word similarity instead of naive substring matching.
+        """
+        if not capabilities or not goals:
+            return 0.0
+
+        # Combine goal names and descriptions
+        goal_texts = []
+        for goal in goals:
+            goal_text = f"{goal.name} {goal.description}"
+            goal_texts.append(goal_text)
+
+        best_match = 0.0
+
+        for cap in capabilities:
+            cap_lower = cap.lower()
+
+            for goal_text in goal_texts:
+                # Use word similarity instead of substring match
+                similarity = self._text_similarity(cap_lower, goal_text.lower())
+
+                # Also check individual word overlap
+                cap_words = set(cap_lower.replace("-", " ").split())
+                goal_words = set(goal_text.lower().replace("-", " ").split())
+                word_overlap = len(cap_words & goal_words) / len(cap_words | goal_words) if cap_words | goal_words else 0
+
+                # Combine both measures
+                combined = max(similarity, word_overlap)
+                best_match = max(best_match, combined)
+
+        return min(1.0, best_match)
+
     async def _calculate_match_score(
         self,
         demand_soul: AgentSoul,
@@ -313,19 +377,17 @@ class USMSBMatchingEngine:
         risks = []
 
         # Goal match: How well does this match serve the demand agent's goals?
+        # D5 Fix: Use proper similarity instead of naive substring matching
         goal_match = 0.0
         if demand_soul.declared.goals:
             # Check if supply's capabilities could serve demand's goals
-            supply_caps = set(supply_soul.declared.capabilities)
-            for goal in demand_soul.declared.goals:
-                # Simple keyword matching (real impl would use embeddings)
-                goal_keywords = goal.name.lower().split()
-                for keyword in goal_keywords:
-                    if keyword in " ".join(supply_caps).lower():
-                        goal_match += 0.2
-                        reasons.append(f"Supply capability matches demand Goal: {goal.name}")
-                        break
-            goal_match = min(1.0, goal_match)
+            goal_match = self._capability_goal_similarity(
+                supply_soul.declared.capabilities,
+                demand_soul.declared.goals
+            )
+
+            if goal_match > 0:
+                reasons.append(f"Capability-Goal similarity: {goal_match:.2f}")
 
         if goal_match < self.MIN_GOAL_MATCH:
             return {
@@ -501,15 +563,36 @@ class USMSBMatchingEngine:
 
         return terms
 
-    async def _get_all_agent_souls(self) -> list[AgentSoul]:
-        """Get all registered agent souls."""
+    async def _get_all_agent_souls(
+        self,
+        limit: int = 1000,
+        offset: int = 0,
+    ) -> list[AgentSoul]:
+        """
+        Get all registered agent souls with pagination.
+
+        D8 Fix: Added pagination to avoid loading all agents at once.
+        For large scales (10000+ agents), use limit/offset.
+
+        Args:
+            limit: Maximum number of agents to return (default 1000)
+            offset: Number of agents to skip (default 0)
+        """
         manager = self._get_soul_manager()
         session = manager.db
         from usmsb_sdk.services.schema import AgentSoulDB
 
-        db_records = session.query(AgentSoulDB).all()
+        db_records = session.query(AgentSoulDB).limit(limit).offset(offset).all()
         souls = [manager._db_to_soul(r) for r in db_records]
         return souls
+
+    async def _get_all_agent_souls_count(self) -> int:
+        """Get total count of registered agents."""
+        manager = self._get_soul_manager()
+        session = manager.db
+        from usmsb_sdk.services.schema import AgentSoulDB
+
+        return session.query(AgentSoulDB).count()
 
     def _extract_agent_needs(self, soul: AgentSoul) -> list[str]:
         """Extract what an agent needs based on their goals."""

@@ -314,10 +314,18 @@ class ValueNegotiationService:
         agent_b_soul: dict[str, Any],
     ) -> tuple[ValueNegotiationSession, dict[str, Any]]:
         """
-        AI-to-AI auto-negotiation using LLM.
+        AI-to-AI auto-negotiation using Soul-driven strategy.
 
-        This method uses the agents' Soul profiles to drive automatic
-        negotiation of variable terms within template ranges.
+        D2 Fix: Replaced stub with Soul-driven multi-strategy negotiation.
+        Uses agent Soul profiles to drive intelligent negotiation,
+        not just naive midpoint calculation.
+
+        Strategy selection based on Soul compatibility:
+        - Aggressive + Aggressive → Competitive
+        - Conservative + Conservative → Cooperative
+        - Aggressive + Conservative → Mixed (aggressive wins more)
+        - Balanced + Balanced → Fair split
+        - High risk variance → Creative (explore alternatives)
 
         Args:
             session_id: Negotiation session ID
@@ -337,45 +345,44 @@ class ValueNegotiationService:
         if not session.template:
             session.template = get_template(session.template_id)
 
-        # Extract current terms from negotiation history
         current_terms = await self._extract_current_terms(session)
         template = session.template
-
-        # Determine acceptable ranges based on agent souls
-        # This is a simplified version - real implementation would use LLM
-
-        # Agent A preferences (demand side)
-        a_risk_tolerance = agent_a_soul.get("declared", {}).get("risk_tolerance", 0.5)
-        a_preferred_price = agent_a_soul.get("declared", {}).get("base_price_vibe")
-
-        # Agent B preferences (supply side)
-        b_risk_tolerance = agent_b_soul.get("declared", {}).get("risk_tolerance", 0.5)
-        b_preferred_price = agent_b_soul.get("declared", {}).get("base_price_vibe")
-
-        # Simple midpoint negotiation on price
-        agreed_terms = current_terms.copy()
         ranges = template.get_variable_ranges()
 
-        if "price_vibe" in ranges and a_preferred_price and b_preferred_price:
-            # Midpoint between preferred prices
-            midpoint = (a_preferred_price + b_preferred_price) / 2
-            # Clamp to template range
-            price_range = ranges["price_vibe"]
-            min_price = price_range.get("min", 0.01)
-            max_price = price_range.get("max", 10000)
-            agreed_price = max(min_price, min(max_price, midpoint))
-            agreed_terms["price_vibe"] = round(agreed_price, 2)
+        # Extract Soul profile preferences
+        a_declared = agent_a_soul.get("declared", {})
+        b_declared = agent_b_soul.get("declared", {})
 
-        if "deadline" in ranges:
-            # Prefer shorter deadline for demand, longer for supply
-            deadline_range = ranges["deadline"]
-            # Use midpoint as starting point
-            min_dl = deadline_range.get("min", 3600)
-            max_dl = deadline_range.get("max", 604800)
-            agreed_terms["deadline"] = (min_dl + max_dl) // 2
+        a_style = a_declared.get("collaboration_style", "balanced")
+        b_style = b_declared.get("collaboration_style", "balanced")
+        a_risk = a_declared.get("risk_tolerance", 0.5)
+        b_risk = b_declared.get("risk_tolerance", 0.5)
+        a_preferred_price = a_declared.get("base_price_vibe")
+        b_preferred_price = b_declared.get("base_price_vibe")
 
-        # Add final round
-        proposer = session.participants[0]
+        # Determine negotiation strategy based on Soul compatibility
+        strategy = self._determine_negotiation_strategy(a_style, b_style, a_risk, b_risk)
+
+        logger.info(
+            f"Auto-negotiate {session_id}: strategy={strategy}, "
+            f"a_style={a_style}, b_style={b_style}"
+        )
+
+        # Calculate agreed terms using strategy
+        agreed_terms = self._apply_negotiation_strategy(
+            strategy=strategy,
+            current_terms=current_terms,
+            ranges=ranges,
+            a_preferred_price=a_preferred_price,
+            b_preferred_price=b_preferred_price,
+            a_risk=a_risk,
+            b_risk=b_risk,
+            a_style=a_style,
+            b_style=b_style,
+            template=template,
+        )
+
+        # Add final round with AUTO proposer
         session.negotiation_rounds.append(
             NegotiationRound(
                 round=len(session.negotiation_rounds) + 1,
@@ -388,11 +395,112 @@ class ValueNegotiationService:
 
         session.status = "agreed"
         session.agreed_at = time.time()
-
         await self._save_session(session)
 
         logger.info(f"Auto-negotiation for session {session_id} completed: {agreed_terms}")
         return session, agreed_terms
+
+    def _determine_negotiation_strategy(
+        self,
+        a_style: str,
+        b_style: str,
+        a_risk: float,
+        b_risk: float,
+    ) -> str:
+        """
+        Determine negotiation strategy based on Soul profiles.
+
+        D2 Fix: Multi-strategy negotiation based on Soul compatibility.
+        """
+        if a_style == "aggressive" and b_style == "aggressive":
+            return "competitive"
+        elif a_style == "conservative" and b_style == "conservative":
+            return "cooperative"
+        elif a_style in ("aggressive", "conservative") or b_style in ("aggressive", "conservative"):
+            return "mixed"
+        elif abs(a_risk - b_risk) > 0.4:
+            return "creative"
+        else:
+            return "fair_split"
+
+    def _apply_negotiation_strategy(
+        self,
+        strategy: str,
+        current_terms: dict,
+        ranges: dict,
+        a_preferred_price: float | None,
+        b_preferred_price: float | None,
+        a_risk: float,
+        b_risk: float,
+        a_style: str,
+        b_style: str,
+        template,
+    ) -> dict[str, Any]:
+        """
+        Apply negotiation strategy to determine agreed terms.
+
+        D2 Fix: Strategy-aware negotiation, not just midpoint.
+        """
+        agreed = current_terms.copy()
+
+        # Cooperative: both conservative → slow, safe adjustments
+        if strategy == "cooperative":
+            if "price_vibe" in ranges and a_preferred_price and b_preferred_price:
+                midpoint = (a_preferred_price + b_preferred_price) / 2
+                current = current_terms.get("price_vibe", midpoint)
+                agreed["price_vibe"] = round(current + (midpoint - current) * 0.3, 2)
+            if "deadline" in ranges:
+                dl_range = ranges["deadline"]
+                agreed["deadline"] = int(dl_range.get("max", 604800) * 0.8)
+
+        # Competitive: both aggressive → push toward own preferred
+        elif strategy == "competitive":
+            if "price_vibe" in ranges and a_preferred_price and b_preferred_price:
+                midpoint = (a_preferred_price + b_preferred_price) / 2
+                agreed["price_vibe"] = round(midpoint, 2)
+            if "deadline" in ranges:
+                dl_range = ranges["deadline"]
+                agreed["deadline"] = int(dl_range.get("min", 3600) * 1.5)
+
+        # Mixed: one aggressive, one conservative
+        elif strategy == "mixed":
+            if "price_vibe" in ranges and a_preferred_price and b_preferred_price:
+                if a_style == "aggressive":
+                    agreed["price_vibe"] = round(a_preferred_price * 0.6 + b_preferred_price * 0.4, 2)
+                else:
+                    agreed["price_vibe"] = round(a_preferred_price * 0.4 + b_preferred_price * 0.6, 2)
+            if "deadline" in ranges:
+                dl_range = ranges["deadline"]
+                agreed["deadline"] = int((dl_range.get("min", 3600) + dl_range.get("max", 604800)) / 2)
+
+        # Creative: high risk variance → explore alternatives
+        elif strategy == "creative":
+            if "price_vibe" in ranges and a_preferred_price and b_preferred_price:
+                midpoint = (a_preferred_price + b_preferred_price) / 2
+                agreed["price_vibe"] = round(midpoint, 2)
+            if "payment_schedule" in ranges:
+                agreed["payment_schedule"] = "milestone_based"
+
+        # Fair split: balanced → straightforward middle ground
+        else:
+            if "price_vibe" in ranges and a_preferred_price and b_preferred_price:
+                midpoint = (a_preferred_price + b_preferred_price) / 2
+                price_range = ranges["price_vibe"]
+                min_p = price_range.get("min", 0.01)
+                max_p = price_range.get("max", 10000)
+                agreed["price_vibe"] = round(max(min_p, min(max_p, midpoint)), 2)
+            if "deadline" in ranges:
+                dl_range = ranges["deadline"]
+                agreed["deadline"] = int((dl_range.get("min", 3600) + dl_range.get("max", 604800)) / 2)
+
+        # Clamp all terms to template ranges
+        for term_name, term_range in ranges.items():
+            if term_name in agreed:
+                min_val = term_range.get("min", 0)
+                max_val = term_range.get("max", float("inf"))
+                agreed[term_name] = max(min_val, min(max_val, agreed[term_name]))
+
+        return agreed
 
     async def get_session(self, session_id: str) -> ValueNegotiationSession | None:
         """Get a negotiation session by ID."""
