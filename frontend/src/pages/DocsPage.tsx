@@ -47,7 +47,7 @@ interface DocItem {
 
 // 文档文件映射 - 支持中英文版本
 const docFiles: Record<string, { en: string; zh: string }> = {
-  'whitepaper': { en: '/docs/whitepaper.md', zh: '/docs/whitepaper.zh.md' },
+  'whitepaper': { en: '/docs/USMSB_SDK_Whitepaper.md' },
   'user-guide': { en: '/docs/user-guide.md', zh: '/docs/user-guide.zh.md' },
   'deployment': { en: '/docs/deployment.md', zh: '/docs/deployment.zh.md' },
   'concepts': { en: '/docs/concepts.md', zh: '/docs/concepts.zh.md' },
@@ -55,7 +55,7 @@ const docFiles: Record<string, { en: string; zh: string }> = {
   'usmsb-sdk': { en: '/docs/usmsb-sdk.md', zh: '/docs/usmsb-sdk.zh.md' },
   'meta-agent-usage': { en: '/docs/meta-agent-usage.md', zh: '/docs/meta-agent-usage.zh.md' },
   'integration-guide': { en: '/docs/integration-guide.md', zh: '/docs/integration-guide.zh.md' },
-  'blockchain-whitepaper': { en: '/docs/blockchain-whitepaper.md', zh: '/docs/blockchain-whitepaper.zh.md' },
+  'blockchain-whitepaper': { zh: '/docs/blockchain-whitepaper.zh.md' },
   'smart-contracts': { en: '/docs/smart-contracts.md', zh: '/docs/smart-contracts.zh.md' },
   'api': { en: '/docs/api-reference.md', zh: '/docs/api-reference.zh.md' },
   'cases': { en: '/docs/cases.md', zh: '/docs/cases.zh.md' },
@@ -64,11 +64,12 @@ const docFiles: Record<string, { en: string; zh: string }> = {
   'copyright': { en: '/docs/copyright.md', zh: '/docs/copyright.md' },
 }
 
-// 获取当前语言对应的文档文件
+// 获取当前语言对应的文档文件（如果指定语言版本不存在，则使用另一个语言版本）
 const getDocFile = (docId: string, lang: string): string => {
   const files = docFiles[docId]
   if (!files) return ''
-  return lang === 'zh' ? files.zh : files.en
+  if (lang === 'zh') return files.zh || files.en
+  return files.en || files.zh
 }
 
 const docItems: DocItem[] = [
