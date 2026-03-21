@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 def create_test_db():
     """Create in-memory SQLite with real production schema."""
-    conn = sqlite3.connect(":memory:")
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
     import usmsb_sdk.api.database as db_mod
     original_get_db = db_mod.get_db
     db_mod.get_db = lambda: conn

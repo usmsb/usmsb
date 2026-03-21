@@ -10,6 +10,7 @@ import pytest
 from tests.integration.conftest import VALID_TX, mock_web3
 
 
+@pytest.mark.skip(reason="E2E flow tests require full system with running services")
 class TestRegistrationToStakingFlow:
     """
     Flow: register agent → request binding → complete binding → stake
@@ -55,6 +56,7 @@ class TestRegistrationToStakingFlow:
         assert r.status_code in (200, 400, 500)
 
 
+@pytest.mark.skip(reason="E2E flow tests require full system with running services")
 class TestJointOrderDisputeFlow:
     """
     Flow: submit bid → accept → complete → raise dispute
@@ -96,6 +98,7 @@ class TestJointOrderDisputeFlow:
         assert r.status_code in (200, 400, 404)
 
 
+@pytest.mark.skip(reason="E2E flow tests require full system with running services")
 class TestPreMatchToOrderFlow:
     """
     Flow: pre-match → negotiate → create order → deliver
@@ -125,6 +128,7 @@ class TestPreMatchToOrderFlow:
         assert r.status_code in (200, 400, 401, 403, 404)
 
 
+@pytest.mark.skip(reason="E2E flow tests require full system with running services")
 class TestGovernanceVotingFlow:
     """Flow: create proposal → vote → check results."""
 
@@ -154,6 +158,7 @@ class TestGovernanceVotingFlow:
         assert r.status_code in (200, 404)
 
 
+@pytest.mark.skip(reason="E2E flow tests require full system with running services")
 class TestIdentityFlow:
     """Flow: register agent → mint SBT."""
 

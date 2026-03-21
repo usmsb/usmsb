@@ -136,8 +136,8 @@ class TestSystem:
         assert r.status_code == 200
 
     def test_liveness_is_public(self, client):
-        """GET /api/liveness → 200 (public liveness check)."""
-        r = client.get("/api/live")
+        """GET /api/health/live → 200 (public liveness check)."""
+        r = client.get("/api/health/live")
         assert r.status_code == 200
 
 
