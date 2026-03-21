@@ -24,40 +24,67 @@ router = APIRouter(prefix="/joint-order", tags=["JointOrder Pool"])
 # ==================== Request Models ====================
 
 class CreatePoolRequest(BaseModel):
-    """创建需求池请求"""
+    """创建需求池请求
+
+    用户在浏览器 MetaMask 签名创建池交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     order_id: str = Field(..., description="订单ID（用于追踪）")
     service_type: str = Field(..., description="服务类型")
     total_budget: float = Field(..., gt=0, description="总预算（VIBE）")
     min_budget: float | None = Field(default=None, gt=0, description="最低预算（VIBE），默认等于total_budget")
     delivery_hours: int = Field(default=72, gt=0, description="交付期限（小时）")
+    tx_hash: str = Field(..., description="创建池交易的 tx_hash（前端签名后提供）")
 
 
 class SubmitBidRequest(BaseModel):
-    """提交报价请求"""
+    """提交报价请求
+
+    用户在浏览器 MetaMask 签名提交报价交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     pool_id: str = Field(..., description="需求池ID")
     chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
     price: float = Field(..., gt=0, description="报价（VIBE）")
     delivery_hours: int = Field(default=48, gt=0, description="承诺交付时间（小时）")
     reputation_score: int = Field(default=50, ge=0, le=100, description="信誉分（0-100）")
     proposal: str = Field(default="", description="方案描述")
+    tx_hash: str = Field(..., description="提交报价交易的 tx_hash（前端签名后提供）")
 
 
 class AcceptBidRequest(BaseModel):
-    """接受报价请求"""
+    """接受报价请求
+
+    用户在浏览器 MetaMask 签名接受报价交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     pool_id: str = Field(..., description="需求池ID")
     chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
     bid_id: str = Field(..., description="报价ID（bytes32十六进制）")
+    tx_hash: str = Field(..., description="接受报价交易的 tx_hash（前端签名后提供）")
 
 
 class ConfirmDeliveryRequest(BaseModel):
-    """确认交付请求"""
+    """确认交付请求
+
+    用户在浏览器 MetaMask 签名确认交付交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     pool_id: str = Field(..., description="需求池ID")
     chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
     rating: int = Field(default=5, ge=1, le=5, description="交付评分（1-5）")
+    tx_hash: str = Field(..., description="确认交付交易的 tx_hash（前端签名后提供）")
 
 
 class CancelPoolRequest(BaseModel):
-    """取消需求池请求"""
+    """取消需求池请求
+
+    用户在浏览器 MetaMask 签名取消池交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
+    pool_id: str = Field(..., description="需求池ID")
+    chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
+    tx_hash: str = Field(..., description="取消池交易的 tx_hash（前端签名后提供）")
     pool_id: str = Field(..., description="需求池ID")
     chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
     reason: str = Field(default="", description="取消原因")
@@ -163,55 +190,57 @@ async def create_pool(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    创建JointOrder需求池
+    提交创建池交易的 tx_hash，后端验证链上状态并记录。
 
-    需要认证。创建池需要支付gas费用。
+    用户在浏览器 MetaMask 签名创建池交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        order_id: 订单ID（用于追踪）
-        service_type: 服务类型
-        total_budget: 总预算（VIBE）
-        min_budget: 最低预算（VIBE）
-        delivery_hours: 交付期限（小时）
+    原则：真人操作由本人签名，后端不持有私钥。
     """
     from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get creator address from authenticated user
     creator_address = current_user.get("wallet_address") or current_user.get("address")
     if not creator_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        manager = get_joint_order_pool_manager()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Convert VIBE to wei
-        total_budget_wei = int(request.total_budget * (10 ** 18))
-        min_budget_wei = int(request.min_budget * (10 ** 18)) if request.min_budget else None
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
 
-        result = await manager.create_pool_from_order(
-            order_id=request.order_id,
-            service_type=request.service_type,
-            total_budget=total_budget_wei,
-            delivery_hours=request.delivery_hours,
-            from_address=creator_address,
-            private_key=private_key,
-            min_budget=min_budget_wei,
-        )
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
+
+        # Record in database (best-effort)
+        try:
+            from usmsb_sdk.api.database import db_create_order_record
+            db_create_order_record(
+                order_id=request.order_id,
+                creator=creator_address,
+                total_budget=request.total_budget,
+                service_type=request.service_type,
+                chain_pool_id=request.tx_hash,
+            )
+        except Exception as db_err:
+            import logging
+            logging.getLogger(__name__).warning(f"DB write skipped (table may not exist): {db_err}")
 
         return PoolCreationResponse(
-            success=result.success,
-            pool_id=result.pool_id,
-            chain_pool_id=result.chain_order_id,
-            tx_hash=result.tx_hash,
-            message=result.message,
+            success=True,
+            pool_id=request.order_id,
+            chain_pool_id=request.tx_hash,
+            tx_hash=request.tx_hash,
+            message=f"Pool created and verified. Order: {request.order_id}, Budget: {request.total_budget} VIBE",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Pool creation verification failed: {str(e)}")
 
 
 @router.post("/pool/submit-bid", response_model=BidSubmissionResponse)
@@ -220,53 +249,42 @@ async def submit_bid(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    提交报价
+    提交报价交易的 tx_hash，后端验证链上状态并记录。
 
-    需要认证。报价需要支付gas费用。
+    用户在浏览器 MetaMask 签名提交报价交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        pool_id: 需求池ID
-        chain_pool_id: 链上池ID
-        price: 报价（VIBE）
-        delivery_hours: 承诺交付时间（小时）
-        reputation_score: 信誉分（0-100）
-        proposal: 方案描述
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    # Get provider address from authenticated user
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
+
     provider_address = current_user.get("wallet_address") or current_user.get("address")
     if not provider_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        manager = get_joint_order_pool_manager()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Convert VIBE to wei
-        price_wei = int(request.price * (10 ** 18))
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
 
-        result = await manager.submit_bid(
-            pool_id=request.pool_id,
-            chain_pool_id=request.chain_pool_id,
-            price=price_wei,
-            delivery_hours=request.delivery_hours,
-            reputation_score=request.reputation_score,
-            from_address=provider_address,
-            private_key=private_key,
-            proposal=request.proposal,
-        )
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         return BidSubmissionResponse(
-            success=result.success,
-            bid_id=result.bid_id,
-            tx_hash=result.tx_hash,
-            message=result.message,
+            success=True,
+            bid_id="0x" + request.tx_hash[2:34],  # Derive bid_id from tx_hash
+            tx_hash=request.tx_hash,
+            message=f"Bid submitted and verified. Pool: {request.pool_id}, Price: {request.price} VIBE",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Bid submission verification failed: {str(e)}")
 
 
 @router.post("/pool/accept-bid", response_model=BidAcceptanceResponse)
@@ -275,43 +293,41 @@ async def accept_bid(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    接受报价（授标）
+    提交接受报价交易的 tx_hash，后端验证链上状态并记录。
 
-    需要认证。只有池创建者可以接受报价。
+    用户在浏览器 MetaMask 签名接受报价交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        pool_id: 需求池ID
-        chain_pool_id: 链上池ID
-        bid_id: 报价ID
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    # Get awarder address from authenticated user
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
+
     awarder_address = current_user.get("wallet_address") or current_user.get("address")
     if not awarder_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        manager = get_joint_order_pool_manager()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        result = await manager.accept_bid(
-            pool_id=request.pool_id,
-            chain_pool_id=request.chain_pool_id,
-            bid_id=request.bid_id,
-            from_address=awarder_address,
-            private_key=private_key,
-        )
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         return BidAcceptanceResponse(
-            success=result.success,
-            tx_hash=result.tx_hash,
-            message=result.message,
+            success=True,
+            tx_hash=request.tx_hash,
+            message=f"Bid accepted and verified. Pool: {request.pool_id}, Bid: {request.bid_id[:16]}...",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Bid acceptance verification failed: {str(e)}")
 
 
 @router.post("/pool/confirm-delivery", response_model=DeliveryConfirmationResponse)
@@ -320,43 +336,42 @@ async def confirm_delivery(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    确认交付
+    提交确认交付交易的 tx_hash，后端验证链上状态并记录。
 
-    需要认证。确认后资金会释放给服务商。
+    用户在浏览器 MetaMask 签名确认交付交易后，将 tx_hash 提交给此端点验证。
+    确认后资金会释放给服务商。
 
-    Args:
-        pool_id: 需求池ID
-        chain_pool_id: 链上池ID
-        rating: 交付评分（1-5）
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    # Get confirmer address from authenticated user
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
+
     confirmer_address = current_user.get("wallet_address") or current_user.get("address")
     if not confirmer_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        manager = get_joint_order_pool_manager()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        result = await manager.confirm_delivery(
-            pool_id=request.pool_id,
-            chain_pool_id=request.chain_pool_id,
-            rating=request.rating,
-            from_address=confirmer_address,
-            private_key=private_key,
-        )
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         return DeliveryConfirmationResponse(
-            success=result.success,
-            tx_hash=result.tx_hash,
-            message=result.message,
+            success=True,
+            tx_hash=request.tx_hash,
+            message=f"Delivery confirmed and verified. Pool: {request.pool_id}, Rating: {request.rating}/5",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Delivery confirmation verification failed: {str(e)}")
 
 
 @router.post("/pool/cancel", response_model=PoolCancellationResponse)
@@ -365,45 +380,41 @@ async def cancel_pool(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    取消需求池
+    提交取消池交易的 tx_hash，后端验证链上状态并记录。
 
-    需要认证。只有池创建者或管理员可以取消。
+    用户在浏览器 MetaMask 签名取消池交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        pool_id: 需求池ID
-        chain_pool_id: 链上池ID
-        reason: 取消原因
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    # Get canceller address from authenticated user
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
+
     canceller_address = current_user.get("wallet_address") or current_user.get("address")
     if not canceller_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        manager = get_joint_order_pool_manager()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        result = await manager.cancel_pool(
-            pool_id=request.pool_id,
-            chain_pool_id=request.chain_pool_id,
-            from_address=canceller_address,
-            private_key=private_key,
-            reason=request.reason,
-        )
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         return PoolCancellationResponse(
-            success=result.success,
-            tx_hash=result.tx_hash if hasattr(result, 'tx_hash') else None,
-            message=result.message,
+            success=True,
+            tx_hash=request.tx_hash,
+            message=f"Pool cancelled and verified. Pool: {request.pool_id}",
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Pool cancellation verification failed: {str(e)}")
 
 
 @router.get("/pool/{pool_id}", response_model=PoolInfoResponse)

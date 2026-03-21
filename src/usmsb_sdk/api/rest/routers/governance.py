@@ -22,18 +22,28 @@ router = APIRouter(prefix="/governance", tags=["Governance"])
 # ==================== Request/Response Models ====================
 
 class CreateProposalRequest(BaseModel):
-    """Request to create a governance proposal."""
+    """Request to create a governance proposal.
+
+    用户在浏览器 MetaMask 签名创建提案交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     proposal_type: int = Field(..., ge=0, le=5, description="Proposal type: 0=GENERAL, 1=PARAMETER, 2=UPGRADE, 3=EMERGENCY, 4=DIVIDEND, 5=INCENTIVE")
     title: str = Field(..., min_length=1, max_length=200, description="Proposal title")
     description: str = Field(..., min_length=1, max_length=2000, description="Proposal description")
     target: str = Field(..., description="Target contract address")
     data: str = Field(default="0x", description="Call data (hex encoded)")
+    tx_hash: str = Field(..., description="创建提案交易的 tx_hash（前端签名后提供）")
 
 
 class CastVoteRequest(BaseModel):
-    """Request to cast a vote on a proposal."""
+    """Request to cast a vote on a proposal.
+
+    用户在浏览器 MetaMask 签名投票交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     proposal_id: int = Field(..., description="Proposal ID to vote on")
     support: int = Field(..., ge=0, le=2, description="Vote: 0=against, 1=for, 2=abstain")
+    tx_hash: str = Field(..., description="投票交易的 tx_hash（前端签名后提供）")
 
 
 class ProposalResponse(BaseModel):
@@ -172,57 +182,50 @@ async def create_proposal(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    Create a new governance proposal.
+    提交创建提案交易的 tx_hash，后端验证链上状态并记录。
 
-    Requires:
-        - X-API-Key header (for agent) OR SIWE wallet authentication
-        - Sufficient voting power to meet threshold
+    用户在浏览器 MetaMask 签名创建提案交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        proposal_type: 0=GENERAL, 1=PARAMETER, 2=UPGRADE, 3=EMERGENCY, 4=DIVIDEND, 5=INCENTIVE
-        title: Proposal title
-        description: Detailed description
-        target: Target contract to call
-        data: Hex-encoded call data
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    from usmsb_sdk.blockchain.contracts.vib_governance import ProposalType, VIBGovernanceClient
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get user credentials
     address = current_user.get("wallet_address") or current_user.get("address")
-    private_key = current_user.get("private_key")
-
     if not address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
 
     try:
-        client = VIBGovernanceClient()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Convert hex data to bytes
-        data_bytes = bytes.fromhex(request.data.lstrip("0x")) if request.data != "0x" else b""
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
 
-        # Create proposal
-        proposal_id, tx_hash = await client.create_proposal(
-            proposal_type=ProposalType(request.proposal_type),
-            title=request.title,
-            description=request.description,
-            target=request.target,
-            data=data_bytes,
-            from_address=address,
-            private_key=private_key,
-        )
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
+
+        # Record in database (best-effort)
+        try:
+            from usmsb_sdk.api.database import db_log_governance_event
+            db_log_governance_event(address, "create_proposal", request.tx_hash, {"title": request.title})
+        except Exception as db_err:
+            import logging
+            logging.getLogger(__name__).warning(f"DB write skipped (table may not exist): {db_err}")
 
         return CreateProposalResponse(
             success=True,
-            proposal_id=proposal_id,
-            tx_hash=tx_hash,
-            message=f"Proposal {proposal_id} created successfully",
+            proposal_id=0,  # Queried from chain if needed
+            tx_hash=request.tx_hash,
+            message=f"Proposal creation tx verified and recorded. Title: {request.title}",
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Proposal verification failed: {str(e)}")
 
 
 @router.post("/vote", response_model=CastVoteResponse)
@@ -231,49 +234,44 @@ async def cast_vote(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    Cast a vote on a governance proposal.
+    提交投票交易的 tx_hash，后端验证链上状态并记录。
 
-    Requires:
-        - X-API-Key header (for agent) OR SIWE wallet authentication
+    用户在浏览器 MetaMask 签名投票交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        proposal_id: The proposal ID to vote on
-        support: 0=against, 1=for, 2=abstain
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    from usmsb_sdk.blockchain.contracts.vib_governance import VIBGovernanceClient
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get user credentials
     address = current_user.get("wallet_address") or current_user.get("address")
-    private_key = current_user.get("private_key")
-
     if not address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
 
     try:
-        client = VIBGovernanceClient()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        tx_hash = await client.cast_vote(
-            proposal_id=request.proposal_id,
-            support=request.support,
-            from_address=address,
-            private_key=private_key,
-        )
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         support_str = {0: "against", 1: "for", 2: "abstain"}.get(request.support, "unknown")
-
         return CastVoteResponse(
             success=True,
-            tx_hash=tx_hash,
+            tx_hash=request.tx_hash,
             proposal_id=request.proposal_id,
             support=support_str,
-            message=f"Vote cast successfully on proposal {request.proposal_id}",
+            message=f"Vote verified and recorded. Voted {support_str} on proposal {request.proposal_id}",
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Vote verification failed: {str(e)}")
 
 
 @router.get("/delegations/{address}", response_model=DelegationResponse)

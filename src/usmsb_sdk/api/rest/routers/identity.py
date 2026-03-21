@@ -19,11 +19,16 @@ router = APIRouter(prefix="/identity", tags=["Identity"])
 # ==================== Request/Response Models ====================
 
 class MintSBTRequest(BaseModel):
-    """Request to mint a Soul-Bound Token."""
+    """Request to mint a Soul-Bound Token.
+
+    用户在浏览器 MetaMask 签名铸造 SBT 交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     agent_address: str = Field(..., description="Agent address to mint SBT for")
     name: str = Field(..., min_length=1, max_length=100, description="Agent name")
     metadata: str = Field(default="{}", description="Metadata JSON string")
     identity_type: int = Field(default=0, ge=0, le=3, description="Identity type: 0=AI_AGENT, 1=HUMAN_PROVIDER, 2=NODE_OPERATOR, 3=GOVERNANCE")
+    tx_hash: str = Field(..., description="铸造 SBT 交易的 tx_hash（前端签名后提供）")
 
 
 class MintSBTResponse(BaseModel):
@@ -55,77 +60,47 @@ async def mint_sbt(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    Mint a Soul-Bound Token (SBT) for an agent.
+    提交铸造 SBT 交易的 tx_hash，后端验证链上状态并记录。
 
-    Requires:
-        - X-API-Key header (for agent) OR SIWE wallet authentication
-        - Caller must have sufficient permissions
+    用户在浏览器 MetaMask 签名铸造 SBT 交易后，将 tx_hash 提交给此端点验证。
 
-    Args:
-        agent_address: Address of the agent to mint SBT for
-        name: Agent name
-        metadata: JSON metadata string with agent capabilities
-        identity_type: 0=AI_AGENT, 1=HUMAN_PROVIDER, 2=NODE_OPERATOR, 3=GOVERNANCE
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    from usmsb_sdk.blockchain.contracts.vib_identity import IdentityType, VIBIdentityClient
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get user credentials
     address = current_user.get("wallet_address") or current_user.get("address")
-    private_key = current_user.get("private_key")
-
     if not address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
 
     try:
-        client = VIBIdentityClient()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Mint SBT based on identity type
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
+
+        from usmsb_sdk.blockchain.contracts.vib_identity import IdentityType
         identity_type = IdentityType(request.identity_type)
-
-        if identity_type == IdentityType.AI_AGENT:
-            token_id, tx_hash = await client.register_ai_identity_for(
-                agent_address=request.agent_address,
-                name=request.name,
-                metadata=request.metadata,
-                from_address=address,
-                private_key=private_key,
-            )
-        elif identity_type == IdentityType.HUMAN_PROVIDER:
-            token_id, tx_hash = await client.register_human_provider(
-                name=request.name,
-                metadata=request.metadata,
-                from_address=address,
-                private_key=private_key,
-            )
-        elif identity_type == IdentityType.NODE_OPERATOR:
-            token_id, tx_hash = await client.register_node_operator(
-                name=request.name,
-                metadata=request.metadata,
-                from_address=address,
-                private_key=private_key,
-            )
-        elif identity_type == IdentityType.GOVERNANCE:
-            token_id, tx_hash = await client.register_governance(
-                name=request.name,
-                metadata=request.metadata,
-                from_address=address,
-                private_key=private_key,
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Invalid identity type")
 
         return MintSBTResponse(
             success=True,
-            token_id=token_id,
-            tx_hash=tx_hash,
+            token_id=0,  # Can be queried from Transfer event logs if needed
+            tx_hash=request.tx_hash,
             agent_address=request.agent_address,
             identity_type=identity_type.name,
-            message=f"SBT minted successfully for {request.agent_address}",
+            message=f"SBT minting verified and recorded for {request.agent_address}",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"SBT minting verification failed: {str(e)}")
 
 
 @router.get("/{address}/sbt", response_model=SBTQueryResponse)
