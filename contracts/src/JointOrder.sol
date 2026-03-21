@@ -27,6 +27,9 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
     /// @notice Medium #14 修复: 订单超时处理时间
     uint256 public constant ORDER_TIMEOUT_DURATION = 30 days;
 
+    /// @notice H3修复: 争议发起押金比例 (1% = 100 bps)
+    uint256 public constant DISPUTE_PENALTY_RATE = 100;
+
     // ========== 状态枚举 ==========
 
     enum PoolStatus {
@@ -101,6 +104,14 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 退款领取记录 (poolId => user => 已领取)
     mapping(bytes32 => mapping(address => bool)) public refundClaimed;
+
+    /// @notice H3修复: 争议押金信息 (poolId => DisputePenalty)
+    struct DisputePenalty {
+        address raiser;
+        uint256 penaltyAmount;
+        bool resolved;
+    }
+    mapping(bytes32 => DisputePenalty) public disputePenalties;
 
     uint256 public totalPoolsCreated;
     uint256 public totalPoolsCompleted;
@@ -617,14 +628,16 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
      * @notice 发起争议
      * @param poolId 池ID
      * @param reason 争议原因
+     * @dev H3修复: 发起争议需要抵押押金，如果败诉则押金赔给对方
      */
     function raiseDispute(
         bytes32 poolId,
         string calldata reason
-    ) 
-        external 
-        poolExists(poolId) 
+    )
+        external
+        poolExists(poolId)
         whenNotPaused
+        nonReentrant
     {
         OrderPool storage pool = pools[poolId];
         Participant storage participant = participants[poolId][msg.sender];
@@ -639,6 +652,25 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
             "JointOrder: not authorized"
         );
 
+        // H3修复: 计算并扣除争议押金 (1% of winning bid)
+        uint256 penaltyAmount = (pool.winningBid * DISPUTE_PENALTY_RATE) / 10000;
+        require(
+            vibeToken.balanceOf(msg.sender) >= penaltyAmount,
+            "JointOrder: insufficient balance for dispute penalty"
+        );
+
+        // 转账押金到合约持有
+        if (penaltyAmount > 0) {
+            vibeToken.safeTransferFrom(msg.sender, address(this), penaltyAmount);
+        }
+
+        // 记录押金信息
+        disputePenalties[poolId] = DisputePenalty({
+            raiser: msg.sender,
+            penaltyAmount: penaltyAmount,
+            resolved: false
+        });
+
         pool.status = PoolStatus.DISPUTED;
 
         emit DisputeRaised(poolId, msg.sender, reason);
@@ -649,6 +681,7 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
      * @param poolId 池ID
      * @param refundBuyers 是否退款给买方
      * @param resolution 解决方案
+     * @dev H3修复: 处理争议押金 - 败诉方押金赔给胜诉方
      */
     function resolveDispute(
         bytes32 poolId,
@@ -662,11 +695,13 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
         nonReentrant
     {
         OrderPool storage pool = pools[poolId];
+        DisputePenalty storage penalty = disputePenalties[poolId];
 
         uint256 buyerRefund = 0;
         uint256 providerPayout = 0;
 
         if (refundBuyers) {
+            // 买家胜诉: 提供商的押金赔给买家，provider输
             // 修复: 使用拉取模式，避免 Gas 溢出
             // 标记池为待退款状态，用户自行领取
             refundPendingPools[poolId] = true;
@@ -680,8 +715,21 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
                 }
             }
 
+            // H3修复: 提供商输，押金不退（已被没收）
+            // 押金留在合约，最终由参与者按比例分享
+            // 如果有罚金，加入退款池
+            if (penalty.penaltyAmount > 0) {
+                buyerRefund += penalty.penaltyAmount;
+            }
+
             pool.status = PoolStatus.CANCELLED;
         } else {
+            // 提供商胜诉: 买家/参与者的押金赔给提供商
+            if (penalty.penaltyAmount > 0) {
+                // 将押金转给提供商
+                vibeToken.safeTransfer(pool.winningProvider, penalty.penaltyAmount);
+            }
+
             // 支付给服务商
             providerPayout = pool.winningBid - pool.platformFee;
             vibeToken.safeTransfer(pool.winningProvider, providerPayout);
@@ -690,6 +738,9 @@ contract JointOrder is Ownable, ReentrancyGuard, Pausable {
             totalPoolsCompleted++;
             totalVolume += pool.winningBid;
         }
+
+        // 标记押金已处理
+        penalty.resolved = true;
 
         emit DisputeResolved(poolId, refundBuyers, buyerRefund, providerPayout);
     }

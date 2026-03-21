@@ -745,6 +745,7 @@ contract VIBIdentity is ERC721, ERC721URIStorage, Ownable, Pausable, ReentrancyG
      * @param tokenId 代币 ID
      * @param auth 授权
      * @return to 接收者地址
+     * @dev C5修复: 防止SBT转移到合约（合约可能转发代币）
      */
     function _update(address to, uint256 tokenId, address auth)
         internal
@@ -756,10 +757,28 @@ contract VIBIdentity is ERC721, ERC721URIStorage, Ownable, Pausable, ReentrancyG
         // 防止转账，但允许铸造（to == address(0)）和销毁（to == address(0)）
         // 当 to == address(0) 时是销毁操作，应该被允许
         if (owner != address(0) && to != address(0)) {
+            // C5修复: 防止SBT转移到合约地址（合约可能转发代币）
+            require(
+                to == address(0) || !_isContract(to),
+                "VIBIdentity: soulbound tokens cannot be transferred to contracts"
+            );
             revert("VIBIdentity: soulbound tokens cannot be transferred");
         }
 
         return super._update(to, tokenId, auth);
+    }
+
+    /**
+     * @notice 检查地址是否为合约
+     * @param addr 地址
+     * @return 是否为合约
+     */
+    function _isContract(address addr) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(addr)
+        }
+        return size > 0;
     }
 
     // ========== 接收函数 ==========

@@ -38,6 +38,9 @@ contract EmissionController is Ownable, ReentrancyGuard {
     // 释放周期（5年线性释放）
     uint256 public constant RELEASE_PERIOD = 5 * 365 days;
 
+    /// @notice H7修复: 最大总发行量上限 (6.3亿)
+    uint256 public constant MAX_EMISSION_TOTAL = 630_000_000 * 10**18;
+
     // ========== 状态变量 ==========
 
     /// @notice VIBE代币
@@ -63,6 +66,9 @@ contract EmissionController is Ownable, ReentrancyGuard {
 
     /// @notice 已释放总量
     uint256 public totalReleased;
+
+    /// @notice H7修复: 累计已发行量
+    uint256 public totalEmissionMinted;
 
     /// @notice 各池已分配数量
     mapping(address => uint256) public poolAllocated;
@@ -142,6 +148,7 @@ contract EmissionController is Ownable, ReentrancyGuard {
      *      - 产出激励: 13% (VIBOutputReward) - 新增
      *      - 治理激励: 12%
      *      - 储备基金: 10%
+     * @dev H7修复: 添加最大发行量检查
      */
     function distribute() external nonReentrant {
         uint256 balance = vibeToken.balanceOf(address(this));
@@ -163,6 +170,12 @@ contract EmissionController is Ownable, ReentrancyGuard {
         }
 
         require(releasable > 0, "EmissionController: nothing to release");
+
+        // H7修复: 检查是否超过最大发行量
+        require(
+            totalEmissionMinted + releasable <= MAX_EMISSION_TOTAL,
+            "EmissionController: max emission reached"
+        );
 
         // 计算各池分配数量（白皮书比例）
         uint256 stakingAmount = (releasable * STAKING_RATIO) / PRECISION;
@@ -205,6 +218,7 @@ contract EmissionController is Ownable, ReentrancyGuard {
         }
 
         totalReleased += releasable;
+        totalEmissionMinted += releasable;
 
         emit DistributionTriggered(
             releasable,

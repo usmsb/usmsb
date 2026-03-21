@@ -123,13 +123,20 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
      * @notice STK-006修复: 通知分红已到账（由VIBEToken在直接转账后调用）
      * @dev 当VIBEToken通过_update直接转账到本合约时，调用此函数更新分红累计
      * @param amount 分红金额
+     * @dev H4修复: 限制msg.sender必须为vibeToken合约，且单次分红不超过合约余额的10%
      */
     function notifyDividendReceived(uint256 amount) external {
         require(amount > 0, "VIBDividend: amount must be greater than 0");
+        // H4修复: 必须由VIBEToken合约调用
         require(
-            msg.sender == address(vibeToken) || msg.sender == owner(),
-            "VIBDividend: unauthorized"
+            msg.sender == address(vibeToken),
+            "VIBDividend: only VIBEToken can notify"
         );
+
+        // H4修复: 单次分红不超过合约余额的10%，防止flash loan攻击
+        uint256 contractBalance = vibeToken.balanceOf(address(this));
+        uint256 maxDividend = contractBalance / 10; // 10% cap
+        require(amount <= maxDividend, "VIBDividend: dividend amount exceeds cap");
 
         // 更新分红累计（代币已经通过VIBEToken._update转入）
         _updateDividendAccumulation(amount);
