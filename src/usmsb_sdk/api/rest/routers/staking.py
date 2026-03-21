@@ -82,8 +82,17 @@ class ClaimResponse(BaseModel):
 # ==================== Helper Functions ====================
 
 def calculate_apy(staked_amount: float) -> float:
-    """Calculate APY based on stake tier."""
+    """Calculate APY based on stake tier.
+
+    - NONE: 0% (no stake)
+    - BRONZE: BASE_APY (5%) — tier_level=1, max(0,1-1)=0 → BASE_APY
+    - SILVER: BASE_APY + 1*BONUS (6%)
+    - GOLD: BASE_APY + 2*BONUS (7%)
+    - PLATINUM: BASE_APY + 3*BONUS (8%)
+    """
     tier = get_stake_tier(staked_amount)
+    if tier == "NONE":
+        return 0.0
     tier_values = {
         "NONE": 0,
         "BRONZE": 1,
