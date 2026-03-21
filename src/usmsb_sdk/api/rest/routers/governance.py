@@ -190,7 +190,6 @@ async def create_proposal(
     """
     from web3 import Web3
     from usmsb_sdk.blockchain.config import BlockchainConfig
-    from usmsb_sdk.blockchain.contracts.vib_governance import VIBGovernanceClient
 
     address = current_user.get("wallet_address") or current_user.get("address")
     if not address:
@@ -243,7 +242,6 @@ async def cast_vote(
     """
     from web3 import Web3
     from usmsb_sdk.blockchain.config import BlockchainConfig
-    from usmsb_sdk.blockchain.contracts.vib_governance import VIBGovernanceClient
 
     address = current_user.get("wallet_address") or current_user.get("address")
     if not address:
