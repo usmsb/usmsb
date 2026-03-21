@@ -887,8 +887,9 @@ def db_create_order_record(order_id: str, creator: str, total_budget: float, ser
     with get_db() as conn:
         cursor = conn.cursor()
         try:
+            # Use INSERT OR REPLACE so duplicate order_id replaces existing record
             cursor.execute('''
-                INSERT OR IGNORE INTO transactions (
+                INSERT OR REPLACE INTO transactions (
                     id, buyer_id, seller_id, amount, title, status,
                     transaction_type, escrow_tx_hash, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
