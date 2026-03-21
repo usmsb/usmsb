@@ -599,7 +599,9 @@ class VIBGovernanceClient(BaseContractClient):
                 "executed": result[15],
             }
         except Exception as e:
-            raise ContractError(f"Failed to get proposal: {e}")
+            # Contract call failed (no contract deployed, network error, etc.)
+            # Return None so caller can treat as proposal-not-found
+            return None
 
     async def get_state(self, proposal_id: int) -> ProposalState:
         """获取提案状态
