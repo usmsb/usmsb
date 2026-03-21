@@ -574,7 +574,7 @@ def create_agent(agent_data: dict[str, Any]) -> dict[str, Any]:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         agent_id = agent_data.get('agent_id') or agent_data.get('id') or f"agent_{now}"
 
@@ -644,7 +644,7 @@ def set_agent_offline(agent_id: str) -> bool:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE agents
             SET status = 'offline', updated_at = ?, unregistered_at = NULL
@@ -680,7 +680,7 @@ def update_agent_heartbeat(agent_id: str, status: str = 'online') -> bool:
     """Update agent heartbeat and status"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE agents SET last_heartbeat = ?, status = ?, updated_at = ?
             WHERE agent_id = ?
@@ -692,7 +692,7 @@ def update_agent_stake(agent_id: str, amount: float) -> bool:
     """Update agent stake and recalculate reputation"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         # Calculate reputation based on stake
         cursor.execute('SELECT stake FROM agents WHERE agent_id = ?', (agent_id,))
         row = cursor.fetchone()
@@ -711,7 +711,7 @@ def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> 
     """Update agent balance"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('SELECT balance FROM agents WHERE agent_id = ?', (agent_id,))
         row = cursor.fetchone()
@@ -748,7 +748,7 @@ def check_and_mark_offline_agents() -> int:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Find agents that are online but have expired TTL
         # TTL expired means: last_heartbeat + ttl < now
@@ -797,7 +797,7 @@ def auto_unregister_inactive_agents(grace_period_seconds: int = None) -> dict[st
     import os
 
     grace_period = grace_period_seconds or int(os.getenv('AUTO_UNREGISTER_GRACE_PERIOD', AUTO_UNREGISTER_GRACE_PERIOD))
-    now = time.time()
+    now = datetime.now().timestamp()
     offline_threshold = now - grace_period
 
     result = {'unregistered': 0, 'kept': 0, 'skipped': 0, 'errors': []}
@@ -894,7 +894,7 @@ def db_create_order_record(order_id: str, creator: str, total_budget: float, ser
     Returns True if a record was inserted or already exists.
     """
     import time as _time
-    now = _time.time()
+    now = _datetime.now().timestamp()
     with get_db() as conn:
         cursor = conn.cursor()
         try:
@@ -929,7 +929,7 @@ def db_log_governance_event(voter: str, event_type: str, tx_hash: str, extra: di
     Returns True if logged successfully.
     """
     import time as _time
-    now = _time.time()
+    now = _datetime.now().timestamp()
     with get_db() as conn:
         cursor = conn.cursor()
         try:
@@ -960,7 +960,7 @@ def create_service(service_data: dict[str, Any]) -> dict[str, Any]:
     """Create a service"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         import uuid
         service_id = service_data.get('id', f"srv-{uuid.uuid4().hex[:8]}")
         cursor.execute('''
@@ -997,7 +997,7 @@ def create_environment(env_data: dict[str, Any]) -> dict[str, Any]:
     """Create environment"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             INSERT INTO environments (id, name, type, state, created_at)
             VALUES (?, ?, ?, ?, ?)
@@ -1035,7 +1035,7 @@ def create_demand(demand_data: dict[str, Any]) -> dict[str, Any]:
     """Create a demand"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         import uuid
         demand_id = demand_data.get('id', f"dem-{uuid.uuid4().hex[:8]}")
         cursor.execute('''
@@ -1131,7 +1131,7 @@ def create_opportunity(opp_data: dict) -> dict:
     """Create opportunity"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         import uuid
         opp_id = opp_data.get('id', f"opp-{uuid.uuid4().hex[:8]}")
         cursor.execute('''
@@ -1162,7 +1162,7 @@ def create_negotiation(neg_data: dict) -> dict:
     """Create negotiation"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         import uuid
         session_id = neg_data.get('session_id', f"neg-{uuid.uuid4().hex[:8]}")
         cursor.execute('''
@@ -1206,7 +1206,7 @@ def create_workflow(workflow_data: dict) -> dict:
     """Create workflow"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             INSERT INTO workflows (id, agent_id, name, task_description, status, steps, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1247,8 +1247,8 @@ def create_collaboration(collab_data: dict) -> dict:
     """Create collaboration"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
-        session_id = collab_data.get('session_id', f"collab-{time.time()}")
+        now = datetime.now().timestamp()
+        session_id = collab_data.get('session_id', f"collab-{datetime.now().timestamp()}")
         cursor.execute('''
             INSERT INTO collaborations (session_id, goal, plan, participants, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -1289,8 +1289,8 @@ def create_proposal(proposal_data: dict) -> dict:
     """Create governance proposal"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
-        proposal_id = proposal_data.get('id', f"prop-{time.time()}")
+        now = datetime.now().timestamp()
+        proposal_id = proposal_data.get('id', f"prop-{datetime.now().timestamp()}")
         cursor.execute('''
             INSERT INTO proposals (id, title, description, proposer_id, status, deadline, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1318,7 +1318,7 @@ def vote_proposal(proposal_id: str, voter_id: str, vote: int) -> bool:
     """Vote on proposal"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Record vote
         cursor.execute('''
@@ -1341,7 +1341,7 @@ def save_learning_insight(agent_id: str, insights: dict) -> dict:
     """Save learning insights"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         insight_id = f"insight-{agent_id}-{now}"
 
         cursor.execute('''
@@ -1372,8 +1372,8 @@ def create_or_update_profile(profile_data: dict) -> dict:
     """Create or update user profile"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
-        user_id = profile_data.get('id', f"user-{time.time()}")
+        now = datetime.now().timestamp()
+        user_id = profile_data.get('id', f"user-{datetime.now().timestamp()}")
 
         cursor.execute('''
             INSERT OR REPLACE INTO user_profiles
@@ -1474,7 +1474,7 @@ def create_nonce(address: str, nonce: str, expires_in_seconds: int = 300) -> dic
     """Create a nonce for SIWE authentication"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         expires_at = now + expires_in_seconds
         nonce_id = f"nonce-{address}-{now}"
 
@@ -1496,7 +1496,7 @@ def get_valid_nonce(address: str, nonce: str) -> dict | None:
     """Get and validate a nonce"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             SELECT * FROM auth_nonces
@@ -1520,7 +1520,7 @@ def create_session(session_data: dict) -> dict:
     """Create a new session"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             INSERT INTO auth_sessions (session_id, address, did, agent_id, access_token, expires_at, created_at, last_activity)
@@ -1542,7 +1542,7 @@ def get_session(session_id: str) -> dict | None:
     """Get session by ID"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             SELECT * FROM auth_sessions
@@ -1559,7 +1559,7 @@ def get_session_by_token(access_token: str) -> dict | None:
     """Get session by access token"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             SELECT * FROM auth_sessions
@@ -1597,7 +1597,7 @@ def create_user(user_data: dict) -> dict:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Check if user exists
         cursor.execute('SELECT * FROM users WHERE wallet_address = ?', (user_data['wallet_address'].lower(),))
@@ -1696,7 +1696,7 @@ def update_user_stake(user_id: str, stake_amount: float) -> dict:
     """Update user stake and reputation"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Get current stake
         cursor.execute('SELECT stake FROM users WHERE id = ?', (user_id,))
@@ -1721,7 +1721,7 @@ def update_user_agent(user_id: str, agent_id: str) -> bool:
     """Update user's agent ID"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE users SET agent_id = ?, updated_at = ? WHERE id = ?
         ''', (agent_id, now, user_id))
@@ -1732,7 +1732,7 @@ def update_user_balance(user_id: str, amount: float, deduct: bool = False) -> di
     """Update user's VIBE balance (deduct or add)"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Get current balance
         cursor.execute('SELECT vibe_balance FROM users WHERE id = ?', (user_id,))
@@ -1762,7 +1762,7 @@ def update_stake_status(user_id: str, status: str, locked_stake: float = 0, unlo
     """Update user's stake status"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE users SET stake_status = ?, locked_stake = ?, unlock_available_at = ?, updated_at = ? WHERE id = ?
         ''', (status, locked_stake, unlock_available_at, now, user_id))
@@ -1802,7 +1802,7 @@ def create_transaction(tx_data: dict) -> dict:
     """Create a new transaction"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         tx_id = tx_data.get('id', f"tx-{now}")
 
         cursor.execute('''
@@ -1876,7 +1876,7 @@ def update_transaction_status(tx_id: str, status: str, extra_data: dict = None) 
     """Update transaction status"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Build update query based on status
         update_fields = ['status = ?', 'updated_at = ?']
@@ -1973,7 +1973,7 @@ def create_agent_wallet(wallet_data: dict[str, Any]) -> dict[str, Any]:
     """Create a new agent wallet"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             INSERT INTO agent_wallets (
@@ -2043,7 +2043,7 @@ def update_agent_wallet_key(agent_id: str, agent_address: str, agent_private_key
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Check if wallet exists for this agent
         cursor.execute('SELECT id FROM agent_wallets WHERE agent_id = ?', (agent_id,))
@@ -2085,7 +2085,7 @@ def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> 
     """Update agent wallet balance"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         if deduct:
             cursor.execute('''
@@ -2108,7 +2108,7 @@ def update_agent_stake(agent_id: str, amount: float, deduct: bool = False) -> bo
     """Update agent stake amount"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         if deduct:
             cursor.execute('''
@@ -2131,7 +2131,7 @@ def update_agent_limits(agent_id: str, max_per_tx: float, daily_limit: float) ->
     """Update agent wallet limits"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             UPDATE agent_wallets
@@ -2147,7 +2147,7 @@ def update_agent_daily_spent(agent_id: str, amount: float) -> bool:
     """Update agent daily spent amount and reset if new day"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Get current wallet info
         cursor.execute('SELECT last_reset_time, daily_spent FROM agent_wallets WHERE agent_id = ?', (agent_id,))
@@ -2178,7 +2178,7 @@ def register_agent_in_registry(agent_id: str) -> bool:
     """Mark agent as registered in registry"""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             UPDATE agent_wallets
@@ -2220,7 +2220,7 @@ def create_api_key(api_key_data: dict[str, Any]) -> dict[str, Any]:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             INSERT INTO agent_api_keys
@@ -2287,7 +2287,7 @@ def update_api_key_last_used(key_id: str) -> bool:
     """Update the last_used_at timestamp for an API key."""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE agent_api_keys SET last_used_at = ? WHERE id = ?
         ''', (now, key_id))
@@ -2298,7 +2298,7 @@ def revoke_api_key(key_id: str, agent_id: str) -> bool:
     """Revoke an API key."""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE agent_api_keys SET revoked_at = ?
             WHERE id = ? AND agent_id = ?
@@ -2310,7 +2310,7 @@ def renew_api_key(key_id: str, agent_id: str, extends_days: int = 365) -> bool:
     """Extend the expiration of an API key."""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         new_expires_at = now + (extends_days * 86400)
         cursor.execute('''
             UPDATE agent_api_keys SET expires_at = ?
@@ -2357,7 +2357,7 @@ def create_binding_request(binding_data: dict[str, Any]) -> dict[str, Any]:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             INSERT INTO agent_binding_requests
@@ -2419,7 +2419,7 @@ def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount:
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         # Get the binding request
         cursor.execute('''
@@ -2507,7 +2507,7 @@ def cancel_binding_request(binding_code: str) -> bool:
     """Cancel a binding request."""
     with get_db() as conn:
         cursor = conn.cursor()
-        time.time()
+        datetime.now().timestamp()
 
         cursor.execute('''
             UPDATE agent_binding_requests SET status = 'cancelled' WHERE binding_code = ?
@@ -2519,7 +2519,7 @@ def expire_binding_requests() -> int:
     """Expire all pending binding requests that have passed their expiration time."""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         cursor.execute('''
             UPDATE agent_binding_requests
@@ -2536,7 +2536,7 @@ def update_agent_binding_status(agent_id: str, status: str, owner_wallet: str = 
     """Update agent's binding status."""
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
 
         if status == 'bound' and owner_wallet:
             cursor.execute('''
@@ -2563,7 +2563,7 @@ def update_agent_wallet_deployed(agent_id: str, wallet_address: str, agent_addre
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        now = time.time()
+        now = datetime.now().timestamp()
         cursor.execute('''
             UPDATE agent_wallets
             SET wallet_address = ?, agent_address = ?, updated_at = ?
