@@ -1981,6 +1981,15 @@ def create_agent_wallet(wallet_data: dict[str, Any]) -> dict[str, Any]:
         return wallet_data
 
 
+def get_agent_wallet(agent_id: str) -> dict | None:
+    """Get agent wallet by agent_id. Returns agent_private_key for autonomous signing."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
 def get_agent_wallet_by_address(wallet_address: str) -> dict | None:
     """Get agent wallet by wallet address"""
     with get_db() as conn:
