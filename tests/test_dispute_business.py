@@ -194,7 +194,7 @@ class TestDisputeAuth:
         app.include_router(router)
         with TestClient(app) as client:
             r = client.get("/dispute/test-pool-id")
-            assert r.status_code >= 400  # crashes before auth (500), returns 500
+            assert r.status_code == 400  # invalid hex → 400
 
     def test_resolve_dispute_requires_auth(self):
         from fastapi.testclient import TestClient
