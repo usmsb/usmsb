@@ -387,11 +387,6 @@ async def cancel_pool(
     try:
         manager = get_joint_order_pool_manager()
 
-        # Note: cancel_pool method might not exist in manager, need to check
-        # For now, we'll raise an error if not available
-        if not hasattr(manager, 'cancel_pool'):
-            raise HTTPException(status_code=501, detail="Cancel pool not implemented in manager")
-
         result = await manager.cancel_pool(
             pool_id=request.pool_id,
             chain_pool_id=request.chain_pool_id,

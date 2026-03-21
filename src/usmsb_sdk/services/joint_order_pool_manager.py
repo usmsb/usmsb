@@ -507,6 +507,64 @@ class JointOrderPoolManager:
                 message=f"Withdrawal failed: {e}",
             )
 
+    async def cancel_pool(
+        self,
+        pool_id: str,
+        chain_pool_id: str,
+        from_address: str,
+        private_key: str,
+        reason: str = "",
+        gas_limit: int | None = None,
+    ) -> BidAcceptanceResult:
+        """
+        Cancel a JointOrder pool.
+
+        Args:
+            pool_id: Readable pool ID
+            chain_pool_id: On-chain pool ID (bytes32 hex)
+            from_address: Canceller's wallet address (must be creator or owner)
+            private_key: Canceller's private key
+            reason: Cancellation reason
+            gas_limit: Optional gas limit
+
+        Returns:
+            BidAcceptanceResult
+        """
+        if not self._client:
+            return BidAcceptanceResult(
+                success=False,
+                tx_hash=None,
+                message="JointOrderClient not available",
+            )
+
+        try:
+            if not chain_pool_id.startswith("0x"):
+                chain_pool_id = "0x" + chain_pool_id
+
+            tx_hash = await self._client.cancel_pool(
+                pool_id=chain_pool_id,
+                from_address=from_address,
+                private_key=private_key,
+                reason=reason,
+                gas_limit=gas_limit,
+            )
+
+            self.logger.info(f"Pool {pool_id} cancelled: tx={tx_hash}")
+
+            return BidAcceptanceResult(
+                success=True,
+                tx_hash=tx_hash,
+                message="Pool cancelled successfully",
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to cancel pool {pool_id}: {e}")
+            return BidAcceptanceResult(
+                success=False,
+                tx_hash=None,
+                message=f"Cancellation failed: {e}",
+            )
+
     # ==================== Queries ====================
 
     async def get_pool_status(

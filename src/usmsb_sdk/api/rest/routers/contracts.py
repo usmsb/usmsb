@@ -20,6 +20,7 @@ Authentication:
 - Require X-API-Key + X-Agent-ID headers
 """
 
+import os
 import time
 from typing import Any
 
@@ -340,6 +341,15 @@ async def confirm_delivery(
     demand_wallet_address = None
     demand_private_key = None
 
+    # Get platform deployer private key for signing transactions on behalf of users
+    # This is set via environment variable for platform-level operations
+    platform_deployer_private_key = os.environ.get("WEB3_PLATFORM_DEPLOYER_PRIVATE_KEY")
+    if not platform_deployer_private_key:
+        import logging
+        logging.getLogger(__name__).warning(
+            "WEB3_PLATFORM_DEPLOYER_PRIVATE_KEY not set - on-chain confirm_delivery will not execute"
+        )
+
     try:
         from usmsb_sdk.blockchain.config import BlockchainConfig
         from usmsb_sdk.blockchain.web3_client import Web3Client
@@ -355,15 +365,16 @@ async def confirm_delivery(
             joint_order_client=joint_order_client,
         )
 
-        # Get demand agent's wallet credentials from the authenticated user
-        # The wallet_address and private_key should be available from the user's session/credentials
-        # For now, we'll use the agent's bound wallet info
+        # Get demand agent's wallet address from the authenticated user
+        # The wallet address is used as the from_address for on-chain operations
         from usmsb_sdk.api.database import get_agent_wallet
         wallet = get_agent_wallet(agent_id)
         if wallet:
             demand_wallet_address = wallet.get("wallet_address")
-            # Note: private_key should come from secure storage/session, not stored in DB
-            # For now, we'll rely on the joint_order_pool_manager's availability
+
+        # Use platform deployer private key for signing (platform wallet pays for gas)
+        # This is required because user wallets' private keys are never stored in the DB
+        demand_private_key = platform_deployer_private_key
 
     except Exception as e:
         # Log but don't fail - on-chain execution may not be available

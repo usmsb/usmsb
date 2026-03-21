@@ -94,6 +94,7 @@ class SelfRegistrationRequest(BaseModel):
     name: str = Field(..., description="Agent name")
     description: str = Field(default="", description="Agent description")
     capabilities: list[str] = Field(default_factory=list, description="Agent capabilities")
+    owner_wallet: str | None = Field(default=None, description="Owner wallet address (optional)")
 
     # ========== Soul Declaration (Phase 1 USMSB) ==========
     # Optional: Declare Soul during registration
@@ -275,7 +276,7 @@ async def register_agent_v2(request: SelfRegistrationRequest):
 
             # Use request.owner_wallet if provided, otherwise use a placeholder
             # For self-registration without owner, we use the platform as temporary owner
-            owner_address = request.owner_wallet if hasattr(request, 'owner_wallet') and request.owner_wallet else platform_agent_address
+            owner_address = request.owner_wallet if request.owner_wallet else platform_agent_address
 
             wallet_address, deploy_tx_hash = await factory.deploy_wallet(
                 owner_address=owner_address,
@@ -460,24 +461,34 @@ async def complete_binding(
     user: dict = Depends(get_current_user)  # SIWE authentication required
 ):
     """
-    Complete the binding process.
+    Complete the binding process with real VIBE staking.
 
     This endpoint is called by the OWNER (not the agent) after they:
     1. Visit the binding URL
     2. Connect their wallet
     3. Sign a message proving ownership (SIWE)
-    4. Stake VIBE tokens
+    4. Stake VIBE tokens (this is now done on-chain)
 
     Authentication:
         - Requires SIWE (Sign-In with Ethereum) session
         - The wallet address is taken from the authenticated session
+
+    B14: This endpoint now executes real VIBE staking on-chain:
+        1. Owner approves VIBStaking contract to spend stake amount
+        2. Owner stakes VIBE via VIBStaking.stake()
     """
-    # Get owner wallet from authenticated user session
+    # Get owner wallet and private key from authenticated user session
     owner_wallet = user.get('wallet_address')
+    owner_private_key = user.get('private_key')
     if not owner_wallet:
         raise HTTPException(
             status_code=401,
             detail={"error": "Wallet address not found in session", "code": "UNAUTHORIZED"}
+        )
+    if not owner_private_key:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "Private key not available for staking", "code": "PRIVATE_KEY_UNAVAILABLE"}
         )
 
     # Get binding request
@@ -505,7 +516,57 @@ async def complete_binding(
             detail={"error": "Binding request expired", "code": "BINDING_EXPIRED"}
         )
 
-    # Complete the binding
+    # B14: Execute real VIBE staking on-chain
+    try:
+        from usmsb_sdk.blockchain.contracts.vib_staking import VIBStakingClient, LockPeriod
+        from usmsb_sdk.blockchain.contracts.vibe_token import VIBETokenClient
+        from usmsb_sdk.blockchain.config import BlockchainConfig
+
+        config = BlockchainConfig()
+        staking_address = config.get_contract_address("VIBStaking")
+        token_address = config.get_contract_address("VIBEToken")
+
+        if not staking_address or staking_address == "待部署":
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "VIBStaking contract not deployed", "code": "STAKING_NOT_DEPLOYED"}
+            )
+
+        # Convert stake amount to wei
+        stake_amount_wei = int(request.stake_amount * (10 ** 18))
+
+        # Step 1: Approve VIBStaking contract to spend VIBE
+        token_client = VIBETokenClient()
+        approve_tx_hash = token_client.approve(
+            spender=staking_address,
+            amount=stake_amount_wei,
+            from_address=owner_wallet,
+            private_key=owner_private_key,
+        )
+
+        # Step 2: Stake VIBE (use 30-day lock period as default)
+        staking_client = VIBStakingClient()
+        stake_tx_hash = await staking_client.stake(
+            amount=stake_amount_wei,
+            lock_period=LockPeriod.DAYS_30,
+            from_address=owner_wallet,
+            private_key=owner_private_key,
+        )
+
+        staking_tx_hashes = {
+            "approve_tx": approve_tx_hash,
+            "stake_tx": stake_tx_hash,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"error": f"Staking failed: {str(e)}", "code": "STAKING_FAILED"}
+        )
+
+    # Complete the binding (database only)
     result = db_complete_binding_request(
         binding_code=binding_code,
         owner_wallet=owner_wallet,
@@ -530,7 +591,8 @@ async def complete_binding(
         "stake_tier": tier,
         "tier_benefits": tier_benefits,
         "completed_at": result['completed_at'],
-        "message": "Binding completed successfully"
+        "staking_transactions": staking_tx_hashes,
+        "message": "Binding completed successfully with VIBE staking"
     }
 
 
@@ -989,8 +1051,6 @@ async def register_via_a2a(request: A2ARegistrationRequest):
         "metadata": agent_card.get("metadata", {}),  # create_agent will json.dumps
         "last_heartbeat": now,
     }
-    # Save to database using unified function
-    db_create_agent(agent_data)
     # Save to database using unified function
     db_create_agent(agent_data)
 
