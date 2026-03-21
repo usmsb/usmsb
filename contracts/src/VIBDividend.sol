@@ -134,6 +134,7 @@ contract VIBDividend is Ownable, ReentrancyGuard, Pausable {
         );
 
         // H4修复: 单次分红不超过合约余额的10%，防止flash loan攻击
+        // M1修复: 在外部转账完成后读取余额，确保cap计算准确
         uint256 contractBalance = vibeToken.balanceOf(address(this));
         uint256 maxDividend = contractBalance / 10; // 10% cap
         require(amount <= maxDividend, "VIBDividend: dividend amount exceeds cap");
