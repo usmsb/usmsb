@@ -434,6 +434,12 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_wallets_owner ON agent_wallets(owner_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_wallets_address ON agent_wallets(wallet_address)')
 
+        # Migration: add agent_private_key column if not exists (for Plan B autonomous wallet control)
+        try:
+            cursor.execute("ALTER TABLE agent_wallets ADD COLUMN agent_private_key TEXT")
+        except Exception:
+            pass  # Column already exists
+
         # ==================== API Key Tables ====================
         # Agent API Keys table for secure API key storage
         cursor.execute('''
@@ -1924,6 +1930,55 @@ def get_agent_wallets_by_owner(owner_id: str) -> list[dict]:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_wallets WHERE owner_id = ?', (owner_id,))
         return [dict(row) for row in cursor.fetchall()]
+
+
+def update_agent_wallet_key(agent_id: str, agent_address: str, agent_private_key: str) -> bool:
+    """Store or update the agent's operational private key (for autonomous wallet control - Plan B).
+
+    This stores the agent's own private key that it uses to sign transactions autonomously.
+    The private key is stored in plaintext in this implementation.
+    For production, use encryption at rest.
+
+    Returns True if the wallet record was found and updated.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+
+        # Check if wallet exists for this agent
+        cursor.execute('SELECT id FROM agent_wallets WHERE agent_id = ?', (agent_id,))
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute('''
+                UPDATE agent_wallets
+                SET agent_address = ?, agent_private_key = ?, updated_at = ?
+                WHERE agent_id = ?
+            ''', (agent_address, agent_private_key, now, agent_id))
+        else:
+            # Wallet record doesn't exist yet - create a placeholder
+            # This can happen if wallet deployment was deferred
+            cursor.execute('''
+                INSERT INTO agent_wallets (
+                    id, agent_id, owner_id, wallet_address, agent_address,
+                    agent_private_key, vibe_balance, staked_amount, stake_status,
+                    max_per_tx, daily_limit, daily_spent, last_reset_time,
+                    registry_registered, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                f"aw_{agent_id}_{int(now * 1000)}",
+                agent_id,
+                "pending",  # owner_id
+                "0x0000000000000000000000000000000000000000",  # wallet_address (deployed later)
+                agent_address,
+                agent_private_key,
+                0, 0, 'none',  # vibe_balance, staked_amount, stake_status
+                500, 1000, 0, now,  # max_per_tx, daily_limit, daily_spent, last_reset_time
+                0, now, now  # registry_registered, created_at, updated_at
+            ))
+
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def update_agent_balance(agent_id: str, amount: float, deduct: bool = False) -> bool:
