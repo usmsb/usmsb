@@ -2338,29 +2338,47 @@ def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount:
             WHERE binding_code = ?
         ''', (owner_wallet, stake_amount, now, binding_code))
 
-        # Update agent
+        # Update agent - set to 'pending' first (will be set to 'bound' after wallet is deployed)
         cursor.execute('''
             UPDATE agents
-            SET owner_wallet = ?, binding_status = 'bound', bound_at = ?, updated_at = ?
+            SET owner_wallet = ?, binding_status = 'pending', updated_at = ?
             WHERE agent_id = ?
-        ''', (owner_wallet, now, now, binding_dict['agent_id']))
+        ''', (owner_wallet, now, binding_dict['agent_id']))
 
-        # Create or update agent wallet
-        cursor.execute('''
-            INSERT OR REPLACE INTO agent_wallets
-            (id, agent_id, owner_id, wallet_address, agent_address, staked_amount, stake_status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'active', COALESCE((SELECT created_at FROM agent_wallets WHERE agent_id = ?), ?), ?)
-        ''', (
-            f"wallet-{binding_dict['agent_id']}",
-            binding_dict['agent_id'],
-            owner_wallet,
-            owner_wallet,
-            f"agent-addr-{binding_dict['agent_id']}",
-            stake_amount,
-            binding_dict['agent_id'],
-            now,
-            now
-        ))
+        # Create or update agent wallet — PRESERVE existing agent_private_key and agent_address
+        # Check if wallet record already exists (from register_agent_v2)
+        cursor.execute('SELECT id, agent_address, agent_private_key FROM agent_wallets WHERE agent_id = ?', (binding_dict['agent_id'],))
+        existing = cursor.fetchone()
+
+        if existing:
+            # UPDATE instead of REPLACE — preserve agent_address and agent_private_key
+            cursor.execute('''
+                UPDATE agent_wallets
+                SET owner_id = ?, wallet_address = ?, staked_amount = ?,
+                    stake_status = 'active', updated_at = ?
+                WHERE agent_id = ?
+            ''', (
+                owner_wallet,
+                owner_wallet,  # placeholder — will be corrected after deployment
+                stake_amount,
+                now,
+                binding_dict['agent_id']
+            ))
+        else:
+            # No existing record — create new
+            cursor.execute('''
+                INSERT INTO agent_wallets
+                (id, agent_id, owner_id, wallet_address, staked_amount, stake_status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+            ''', (
+                f"wallet-{binding_dict['agent_id']}",
+                binding_dict['agent_id'],
+                owner_wallet,
+                owner_wallet,  # placeholder
+                stake_amount,
+                now,
+                now
+            ))
 
         # Upgrade all API keys for this agent to level 1
         cursor.execute('''

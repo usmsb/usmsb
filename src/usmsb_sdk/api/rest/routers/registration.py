@@ -602,14 +602,41 @@ async def complete_binding(
             logging.getLogger(__name__).warning(
                 "AGENT_WALLET_DEPLOYER_PRIVATE_KEY not set — skipping on-chain wallet deployment"
             )
+            # No wallet deployed — leave status as 'pending' so caller knows deployment is required
+            # User needs to manually deploy wallet or retry when platform is configured
+            wallet_deployed = False
 
     except Exception as wallet_err:
-        logging.getLogger(__name__).warning(f"Wallet deployment failed (binding still completes): {wallet_err}")
-        wallet_deployed = False
+        logging.getLogger(__name__).warning(f"Wallet deployment failed: {wallet_err}")
+        # Deployment failed — binding should NOT be marked as "bound" yet
+        # The on-chain stake succeeded (verified above), but wallet isn't deployed
+        # Leave binding_status as "pending" so caller knows wallet deployment is pending
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Wallet deployment failed, please retry or contact support",
+                "code": "WALLET_DEPLOY_FAILED",
+                "stake_verified": True,
+                "wallet_deployed": False,
+            }
+        )
 
     # Get tier info
     tier = get_stake_tier(request.stake_amount)
     tier_benefits = get_tier_benefits(tier)
+
+    # Persist tier to database (best-effort)
+    try:
+        from usmsb_sdk.api.database import get_db
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'UPDATE agent_wallets SET stake_tier = ?, staked_amount = ?, updated_at = ? WHERE agent_id = ?',
+                (tier, request.stake_amount, __import__('time').time(), result['agent_id'])
+            )
+            conn.commit()
+    except Exception:
+        pass  # Best-effort
 
     return {
         "success": True,
@@ -624,7 +651,7 @@ async def complete_binding(
         "wallet_address": wallet_address,
         "wallet_deploy_tx": wallet_deploy_tx_hash,
         "message": "Binding completed successfully with VIBE staking."
-                + (" AgentWallet deployed and registered." if wallet_deployed else " Wallet deployment skipped.")
+                + (" AgentWallet deployed and registered on-chain." if wallet_deployed else " Wallet deployment requires retry.")
     }
 
 
