@@ -162,6 +162,20 @@ class BlockchainConfig:
         """
         return self.config.contracts.get(name)
 
+    @classmethod
+    def from_env(cls) -> "BlockchainConfig":
+        """
+        从环境变量创建配置实例。
+
+        读取以下环境变量:
+        - VIBE_NETWORK: 网络类型 (mainnet/testnet/base_sepolia)
+        - VIBE_RPC_URL: 自定义RPC URL
+
+        Returns:
+            BlockchainConfig 实例
+        """
+        return cls()
+
     def get_explorer_url(self, tx_hash: str) -> str:
         """
         获取交易的区块浏览器URL

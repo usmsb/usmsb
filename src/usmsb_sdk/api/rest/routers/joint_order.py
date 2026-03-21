@@ -85,8 +85,6 @@ class CancelPoolRequest(BaseModel):
     pool_id: str = Field(..., description="需求池ID")
     chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
     tx_hash: str = Field(..., description="取消池交易的 tx_hash（前端签名后提供）")
-    pool_id: str = Field(..., description="需求池ID")
-    chain_pool_id: str = Field(..., description="链上池ID（bytes32十六进制）")
     reason: str = Field(default="", description="取消原因")
 
 

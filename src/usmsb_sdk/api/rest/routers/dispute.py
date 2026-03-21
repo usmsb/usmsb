@@ -133,6 +133,16 @@ async def get_dispute_status(pool_id: str):
     """
     from usmsb_sdk.blockchain.contracts.joint_order import JointOrderClient
 
+    # Validate pool_id is valid hex before calling blockchain
+    try:
+        hex_str = pool_id.lstrip("0x")
+        bytes.fromhex(hex_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "Invalid pool_id format: must be a valid hex string"}
+        )
+
     try:
         client = JointOrderClient()
 
