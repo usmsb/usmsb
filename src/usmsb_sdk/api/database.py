@@ -16,7 +16,7 @@ def _filter_sensitive_fields(data: dict) -> dict:
 def _row_to_dict(cursor: sqlite3.Cursor, row) -> dict:
     """Convert a SQLite row (tuple) to dict using cursor.description column names.
     
-    Note: sqlite3.Row supports dict(row) but plain tuples from fetchone/fetchall
+    Note: plain tuples require _row_to_dict(cursor, row) from fetchone/fetchall
     require zip(columns, row) approach. This helper handles both cases.
     """
     if row is None:
@@ -673,7 +673,7 @@ def get_all_agents(agent_type: str = None, status: str = None, protocol: str = N
 
         query += f' ORDER BY created_at DESC LIMIT {limit}'
         cursor.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 def update_agent_heartbeat(agent_id: str, status: str = 'online') -> bool:
@@ -988,7 +988,7 @@ def get_services_by_agent(agent_id: str) -> list[dict[str, Any]]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM services WHERE agent_id = ?', (agent_id,))
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 # ==================== Environment Operations ====================
@@ -1017,7 +1017,8 @@ def get_environment(env_id: str) -> dict[str, Any] | None:
         cursor.execute('SELECT * FROM environments WHERE id = ?', (env_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 def get_all_environments(limit: int = 100) -> list[dict[str, Any]]:
@@ -1025,7 +1026,7 @@ def get_all_environments(limit: int = 100) -> list[dict[str, Any]]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM environments LIMIT ?', (limit,))
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 # ==================== Demand/Supply Operations ====================
@@ -1117,7 +1118,7 @@ def search_demands(capabilities: list[str] = None, budget_min: float = None, bud
             params.append(budget_max)
 
         cursor.execute(query, params)
-        demands = [dict(row) for row in cursor.fetchall()]
+        demands = [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
         # Note: Capability filtering is now done by HybridMatchingService
         # which uses vector embeddings for semantic matching
@@ -1152,7 +1153,7 @@ def get_all_opportunities() -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM opportunities')
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 # ==================== Negotiation Operations ====================
@@ -1185,7 +1186,7 @@ def get_negotiations() -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM negotiations')
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 def get_negotiation(session_id: str) -> dict | None:
     """Get negotiation by session ID"""
@@ -1194,7 +1195,8 @@ def get_negotiation(session_id: str) -> dict | None:
         cursor.execute('SELECT * FROM negotiations WHERE session_id = ?', (session_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 
@@ -1225,7 +1227,7 @@ def get_workflows() -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM workflows')
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 def get_workflow(workflow_id: str) -> dict | None:
     """Get workflow by ID"""
@@ -1234,7 +1236,8 @@ def get_workflow(workflow_id: str) -> dict | None:
         cursor.execute('SELECT * FROM workflows WHERE id = ?', (workflow_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 
@@ -1266,7 +1269,7 @@ def get_collaborations() -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM collaborations')
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 def get_collaboration(session_id: str) -> dict | None:
     """Get collaboration by session ID"""
@@ -1275,7 +1278,8 @@ def get_collaboration(session_id: str) -> dict | None:
         cursor.execute('SELECT * FROM collaborations WHERE session_id = ?', (session_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 
@@ -1308,7 +1312,7 @@ def get_proposals() -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM proposals')
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 def vote_proposal(proposal_id: str, voter_id: str, vote: int) -> bool:
     """Vote on proposal"""
@@ -1359,7 +1363,7 @@ def get_learning_insights(agent_id: str) -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM learning_insights WHERE agent_id = ? ORDER BY created_at DESC', (agent_id,))
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 # ==================== User Profile Operations ====================
@@ -1400,7 +1404,8 @@ def get_profile(user_id: str) -> dict | None:
         cursor.execute('SELECT * FROM user_profiles WHERE id = ?', (user_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 
@@ -1500,7 +1505,8 @@ def get_valid_nonce(address: str, nonce: str) -> dict | None:
 
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 def delete_nonce(nonce_id: str) -> bool:
@@ -1545,7 +1551,8 @@ def get_session(session_id: str) -> dict | None:
 
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 def get_session_by_token(access_token: str) -> dict | None:
@@ -1565,7 +1572,8 @@ def get_session_by_token(access_token: str) -> dict | None:
             cursor.execute('''
                 UPDATE auth_sessions SET last_activity = ? WHERE session_id = ?
             ''', (now, row['session_id']))
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 def delete_session(session_id: str) -> bool:
@@ -1669,7 +1677,8 @@ def get_user_by_address(address: str) -> dict | None:
         cursor.execute('SELECT * FROM users WHERE wallet_address = ?', (address.lower(),))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 def get_user_by_did(did: str) -> dict | None:
@@ -1679,7 +1688,8 @@ def get_user_by_did(did: str) -> dict | None:
         cursor.execute('SELECT * FROM users WHERE did = ?', (did,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 def update_user_stake(user_id: str, stake_amount: float) -> dict:
@@ -1769,7 +1779,8 @@ def get_user_balance_info(user_id: str) -> dict | None:
         ''', (user_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 
@@ -1829,7 +1840,8 @@ def get_transaction(tx_id: str) -> dict | None:
         cursor.execute('SELECT * FROM transactions WHERE id = ?', (tx_id,))
         row = cursor.fetchone()
         if row:
-            return dict(row)
+
+            return _row_to_dict(cursor, row)
         return None
 
 
@@ -1849,7 +1861,7 @@ def get_transactions_by_user(user_id: str, role: str = None, status: str = None,
         params.append(limit)
 
         cursor.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 def get_all_transactions(limit: int = 100) -> list[dict]:
@@ -1857,7 +1869,7 @@ def get_all_transactions(limit: int = 100) -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM transactions ORDER BY created_at DESC LIMIT ?', (limit,))
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 def update_transaction_status(tx_id: str, status: str, extra_data: dict = None) -> dict | None:
@@ -1952,7 +1964,7 @@ def get_transaction_stats(user_id: str = None) -> dict:
             ''')
 
         row = cursor.fetchone()
-        return dict(row) if row else {}
+        return _row_to_dict(cursor, row) if row else {}
 
 
 # ==================== Agent Wallet Operations ====================
@@ -2245,7 +2257,7 @@ def get_api_key_by_hash(key_hash: str) -> dict[str, Any] | None:
             WHERE key_hash = ? AND revoked_at IS NULL
         ''', (key_hash,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row) if row else None
 
 
 def get_api_keys_by_agent(agent_id: str) -> list[dict[str, Any]]:
@@ -2259,7 +2271,7 @@ def get_api_keys_by_agent(agent_id: str) -> list[dict[str, Any]]:
             WHERE agent_id = ? AND revoked_at IS NULL
             ORDER BY created_at DESC
         ''', (agent_id,))
-        return [dict(row) for row in cursor.fetchall()]
+        return [_row_to_dict(cursor, row) for row in cursor.fetchall()]
 
 
 def get_api_key_by_id(key_id: str) -> dict[str, Any] | None:
@@ -2268,7 +2280,7 @@ def get_api_key_by_id(key_id: str) -> dict[str, Any] | None:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_api_keys WHERE id = ?', (key_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row) if row else None
 
 
 def update_api_key_last_used(key_id: str) -> bool:
@@ -2383,7 +2395,7 @@ def get_binding_request_by_code(binding_code: str) -> dict[str, Any] | None:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_binding_requests WHERE binding_code = ?', (binding_code,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row) if row else None
 
 
 def get_binding_request_by_agent(agent_id: str) -> dict[str, Any] | None:
@@ -2397,7 +2409,7 @@ def get_binding_request_by_agent(agent_id: str) -> dict[str, Any] | None:
             LIMIT 1
         ''', (agent_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row) if row else None
 
 
 def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount: float) -> dict[str, Any] | None:
@@ -2574,7 +2586,7 @@ def get_agent_binding_info(agent_id: str) -> dict[str, Any] | None:
         ''', (agent_id,))
 
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row) if row else None
 
 
 if __name__ == '__main__':
