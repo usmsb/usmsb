@@ -426,6 +426,9 @@ class ValueContractService:
         quality_approved: bool,
         quality_feedback: dict[str, Any] | None = None,
         demand_agent_id: str | None = None,
+        joint_order_pool_manager: Any = None,
+        demand_wallet_address: str | None = None,
+        demand_private_key: str | None = None,
     ) -> BaseValueContract:
         """
         Confirm task delivery (trigger value flow execution).
@@ -471,7 +474,13 @@ class ValueContractService:
         # Execute value flows
         for i, flow in enumerate(contract.value_flows):
             if flow.status == "pending":
-                await self.execute_value_flow(contract_id, i)
+                await self.execute_value_flow(
+                    contract_id,
+                    i,
+                    demand_wallet_address=demand_wallet_address,
+                    demand_private_key=demand_private_key,
+                    joint_order_pool_manager=joint_order_pool_manager,
+                )
 
         logger.info(f"Contract {contract_id} completed, value flows executed")
         return contract

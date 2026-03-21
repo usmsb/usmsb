@@ -65,6 +65,7 @@ from usmsb_sdk.api.rest.routers import (
     feedback_router,
     gene_capsule_router,
     heartbeat_router,
+    joint_order_router,
     learning_router,
     matching_router,
     meta_agent_matching_router,
@@ -507,6 +508,7 @@ app.include_router(registration_router, prefix="/api")
 app.include_router(services_router, prefix="/api")
 app.include_router(system_router, prefix="/api")
 app.include_router(gene_capsule_router, prefix="/api")
+app.include_router(joint_order_router, prefix="/api")
 app.include_router(pre_match_negotiation_router, prefix="/api")
 app.include_router(meta_agent_router, prefix="/api")
 app.include_router(meta_agent_matching_router, prefix="/api")

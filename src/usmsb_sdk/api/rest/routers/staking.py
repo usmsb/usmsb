@@ -513,3 +513,228 @@ async def claim_rewards(
         new_balance=new_balance,
         message=f"Successfully claimed {pending_rewards:.6f} VIBE rewards"
     )
+
+
+# ==================== On-Chain Staking Endpoints ====================
+
+class OnChainStakeRequest(BaseModel):
+    """On-chain质押请求"""
+    amount: float = Field(..., gt=0, description="质押金额（VIBE）")
+    lock_period: int = Field(default=1, ge=0, le=4, description="锁仓期: 0=无锁仓, 1=30天, 2=90天, 3=180天, 4=365天")
+
+
+class OnChainUnstakeRequest(BaseModel):
+    """On-chain解除质押请求"""
+    pass  # No parameters needed, unstakes all
+
+
+class OnChainStakeResponse(BaseModel):
+    """On-chain质押响应"""
+    success: bool
+    tx_hash: str
+    from_address: str
+    amount_vibe: float
+    lock_period: int
+    message: str
+
+
+class OnChainStakingInfoResponse(BaseModel):
+    """On-chain质押信息响应"""
+    address: str
+    amount_wei: int
+    amount_vibe: float
+    tier: int
+    tier_name: str
+    lock_period: int
+    stake_time: int
+    unlock_time: int
+    pending_reward_wei: int
+    pending_reward_vibe: float
+    is_active: bool
+
+
+class OnChainRewardsResponse(BaseModel):
+    """On-chain质押奖励响应"""
+    address: str
+    pending_reward_wei: int
+    pending_reward_vibe: float
+
+
+@router.post("/stake", response_model=OnChainStakeResponse)
+async def on_chain_stake(
+    request: OnChainStakeRequest,
+    current_user: dict = Depends(get_current_user_unified),
+):
+    """
+    On-chain质押VIBE代币
+
+    需要认证。质押需要先调用POST /blockchain/approve授权staking合约。
+
+    Args:
+        amount: 质押金额（VIBE）
+        lock_period: 锁仓期 (0=无锁仓, 1=30天, 2=90天, 3=180天, 4=365天)
+    """
+    from usmsb_sdk.blockchain import VIBEBlockchainClient
+    from usmsb_sdk.blockchain.contracts.vib_staking import LockPeriod
+
+    # Get staker address from authenticated user
+    staker_address = current_user.get("wallet_address") or current_user.get("address")
+    if not staker_address:
+        raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
+
+    # Get private key
+    private_key = current_user.get("private_key")
+    if not private_key:
+        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
+
+    try:
+        client = VIBEBlockchainClient()
+
+        # Convert VIBE to wei
+        amount_wei = int(request.amount * (10 ** 18))
+
+        # Map lock_period to LockPeriod enum
+        lock_period_map = {
+            0: LockPeriod.NONE,
+            1: LockPeriod.DAYS_30,
+            2: LockPeriod.DAYS_90,
+            3: LockPeriod.DAYS_180,
+            4: LockPeriod.DAYS_365,
+        }
+        lock_period = lock_period_map.get(request.lock_period, LockPeriod.NONE)
+
+        # Execute stake
+        tx_hash = await client.staking.stake(
+            amount=amount_wei,
+            lock_period=lock_period,
+            from_address=staker_address,
+            private_key=private_key,
+        )
+
+        return OnChainStakeResponse(
+            success=True,
+            tx_hash=tx_hash,
+            from_address=staker_address,
+            amount_vibe=request.amount,
+            lock_period=request.lock_period,
+            message=f"Successfully staked {request.amount} VIBE with lock period {request.lock_period}",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/unstake", response_model=OnChainStakeResponse)
+async def on_chain_unstake(
+    request: OnChainUnstakeRequest,
+    current_user: dict = Depends(get_current_user_unified),
+):
+    """
+    On-chain解除质押
+
+    需要认证。解除质押后会领取所有待领取奖励。
+
+    注意: 解除质押需要满足锁仓期条件。
+    """
+    from usmsb_sdk.blockchain import VIBEBlockchainClient
+
+    # Get staker address from authenticated user
+    staker_address = current_user.get("wallet_address") or current_user.get("address")
+    if not staker_address:
+        raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
+
+    # Get private key
+    private_key = current_user.get("private_key")
+    if not private_key:
+        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
+
+    try:
+        client = VIBEBlockchainClient()
+
+        # Execute unstake
+        tx_hash = await client.staking.unstake(
+            from_address=staker_address,
+            private_key=private_key,
+        )
+
+        return OnChainStakeResponse(
+            success=True,
+            tx_hash=tx_hash,
+            from_address=staker_address,
+            amount_vibe=0,  # Amount not returned by unstake
+            lock_period=0,
+            message="Unstake transaction submitted successfully",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/info/{address}", response_model=OnChainStakingInfoResponse)
+async def get_on_chain_staking_info(address: str):
+    """
+    查询On-chain质押信息
+
+    无需认证，直接从区块链查询。
+
+    Args:
+        address: 质押者地址
+    """
+    from usmsb_sdk.blockchain import VIBEBlockchainClient
+    from usmsb_sdk.blockchain.contracts.vib_staking import StakeTier
+
+    try:
+        client = VIBEBlockchainClient()
+
+        # Get stake info
+        stake_info = await client.staking.get_stake_info(address)
+
+        # Convert wei to VIBE
+        amount_vibe = float(client.token.w3.from_wei(stake_info["amount"], "ether"))
+        pending_reward_vibe = float(client.token.w3.from_wei(stake_info["pending_reward"], "ether"))
+
+        # Get tier name
+        tier = StakeTier(stake_info["tier"])
+        tier_name = tier.name
+
+        return OnChainStakingInfoResponse(
+            address=address,
+            amount_wei=stake_info["amount"],
+            amount_vibe=amount_vibe,
+            tier=stake_info["tier"],
+            tier_name=tier_name,
+            lock_period=stake_info["lock_period"],
+            stake_time=stake_info["stake_time"],
+            unlock_time=stake_info["unlock_time"],
+            pending_reward_wei=stake_info["pending_reward"],
+            pending_reward_vibe=pending_reward_vibe,
+            is_active=stake_info["is_active"],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rewards/{address}", response_model=OnChainRewardsResponse)
+async def get_on_chain_rewards(address: str):
+    """
+    查询On-chain待领取奖励
+
+    无需认证，直接从区块链查询。
+
+    Args:
+        address: 质押者地址
+    """
+    from usmsb_sdk.blockchain import VIBEBlockchainClient
+
+    try:
+        client = VIBEBlockchainClient()
+
+        # Get pending reward
+        pending_reward_wei = await client.staking.get_pending_reward(address)
+        pending_reward_vibe = float(client.token.w3.from_wei(pending_reward_wei, "ether"))
+
+        return OnChainRewardsResponse(
+            address=address,
+            pending_reward_wei=pending_reward_wei,
+            pending_reward_vibe=pending_reward_vibe,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

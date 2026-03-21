@@ -13,6 +13,7 @@ from usmsb_sdk.api.rest.routers.environments import router as environments_route
 from usmsb_sdk.api.rest.routers.feedback import router as feedback_router
 from usmsb_sdk.api.rest.routers.gene_capsule import router as gene_capsule_router
 from usmsb_sdk.api.rest.routers.heartbeat import router as heartbeat_router
+from usmsb_sdk.api.rest.routers.joint_order import router as joint_order_router
 from usmsb_sdk.api.rest.routers.learning import router as learning_router
 from usmsb_sdk.api.rest.routers.matching import router as matching_router
 from usmsb_sdk.api.rest.routers.meta_agent_matching import router as meta_agent_matching_router
@@ -47,6 +48,7 @@ __all__ = [
     "services_router",
     "system_router",
     "gene_capsule_router",
+    "joint_order_router",
     "pre_match_negotiation_router",
     "meta_agent_matching_router",
     "staking_router",

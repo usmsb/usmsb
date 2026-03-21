@@ -23,7 +23,7 @@ Authentication:
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
@@ -307,7 +307,7 @@ async def decline_contract(
 @router.post("/{contract_id}/deliver")
 async def deliver_task(
     contract_id: str,
-    deliverables: dict[str, Any] = Field(..., description="Delivery data"),
+    deliverables: dict[str, Any] = Body(..., description="Delivery data"),
     current_user: dict = Depends(get_current_user_unified),
 ):
     """Mark task as delivered (awaiting confirmation)."""
@@ -335,12 +335,50 @@ async def confirm_delivery(
 
     service = get_contract_service()
 
+    # Instantiate JointOrderPoolManager for on-chain value flow execution
+    joint_order_pool_manager = None
+    demand_wallet_address = None
+    demand_private_key = None
+
+    try:
+        from usmsb_sdk.blockchain.config import BlockchainConfig
+        from usmsb_sdk.blockchain.web3_client import Web3Client
+        from usmsb_sdk.services.joint_order_pool_manager import JointOrderPoolManager
+        from usmsb_sdk.blockchain.contracts.joint_order import JointOrderClient
+
+        config = BlockchainConfig.from_env()
+        web3_client = Web3Client(config=config)
+        joint_order_client = JointOrderClient(web3_client=web3_client, config=config)
+        joint_order_pool_manager = JointOrderPoolManager(
+            web3_client=web3_client,
+            config=config,
+            joint_order_client=joint_order_client,
+        )
+
+        # Get demand agent's wallet credentials from the authenticated user
+        # The wallet_address and private_key should be available from the user's session/credentials
+        # For now, we'll use the agent's bound wallet info
+        from usmsb_sdk.api.database import get_agent_wallet
+        wallet = get_agent_wallet(agent_id)
+        if wallet:
+            demand_wallet_address = wallet.get("wallet_address")
+            # Note: private_key should come from secure storage/session, not stored in DB
+            # For now, we'll rely on the joint_order_pool_manager's availability
+
+    except Exception as e:
+        # Log but don't fail - on-chain execution may not be available
+        import logging
+        logging.getLogger(__name__).warning(f"Could not initialize JointOrderPoolManager: {e}")
+
     try:
         contract = await service.confirm_delivery(
             contract_id,
             quality_approved=request.quality_approved,
             quality_feedback=request.quality_feedback,
             demand_agent_id=agent_id,
+            joint_order_pool_manager=joint_order_pool_manager,
+            demand_wallet_address=demand_wallet_address,
+            demand_private_key=demand_private_key,
         )
         return {
             "success": True,
