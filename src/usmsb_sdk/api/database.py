@@ -13,6 +13,19 @@ def _filter_sensitive_fields(data: dict) -> dict:
     sensitive = {"api_key_hash", "soul_private_key", "api_key", "private_key"}
     return {k: v for k, v in data.items() if k not in sensitive}
 
+def _row_to_dict(cursor: sqlite3.Cursor, row) -> dict:
+    """Convert a SQLite row (tuple) to dict using cursor.description column names.
+    
+    Note: sqlite3.Row supports dict(row) but plain tuples from fetchone/fetchall
+    require zip(columns, row) approach. This helper handles both cases.
+    """
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row
+    columns = [desc[0] for desc in cursor.description]
+    return dict(zip(columns, row))
+
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
@@ -620,9 +633,7 @@ def get_agent(agent_id: str) -> dict[str, Any] | None:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agents WHERE agent_id = ?', (agent_id,))
         row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
+        return _row_to_dict(cursor, row)
 
 
 def set_agent_offline(agent_id: str) -> bool:
@@ -867,7 +878,7 @@ def get_agent_wallet(agent_id: str) -> dict[str, Any] | None:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_wallets WHERE agent_id = ?', (agent_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row)
 
 
 def has_wallet_binding(agent_id: str) -> bool:
@@ -1988,7 +1999,7 @@ def get_agent_wallet(agent_id: str) -> dict | None:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_wallets WHERE agent_id = ?', (agent_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row)
 
 
 def get_agent_wallet_by_address(wallet_address: str) -> dict | None:
@@ -1997,7 +2008,7 @@ def get_agent_wallet_by_address(wallet_address: str) -> dict | None:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_wallets WHERE wallet_address = ?', (wallet_address,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _row_to_dict(cursor, row)
 
 
 def get_agent_wallets_by_owner(owner_id: str) -> list[dict]:
@@ -2005,7 +2016,8 @@ def get_agent_wallets_by_owner(owner_id: str) -> list[dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM agent_wallets WHERE owner_id = ?', (owner_id,))
-        return [dict(row) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        return [_row_to_dict(cursor, row) for row in rows]
 
 
 def update_agent_wallet_key(agent_id: str, agent_address: str, agent_private_key: str) -> bool:
