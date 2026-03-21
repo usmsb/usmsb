@@ -255,76 +255,32 @@ async def register_agent_v2(request: SelfRegistrationRequest):
 
     # Deploy AgentWallet and register with AgentRegistry
     wallet_address = None
-    wallet_deployed = False
-    agent_registry_registered = False
+    # Step 1: Generate agent's operational keypair (Plan B)
+    # This keypair is generated at registration time, but the wallet is NOT deployed yet.
+    # Wallet deployment is deferred to complete_binding when an owner actually binds.
+    import os
+    from eth_account import Account
+    from usmsb_sdk.api.database import update_agent_wallet_key
 
-    # Agent operational keypair for autonomous wallet control (Plan B)
-    # Generate a unique private key for this agent — agent uses this to sign transactions autonomously
     agent_private_key = None
     agent_address = None
-    wallet_address = None
-    wallet_deployed = False
 
     try:
-        import os
-        from eth_account import Account
-        from usmsb_sdk.blockchain.config import BlockchainConfig
-        from usmsb_sdk.blockchain.contracts.agent_wallet import AgentWalletFactory
-        from usmsb_sdk.blockchain.contracts.agent_registry import AgentRegistryClient
+        # Generate unique keypair for this agent — agent uses this to sign autonomous transactions
+        acct = Account.create()
+        agent_private_key = acct.key.hex()  # 64-char hex private key
+        agent_address = acct.address
 
-        # Get platform deployer private key from environment (for deployment gas only)
-        deployer_private_key = os.getenv("AGENT_WALLET_DEPLOYER_PRIVATE_KEY")
-        platform_agent_address = os.getenv("PLATFORM_AGENT_ADDRESS", "0x0000000000000000000000000000000000000000")
-
-        if deployer_private_key and len(deployer_private_key) == 66:
-            config = BlockchainConfig.from_env()
-            factory = AgentWalletFactory.from_config(config)
-
-            # Plan B: Generate unique keypair for this agent
-            # Agent holds this private key and uses it to sign autonomous transactions
-            acct = Account.create()
-            agent_private_key = acct.key.hex()  # 64-char hex private key
-            agent_address = acct.address
-
-            # Owner address: from request if provided, otherwise platform (Level 0, no owner yet)
-            owner_address = request.owner_wallet if request.owner_wallet else platform_agent_address
-
-            # Deploy AgentWallet:
-            # - owner_address: the entity that authorizes the wallet (Owner EOA or platform)
-            # - agent_address: the entity that can autonomously execute transactions (derived from agent_private_key)
-            # - from_address: platform deployer pays gas for deployment transaction
-            wallet_address, deploy_tx_hash = await factory.deploy_wallet(
-                owner_address=owner_address,
-                agent_address=agent_address,   # Agent's own EOA derived from agent_private_key
-                from_address=platform_agent_address,  # Platform pays gas
-                private_key=deployer_private_key,      # Platform signs deployment
-            )
-            wallet_deployed = True
-
-            # Store agent's operational private key in database (encrypted at rest)
-            # Agent retrieves this key to sign autonomous transactions
-            from usmsb_sdk.api.database import update_agent_wallet_key
-            try:
-                update_agent_wallet_key(agent_id, agent_address, agent_private_key)
-            except Exception as db_err:
-                logging.getLogger(__name__).warning(f"Failed to store agent wallet key: {db_err}")
-
-            # Register with AgentRegistry (chainon registration)
-            try:
-                registry_client = AgentRegistryClient(config=config)
-                await registry_client.register_agent(
-                    wallet_address=wallet_address,
-                    owner_address=owner_address,
-                    owner_private_key=deployer_private_key,
-                )
-                agent_registry_registered = True
-            except Exception as e:
-                logging.getLogger(__name__).warning(f"AgentRegistry registration failed for {agent_id}: {e}")
+        # Store agent's operational keypair in database
+        # The wallet will be deployed when complete_binding is called
+        try:
+            update_agent_wallet_key(agent_id, agent_address, agent_private_key)
+        except Exception as db_err:
+            logging.getLogger(__name__).warning(f"Failed to store agent wallet key: {db_err}")
 
     except Exception as e:
-        # Wallet deployment or registry registration failed, but agent is still registered
-        import logging
-        logging.getLogger(__name__).warning(f"Wallet deployment failed for {agent_id}: {e}")
+        logging.getLogger(__name__).warning(f"Failed to generate agent keypair for {agent_id}: {e}")
+        # Keypair generation failed — agent can still be registered but won't have autonomous wallet
 
     # Generate API Key
     api_key, key_hash, key_prefix = generate_api_key(agent_id)
@@ -350,14 +306,13 @@ async def register_agent_v2(request: SelfRegistrationRequest):
         "binding_status": "unbound",
         "soul_registered": soul_registered,
         "soul_version": soul_version,
-        "wallet_address": wallet_address,
+        "wallet_address": None,  # Deployed at complete_binding
         "agent_address": agent_address,  # Agent's EOA address (derived from agent_private_key)
         "agent_private_key": agent_private_key,  # ⚠️ SAVE THIS - only shown once! Agent uses this to sign autonomous transactions
-        "wallet_deployed": wallet_deployed,
-        "agent_registry_registered": agent_registry_registered,
+        "wallet_deployed": False,  # Deferred to complete_binding
         "message": "Agent registered successfully. Save your API key and agent_private_key securely - they won't be shown again!"
                 + (" Soul declared and registered." if soul_registered else " Consider declaring your Soul via /agents/soul/register for better matching.")
-                + (" AgentWallet deployed. Store agent_private_key securely - it's required for autonomous wallet control." if wallet_deployed else ""),
+                + (" AgentWallet will be deployed when owner binding completes."),
     }
 
 
@@ -581,6 +536,76 @@ async def complete_binding(
             detail={"error": f"Staking failed: {str(e)}", "code": "STAKING_FAILED"}
         )
 
+    # Step 2: Deploy AgentWallet (owner pays gas for deployment)
+    # This is triggered at complete_binding time — no wallet deployed during register_agent_v2
+    wallet_deployed = False
+    agent_registry_registered = False
+    wallet_deploy_tx_hash = None
+    wallet_address = None
+
+    try:
+        import os
+        from usmsb_sdk.blockchain.config import BlockchainConfig
+        from usmsb_sdk.blockchain.contracts.agent_wallet import AgentWalletFactory
+        from usmsb_sdk.blockchain.contracts.agent_registry import AgentRegistryClient
+        from usmsb_sdk.api.database import get_agent_wallet, update_agent_binding_status
+
+        deployer_private_key = os.getenv("AGENT_WALLET_DEPLOYER_PRIVATE_KEY")
+        platform_agent_address = os.getenv("PLATFORM_AGENT_ADDRESS", "0x0000000000000000000000000000000000000000")
+
+        # Get agent's pre-generated keypair from database
+        agent_wallet = get_agent_wallet(result['agent_id'])
+        if agent_wallet and agent_wallet.get('agent_address'):
+            agent_address = agent_wallet['agent_address']
+            agent_private_key = agent_wallet.get('agent_private_key')
+
+        if not agent_address or not agent_private_key:
+            raise Exception("Agent keypair not found in database — run register_agent_v2 first")
+
+        if deployer_private_key and len(deployer_private_key) == 66:
+            config = BlockchainConfig.from_env()
+            factory = AgentWalletFactory.from_config(config)
+
+            # Deploy AgentWallet:
+            # - owner_address: Owner EOA (authorizing entity)
+            # - agent_address: Agent's EOA (can autonomously execute transactions)
+            # - from_address: platform deployer (pays gas for deployment)
+            # - private_key: platform private key (signs deployment tx)
+            wallet_address, wallet_deploy_tx_hash = await factory.deploy_wallet(
+                owner_address=owner_wallet,
+                agent_address=agent_address,
+                from_address=platform_agent_address,
+                private_key=deployer_private_key,
+            )
+            wallet_deployed = True
+
+            # Update DB: set wallet address and owner binding
+            try:
+                update_agent_binding_status(result['agent_id'], "bound", owner_wallet=wallet_address)
+            except Exception as db_err:
+                logging.getLogger(__name__).warning(f"Failed to update agent wallet in DB: {db_err}")
+
+            # Register with AgentRegistry (chainon registration)
+            try:
+                registry_client = AgentRegistryClient(config=config)
+                await registry_client.register_agent(
+                    wallet_address=wallet_address,
+                    owner_address=owner_wallet,
+                    owner_private_key=deployer_private_key,
+                )
+                agent_registry_registered = True
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"AgentRegistry registration failed: {e}")
+
+        else:
+            logging.getLogger(__name__).warning(
+                "AGENT_WALLET_DEPLOYER_PRIVATE_KEY not set — skipping on-chain wallet deployment"
+            )
+
+    except Exception as wallet_err:
+        logging.getLogger(__name__).warning(f"Wallet deployment failed (binding still completes): {wallet_err}")
+        wallet_deployed = False
+
     # Complete the binding (database only)
     result = db_complete_binding_request(
         binding_code=binding_code,
@@ -607,7 +632,11 @@ async def complete_binding(
         "tier_benefits": tier_benefits,
         "completed_at": result['completed_at'],
         "staking_transactions": staking_tx_hashes,
-        "message": "Binding completed successfully with VIBE staking"
+        "wallet_deployed": wallet_deployed,
+        "wallet_address": wallet_address,
+        "wallet_deploy_tx": wallet_deploy_tx_hash,
+        "message": "Binding completed successfully with VIBE staking."
+                + (" AgentWallet deployed and registered." if wallet_deployed else " Wallet deployment skipped.")
     }
 
 
