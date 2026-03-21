@@ -8,6 +8,7 @@ import { getHealth } from '@/lib/api'
 import { useAppStore } from '@/store'
 import { useAuthStore, USER_ROLE_LABELS } from '@/stores/authStore'
 import { useWalletAuth } from '@/hooks/useWalletAuth'
+import { useToken } from '@/hooks/useToken'
 import LanguageSwitcher from './LanguageSwitcher'
 import ThemeToggle from './ThemeToggle'
 import MobileDrawer from './MobileDrawer'
@@ -20,6 +21,7 @@ export default function Header() {
   const { notifications } = useAppStore()
   const { disconnect: _disconnect } = useDisconnect()
   const { isAuthenticated, logout: authLogout } = useWalletAuth()
+  const { formattedBalance } = useToken()
   const { 
     address, 
     isConnected, 
@@ -305,7 +307,19 @@ export default function Header() {
                     border-secondary-200
                     dark:border-neon-blue/20
                   `}>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className={`
+                          text-xs
+                          text-secondary-500
+                          dark:text-neon-blue/60
+                        `}>Balance</p>
+                        <p className={`
+                          text-lg font-semibold
+                          text-secondary-900
+                          dark:text-neon-blue
+                        `}>{parseFloat(formattedBalance).toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                      </div>
                       <div>
                         <p className={`
                           text-xs

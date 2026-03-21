@@ -4,6 +4,221 @@
 // Deployed: 2026-03-19
 // VIBEToken: 0x93C52dF000317e12F891474B46d8B05652430bDC
 
+// ============================================
+// Minimal ABIs for frontend blockchain interaction
+// ============================================
+
+export const VIBETOKEN_ABI = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'name',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'symbol',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'decimals',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'transfer',
+    type: 'function',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'approve',
+    type: 'function',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'totalSupply',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const
+
+export const VIBSTAKING_ABI = [
+  {
+    name: 'getStakedAmount',
+    type: 'function',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'getPendingRewards',
+    type: 'function',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'stake',
+    type: 'function',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'unstake',
+    type: 'function',
+    inputs: [{ name: 'amount', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'claimRewards',
+    type: 'function',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'rewardToken',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'stakingToken',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+] as const
+
+export const VIBGOVERNANCE_ABI = [
+  {
+    name: 'proposalCount',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'getProposal',
+    type: 'function',
+    inputs: [{ name: 'proposalId', type: 'uint256' }],
+    outputs: [
+      {
+        type: 'tuple',
+        name: '',
+        components: [
+          { name: 'id', type: 'uint256' },
+          { name: 'proposer', type: 'address' },
+          { name: 'title', type: 'string' },
+          { name: 'description', type: 'string' },
+          { name: 'forVotes', type: 'uint256' },
+          { name: 'againstVotes', type: 'uint256' },
+          { name: 'startTime', type: 'uint256' },
+          { name: 'endTime', type: 'uint256' },
+          { name: 'executed', type: 'bool' },
+          { name: 'cancelled', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    name: 'castVote',
+    type: 'function',
+    inputs: [
+      { name: 'proposalId', type: 'uint256' },
+      { name: 'support', type: 'bool' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'getVotes',
+    type: 'function',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const
+
+export const JOINTORDER_ABI = [
+  {
+    name: 'createOrder',
+    type: 'function',
+    inputs: [
+      { name: 'serviceId', type: 'uint256' },
+      { name: 'agentId', type: 'uint256' },
+      { name: 'clientId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'requirements', type: 'string' },
+    ],
+    outputs: [{ name: 'orderId', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'confirmDelivery',
+    type: 'function',
+    inputs: [{ name: 'orderId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'raiseDispute',
+    type: 'function',
+    inputs: [{ name: 'orderId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
+// Contract address exports
+export const VIBETOKEN_ADDRESS = '0x93C52dF000317e12F891474B46d8B05652430bDC'
+export const VIBSTAKING_ADDRESS = '0x1901Ab56eA38cBeFc7a3F0Ed188B7108d27f4c05'
+export const VIBGOVERNANCE_ADDRESS = '0x27475aea1eEba485005B1717a35a7D411d144a1d'
+export const VIBVESTING_ADDRESS = '0x4d3008550fc164ccf0e1C0C4f666EFC14dE924'
+export const JOINTORDER_ADDRESS = '0x55f4b49c9C269Fccf6d90e16304654b7F69138d0'
+export const VIBIDENTITY_ADDRESS = '0x978eddDf11728B4e6A6C461D8806eD5f4339D466'
+export const AGENTREGISTRY_ADDRESS = '0xC5AbAE9f580C48D645bDE9904712891AE8FcDec6'
+export const AGENTWALLET_ADDRESS = '0xeAd5FCC931493F702208B737528578718D681243'
+
 export interface ContractInfo {
   name: string
   address: string

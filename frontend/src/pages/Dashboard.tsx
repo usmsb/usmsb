@@ -29,6 +29,8 @@ import { getMetrics, getAgents, getWorkflows, getStatsSummary, getSystemStatus, 
 import { WelcomeGuide } from '@/components/WelcomeGuide'
 import { ListItemSkeleton } from '@/components/ui/EmptyState'
 import { WalletBalanceCard, TransactionList } from '@/components/WalletBalance'
+import { BalanceDisplay } from '@/components/BalanceDisplay'
+import { GovernancePanel } from '@/components/GovernancePanel'
 import { ReputationDisplay } from '@/components/ReputationDisplay'
 import { BlockchainStatusCard, TokenBalanceChecker } from '@/components/BlockchainStatus'
 import { useAppStore } from '@/store'
@@ -538,8 +540,14 @@ export default function Dashboard() {
 
       {/* Wallet & Reputation Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <BalanceDisplay />
         <WalletBalanceCard />
         <ReputationDisplay showHistory={true} />
+      </div>
+
+      {/* Blockchain & Governance Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GovernancePanel />
         <BlockchainStatusCard />
       </div>
 

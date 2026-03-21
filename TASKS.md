@@ -35,7 +35,7 @@
 ### P0 Critical
 - [ ] B1: Agent 注册时自动创建 AgentWallet (register_agent_v2)
 - [ ] B2: confirm_delivery 的 joint_order_pool_manager 传参修复
-- [ ] B3: 前端集成 viem/ethers.js 连接钱包
+- [D] B3: 前端集成 viem/ethers.js 连接钱包
 
 ### P1 Core
 - [ ] B4: JointOrder 完整 API (create/submit/accept/confirm/cancel pool)
@@ -47,11 +47,11 @@
 ### P2 Extended
 - [ ] B9:  身份 SBT 铸造 API
 - [ ] B10: 协作分成 API
-- [ ] B11: 前端质押界面
-- [ ] B12: 前端治理投票界面
-- [ ] B13: 前端交易历史
+- [D] B11: 前端质押界面
+- [D] B12: 前端治理投票界面
+- [D] B13: 前端交易历史
 - [ ] B14: 绑定 owner 时真实调用 VIBStaking 质押
-- [ ] B15: 前端显示 VIBE 余额
+- [D] B15: 前端显示 VIBE 余额
 
 ### P3 体验优化
 - [ ] B16: 交易状态通知 (pending → confirmed)
