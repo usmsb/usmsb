@@ -4,6 +4,15 @@ SQLite Database setup for AI Civilization Platform
 import json
 import os
 import sqlite3
+
+
+def _filter_sensitive_fields(data: dict) -> dict:
+    """Remove sensitive fields before returning to API layer."""
+    if data is None:
+        return None
+    sensitive = {"api_key_hash", "soul_private_key", "api_key", "private_key"}
+    return {k: v for k, v in data.items() if k not in sensitive}
+
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
