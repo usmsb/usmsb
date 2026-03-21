@@ -472,16 +472,18 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
      */
     function emergencyWithdraw() external nonReentrant isStaked(msg.sender) {
         StakeInfo storage info = stakeInfos[msg.sender];
+        uint256 amount = info.amount;
 
-        // 不更新奖励，直接提取
-        vibeToken.safeTransfer(msg.sender, info.amount);
-
-        emit EmergencyWithdraw(msg.sender, info.amount);
-
-        totalStaked -= info.amount;
+        // C2修复: CEI模式 - 先更新状态，再转账
+        totalStaked -= amount;
         info.amount = 0;
         rewards[msg.sender] = 0;
         info.isActive = false;
+
+        // 转账（状态已更新，安全）
+        vibeToken.safeTransfer(msg.sender, amount);
+
+        emit EmergencyWithdraw(msg.sender, amount);
     }
 
     // ========== 管理员函数 ==========
