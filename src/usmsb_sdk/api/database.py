@@ -867,6 +867,72 @@ def has_wallet_binding(agent_id: str) -> bool:
     return wallet is not None and bool(wallet.get('wallet_address'))
 
 
+def db_create_order_record(order_id: str, creator: str, total_budget: float, service_type: str, chain_pool_id: str) -> bool:
+    """Record a JointOrder pool creation event in the database.
+
+    Stores the order in the transactions table (used as the orders table).
+    Returns True if a record was inserted or already exists.
+    """
+    import time as _time
+    now = _time.time()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT OR IGNORE INTO transactions (
+                    id, buyer_id, seller_id, amount, title, status,
+                    transaction_type, escrow_tx_hash, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                f"order_{order_id}",
+                creator,           # buyer_id = creator
+                creator,           # seller_id = creator initially
+                total_budget,
+                service_type,      # title = service_type
+                'pending',         # status
+                'joint_order',
+                chain_pool_id,     # escrow_tx_hash = chain pool id
+                now, now
+            ))
+            conn.commit()
+            return True
+        except Exception:
+            return False
+
+
+def db_log_governance_event(voter: str, event_type: str, tx_hash: str, extra: dict = None) -> bool:
+    """Log a governance event (proposal creation or vote) to the database.
+
+    For votes, stores in the votes table.
+    For proposals, stores in the proposals table.
+    Returns True if logged successfully.
+    """
+    import time as _time
+    now = _time.time()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        try:
+            if event_type == "create_proposal":
+                title = (extra or {}).get("title", "")
+                cursor.execute('''
+                    INSERT OR IGNORE INTO proposals (
+                        id, title, proposer_id, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                ''', (f"prop_{tx_hash[:16]}", title, voter, "active", now, now))
+            elif event_type == "vote":
+                proposal_ref = (extra or {}).get("proposal_id", f"prop_{tx_hash[:16]}")
+                vote_val = (extra or {}).get("support", 1)  # 1=for, 0=against, 2=abstain
+                cursor.execute('''
+                    INSERT OR IGNORE INTO votes (
+                        id, proposal_id, voter_id, vote, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                ''', (f"vote_{tx_hash[:16]}", proposal_ref, voter, vote_val, now))
+            conn.commit()
+            return True
+        except Exception:
+            return False
+
+
 # ==================== Service Operations ====================
 
 def create_service(service_data: dict[str, Any]) -> dict[str, Any]:

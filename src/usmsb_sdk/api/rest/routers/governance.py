@@ -254,11 +254,33 @@ async def cast_vote(
         if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
             raise HTTPException(status_code=400, detail="Invalid tx_hash format")
 
+        # Verify tx was mined and succeeded
         receipt = w3.eth.get_transaction_receipt(request.tx_hash)
         if receipt is None:
             raise HTTPException(status_code=400, detail="Transaction not found or still pending")
         if receipt.status != 1:
             raise HTTPException(status_code=400, detail="Transaction failed on-chain")
+
+        # Validate: proposal must exist on-chain
+        try:
+            governance_client = VIBGovernanceClient()
+            proposal = await governance_client.get_proposal(request.proposal_id)
+            if proposal is None:
+                raise HTTPException(status_code=404, detail=f"Proposal {request.proposal_id} not found on-chain")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Failed to query proposal: {str(e)}")
+
+        # Validate: voter must have voting power (general voting power, not proposal-specific)
+        try:
+            voting_power = await governance_client.get_voting_power(address)
+            if voting_power == 0:
+                raise HTTPException(status_code=403, detail="No voting power — stake VIBE to gain voting rights")
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # If we can't check, trust the on-chain tx result
 
         support_str = {0: "against", 1: "for", 2: "abstain"}.get(request.support, "unknown")
         return CastVoteResponse(

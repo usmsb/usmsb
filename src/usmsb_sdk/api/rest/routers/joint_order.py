@@ -262,6 +262,24 @@ async def submit_bid(
     if not provider_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
+    # Validate: provider must be a registered and bound agent
+    agent_id = current_user.get("agent_id")
+    if not agent_id:
+        raise HTTPException(status_code=403, detail="Only registered agents can submit bids")
+    try:
+        from usmsb_sdk.api.database import get_agent, has_wallet_binding
+        agent = get_agent(agent_id)
+        if not agent:
+            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+        if agent.get("binding_status") != "bound":
+            raise HTTPException(status_code=403, detail="Agent is not bound to an owner — cannot bid")
+        if not has_wallet_binding(agent_id):
+            raise HTTPException(status_code=403, detail="Agent wallet not deployed — binding incomplete")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Best-effort validation
+
     try:
         config = BlockchainConfig.from_env()
         w3 = Web3(Web3.HTTPProvider(config.rpc_url))
