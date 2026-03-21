@@ -2431,7 +2431,7 @@ def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount:
         if not binding:
             return None
 
-        binding_dict = dict(binding)
+        binding_dict = _row_to_dict(cursor, binding)
 
         # Check if expired
         if binding_dict['expires_at'] < now:
@@ -2447,10 +2447,11 @@ def complete_binding_request(binding_code: str, owner_wallet: str, stake_amount:
             WHERE binding_code = ?
         ''', (owner_wallet, stake_amount, now, binding_code))
 
-        # Update agent - set to 'pending' first (will be set to 'bound' after wallet is deployed)
+        # Update agent_wallets to set owner_wallet (agents table has no owner_wallet column)
+        # Set binding_status via stake_status in agent_wallets (agents table has no binding_status)
         cursor.execute('''
-            UPDATE agents
-            SET owner_wallet = ?, binding_status = 'pending', updated_at = ?
+            UPDATE agent_wallets
+            SET owner_id = ?, updated_at = ?
             WHERE agent_id = ?
         ''', (owner_wallet, now, binding_dict['agent_id']))
 
