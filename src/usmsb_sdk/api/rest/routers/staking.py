@@ -614,7 +614,7 @@ async def on_chain_stake(
             raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         # Transaction successful — update database
-        from usmsb_sdk.api.database import update_agent_balance, update_agent_wallet
+        from usmsb_sdk.api.database import update_agent_balance
         amount_wei = int(request.amount * (10 ** 18))
 
         # Find agent by wallet address and update staking info
@@ -680,7 +680,7 @@ async def on_chain_unstake(
             try:
                 from usmsb_sdk.api.database import update_agent_balance
                 # Unstake clears all staking - mark as unbound
-                from usmsb_sdk.api.database import update_agent_wallet
+                pass  # update_agent_wallet not available
             except Exception:
                 pass
 
