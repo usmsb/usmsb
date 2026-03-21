@@ -1,509 +1,173 @@
-import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
-import {
-  Coins,
-  TrendingUp,
-  Lock,
-  Unlock,
-  AlertCircle,
-  Loader2,
-  Gift,
-  ArrowUpRight,
-  ArrowDownRight,
-  Info,
-} from 'lucide-react'
-import {
-  getStakingInfo,
-  depositStake,
-  withdrawStake,
-  getStakingRewards,
-  claimRewards,
-} from '@/lib/api'
-import clsx from 'clsx'
+import React, { useState } from 'react'
+import { useStaking } from '../hooks/useStaking'
+import { useAccount } from 'wagmi'
 
-interface StakingPanelProps {
-  onStakeChange?: () => void
-}
+export default function StakingPanel() {
+  const { address, isConnected } = useAccount()
+  const {
+    stakedAmount,
+    formattedStakedAmount,
+    pendingRewards,
+    formattedPendingRewards,
+    stake,
+    unstake,
+    claimReward,
+    isLoading,
+    isConfirming,
+    isConfirmed,
+    error,
+  } = useStaking()
 
-const STAKE_TIERS = [
-  { tier: 'BRONZE', min: 100, max: 999, label: 'Bronze', agents: 1, discount: '0%', color: '#cd7f32' },
-  { tier: 'SILVER', min: 1000, max: 4999, label: 'Silver', agents: 3, discount: '5%', color: '#c0c0c0' },
-  { tier: 'GOLD', min: 5000, max: 9999, label: 'Gold', agents: 10, discount: '10%', color: '#ffd700' },
-  { tier: 'PLATINUM', min: 10000, max: Infinity, label: 'Platinum', agents: 50, discount: '20%', color: '#e5e4e2' },
-]
+  const [stakeAmount, setStakeAmount] = useState('')
+  const [lockPeriod, setLockPeriod] = useState(1)
+  const [txStatus, setTxStatus] = useState<'idle' | 'signing' | 'pending' | 'confirmed' | 'failed'>('idle')
 
-export function StakingPanel({ onStakeChange }: StakingPanelProps) {
-  const { t } = useTranslation()
-  const [stakeInfo, setStakeInfo] = useState<{
-    staked_amount: number
-    stake_status: string
-    stake_tier: string
-    locked_stake: number
-    pending_rewards: number
-    apy: number
-    tier_benefits?: { max_agents: number; discount: number }
-  } | null>(null)
-  const [rewardsInfo, setRewardsInfo] = useState<{
-    pending_rewards: number
-    total_claimed: number
-    apy: number
-  } | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [actionType, setActionType] = useState<'deposit' | 'withdraw' | 'claim' | null>(null)
-  const [showDepositModal, setShowDepositModal] = useState(false)
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false)
-  const [amount, setAmount] = useState('')
-
-  useEffect(() => {
-    loadStakingInfo()
-  }, [])
-
-  const loadStakingInfo = async () => {
-    setIsLoading(true)
-    setError(null)
+  const handleStake = async () => {
+    if (!stakeAmount || parseFloat(stakeAmount) <= 0) return
+    setTxStatus('signing')
     try {
-      const [stakeResponse, rewardsResponse] = await Promise.all([
-        getStakingInfo(),
-        getStakingRewards(),
-      ])
-      setStakeInfo(stakeResponse)
-      setRewardsInfo(rewardsResponse)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load staking info')
-    } finally {
-      setIsLoading(false)
+      const hash = await stake(stakeAmount, lockPeriod)
+      if (hash) {
+        setTxStatus('pending')
+      } else {
+        setTxStatus('failed')
+      }
+    } catch {
+      setTxStatus('failed')
     }
   }
 
-  const handleDeposit = async () => {
-    const depositAmount = parseFloat(amount)
-    if (isNaN(depositAmount) || depositAmount <= 0) {
-      setError('Please enter a valid amount')
-      return
-    }
-
-    setActionType('deposit')
-    setError(null)
+  const handleUnstake = async () => {
+    setTxStatus('signing')
     try {
-      const response = await depositStake(depositAmount)
-      setStakeInfo({
-        staked_amount: response.staked_amount,
-        stake_status: response.stake_status,
-        stake_tier: response.stake_tier,
-        locked_stake: response.locked_stake,
-        pending_rewards: response.pending_rewards,
-        apy: response.apy,
-        tier_benefits: response.tier_benefits,
-      })
-      setShowDepositModal(false)
-      setAmount('')
-      onStakeChange?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to deposit stake')
-    } finally {
-      setActionType(null)
+      const hash = await unstake()
+      if (hash) {
+        setTxStatus('pending')
+      } else {
+        setTxStatus('failed')
+      }
+    } catch {
+      setTxStatus('failed')
     }
   }
 
-  const handleWithdraw = async () => {
-    const withdrawAmount = parseFloat(amount)
-    if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
-      setError('Please enter a valid amount')
-      return
-    }
-
-    setActionType('withdraw')
-    setError(null)
+  const handleClaim = async () => {
+    setTxStatus('signing')
     try {
-      const response = await withdrawStake(withdrawAmount)
-      setStakeInfo({
-        staked_amount: response.staked_amount,
-        stake_status: response.stake_status,
-        stake_tier: response.stake_tier,
-        locked_stake: 0,
-        pending_rewards: response.pending_rewards,
-        apy: response.apy,
-        tier_benefits: response.tier_benefits,
-      })
-      setShowWithdrawModal(false)
-      setAmount('')
-      onStakeChange?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to withdraw stake')
-    } finally {
-      setActionType(null)
+      const hash = await claimReward()
+      if (hash) {
+        setTxStatus('pending')
+      } else {
+        setTxStatus('failed')
+      }
+    } catch {
+      setTxStatus('failed')
     }
   }
 
-  const handleClaimRewards = async () => {
-    setActionType('claim')
-    setError(null)
-    try {
-      await claimRewards()
-      await loadStakingInfo()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to claim rewards')
-    } finally {
-      setActionType(null)
-    }
+  const resetStatus = () => {
+    setTimeout(() => setTxStatus('idle'), 3000)
   }
 
-  const getCurrentTier = () => {
-    if (!stakeInfo) return STAKE_TIERS[0]
-    return STAKE_TIERS.find(
-      (t) => stakeInfo.staked_amount >= t.min && stakeInfo.staked_amount <= t.max
-    ) || STAKE_TIERS[0]
-  }
-
-  const getNextTier = () => {
-    if (!stakeInfo) return STAKE_TIERS[1]
-    const currentIndex = STAKE_TIERS.findIndex(
-      (t) => stakeInfo.staked_amount >= t.min && stakeInfo.staked_amount <= t.max
-    )
-    return currentIndex < STAKE_TIERS.length - 1 ? STAKE_TIERS[currentIndex + 1] : null
-  }
-
-  const formatNumber = (num: number) => {
-    return num.toLocaleString(undefined, { maximumFractionDigits: 2 })
-  }
-
-  if (isLoading) {
+  if (!isConnected) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-        <span className="ml-2 text-secondary-500 dark:text-secondary-400">{t('common.loading', 'Loading...')}</span>
+      <div className="staking-panel">
+        <p className="text-gray-400">Connect wallet to view staking info</p>
       </div>
     )
   }
-
-  const currentTier = getCurrentTier()
-  const nextTier = getNextTier()
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
-            <Coins className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100">{t('staking.title', 'Staking')}</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-secondary-500 dark:text-secondary-400">{t('staking.apy', 'APY')}:</span>
-          <span className="text-green-600 dark:text-green-400 font-medium">{stakeInfo?.apy || 0}%</span>
-        </div>
-      </div>
+    <div className="staking-panel p-4 bg-white rounded-lg shadow">
+      <h3 className="text-lg font-semibold mb-4">VIBE Staking</h3>
 
-      {/* Error Display */}
-      {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-600 dark:text-red-400">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">{error}</span>
+      {/* Status Banner */}
+      {txStatus !== 'idle' && (
+        <div className={`mb-4 p-3 rounded ${
+          txStatus === 'confirmed' ? 'bg-green-100 text-green-700' :
+          txStatus === 'failed' ? 'bg-red-100 text-red-700' :
+          txStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+          'bg-blue-100 text-blue-700'
+        }`}>
+          {txStatus === 'signing' && '⏳ Waiting for wallet signature...'}
+          {txStatus === 'pending' && '⏳ Transaction submitted, waiting for confirmation...'}
+          {txStatus === 'confirmed' && '✅ Transaction confirmed!'}
+          {txStatus === 'failed' && '❌ Transaction failed.'}
+          {(txStatus === 'confirmed' || txStatus === 'failed') && (
+            <button onClick={resetStatus} className="ml-2 text-sm underline">Dismiss</button>
+          )}
         </div>
       )}
 
-      {/* Main Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Staked Amount */}
-        <div className="card">
-          <div className="flex items-center gap-2 text-secondary-500 dark:text-secondary-400 text-sm mb-1">
-            <Lock className="w-4 h-4" />
-            {t('staking.stakedAmount', 'Staked Amount')}
-          </div>
-          <div className="text-2xl font-bold text-light-text-primary dark:text-secondary-100">
-            {formatNumber(stakeInfo?.staked_amount || 0)} VIBE
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span
-              className="px-2 py-0.5 text-xs font-medium rounded"
-              style={{
-                backgroundColor: `${currentTier.color}20`,
-                color: currentTier.color,
-              }}
-            >
-              {currentTier.label}
-            </span>
-          </div>
+      {/* Staked Amount */}
+      <div className="mb-4">
+        <p className="text-sm text-gray-500">Staked Amount</p>
+        <p className="text-2xl font-bold">{formattedStakedAmount} <span className="text-sm font-normal">VIBE</span></p>
+      </div>
+
+      {/* Pending Rewards */}
+      <div className="mb-4">
+        <p className="text-sm text-gray-500">Pending Rewards</p>
+        <p className="text-xl font-semibold text-green-600">{formattedPendingRewards} <span className="text-sm">VIBE</span></p>
+      </div>
+
+      {/* Stake Form */}
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Amount to Stake</label>
+          <input
+            type="number"
+            value={stakeAmount}
+            onChange={(e) => setStakeAmount(e.target.value)}
+            placeholder="0.0"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
 
-        {/* Pending Rewards */}
-        <div className="card">
-          <div className="flex items-center gap-2 text-secondary-500 dark:text-secondary-400 text-sm mb-1">
-            <Gift className="w-4 h-4" />
-            {t('staking.pendingRewards', 'Pending Rewards')}
-          </div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {formatNumber(stakeInfo?.pending_rewards || 0)} VIBE
-          </div>
-          <button
-            onClick={handleClaimRewards}
-            disabled={actionType === 'claim' || !stakeInfo?.pending_rewards}
-            className={clsx(
-              'mt-2 px-3 py-1 text-sm rounded-lg transition-all',
-              'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-              'hover:bg-green-200 dark:hover:bg-green-900/50',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Lock Period</label>
+          <select
+            value={lockPeriod}
+            onChange={(e) => setLockPeriod(Number(e.target.value))}
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {actionType === 'claim' ? (
-              <span className="flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {t('staking.claiming', 'Claiming...')}
-              </span>
-            ) : (
-              t('staking.claimRewards', 'Claim Rewards')
-            )}
-          </button>
+            <option value={0}>No Lock</option>
+            <option value={1}>30 Days</option>
+            <option value={2}>90 Days</option>
+            <option value={3}>180 Days</option>
+            <option value={4}>365 Days</option>
+          </select>
         </div>
-      </div>
 
-      {/* Tier Progress */}
-      {nextTier && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-secondary-500 dark:text-secondary-400">{t('staking.nextTier', 'Next Tier')}</span>
-            <span className="text-sm font-medium" style={{ color: nextTier.color }}>
-              {nextTier.label}
-            </span>
-          </div>
-          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${Math.min(
-                  100,
-                  ((stakeInfo?.staked_amount || 0) / nextTier.min) * 100
-                )}%`,
-                backgroundColor: currentTier.color,
-              }}
-            />
-          </div>
-          <p className="text-xs text-secondary-400 dark:text-secondary-500 mt-2">
-            {t('staking.tierProgress', 'Stake {{amount}} more VIBE to reach {{tier}}', {
-              amount: formatNumber(nextTier.min - (stakeInfo?.staked_amount || 0)),
-              tier: nextTier.label,
-            })}
-          </p>
-        </div>
-      )}
-
-      {/* Tier Benefits */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-3">
-          <Info className="w-4 h-4 text-secondary-400" />
-          <span className="text-sm font-medium text-light-text-primary dark:text-secondary-100">
-            {t('staking.tierBenefits', 'Tier Benefits')}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-secondary-500 dark:text-secondary-400">{t('staking.maxAgents', 'Max Agents')}:</span>
-            <span className="ml-2 text-light-text-primary dark:text-secondary-100">{stakeInfo?.tier_benefits?.max_agents || 1}</span>
-          </div>
-          <div>
-            <span className="text-secondary-500 dark:text-secondary-400">{t('staking.discount', 'Discount')}:</span>
-            <span className="ml-2 text-green-600 dark:text-green-400">{stakeInfo?.tier_benefits?.discount || 0}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* All Tiers */}
-      <div className="space-y-2">
-        <span className="text-sm font-medium text-secondary-500 dark:text-secondary-400">{t('staking.allTiers', 'Staking Tiers')}</span>
-        {STAKE_TIERS.map((tier) => {
-          const isCurrent = stakeInfo?.stake_tier === tier.tier
-          return (
-            <div
-              key={tier.tier}
-              className={clsx(
-                'p-3 rounded-lg border transition-all',
-                isCurrent
-                  ? 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700'
-                  : 'bg-gray-50 dark:bg-gray-800/50 border-light-border dark:border-gray-700'
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: tier.color }}
-                  />
-                  <span className="font-medium text-light-text-primary dark:text-secondary-100">{tier.label}</span>
-                  {isCurrent && (
-                    <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
-                      {t('staking.current', 'Current')}
-                    </span>
-                  )}
-                </div>
-                <span className="text-sm text-secondary-500 dark:text-secondary-400">
-                  {tier.min.toLocaleString()} - {tier.max === Infinity ? '∞' : tier.max.toLocaleString()} VIBE
-                </span>
-              </div>
-              <div className="flex items-center gap-4 mt-1 text-xs text-secondary-400 dark:text-secondary-500">
-                <span>{tier.agents} agents</span>
-                <span>{tier.discount} discount</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-3">
         <button
-          onClick={() => setShowDepositModal(true)}
-          className="flex-1 btn btn-primary flex items-center justify-center gap-2"
+          onClick={handleStake}
+          disabled={!stakeAmount || parseFloat(stakeAmount) <= 0 || txStatus === 'pending' || txStatus === 'signing'}
+          className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <ArrowUpRight className="w-4 h-4" />
-          {t('staking.deposit', 'Deposit')}
+          {txStatus === 'pending' || txStatus === 'signing' ? 'Processing...' : 'Stake VIBE'}
         </button>
+
         <button
-          onClick={() => setShowWithdrawModal(true)}
-          disabled={!stakeInfo?.staked_amount}
-          className="flex-1 btn btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleUnstake}
+          disabled={txStatus === 'pending' || txStatus === 'signing'}
+          className="w-full py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <ArrowDownRight className="w-4 h-4" />
-          {t('staking.withdraw', 'Withdraw')}
+          {txStatus === 'pending' || txStatus === 'signing' ? 'Processing...' : 'Unstake All'}
+        </button>
+
+        <button
+          onClick={handleClaim}
+          disabled={txStatus === 'pending' || txStatus === 'signing'}
+          className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {txStatus === 'pending' || txStatus === 'signing' ? 'Processing...' : 'Claim Rewards'}
         </button>
       </div>
 
-      {/* Deposit Modal */}
-      {showDepositModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl border border-light-border dark:border-gray-700 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
-              {t('staking.depositTitle', 'Deposit VIBE')}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-secondary-600 dark:text-secondary-400 mb-1">
-                  {t('staking.amount', 'Amount')}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    min={100}
-                    className="w-full bg-white dark:bg-gray-700 border border-light-border dark:border-gray-600 rounded-lg px-4 py-3 text-light-text-primary dark:text-secondary-100 text-xl placeholder-secondary-400 focus:border-blue-500 focus:outline-none"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary-400">
-                    VIBE
-                  </span>
-                </div>
-                <p className="text-xs text-secondary-400 dark:text-secondary-500 mt-1">
-                  {t('staking.minDeposit', 'Minimum deposit: 100 VIBE')}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowDepositModal(false)}
-                  className="flex-1 btn btn-secondary"
-                >
-                  {t('common.cancel', 'Cancel')}
-                </button>
-                <button
-                  onClick={handleDeposit}
-                  disabled={actionType === 'deposit'}
-                  className="flex-1 btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionType === 'deposit' ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {t('staking.depositing', 'Depositing...')}
-                    </span>
-                  ) : (
-                    t('staking.depositButton', 'Deposit')
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Withdraw Modal */}
-      {showWithdrawModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl border border-light-border dark:border-gray-700 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-light-text-primary dark:text-secondary-100 mb-4">
-              {t('staking.withdrawTitle', 'Withdraw VIBE')}
-            </h3>
-            <div className="space-y-4">
-              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                <div className="text-sm text-secondary-500 dark:text-secondary-400">{t('staking.available', 'Available')}</div>
-                <div className="text-xl font-bold text-light-text-primary dark:text-secondary-100">
-                  {formatNumber((stakeInfo?.staked_amount || 0) - (stakeInfo?.locked_stake || 0))} VIBE
-                </div>
-                {stakeInfo?.locked_stake ? (
-                  <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                    {formatNumber(stakeInfo.locked_stake)} VIBE {t('staking.locked', 'locked')}
-                  </div>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="block text-sm text-secondary-600 dark:text-secondary-400 mb-1">
-                  {t('staking.amount', 'Amount')}
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    min={0}
-                    max={(stakeInfo?.staked_amount || 0) - (stakeInfo?.locked_stake || 0)}
-                    className="w-full bg-white dark:bg-gray-700 border border-light-border dark:border-gray-600 rounded-lg px-4 py-3 text-light-text-primary dark:text-secondary-100 text-xl placeholder-secondary-400 focus:border-blue-500 focus:outline-none"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary-400">
-                    VIBE
-                  </span>
-                </div>
-                <button
-                  onClick={() =>
-                    setAmount(
-                      String((stakeInfo?.staked_amount || 0) - (stakeInfo?.locked_stake || 0))
-                    )
-                  }
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-1"
-                >
-                  {t('staking.withdrawAll', 'Withdraw all')}
-                </button>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowWithdrawModal(false)}
-                  className="flex-1 btn btn-secondary"
-                >
-                  {t('common.cancel', 'Cancel')}
-                </button>
-                <button
-                  onClick={handleWithdraw}
-                  disabled={actionType === 'withdraw'}
-                  className="flex-1 btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {actionType === 'withdraw' ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {t('staking.withdrawing', 'Withdrawing...')}
-                    </span>
-                  ) : (
-                    t('staking.withdrawButton', 'Withdraw')
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Error */}
+      {error && (
+        <p className="mt-3 text-sm text-red-600">Error: {error.message}</p>
       )}
     </div>
   )
 }
-
-export default StakingPanel
