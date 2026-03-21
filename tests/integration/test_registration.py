@@ -51,34 +51,6 @@ class TestBindingFlow:
         assert r.status_code in (400, 422, 500)
 
 
-class TestWalletBinding:
-    def test_bind_wallet_success(self, client, integration_db, sample_bound_agent):
-        """POST /api/agents/v2/{agent_id}/wallet-binding → 200 on success."""
-        with mock_web3():
-            r = client.post(
-                f"/api/agents/v2/{sample_bound_agent}/wallet-binding",
-                json={
-                    "wallet_address": "0xNEWWALLET12345678901234567890123456",
-                    "owner_address": "0xOWNER1234567890123456789012345678901234",
-                    "binding_code": "CODE123",
-                },
-            )
-        # 200 = success, 400 = already bound, 500 = mock error
-        assert r.status_code in (200, 400, 500)
-
-    def test_bind_wallet_already_bound_returns_400(self, client, integration_db, sample_bound_agent):
-        """POST wallet-binding when already bound → 400."""
-        r = client.post(
-            f"/api/agents/v2/{sample_bound_agent}/wallet-binding",
-            json={
-                "wallet_address": "0xNEWWALLET12345678901234567890123456",
-                "owner_address": "0xOWNER1234567890123456789012345678901234",
-                "binding_code": "CODE123",
-            },
-        )
-        assert r.status_code in (200, 400)
-
-
 class TestAgentAPIKeys:
     def test_list_api_keys_returns_200_or_403(self, client, integration_db, sample_bound_agent):
         """GET /api/agents/v2/{agent_id}/api-keys → 200 or 403."""

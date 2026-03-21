@@ -306,16 +306,16 @@ async def get_optional_user_unified(
 def require_stake_unified(min_stake: int = 100):
     """Dependency factory to require minimum stake (works with both auth types)."""
     async def stake_checker(user: dict = Depends(get_current_user_unified)) -> dict:
-        if user['staked_amount'] < min_stake:
+        if user.get('staked_amount', 0) < min_stake:
             raise HTTPException(
                 status_code=403,
                 detail={
                     "error": "Insufficient stake",
                     "code": ErrorCode.INSUFFICIENT_STAKE,
                     "message": f"This action requires a minimum stake of {min_stake} VIBE. "
-                              f"Current stake: {user['staked_amount']} VIBE.",
+                              f"Current stake: {user.get('staked_amount', 0)} VIBE.",
                     "required": min_stake,
-                    "current": user['staked_amount']
+                    "current": user.get("staked_amount", 0)
                 }
             )
         return user
