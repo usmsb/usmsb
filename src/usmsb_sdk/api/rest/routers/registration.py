@@ -252,6 +252,66 @@ async def register_agent_v2(request: SelfRegistrationRequest):
             import logging
             logging.getLogger(__name__).warning(f"Soul registration failed for {agent_id}: {e}")
 
+    # Deploy AgentWallet and register with AgentRegistry
+    wallet_address = None
+    wallet_deployed = False
+    agent_registry_registered = False
+
+    try:
+        import os
+        from usmsb_sdk.blockchain.config import BlockchainConfig
+        from usmsb_sdk.blockchain.contracts.agent_wallet import AgentWalletFactory
+        from usmsb_sdk.blockchain.contracts.agent_registry import AgentRegistryClient
+
+        # Get deployer private key from environment
+        deployer_private_key = os.getenv("AGENT_WALLET_DEPLOYER_PRIVATE_KEY")
+        platform_agent_address = os.getenv("PLATFORM_AGENT_ADDRESS", "0x0000000000000000000000000000000000000000")
+
+        if deployer_private_key and len(deployer_private_key) == 66:  # Valid private key format
+            config = BlockchainConfig.from_env()
+
+            # Deploy AgentWallet
+            factory = AgentWalletFactory.from_config(config)
+
+            # Use request.owner_wallet if provided, otherwise use a placeholder
+            # For self-registration without owner, we use the platform as temporary owner
+            owner_address = request.owner_wallet if hasattr(request, 'owner_wallet') and request.owner_wallet else platform_agent_address
+
+            wallet_address, deploy_tx_hash = await factory.deploy_wallet(
+                owner_address=owner_address,
+                agent_address=platform_agent_address,
+                from_address=owner_address,  # Deployer address
+                private_key=deployer_private_key,
+            )
+
+            wallet_deployed = True
+
+            # Store wallet address in agent record (update owner_wallet field)
+            from usmsb_sdk.api.database import update_agent_binding_status
+            # Note: This updates the owner_wallet field in agents table
+            # The agent_wallets table entry will be created during owner binding
+            try:
+                update_agent_binding_status(agent_id, "unbound", owner_wallet=wallet_address)
+            except Exception as db_err:
+                logging.getLogger(__name__).warning(f"Failed to update agent wallet in DB: {db_err}")
+
+            # Register with AgentRegistry
+            try:
+                registry_client = AgentRegistryClient(config=config)
+                await registry_client.register_agent(
+                    wallet_address=wallet_address,
+                    owner_address=owner_address,
+                    owner_private_key=deployer_private_key,
+                )
+                agent_registry_registered = True
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"AgentRegistry registration failed for {agent_id}: {e}")
+
+    except Exception as e:
+        # Wallet deployment or registry registration failed, but agent is still registered
+        import logging
+        logging.getLogger(__name__).warning(f"Wallet deployment failed for {agent_id}: {e}")
+
     # Generate API Key
     api_key, key_hash, key_prefix = generate_api_key(agent_id)
     key_id = generate_key_id()
@@ -276,8 +336,12 @@ async def register_agent_v2(request: SelfRegistrationRequest):
         "binding_status": "unbound",
         "soul_registered": soul_registered,
         "soul_version": soul_version,
+        "wallet_address": wallet_address,
+        "wallet_deployed": wallet_deployed,
+        "agent_registry_registered": agent_registry_registered,
         "message": "Agent registered successfully. Save your API key securely - it won't be shown again!"
-                + (" Soul declared and registered." if soul_registered else " Consider declaring your Soul via /agents/soul/register for better matching."),
+                + (" Soul declared and registered." if soul_registered else " Consider declaring your Soul via /agents/soul/register for better matching.")
+                + (" AgentWallet deployed and registered." if wallet_deployed else ""),
     }
 
 

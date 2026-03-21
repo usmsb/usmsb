@@ -33,16 +33,16 @@
 ## 第二部分：业务合约对接 (无数量限制，全面对接)
 
 ### P0 Critical
-- [ ] B1: Agent 注册时自动创建 AgentWallet (register_agent_v2)
-- [ ] B2: confirm_delivery 的 joint_order_pool_manager 传参修复
+- [D] B1: Agent 注册时自动创建 AgentWallet (register_agent_v2)
+- [D] B2: confirm_delivery 的 joint_order_pool_manager 传参修复
 - [D] B3: 前端集成 viem/ethers.js 连接钱包
 
 ### P1 Core
-- [ ] B4: JointOrder 完整 API (create/submit/accept/confirm/cancel pool)
-- [ ] B5: 质押/解除质押 API (stake/unstake)
-- [ ] B6: VIBEToken 转账 API (transfer/approve/allowance)
+- [D] B4: JointOrder 完整 API (create/submit/accept/confirm/cancel pool)
+- [D] B5: 质押/解除质押 API (stake/unstake)
+- [D] B6: VIBEToken 转账 API (transfer/approve/allowance)
 - [ ] B7: 治理 API (propose/vote/query)
-- [ ] B8: 注册时调用 AgentRegistry 链上注册
+- [D] B8: 注册时调用 AgentRegistry 链上注册
 
 ### P2 Extended
 - [ ] B9:  身份 SBT 铸造 API
