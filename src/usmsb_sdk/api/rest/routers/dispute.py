@@ -20,16 +20,26 @@ router = APIRouter(prefix="/dispute", tags=["Dispute"])
 # ==================== Request/Response Models ====================
 
 class RaiseDisputeRequest(BaseModel):
-    """Request to raise a dispute on a JointOrder pool."""
+    """Request to raise a dispute on a JointOrder pool.
+
+    用户在浏览器 MetaMask 签名 raise dispute 交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     pool_id: str = Field(..., description="JointOrder pool ID (hex string)")
     reason: str = Field(..., min_length=1, max_length=500, description="Reason for dispute")
+    tx_hash: str = Field(..., description="raise dispute 交易的 tx_hash（前端签名后提供）")
 
 
 class ResolveDisputeRequest(BaseModel):
-    """Request to resolve a dispute (arbitrator only)."""
+    """Request to resolve a dispute (arbitrator only).
+
+    仲裁者在浏览器 MetaMask 签名 resolve dispute 交易后，将 tx_hash 提交给后端验证。
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     pool_id: str = Field(..., description="JointOrder pool ID (hex string)")
     refund_buyers: bool = Field(..., description="True to refund buyers, False to pay provider")
     resolution: str = Field(..., min_length=1, max_length=500, description="Resolution description")
+    tx_hash: str = Field(..., description="resolve dispute 交易的 tx_hash（前端签名后提供）")
 
 
 class RaiseDisputeResponse(BaseModel):
@@ -82,51 +92,35 @@ async def raise_dispute(
     from usmsb_sdk.blockchain.contracts.joint_order import JointOrderClient
     from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get user credentials
     address = current_user.get("wallet_address") or current_user.get("address")
-    private_key = current_user.get("private_key")
-
     if not address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
 
     try:
-        config = BlockchainConfig()
-        client = JointOrderClient()
+        from web3 import Web3
+        from usmsb_sdk.blockchain.config import BlockchainConfig
 
-        # Convert pool_id to bytes32
-        pool_id_bytes = bytes.fromhex(request.pool_id.lstrip("0x"))
-        while len(pool_id_bytes) < 32:
-            pool_id_bytes = b"\x00" + pool_id_bytes
-        pool_id_bytes32 = pool_id_bytes[:32]
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Get pool info to calculate penalty
-        pool = client.call_contract_function(
-            client.contract.functions.getPool(pool_id_bytes32)
-        )
-        winning_bid = int(pool[7])  # winningBid is at index 7 in OrderPool struct
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
 
-        # Calculate penalty (1% of winning bid)
-        penalty_rate = 100  # 100 bps = 1%
-        penalty_amount = winning_bid * penalty_rate // 10000
-
-        # Raise dispute via JointOrder contract directly
-        tx = client.build_contract_transaction(
-            client.contract.functions.raiseDispute(pool_id_bytes32, request.reason),
-            from_address=address,
-        )
-        tx_hash = client.sign_and_send_transaction(tx, private_key)
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None or receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Dispute raise transaction failed or not mined")
 
         return RaiseDisputeResponse(
             success=True,
-            tx_hash=tx_hash,
+            tx_hash=request.tx_hash,
             pool_id=request.pool_id,
-            penalty_amount=float(penalty_amount) / 1e18,  # Convert to VIBE
-            message=f"Dispute raised successfully on pool {request.pool_id}",
+            penalty_amount=0,  # Can be calculated from chain events if needed
+            message=f"Dispute raised and verified on pool {request.pool_id}",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Dispute raise verification failed: {str(e)}")
 
 
 @router.get("/{pool_id}", response_model=DisputeStatusResponse)
@@ -195,41 +189,32 @@ async def resolve_dispute(
     """
     from usmsb_sdk.blockchain.contracts.joint_order import JointOrderClient
 
-    # Get user credentials
     address = current_user.get("wallet_address") or current_user.get("address")
-    private_key = current_user.get("private_key")
-
     if not address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
 
     try:
-        client = JointOrderClient()
+        from web3 import Web3
+        from usmsb_sdk.blockchain.config import BlockchainConfig
 
-        # Convert pool_id to bytes32
-        pool_id_bytes = bytes.fromhex(request.pool_id.lstrip("0x"))
-        while len(pool_id_bytes) < 32:
-            pool_id_bytes = b"\x00" + pool_id_bytes
-        pool_id_bytes32 = pool_id_bytes[:32]
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Resolve dispute
-        tx = client.build_contract_transaction(
-            client.contract.functions.resolveDispute(
-                pool_id_bytes32,
-                request.refund_buyers,
-                request.resolution,
-            ),
-            from_address=address,
-        )
-        tx_hash = client.sign_and_send_transaction(tx, private_key)
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None or receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Dispute resolve transaction failed or not mined")
 
         return ResolveDisputeResponse(
             success=True,
-            tx_hash=tx_hash,
+            tx_hash=request.tx_hash,
             pool_id=request.pool_id,
             refund_buyers=request.refund_buyers,
-            message=f"Dispute resolved successfully on pool {request.pool_id}",
+            message=f"Dispute resolved and verified on pool {request.pool_id}",
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Dispute resolve verification failed: {str(e)}")

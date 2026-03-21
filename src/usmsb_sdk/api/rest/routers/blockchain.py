@@ -218,11 +218,22 @@ async def transfer_vibe(
     if not sender_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key - this should be securely retrieved based on auth type
-    # For API key auth, we need to get the private key from secure storage
+    # Get private key:
+    # - Agent (API key auth): use agent_private_key from DB
+    # - Real user (SIWE auth): use private_key from session
     private_key = current_user.get("private_key")
     if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
+        # Try to get agent's own private key from DB (Plan B autonomous signing)
+        agent_id = current_user.get("agent_id")
+        if agent_id:
+            from usmsb_sdk.api.database import get_agent_wallet
+            agent_wallet = get_agent_wallet(agent_id)
+            if agent_wallet and agent_wallet.get("agent_private_key"):
+                private_key = agent_wallet["agent_private_key"]
+                sender_address = agent_wallet.get("agent_address", sender_address)
+
+    if not private_key:
+        raise HTTPException(status_code=401, detail="Private key not available — agents must use agent_private_key for autonomous signing")
 
     try:
         client = VIBEBlockchainClient()
@@ -271,10 +282,21 @@ async def approve_vibe(
     if not owner_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
+    # Get private key:
+    # - Agent (API key auth): use agent_private_key from DB
+    # - Real user (SIWE auth): use private_key from session
     private_key = current_user.get("private_key")
     if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
+        agent_id = current_user.get("agent_id")
+        if agent_id:
+            from usmsb_sdk.api.database import get_agent_wallet
+            agent_wallet = get_agent_wallet(agent_id)
+            if agent_wallet and agent_wallet.get("agent_private_key"):
+                private_key = agent_wallet["agent_private_key"]
+                owner_address = agent_wallet.get("agent_address", owner_address)
+
+    if not private_key:
+        raise HTTPException(status_code=401, detail="Private key not available — agents must use agent_private_key for autonomous signing")
 
     try:
         client = VIBEBlockchainClient()

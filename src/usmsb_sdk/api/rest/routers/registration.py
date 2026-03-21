@@ -150,8 +150,17 @@ class RenewAPIKeyRequest(BaseModel):
 
 
 class CompleteBindingRequest(BaseModel):
-    """Request to complete binding (called by owner)."""
+    """Request to complete binding (called by owner).
+
+    用户在浏览器 MetaMask 完成以下操作后，将 tx_hash 提交给后端验证：
+    1. approve(VIBStaking, stake_amount) — 授权质押合约
+    2. stake(stake_amount, lockPeriod) — 执行质押
+
+    原则：真人操作由本人签名，后端不持有私钥。
+    """
     stake_amount: float = Field(..., description="Amount to stake in VIBE")
+    approve_tx_hash: str = Field(..., description="approve交易的tx_hash（Owner在浏览器签名）")
+    stake_tx_hash: str = Field(..., description="stake交易的tx_hash（Owner在浏览器签名）")
 
 
 # ==================== New Registration Endpoints ====================
@@ -447,18 +456,12 @@ async def complete_binding(
         1. Owner approves VIBStaking contract to spend stake amount
         2. Owner stakes VIBE via VIBStaking.stake()
     """
-    # Get owner wallet and private key from authenticated user session
+    # Get owner wallet from authenticated user session
     owner_wallet = user.get('wallet_address')
-    owner_private_key = user.get('private_key')
     if not owner_wallet:
         raise HTTPException(
             status_code=401,
             detail={"error": "Wallet address not found in session", "code": "UNAUTHORIZED"}
-        )
-    if not owner_private_key:
-        raise HTTPException(
-            status_code=401,
-            detail={"error": "Private key not available for staking", "code": "PRIVATE_KEY_UNAVAILABLE"}
         )
 
     # Get binding request
@@ -486,46 +489,32 @@ async def complete_binding(
             detail={"error": "Binding request expired", "code": "BINDING_EXPIRED"}
         )
 
-    # B14: Execute real VIBE staking on-chain
+    # B14: Verify real VIBE staking on-chain via tx_hash
+    # Owner signed these transactions in MetaMask browser wallet
     try:
-        from usmsb_sdk.blockchain.contracts.vib_staking import VIBStakingClient, LockPeriod
-        from usmsb_sdk.blockchain.contracts.vibe_token import VIBETokenClient
+        from web3 import Web3
         from usmsb_sdk.blockchain.config import BlockchainConfig
 
-        config = BlockchainConfig()
-        staking_address = config.get_contract_address("VIBStaking")
-        token_address = config.get_contract_address("VIBEToken")
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        if not staking_address or staking_address == "待部署":
-            raise HTTPException(
-                status_code=500,
-                detail={"error": "VIBStaking contract not deployed", "code": "STAKING_NOT_DEPLOYED"}
-            )
+        # Validate and verify approve tx
+        if not request.approve_tx_hash.startswith("0x") or len(request.approve_tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid approve_tx_hash format")
+        approve_receipt = w3.eth.get_transaction_receipt(request.approve_tx_hash)
+        if approve_receipt is None or approve_receipt.status != 1:
+            raise HTTPException(status_code=400, detail="approve transaction failed or not mined")
 
-        # Convert stake amount to wei
-        stake_amount_wei = int(request.stake_amount * (10 ** 18))
-
-        # Step 1: Approve VIBStaking contract to spend VIBE
-        token_client = VIBETokenClient()
-        approve_tx_hash = token_client.approve(
-            spender=staking_address,
-            amount=stake_amount_wei,
-            from_address=owner_wallet,
-            private_key=owner_private_key,
-        )
-
-        # Step 2: Stake VIBE (use 30-day lock period as default)
-        staking_client = VIBStakingClient()
-        stake_tx_hash = await staking_client.stake(
-            amount=stake_amount_wei,
-            lock_period=LockPeriod.DAYS_30,
-            from_address=owner_wallet,
-            private_key=owner_private_key,
-        )
+        # Validate and verify stake tx
+        if not request.stake_tx_hash.startswith("0x") or len(request.stake_tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid stake_tx_hash format")
+        stake_receipt = w3.eth.get_transaction_receipt(request.stake_tx_hash)
+        if stake_receipt is None or stake_receipt.status != 1:
+            raise HTTPException(status_code=400, detail="stake transaction failed or not mined")
 
         staking_tx_hashes = {
-            "approve_tx": approve_tx_hash,
-            "stake_tx": stake_tx_hash,
+            "approve_tx": request.approve_tx_hash,
+            "stake_tx": request.stake_tx_hash,
         }
 
     except HTTPException:

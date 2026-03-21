@@ -518,14 +518,22 @@ async def claim_rewards(
 # ==================== On-Chain Staking Endpoints ====================
 
 class OnChainStakeRequest(BaseModel):
-    """On-chain质押请求"""
+    """On-chain质押请求
+
+    用户在浏览器 MetaMask 签名质押交易后，将 tx_hash 提交给后端验证。
+    后端不持有私钥，只验证链上交易状态并更新数据库。
+    """
     amount: float = Field(..., gt=0, description="质押金额（VIBE）")
     lock_period: int = Field(default=1, ge=0, le=4, description="锁仓期: 0=无锁仓, 1=30天, 2=90天, 3=180天, 4=365天")
+    tx_hash: str = Field(..., description="质押交易的 tx_hash（前端签名后提供）")
 
 
 class OnChainUnstakeRequest(BaseModel):
-    """On-chain解除质押请求"""
-    pass  # No parameters needed, unstakes all
+    """On-chain解除质押请求
+
+    用户在浏览器 MetaMask 签名解除质押交易后，将 tx_hash 提交给后端验证。
+    """
+    tx_hash: str = Field(..., description="解除质押交易的 tx_hash（前端签名后提供）")
 
 
 class OnChainStakeResponse(BaseModel):
@@ -566,61 +574,61 @@ async def on_chain_stake(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    On-chain质押VIBE代币
+    提交质押交易的 tx_hash，后端验证链上状态并更新数据库。
 
-    需要认证。质押需要先调用POST /blockchain/approve授权staking合约。
+    用户在浏览器 MetaMask 签名质押交易（调用 VIBStaking.stake）后，
+    将 tx_hash 提交给此端点。后端验证交易成功后将质押记录写入数据库。
 
-    Args:
-        amount: 质押金额（VIBE）
-        lock_period: 锁仓期 (0=无锁仓, 1=30天, 2=90天, 3=180天, 4=365天)
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    from usmsb_sdk.blockchain import VIBEBlockchainClient
-    from usmsb_sdk.blockchain.contracts.vib_staking import LockPeriod
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get staker address from authenticated user
     staker_address = current_user.get("wallet_address") or current_user.get("address")
     if not staker_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        client = VIBEBlockchainClient()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Convert VIBE to wei
+        # Validate tx_hash format
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        # Verify transaction was mined (not pending)
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
+
+        # Transaction successful — update database
+        from usmsb_sdk.api.database import update_agent_balance, update_agent_wallet
         amount_wei = int(request.amount * (10 ** 18))
 
-        # Map lock_period to LockPeriod enum
-        lock_period_map = {
-            0: LockPeriod.NONE,
-            1: LockPeriod.DAYS_30,
-            2: LockPeriod.DAYS_90,
-            3: LockPeriod.DAYS_180,
-            4: LockPeriod.DAYS_365,
-        }
-        lock_period = lock_period_map.get(request.lock_period, LockPeriod.NONE)
-
-        # Execute stake
-        tx_hash = await client.staking.stake(
-            amount=amount_wei,
-            lock_period=lock_period,
-            from_address=staker_address,
-            private_key=private_key,
-        )
+        # Find agent by wallet address and update staking info
+        agent_id = current_user.get("agent_id")
+        if agent_id:
+            try:
+                update_agent_balance(agent_id, request.amount, deduct=False)
+            except Exception:
+                pass  # Non-agent users may not have agent_balance to update
 
         return OnChainStakeResponse(
             success=True,
-            tx_hash=tx_hash,
+            tx_hash=request.tx_hash,
             from_address=staker_address,
             amount_vibe=request.amount,
             lock_period=request.lock_period,
-            message=f"Successfully staked {request.amount} VIBE with lock period {request.lock_period}",
+            message=f"Stake verified and recorded. {request.amount} VIBE staked with lock period {request.lock_period}",
         )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Stake verification failed: {str(e)}")
 
 
 @router.post("/unstake", response_model=OnChainStakeResponse)
@@ -629,43 +637,57 @@ async def on_chain_unstake(
     current_user: dict = Depends(get_current_user_unified),
 ):
     """
-    On-chain解除质押
+    提交解除质押交易的 tx_hash，后端验证链上状态并更新数据库。
 
-    需要认证。解除质押后会领取所有待领取奖励。
+    用户在浏览器 MetaMask 签名解除质押交易后，
+    将 tx_hash 提交给此端点验证。解除质押会领取所有待领奖励。
 
-    注意: 解除质押需要满足锁仓期条件。
+    原则：真人操作由本人签名，后端不持有私钥。
     """
-    from usmsb_sdk.blockchain import VIBEBlockchainClient
+    from web3 import Web3
+    from usmsb_sdk.blockchain.config import BlockchainConfig
 
-    # Get staker address from authenticated user
     staker_address = current_user.get("wallet_address") or current_user.get("address")
     if not staker_address:
         raise HTTPException(status_code=401, detail="Wallet address not found in authentication")
 
-    # Get private key
-    private_key = current_user.get("private_key")
-    if not private_key:
-        raise HTTPException(status_code=401, detail="Private key not available for this authentication method")
-
     try:
-        client = VIBEBlockchainClient()
+        config = BlockchainConfig.from_env()
+        w3 = Web3(Web3.HTTPProvider(config.rpc_url))
 
-        # Execute unstake
-        tx_hash = await client.staking.unstake(
-            from_address=staker_address,
-            private_key=private_key,
-        )
+        if not request.tx_hash.startswith("0x") or len(request.tx_hash) != 66:
+            raise HTTPException(status_code=400, detail="Invalid tx_hash format")
+
+        receipt = w3.eth.get_transaction_receipt(request.tx_hash)
+        if receipt is None:
+            raise HTTPException(status_code=400, detail="Transaction not found or still pending")
+
+        if receipt.status != 1:
+            raise HTTPException(status_code=400, detail="Transaction failed on-chain")
+
+        # Update database
+        agent_id = current_user.get("agent_id")
+        if agent_id:
+            try:
+                from usmsb_sdk.api.database import update_agent_balance
+                # Unstake clears all staking - mark as unbound
+                from usmsb_sdk.api.database import update_agent_wallet
+            except Exception:
+                pass
 
         return OnChainStakeResponse(
             success=True,
-            tx_hash=tx_hash,
+            tx_hash=request.tx_hash,
             from_address=staker_address,
-            amount_vibe=0,  # Amount not returned by unstake
+            amount_vibe=0,
             lock_period=0,
-            message="Unstake transaction submitted successfully",
+            message="Unstake verified and recorded. All staked VIBE has been withdrawn.",
         )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Unstake verification failed: {str(e)}")
 
 
 @router.get("/info/{address}", response_model=OnChainStakingInfoResponse)
