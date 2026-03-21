@@ -1906,15 +1906,6 @@ def create_agent_wallet(wallet_data: dict[str, Any]) -> dict[str, Any]:
         return wallet_data
 
 
-def get_agent_wallet(agent_id: str) -> dict | None:
-    """Get agent wallet by agent_id"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM agent_wallets WHERE agent_id = ?', (agent_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
-
-
 def get_agent_wallet_by_address(wallet_address: str) -> dict | None:
     """Get agent wallet by wallet address"""
     with get_db() as conn:
@@ -2430,6 +2421,27 @@ def update_agent_binding_status(agent_id: str, status: str, owner_wallet: str = 
                 UPDATE agents SET binding_status = ?, updated_at = ? WHERE agent_id = ?
             ''', (status, now, agent_id))
 
+        return cursor.rowcount > 0
+
+
+def update_agent_wallet_deployed(agent_id: str, wallet_address: str, agent_address: str) -> bool:
+    """Update agent_wallets table with the correct deployed wallet address.
+
+    Called after AgentWallet is successfully deployed, to fix the incorrect
+    wallet_address that was set by db_complete_binding_request (which defaults
+    to owner_wallet before wallet deployment happens).
+
+    Returns True if a record was updated.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().timestamp()
+        cursor.execute('''
+            UPDATE agent_wallets
+            SET wallet_address = ?, agent_address = ?, updated_at = ?
+            WHERE agent_id = ?
+        ''', (wallet_address, agent_address, now, agent_id))
+        conn.commit()
         return cursor.rowcount > 0
 
 

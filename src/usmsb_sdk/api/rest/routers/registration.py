@@ -537,6 +537,16 @@ async def complete_binding(
         )
 
     # Step 2: Deploy AgentWallet (owner pays gas for deployment)
+    # Step 1: Complete binding record FIRST (creates agent_wallets row with placeholder wallet_address=owner_wallet)
+    result = db_complete_binding_request(
+        binding_code=binding_code,
+        owner_wallet=owner_wallet,
+        stake_amount=request.stake_amount
+    )
+    if not result:
+        raise HTTPException(status_code=500, detail={"error": "Failed to complete binding", "code": "INTERNAL_ERROR"})
+
+    # Step 2: Deploy AgentWallet (owner pays gas for deployment)
     # This is triggered at complete_binding time — no wallet deployed during register_agent_v2
     wallet_deployed = False
     agent_registry_registered = False
@@ -548,19 +558,19 @@ async def complete_binding(
         from usmsb_sdk.blockchain.config import BlockchainConfig
         from usmsb_sdk.blockchain.contracts.agent_wallet import AgentWalletFactory
         from usmsb_sdk.blockchain.contracts.agent_registry import AgentRegistryClient
-        from usmsb_sdk.api.database import get_agent_wallet, update_agent_binding_status
+        from usmsb_sdk.api.database import get_agent_wallet, update_agent_binding_status, update_agent_wallet_deployed
 
         deployer_private_key = os.getenv("AGENT_WALLET_DEPLOYER_PRIVATE_KEY")
         platform_agent_address = os.getenv("PLATFORM_AGENT_ADDRESS", "0x0000000000000000000000000000000000000000")
 
-        # Get agent's pre-generated keypair from database
+        # Get agent's pre-generated keypair from database (set during register_agent_v2)
         agent_wallet = get_agent_wallet(result['agent_id'])
         if agent_wallet and agent_wallet.get('agent_address'):
             agent_address = agent_wallet['agent_address']
             agent_private_key = agent_wallet.get('agent_private_key')
 
         if not agent_address or not agent_private_key:
-            raise Exception("Agent keypair not found in database — run register_agent_v2 first")
+            raise Exception("Agent keypair not found — register_agent_v2 must be called first")
 
         if deployer_private_key and len(deployer_private_key) == 66:
             config = BlockchainConfig.from_env()
@@ -579,9 +589,11 @@ async def complete_binding(
             )
             wallet_deployed = True
 
-            # Update DB: set wallet address and owner binding
+            # Fix agent_wallets row: db_complete_binding_request set wallet_address=owner_wallet (wrong).
+            # Update it with the correct deployed wallet address and agent address.
             try:
-                update_agent_binding_status(result['agent_id'], "bound", owner_wallet=wallet_address)
+                update_agent_wallet_deployed(result['agent_id'], wallet_address, agent_address)
+                update_agent_binding_status(result['agent_id'], "bound", owner_wallet=owner_wallet)
             except Exception as db_err:
                 logging.getLogger(__name__).warning(f"Failed to update agent wallet in DB: {db_err}")
 
@@ -605,19 +617,6 @@ async def complete_binding(
     except Exception as wallet_err:
         logging.getLogger(__name__).warning(f"Wallet deployment failed (binding still completes): {wallet_err}")
         wallet_deployed = False
-
-    # Complete the binding (database only)
-    result = db_complete_binding_request(
-        binding_code=binding_code,
-        owner_wallet=owner_wallet,
-        stake_amount=request.stake_amount
-    )
-
-    if not result:
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "Failed to complete binding", "code": "INTERNAL_ERROR"}
-        )
 
     # Get tier info
     tier = get_stake_tier(request.stake_amount)
