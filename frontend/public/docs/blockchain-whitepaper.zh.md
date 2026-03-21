@@ -1,1 +1,1 @@
-../../../../docs/whitepaper/VIBE_Whitepaper.md
+/Users/gujun/vibecode/usmsb/docs/whitepaper/VIBE_Whitepaper.md
