@@ -50,6 +50,17 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     /// @notice 精度因子 (处理百分比计算)
     uint256 public constant TAX_PRECISION = 10000;
 
+    // ========== H1修复: 验证税费分配比例总和 ==========
+
+    /// @notice 税费分配比例验证
+    /// @dev 确保 BURN_RATIO + DIVIDEND_RATIO + ECOSYSTEM_FUND_RATIO + PROTOCOL_FUND_RATIO == TAX_PRECISION
+    function _validateTaxRatios() internal pure {
+        require(
+            BURN_RATIO + DIVIDEND_RATIO + ECOSYSTEM_FUND_RATIO + PROTOCOL_FUND_RATIO == TAX_PRECISION,
+            "VIBEToken: tax ratios must sum to 100%"
+        );
+    }
+
     // ========== 状态变量 ==========
 
     /// @notice 质押合约地址，允许铸造奖励
@@ -187,6 +198,9 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         string memory _name,
         string memory _symbol
     ) ERC20(_name, _symbol) ERC20Permit(_name) Ownable(msg.sender) {
+        // H1修复: 验证税费分配比例
+        _validateTaxRatios();
+
         // 注意: 不再在构造函数中预铸造代币
         // 所有代币通过 distributeToPools() 分配到各池
         // 这样确保团队8%通过归属合约锁定

@@ -428,6 +428,8 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 提取质押和奖励
+     * @dev C2修复: CEI模式 - 先更新状态，再转账，防止重入攻击
+     * @dev H2修复: 添加合约余额检查，防止挤兑
      */
     function unstake() external nonReentrant whenNotPaused isStaked(msg.sender) lockExpired(msg.sender) {
         // 更新全局奖励
@@ -437,16 +439,24 @@ contract VIBStaking is Ownable, ReentrancyGuard, Pausable {
         _claimReward(msg.sender);
 
         StakeInfo storage info = stakeInfos[msg.sender];
+        uint256 amount = info.amount;
 
-        // 转回质押代币
-        vibeToken.safeTransfer(msg.sender, info.amount);
+        // H2修复: 检查合约余额是否足够
+        require(
+            vibeToken.balanceOf(address(this)) >= amount,
+            "VIBStaking: insufficient contract balance"
+        );
 
-        emit Unstaked(msg.sender, info.amount);
-
+        // C2修复: CEI模式 - 先更新状态，再转账
         // 重置质押信息
-        totalStaked -= info.amount;
+        totalStaked -= amount;
         info.amount = 0;
         info.isActive = false;
+
+        // 转回质押代币（状态已更新，安全）
+        vibeToken.safeTransfer(msg.sender, amount);
+
+        emit Unstaked(msg.sender, amount);
     }
 
     /**
