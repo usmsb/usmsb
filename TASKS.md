@@ -42,22 +42,22 @@
 - [X] B4: JointOrder 完整 API (create/submit/accept/confirm/cancel pool) → joint_order.py (526行)
 - [X] B5: 质押/解除质押 API → staking.py (225行)
 - [X] B6: VIBEToken 转账 API (transfer/approve/allowance) → blockchain.py 扩展
-- [ ] B7: 治理 API (propose/vote/query) → **未实现** ❌
+- [X] B7: 治理 API (propose/vote/query) → governance.py ✅
 - [X] B8: 注册时调用 AgentRegistry 链上注册 → registration.py 已实现
 
 ### P2 Extended
-- [ ] B9:  身份 SBT 铸造 API → **未实现** ❌
+- [X] B9:  身份 SBT 铸造 API → identity.py ✅
 - [X] B10: 协作分成 API → collaborations.py 已存在（需验证是否已对接合约）
 - [X] B11: 前端质押界面 → StakingPanel.tsx
 - [X] B12: 前端治理投票界面 → GovernancePanel.tsx
 - [X] B13: 前端交易历史 → 前端已存在
-- [ ] B14: 绑定 owner 时真实调用 VIBStaking 质押 → **未实现** ❌
+- [X] B14: 绑定 owner 时真实调用 VIBStaking 质押 → registration.py ✅
 - [X] B15: 前端显示 VIBE 余额 → BalanceDisplay.tsx
 
 ### P3 体验优化
-- [ ] B16: 交易状态通知 (pending → confirmed) → **未实现** ❌
-- [ ] B17: Gas 估算与显示 → **未实现** ❌
-- [ ] B18: 争议处理 API (raise/resolve dispute) → **未实现** ❌
+- [X] B16: 交易状态通知 (pending → confirmed) → blockchain.py ✅
+- [X] B17: Gas 估算与显示 → blockchain.py ✅
+- [X] B18: 争议处理 API (raise/resolve dispute) → dispute.py ✅
 
 ---
 
@@ -67,21 +67,41 @@
 |---|---|---|---|
 | 合约修复 | 14 | 14 | 0 |
 | 业务对接 P0 | 3 | 3 | 0 |
-| 业务对接 P1 | 5 | 4 | 1 (B7) |
-| 业务对接 P2 | 7 | 5 | 2 (B9, B14) |
-| 业务对接 P3 | 3 | 0 | 3 |
+| 业务对接 P1 | 5 | 5 | 0 |
+| 业务对接 P2 | 7 | 7 | 0 |
+| 业务对接 P3 | 3 | 3 | 0 |
 
 **前端构建**: ✅ `npm run build` 通过 (44.48s)
 **合约编译**: ✅ `npx hardhat compile` 通过
-**Git**: ✅ 3个新 commit 已推送
+**Git**: ✅ 新 commit 已推送
 
 ---
 
-## 剩余未完成任务
+## 已完成任务 (2026-03-21)
 
-1. **B7**: Governance API (governance.py) — 治理提案/投票/查询
-2. **B9**: Identity SBT API (identity.py) — 铸造/查询 SBT
-3. **B14**: Owner 绑定时真实调用 VIBStaking 质押
-4. **B16**: 交易状态通知 (pending → confirmed)
-5. **B17**: Gas 估算与显示
-6. **B18**: Dispute API (raise/resolve)
+### 新增 API 路由
+
+1. **governance.py** - 治理 API
+   - GET /governance/proposals — 列出所有提案
+   - GET /governance/proposals/{id} — 获取提案详情
+   - POST /governance/proposals — 创建提案
+   - POST /governance/vote — 投票
+   - GET /governance/delegations/{address} — 获取委托信息
+
+2. **identity.py** - 身份 SBT API
+   - POST /identity/mint-sbt — 铸造 Soul-Bound Token
+   - GET /identity/{address}/sbt — 查询地址的 SBT
+
+3. **dispute.py** - 争议处理 API
+   - POST /dispute/raise — 在 JointOrder 池上发起争议
+   - GET /dispute/{pool_id} — 获取争议状态
+   - POST /dispute/resolve — 解决争议（仅仲裁员）
+
+4. **blockchain.py 扩展** - 交易追踪和 Gas 估算
+   - GET /blockchain/tx/{task_id} — 获取交易状态
+   - POST /blockchain/tx/track — 追踪交易
+   - GET /blockchain/gas-estimate — 估算 Gas
+
+5. **registration.py** - B14 真实 VIBE 质押
+   - complete_binding 现在执行真实 VIBE 质押
+   - 先 approve VIBStaking 合约，再调用 stake
