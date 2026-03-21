@@ -9,10 +9,13 @@ from usmsb_sdk.api.rest.routers.blockchain import router as blockchain_router
 from usmsb_sdk.api.rest.routers.collaborations import router as collaborations_router
 from usmsb_sdk.api.rest.routers.contracts import router as contracts_router
 from usmsb_sdk.api.rest.routers.demands import router as demands_router
+from usmsb_sdk.api.rest.routers.dispute import router as dispute_router
 from usmsb_sdk.api.rest.routers.environments import router as environments_router
 from usmsb_sdk.api.rest.routers.feedback import router as feedback_router
 from usmsb_sdk.api.rest.routers.gene_capsule import router as gene_capsule_router
+from usmsb_sdk.api.rest.routers.governance import router as governance_router
 from usmsb_sdk.api.rest.routers.heartbeat import router as heartbeat_router
+from usmsb_sdk.api.rest.routers.identity import router as identity_router
 from usmsb_sdk.api.rest.routers.joint_order import router as joint_order_router
 from usmsb_sdk.api.rest.routers.learning import router as learning_router
 from usmsb_sdk.api.rest.routers.matching import router as matching_router
@@ -60,4 +63,7 @@ __all__ = [
     "negotiations_router",
     "usmsb_matching_router",
     "feedback_router",
+    "governance_router",
+    "identity_router",
+    "dispute_router",
 ]

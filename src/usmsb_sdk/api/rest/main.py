@@ -61,10 +61,13 @@ from usmsb_sdk.api.rest.routers import (
     collaborations_router,
     contracts_router,
     demands_router,
+    dispute_router,
     environments_router,
     feedback_router,
     gene_capsule_router,
+    governance_router,
     heartbeat_router,
+    identity_router,
     joint_order_router,
     learning_router,
     matching_router,
@@ -522,6 +525,9 @@ app.include_router(negotiations_router, prefix="/api")
 app.include_router(usmsb_matching_router, prefix="/api")
 app.include_router(feedback_router, prefix="/api")
 app.include_router(souls_router, prefix="/api")
+app.include_router(governance_router, prefix="/api")
+app.include_router(identity_router, prefix="/api")
+app.include_router(dispute_router, prefix="/api")
 
 
 # WebSocket endpoint
