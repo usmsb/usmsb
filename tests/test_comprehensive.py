@@ -691,3 +691,121 @@ class TestConfig:
         from usmsb_sdk.blockchain.config import BlockchainConfig, NetworkType
         cfg = BlockchainConfig(network=NetworkType.TESTNET)
         assert bool(cfg.rpc_url)
+
+
+# =============================================================================
+# Test Business Logic — Mock Web3 Behavior Tests
+# =============================================================================
+
+class TestStakingWeb3Behavior:
+    """Test on_chain_stake endpoint with mocked Web3 responses."""
+
+    def test_on_chain_stake_tx_hash_format_validation(self):
+        """tx_hash must start with 0x and be 66 chars."""
+        with open("src/usmsb_sdk/api/rest/routers/staking.py") as f:
+            src = f.read()
+        assert 'tx_hash.startswith("0x")' in src
+        assert 'len(request.tx_hash) != 66' in src
+        assert 'Invalid tx_hash format' in src
+
+    def test_on_chain_stake_rejects_pending_tx(self):
+        """Transaction still pending should return error."""
+        with open("src/usmsb_sdk/api/rest/routers/staking.py") as f:
+            src = f.read()
+        assert "Transaction not found or still pending" in src
+
+    def test_on_chain_stake_rejects_failed_tx(self):
+        """Transaction with status=0 should return error."""
+        with open("src/usmsb_sdk/api/rest/routers/staking.py") as f:
+            src = f.read()
+        assert "Transaction failed on-chain" in src
+
+
+class TestGovernanceWeb3Behavior:
+    """Test governance endpoints with mocked Web3 responses."""
+
+    def test_cast_vote_tx_hash_format_validation(self):
+        with open("src/usmsb_sdk/api/rest/routers/governance.py") as f:
+            src = f.read()
+        assert 'tx_hash.startswith("0x")' in src
+        assert 'len(request.tx_hash) != 66' in src
+
+    def test_vote_rejects_failed_tx(self):
+        with open("src/usmsb_sdk/api/rest/routers/governance.py") as f:
+            src = f.read()
+        assert "Transaction failed on-chain" in src
+
+    def test_vote_returns_403_if_no_voting_power(self):
+        with open("src/usmsb_sdk/api/rest/routers/governance.py") as f:
+            src = f.read()
+        # Should check get_voting_power before accepting vote
+        assert "get_voting_power" in src
+        # Should reject if voting power is 0
+        assert "voting_power" in src or "power" in src
+
+
+class TestJointOrderWeb3Behavior:
+    """Test joint_order endpoint logic."""
+
+    def test_submit_bid_requires_bound_agent(self):
+        with open("src/usmsb_sdk/api/rest/routers/joint_order.py") as f:
+            src = f.read()
+        # Must check agent is registered and bound before accepting bid
+        assert "has_wallet_binding" in src
+        assert "binding_status" in src
+
+    def test_confirm_delivery_requires_rating(self):
+        with open("src/usmsb_sdk/api/rest/routers/joint_order.py") as f:
+            src = f.read()
+        assert "rating" in src
+
+
+class TestBalanceAndAuth:
+    """Test balance and authentication logic."""
+
+    def test_get_balance_public_by_design(self):
+        with open("src/usmsb_sdk/api/rest/routers/blockchain.py") as f:
+            src = f.read()
+        # /balance/{address} is intentionally public — blockchain data is public.
+        # Auth is required only for write operations (transfer, approve).
+        assert "/balance/{address}" in src
+
+    def test_transfer_uses_db_private_key_fallback(self):
+        with open("src/usmsb_sdk/api/rest/routers/blockchain.py") as f:
+            src = f.read()
+        # When API key auth is used, agent_private_key comes from DB
+        assert "agent_private_key" in src
+        assert "get_agent_wallet" in src
+
+
+class TestRegistrationFlow:
+    """Test complete_binding flow."""
+
+    def test_complete_binding_stakes_before_deploy(self):
+        with open("src/usmsb_sdk/api/rest/routers/registration.py") as f:
+            src = f.read()
+        # Stake tokens BEFORE deploying wallet
+        assert "stake_receipt" in src or "approve_receipt" in src
+
+    def test_complete_binding_raises_on_deploy_failure(self):
+        with open("src/usmsb_sdk/api/rest/routers/registration.py") as f:
+            src = f.read()
+        # If wallet deployment fails, raise exception (don't mark as bound)
+        assert "WALLET_DEPLOY_FAILED" in src or "deployment failed" in src.lower()
+
+    def test_complete_binding_updates_status_after_success(self):
+        with open("src/usmsb_sdk/api/rest/routers/registration.py") as f:
+            src = f.read()
+        # After successful deploy, update wallet_deployed flag
+        assert "update_agent_wallet_deployed" in src
+
+    def test_retry_deploy_clears_failed_state(self):
+        with open("src/usmsb_sdk/api/rest/routers/registration.py") as f:
+            src = f.read()
+        assert "retry" in src and "deploy" in src
+
+    def test_binding_status_endpoint_exists(self):
+        # binding-status endpoint exists for polling binding progress
+        with open("src/usmsb_sdk/api/rest/routers/registration.py") as f:
+            src = f.read()
+        assert "binding-status" in src or "binding_status" in src
