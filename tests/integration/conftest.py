@@ -286,3 +286,43 @@ def sample_pending_binding(integration_db):
     integration_db.commit()
     return "agent_pending"
 
+
+
+class _VIBClientCtx:
+    """Patch VIBGovernanceClient to return mock data without touching real blockchain."""
+    def __init__(self, proposal_data=None, voting_power=None):
+        from unittest.mock import MagicMock, AsyncMock
+        if proposal_data is None:
+            proposal_data = {
+                "id": 1, "proposer": "0xVOTERADDR", "proposal_type": MagicMock(),
+                "state": MagicMock(), "title": "Test", "description": "Test proposal",
+                "target": "0x" + "b"*40, "data": "", "start_time": 0, "end_time": 0,
+                "execute_time": 0, "for_votes": 100, "against_votes": 50,
+                "abstain_votes": 10, "total_voters": 5, "executed": False,
+            }
+        self.proposal_data = proposal_data
+        self.voting_power = voting_power if voting_power is not None else 1000 * (10**18)
+        self._mock = MagicMock()
+        self._mock.get_proposal = AsyncMock(return_value=self.proposal_data)
+        self._mock.get_voting_power = AsyncMock(return_value=self.voting_power)
+
+    def __enter__(self):
+        import usmsb_sdk.blockchain.contracts.vib_governance as vg_mod
+        # Patch the class so VIBGovernanceClient() returns our mock
+        self._orig = vg_mod.VIBGovernanceClient
+        vg_mod.VIBGovernanceClient = lambda *a, **kw: self._mock
+        return self._mock
+
+    def __exit__(self, *args):
+        import usmsb_sdk.blockchain.contracts.vib_governance as vg_mod
+        vg_mod.VIBGovernanceClient = self._orig
+
+
+def mock_vib_governance_client(proposal_data=None, voting_power=None):
+    """Mock VIBGovernanceClient chain calls for governance tests.
+    
+    Usage:
+        with mock_vib_governance_client({"for_votes": 100}):
+            response = client.post("/api/governance/vote", ...)
+    """
+    return _VIBClientCtx(proposal_data, voting_power)

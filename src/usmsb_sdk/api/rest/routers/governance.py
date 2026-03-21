@@ -262,6 +262,7 @@ async def cast_vote(
             raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         # Validate: proposal must exist on-chain
+        from usmsb_sdk.blockchain.contracts.vib_governance import VIBGovernanceClient
         try:
             governance_client = VIBGovernanceClient()
             proposal = await governance_client.get_proposal(request.proposal_id)
