@@ -26,11 +26,11 @@ export function GovernancePanel() {
   const [selectedProposalId, setSelectedProposalId] = useState<number | null>(null)
   const [isVoting, setIsVoting] = useState(false)
 
-  // Read proposal count
+  // Read total proposal count via getProposalCount() (proposalCount is a per-address mapping)
   const { data: proposalCount, isLoading: isCountLoading, refetch: refetchCount } = useReadContract({
     address: VIBGOVERNANCE_ADDRESS,
     abi: VIBGOVERNANCE_ABI,
-    functionName: 'proposalCount',
+    functionName: 'getProposalCount',
   })
 
   // Read user's voting power

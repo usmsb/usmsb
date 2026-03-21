@@ -78,35 +78,43 @@ export const VIBETOKEN_ABI = [
 
 export const VIBSTAKING_ABI = [
   {
-    name: 'getStakedAmount',
+    name: 'getStakeInfo',
     type: 'function',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
+    inputs: [{ name: 'user', type: 'address' }],
+    outputs: [
+      { name: 'amount', type: 'uint256' },
+      { name: 'startTime', type: 'uint256' },
+      { name: 'lockPeriod', type: 'uint256' },
+      { name: 'isActive', type: 'bool' },
+    ],
     stateMutability: 'view',
   },
   {
-    name: 'getPendingRewards',
+    name: 'getPendingReward',
     type: 'function',
-    inputs: [{ name: 'account', type: 'address' }],
+    inputs: [{ name: 'user', type: 'address' }],
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
     name: 'stake',
     type: 'function',
-    inputs: [{ name: 'amount', type: 'uint256' }],
+    inputs: [
+      { name: 'amount', type: 'uint256' },
+      { name: 'lockPeriod', type: 'uint256' },
+    ],
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
     name: 'unstake',
     type: 'function',
-    inputs: [{ name: 'amount', type: 'uint256' }],
+    inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
   },
   {
-    name: 'claimRewards',
+    name: 'claimReward',
     type: 'function',
     inputs: [],
     outputs: [],
@@ -130,7 +138,7 @@ export const VIBSTAKING_ABI = [
 
 export const VIBGOVERNANCE_ABI = [
   {
-    name: 'proposalCount',
+    name: 'getProposalCount',
     type: 'function',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
@@ -213,7 +221,7 @@ export const JOINTORDER_ABI = [
 export const VIBETOKEN_ADDRESS = '0x93C52dF000317e12F891474B46d8B05652430bDC'
 export const VIBSTAKING_ADDRESS = '0x1901Ab56eA38cBeFc7a3F0Ed188B7108d27f4c05'
 export const VIBGOVERNANCE_ADDRESS = '0x27475aea1eEba485005B1717a35a7D411d144a1d'
-export const VIBVESTING_ADDRESS = '0x4d3008550fc164ccf0e1C0C4f666EFC14dE924'
+export const VIBVESTING_ADDRESS = '0x4d3008550fc164ccf0e1C0C4f666E77FC14dE924'
 export const JOINTORDER_ADDRESS = '0x55f4b49c9C269Fccf6d90e16304654b7F69138d0'
 export const VIBIDENTITY_ADDRESS = '0x978eddDf11728B4e6A6C461D8806eD5f4339D466'
 export const AGENTREGISTRY_ADDRESS = '0xC5AbAE9f580C48D645bDE9904712891AE8FcDec6'

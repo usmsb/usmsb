@@ -10,9 +10,10 @@ export interface UseStakingReturn {
   formattedPendingRewards: string
 
   // Write functions
-  stake: (amount: string) => Promise<`0x${string}` | null>
-  unstake: (amount: string) => Promise<`0x${string}` | null>
-  claimRewards: () => Promise<`0x${string}` | null>
+  // lockPeriod: 0=NONE, 1=THIRTY(30d), 2=NINETY(90d), 3=ONE80(180d), 4=ONE_YEAR(365d)
+  stake: (amount: string, lockPeriod: number) => Promise<`0x${string}` | null>
+  unstake: () => Promise<`0x${string}` | null>
+  claimReward: () => Promise<`0x${string}` | null>
 
   // State
   isLoading: boolean
@@ -27,20 +28,23 @@ const VIBE_DECIMALS = 18
 export function useStaking(): UseStakingReturn {
   const { address, isConnected } = useAccount()
 
-  // Read staked amount
+  // Read staked amount via getStakeInfo which returns (amount, startTime, lockPeriod, isActive)
   const {
-    data: stakedAmount,
+    data: stakeInfo,
     isLoading: isStakedLoading,
     error: stakedError,
   } = useReadContract({
     address: VIBSTAKING_ADDRESS,
     abi: VIBSTAKING_ABI,
-    functionName: 'getStakedAmount',
+    functionName: 'getStakeInfo',
     args: [address!],
     query: {
       enabled: isConnected && !!address,
     },
   })
+
+  // Extract staked amount from the struct (index 0 = amount)
+  const stakedAmount = stakeInfo ? (stakeInfo[0] as bigint) : undefined
 
   // Read pending rewards
   const {
@@ -50,7 +54,7 @@ export function useStaking(): UseStakingReturn {
   } = useReadContract({
     address: VIBSTAKING_ADDRESS,
     abi: VIBSTAKING_ABI,
-    functionName: 'getPendingRewards',
+    functionName: 'getPendingReward',
     args: [address!],
     query: {
       enabled: isConnected && !!address,
@@ -74,15 +78,15 @@ export function useStaking(): UseStakingReturn {
     ? formatUnits(pendingRewards, VIBE_DECIMALS)
     : '0'
 
-  // Stake function
-  const stake = async (amount: string): Promise<`0x${string}` | null> => {
+  // Stake function — lockPeriod: 0=NONE, 1=THIRTY(30d), 2=NINETY(90d), 3=ONE80(180d), 4=ONE_YEAR(365d)
+  const stake = async (amount: string, lockPeriod: number): Promise<`0x${string}` | null> => {
     try {
       const parsedAmount = parseUnits(amount, VIBE_DECIMALS)
       writeContract({
         address: VIBSTAKING_ADDRESS,
         abi: VIBSTAKING_ABI,
         functionName: 'stake',
-        args: [parsedAmount],
+        args: [parsedAmount, BigInt(lockPeriod)],
       })
       return writeData ?? null
     } catch {
@@ -90,15 +94,14 @@ export function useStaking(): UseStakingReturn {
     }
   }
 
-  // Unstake function
-  const unstake = async (amount: string): Promise<`0x${string}` | null> => {
+  // Unstake function — unstakes ALL (contract takes no parameters)
+  const unstake = async (): Promise<`0x${string}` | null> => {
     try {
-      const parsedAmount = parseUnits(amount, VIBE_DECIMALS)
       writeContract({
         address: VIBSTAKING_ADDRESS,
         abi: VIBSTAKING_ABI,
         functionName: 'unstake',
-        args: [parsedAmount],
+        args: [],
       })
       return writeData ?? null
     } catch {
@@ -107,12 +110,12 @@ export function useStaking(): UseStakingReturn {
   }
 
   // Claim rewards function
-  const claimRewards = async (): Promise<`0x${string}` | null> => {
+  const claimReward = async (): Promise<`0x${string}` | null> => {
     try {
       writeContract({
         address: VIBSTAKING_ADDRESS,
         abi: VIBSTAKING_ABI,
-        functionName: 'claimRewards',
+        functionName: 'claimReward',
         args: [],
       })
       return writeData ?? null
@@ -130,7 +133,7 @@ export function useStaking(): UseStakingReturn {
     formattedPendingRewards,
     stake,
     unstake,
-    claimRewards,
+    claimReward,
     isLoading: isStakedLoading || isRewardsLoading || isPending,
     isConfirming,
     isConfirmed,
