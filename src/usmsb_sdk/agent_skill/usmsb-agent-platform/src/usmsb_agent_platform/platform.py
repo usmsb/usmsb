@@ -3,6 +3,7 @@ Main AgentPlatform class for interacting with USMSB Platform.
 """
 
 import asyncio
+from typing import Callable
 
 import aiohttp
 
@@ -23,6 +24,7 @@ from .types import (
     StakeRequirement,
 )
 from .order import Order, OrderTerms, OrderStatus, Deliverable
+from .websocket_mixin import WebSocketMixin, WebSocketConnection
 
 
 class PlatformClient:
@@ -899,7 +901,7 @@ class OrderAPI(BaseAPI):
 
 
 # ==================== Main AgentPlatform Class ====================
-class AgentPlatform:
+class AgentPlatform(WebSocketMixin):
     """
     Main class for interacting with USMSB Agent Platform.
 
@@ -933,6 +935,13 @@ class AgentPlatform:
             base_url: Platform API base URL
             retry_config: Optional retry configuration
         """
+        # WebSocket URL
+        ws_url = base_url.replace("http://", "ws://").replace("https://", "wss://")
+        ws_url = f"{ws_url}/ws"
+
+        # Initialize WebSocketMixin
+        WebSocketMixin.__init__(self, ws_url, agent_id, api_key)
+
         self.api_key = api_key
         self.agent_id = agent_id
         self.base_url = base_url
@@ -1326,8 +1335,107 @@ class AgentPlatform:
         """Get order status including available actions."""
         return await self.call(f"订单状态 {order_id}")
 
+    # ========================================================================
+    # WebSocket Callbacks (inherited from WebSocketMixin)
+    # ========================================================================
+
+    # Note: connect_websocket(), disconnect_websocket(), is_connected()
+    # are inherited from WebSocketMixin
+
+    # ========================================================================
+    # Event Registration Methods
+    # ========================================================================
+
+    async def on_negotiation_request(self, callback: Callable) -> None:
+        """
+        Register callback for incoming negotiation requests.
+
+        Args:
+            callback: Async function that receives negotiation request data.
+        """
+        self._negotiation_callbacks.append(callback)
+
+    async def on_opportunity(self, callback: Callable) -> None:
+        """
+        Register callback for new opportunities.
+
+        Args:
+            callback: Async function that receives opportunity data.
+        """
+        self._opportunity_callbacks.append(callback)
+
+    async def on_message(self, callback: Callable) -> None:
+        """Register callback for incoming messages."""
+        self._message_callbacks.append(callback)
+
+    async def on_work_assignment(self, callback: Callable) -> None:
+        """Register callback for work assignments."""
+        self._work_callbacks.append(callback)
+
+    async def on_notification(self, callback: Callable) -> None:
+        """Register callback for general notifications."""
+        self._notification_callbacks.append(callback)
+
+    async def on_status_update(self, callback: Callable) -> None:
+        """Register callback for status updates."""
+        self._status_callbacks.append(callback)
+
+    # ========================================================================
+    # Passive Receive Methods (Polling-based Agent Support)
+    # ========================================================================
+
+    async def get_pending_negotiations(self) -> dict:
+        """
+        Get pending negotiations for this agent (polling-based).
+
+        Use this for agents that prefer polling over WebSocket callbacks.
+
+        Returns:
+            List of pending negotiation requests.
+        """
+        client = self._get_client()
+        return await client.negotiation.list_pending(agent_id=self.agent_id)
+
+    async def get_incoming_orders(self) -> dict:
+        """
+        Get incoming orders for this agent.
+
+        Returns:
+            List of incoming orders.
+        """
+        client = self._get_client()
+        return await client.order.list_incoming(agent_id=self.agent_id)
+
+    async def get_notifications(self, unread_only: bool = True) -> dict:
+        """
+        Get notifications for this agent.
+
+        Args:
+            unread_only: If True, only return unread notifications.
+
+        Returns:
+            List of notifications.
+        """
+        client = self._get_client()
+        return await client.notifications.list(
+            agent_id=self.agent_id,
+            unread_only=unread_only
+        )
+
+    async def get_opportunities(self) -> dict:
+        """
+        Get new opportunities matching agent's capabilities.
+
+        Returns:
+            List of matching opportunities.
+        """
+        client = self._get_client()
+        return await client.discovery.opportunities(agent_id=self.agent_id)
+
     async def close(self):
-        """Close the platform connection."""
+        """Close the platform connection including WebSocket."""
+        if self._ws_connection:
+            await self.disconnect_websocket()
         if self._client:
             await self._client.close()
 
