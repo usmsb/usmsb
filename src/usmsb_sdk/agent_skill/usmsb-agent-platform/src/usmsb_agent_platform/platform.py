@@ -838,7 +838,8 @@ class HeartbeatAPI(BaseAPI):
     async def get_status(self, agent_id: str = "") -> dict:
         """Get agent status."""
         target_id = agent_id or self.client.agent_id
-        return await self.client.get(f"/api/agents/{target_id}/status")
+        # Use GET /api/agents/{agent_id} which returns agent info including status
+        return await self.client.get(f"/api/agents/{target_id}")
 
 
 # ==================== Order API ====================
