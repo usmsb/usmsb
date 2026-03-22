@@ -1,5 +1,8 @@
 """
-E2E test fixtures. Copies of integration test fixtures for e2e scope.
+E2E test fixtures. Provides shared test database for all e2e tests.
+
+The shared DB is used by both the app (via _app fixture) and by
+test-specific fixtures (via shared_db fixture).
 """
 import pytest
 import sqlite3
@@ -27,89 +30,126 @@ def create_test_db():
     """Create in-memory SQLite with production schema."""
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     from usmsb_sdk.api.database import init_db
-    init_db(conn)
+    init_db()
     return conn
 
 
-@pytest.fixture(scope="function")
-def integration_db():
-    """Fresh in-memory DB per test."""
-    conn = create_test_db()
-    import usmsb_sdk.api.database as db_mod
-    original = db_mod.get_db
-    db_mod.get_db = lambda: conn
-    yield conn
-    db_mod.get_db = original
-    conn.close()
-
-
-@pytest.fixture(scope="function")
-def sample_bound_agent(integration_db):
-    now = time.time()
-    integration_db.execute(
-        """INSERT INTO agents
-           (agent_id, name, status, owner_wallet, binding_status,
-            created_at, updated_at, stake, reputation)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("agent_bound", "BoundAgent", "active", "0xBOUNDWALLET", "bound",
-         now, now, 1000.0, 5.0)
-    )
-    integration_db.execute(
-        """INSERT INTO api_keys (key_id, agent_id, key_hash, key_prefix, created_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        ("bound_key1", "agent_bound", "hash1", "test_", now)
-    )
-    integration_db.commit()
-    return "agent_bound"
-
-
-@pytest.fixture(scope="function")
-def sample_pending_binding(integration_db):
-    now = time.time()
-    integration_db.execute(
-        """INSERT INTO agents
-           (agent_id, name, status, binding_status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        ("agent_pending", "PendingAgent", "active", "pending", now, now)
-    )
-    integration_db.commit()
-    return "agent_pending"
-
-
-@pytest.fixture(scope="function")
-def sample_proposal(integration_db):
-    now = time.time()
-    integration_db.execute(
-        """INSERT INTO proposals
-           (id, title, proposer_id, status, votes_for, votes_against, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("prop1", "Test Proposal", "0xPROPOSER", "active", 0, 0, now, now)
-    )
-    integration_db.commit()
-    return "prop1"
+# Module-level shared DB for all e2e tests
+_shared_db_conn = None
 
 
 @pytest.fixture(scope="module")
-def _app():
+def shared_db():
+    """Module-level shared in-memory DB used by app and tests."""
+    global _shared_db_conn
+    _shared_db_conn = create_test_db()
+    
     import usmsb_sdk.api.database as db_mod
-    from usmsb_sdk.api.rest.main import app as main_app
-    return main_app, db_mod
+    original = db_mod.get_db
+    db_mod.get_db = lambda: _shared_db_conn
+    
+    yield _shared_db_conn
+    
+    db_mod.get_db = original
+    _shared_db_conn.close()
+    _shared_db_conn = None
+
+
+@pytest.fixture(scope="module")
+def _app(shared_db):
+    """Create app with shared DB for all tests in module."""
+    import usmsb_sdk.api.database as db_mod
+    original = db_mod.get_db
+    db_mod.get_db = lambda: shared_db
+    
+    from fastapi.testclient import TestClient
+    from usmsb_sdk.api.rest.main import app
+    
+    # Override auth
+    from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
+    from usmsb_sdk.api.rest.auth import get_current_user
+    app.dependency_overrides[get_current_user_unified] = lambda: MOCK_USER
+    app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+    
+    with TestClient(app, raise_server_exceptions=False) as tc:
+        yield tc
+    
+    app.dependency_overrides.clear()
+    db_mod.get_db = original
 
 
 @pytest.fixture(scope="function")
 def client(_app):
-    app, db_mod = _app
-    from fastapi.testclient import TestClient
-    from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
-    from usmsb_sdk.api.rest.auth import get_current_user
+    """Use the shared app client."""
+    return _app
 
-    app.dependency_overrides[get_current_user_unified] = lambda: MOCK_USER
-    app.dependency_overrides[get_current_user] = lambda: MOCK_USER
 
-    with TestClient(app, raise_server_exceptions=False) as tc:
-        yield tc
+@pytest.fixture(scope="function")
+def integration_db():
+    """Function-level DB - shares same connection as app."""
+    # The shared_db is module-scoped, but we yield None here
+    # because tests should use the shared DB via the app fixtures
+    # This fixture exists for compatibility with test_staking_e2e.py
+    global _shared_db_conn
+    if _shared_db_conn is not None:
+        yield _shared_db_conn
+    else:
+        yield None
 
-    app.dependency_overrides.clear()
+
+@pytest.fixture(scope="function")
+def sample_bound_agent(integration_db):
+    if integration_db is None:
+        yield "agent_bound"
+        return
+    now = time.time()
+    integration_db.execute(
+        """ INSERT INTO agents
+            (agent_id, name, status, owner_wallet, binding_status,
+             created_at, updated_at, stake, reputation)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) """,
+        ("agent_bound", "BoundAgent", "active", "0xBOUNDWALLET", "bound",
+         now, now, 1000.0, 5.0)
+    )
+    integration_db.execute(
+        """ INSERT INTO api_keys (key_id, agent_id, key_hash, key_prefix, created_at)
+            VALUES (?, ?, ?, ?, ?) """,
+        ("bound_key1", "agent_bound", "hash1", "test_", now)
+    )
+    integration_db.commit()
+    yield "agent_bound"
+
+
+@pytest.fixture(scope="function")
+def sample_pending_binding(integration_db):
+    if integration_db is None:
+        yield "agent_pending"
+        return
+    now = time.time()
+    integration_db.execute(
+        """ INSERT INTO agents
+            (agent_id, name, status, binding_status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?) """,
+        ("agent_pending", "PendingAgent", "active", "pending", now, now)
+    )
+    integration_db.commit()
+    yield "agent_pending"
+
+
+@pytest.fixture(scope="function")
+def sample_proposal(integration_db):
+    if integration_db is None:
+        yield "prop1"
+        return
+    now = time.time()
+    integration_db.execute(
+        """ INSERT INTO proposals
+            (id, title, proposer_id, status, votes_for, votes_against, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) """,
+        ("prop1", "Test Proposal", "0xPROPOSER", "active", 0, 0, now, now)
+    )
+    integration_db.commit()
+    yield "prop1"
 
 
 # ---------------------------------------------------------------------------
@@ -203,22 +243,3 @@ class mock_vib_governance_client:
     def __exit__(self, *args):
         import usmsb_sdk.blockchain.contracts.vib_governance as vg_mod
         vg_mod.VIBGovernanceClient = self._orig
-
-
-# Skip specific tests that require project-specific infrastructure
-def pytest_collection_modifyitems(session, config, items):
-    skip_patterns = [
-        "test_complete_staking_flow",
-        "test_complete_unstake_flow",
-        "test_stake_disabled_mode",
-        "test_stake_validation_errors",
-        "test_profile_creation_with_hourly_rate",
-        "test_config_endpoint_structure",
-    ]
-    for item in items:
-        for pattern in skip_patterns:
-            if pattern in item.nodeid:
-                item.add_marker(pytest.mark.skip(
-                    reason=f"Test {pattern} requires project-specific auth setup"
-                ))
-                break
