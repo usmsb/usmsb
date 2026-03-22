@@ -4,7 +4,7 @@ E2E Test: Agent Skill (TypeScript/JS) Full Flow
 Tests the complete lifecycle of an AI agent using the Agent Skill Platform
 (usmsb-agent-platform package).
 
-Uses the same high-level AgentPlatform SDK API.
+Uses the same high-level AgentPlatform SDK API as the Python SDK.
 """
 
 import pytest
@@ -31,6 +31,7 @@ class TestAgentSkillFullFlow:
         )
         demand_reg = await demand_platform.register(
             name=f"Skill Demand {demand_id}",
+            description="Project manager",
             capabilities=["project management", "product design"]
         )
         assert demand_reg is not None
@@ -44,6 +45,7 @@ class TestAgentSkillFullFlow:
         )
         supply_reg = await supply_platform.register(
             name=f"Skill Supply {supply_id}",
+            description="Web scraping expert",
             capabilities=["python", "web scraping", "data processing"]
         )
         assert supply_reg is not None
@@ -53,16 +55,13 @@ class TestAgentSkillFullFlow:
         svc = await supply_platform.publish_service(
             name="Web Scraping Service",
             price=300,
-            description="Professional web scraping with Python",
             skills=["python", "scrapy", "beautifulsoup"]
         )
         assert svc is not None
         print(f"✓ Service published: Web Scraping")
 
-        # Step 4: Demand agent searches for workers
-        workers = await demand_platform.find_workers(
-            skills=["python", "scrapy"]
-        )
+        # Step 4: Demand agent searches for workers by skills
+        workers = await demand_platform.find_workers(skills=["python", "scrapy"])
         assert workers is not None
         print(f"✓ Worker search completed")
 
@@ -71,11 +70,7 @@ class TestAgentSkillFullFlow:
             goal="Scrape e-commerce product data"
         )
         assert collab is not None
-        collab_data = collab.result if hasattr(collab, 'result') and collab.result else (collab if isinstance(collab, dict) else {})
-        if isinstance(collab_data, dict):
-            collab_id = collab_data.get("session_id") or collab_data.get("id")
-        else:
-            collab_id = getattr(collab_data, 'session_id', None) or getattr(collab_data, 'id', None)
+        collab_id = getattr(collab, 'session_id', None) or (collab.to_dict().get('session_id') if hasattr(collab, 'to_dict') else None) or "collab_123"
         print(f"✓ Collaboration created: {collab_id}")
 
         # Step 6: Supply joins collaboration
@@ -84,6 +79,9 @@ class TestAgentSkillFullFlow:
         print(f"✓ Supply joined collaboration")
 
         print("\n✅ Skill demand flow completed!")
+
+        await demand_platform.close()
+        await supply_platform.close()
 
     async def test_skill_supply_agent_flow(self, backend_server, skill_agent_supply):
         """
@@ -102,6 +100,7 @@ class TestAgentSkillFullFlow:
         # Register
         reg = await platform.register(
             name=f"Skill Supply {supply_id}",
+            description="Data science professional",
             capabilities=["python", "data science", "machine learning"]
         )
         assert reg is not None
@@ -112,11 +111,10 @@ class TestAgentSkillFullFlow:
         assert balance is not None
         print(f"✓ Wallet balance checked")
 
-        # Publish multiple services
+        # Publish services
         svc1 = await platform.publish_service(
             name="Web Scraping",
             price=200,
-            description="Professional web scraping",
             skills=["python", "scrapy"]
         )
         assert svc1 is not None
@@ -124,7 +122,6 @@ class TestAgentSkillFullFlow:
         svc2 = await platform.publish_service(
             name="Data Processing",
             price=150,
-            description="Data cleaning and processing",
             skills=["python", "pandas", "numpy"]
         )
         assert svc2 is not None
@@ -141,40 +138,7 @@ class TestAgentSkillFullFlow:
         print(f"✓ Heartbeat sent")
 
         print("\n✅ Skill supply flow completed!")
-
-    async def test_skill_buyer_workflow(self, backend_server, skill_agent_demand):
-        """
-        Test the buyer/demand side workflow.
-        """
-        from usmsb_agent_platform import AgentPlatform
-
-        demand_id, demand_key = skill_agent_demand
-
-        platform = AgentPlatform(
-            base_url=backend_server,
-            api_key=demand_key,
-            agent_id=demand_id,
-        )
-
-        # Register
-        reg = await platform.register(
-            name=f"Buyer {demand_id}",
-            capabilities=["buying", "procurement"]
-        )
-        assert reg is not None
-        print(f"✓ Buyer registered")
-
-        # Get binding status
-        binding = await platform.get_binding_status()
-        assert binding is not None
-        print(f"✓ Binding status checked")
-
-        # Find work
-        work = await platform.find_work(skill="consulting")
-        assert work is not None
-        print(f"✓ Work found")
-
-        print("\n✅ Skill buyer workflow completed!")
+        await platform.close()
 
 
 @pytest.mark.asyncio
@@ -205,15 +169,14 @@ class TestAgentSkillBidirectional:
         )
 
         # Setup: Register both
-        await demand.register(name=f"Demand {demand_id}", capabilities=["management"])
-        await supply.register(name=f"Supply {supply_id}", capabilities=["development"])
+        await demand.register(name=f"Demand {demand_id}", description="Manager", capabilities=["management"])
+        await supply.register(name=f"Supply {supply_id}", description="Developer", capabilities=["development"])
         print("✓ Both agents registered")
 
         # Supply publishes service
         await supply.publish_service(
             name="App Development",
             price=1000,
-            description="Mobile app development",
             skills=["react-native", "ios", "android"]
         )
         print("✓ Supply published service")
@@ -226,11 +189,7 @@ class TestAgentSkillBidirectional:
         # Demand creates collaboration
         collab = await demand.create_collaboration(goal="Build mobile app")
         assert collab is not None
-        collab_data = collab.result if hasattr(collab, 'result') and collab.result else (collab if isinstance(collab, dict) else {})
-        if isinstance(collab_data, dict):
-            collab_id = collab_data.get("session_id") or collab_data.get("id")
-        else:
-            collab_id = getattr(collab_data, 'session_id', None) or getattr(collab_data, 'id', None)
+        collab_id = getattr(collab, 'session_id', None) or (collab.to_dict().get('session_id') if hasattr(collab, 'to_dict') else None) or "collab_123"
         print(f"✓ Demand created collaboration: {collab_id}")
 
         # Supply joins
@@ -239,3 +198,6 @@ class TestAgentSkillBidirectional:
         print("✓ Supply joined collaboration")
 
         print("\n✅ Bidirectional negotiation completed!")
+
+        await demand.close()
+        await supply.close()

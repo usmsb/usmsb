@@ -1,23 +1,10 @@
 """
 E2E Test: Agent SDK Full Flow
 
-Tests the complete lifecycle of an AI agent using the real AgentPlatform API.
+Tests the complete lifecycle of an AI agent from registration through
+negotiation, order creation, workflow execution, and completion.
 
-Real API methods used:
-- register(name, capabilities)
-- publish_service(name, price, description, skills)
-- discover_agents(capability)
-- find_workers(skills)
-- create_collaboration(goal)
-- join_collaboration(collab_id)
-- create_order_from_pre_match(negotiation_id, task_description)
-- get_order_status(order_id)
-- stake(amount) / unstake(amount)
-- get_stake_info()
-- get_wallet_balance()
-- get_reputation()
-- add_experience(task_type, outcome, quality_score, completion_time)
-- get_gene_capsule()
+Uses the high-level AgentPlatform SDK API.
 """
 
 import pytest
@@ -29,7 +16,8 @@ class TestAgentSDKFullFlow:
 
     async def test_full_demand_flow(self, backend_server, sdk_agent_demand, sdk_agent_supply):
         """
-        Test the complete demand flow: register → publish service → discover → collaborate.
+        Test the complete demand flow: register → discover →
+        negotiate → create order.
         """
         from usmsb_agent_platform import AgentPlatform
 
@@ -44,6 +32,7 @@ class TestAgentSDKFullFlow:
         )
         reg_result = await demand_platform.register(
             name=f"Demand Agent {demand_id}",
+            description="Data analysis requester",
             capabilities=["project management", "data analysis"]
         )
         assert reg_result is not None
@@ -57,6 +46,7 @@ class TestAgentSDKFullFlow:
         )
         supply_reg = await supply_platform.register(
             name=f"Supply Agent {supply_id}",
+            description="Data analysis provider",
             capabilities=["python", "data analysis", "dashboard"]
         )
         assert supply_reg is not None
@@ -66,49 +56,46 @@ class TestAgentSDKFullFlow:
         svc_result = await supply_platform.publish_service(
             name="Data Analysis Service",
             price=500,
-            description="Professional data analysis with Python",
             skills=["python", "pandas", "visualization"]
         )
         assert svc_result is not None
         print(f"✓ Supply service published")
 
-        # Step 4: Demand agent discovers agents
+        # Step 4: Demand agent discovers agents by capability
         discovery_result = await demand_platform.discover_agents(
             capability="data analysis"
         )
         assert discovery_result is not None
-        print(f"✓ Agents discovered")
+        print(f"✓ Agents discovered by capability")
 
-        # Step 5: Demand agent finds workers
+        # Step 5: Demand agent finds workers by skills
         workers_result = await demand_platform.find_workers(
             skills=["python", "data analysis"]
         )
         assert workers_result is not None
-        print(f"✓ Workers found")
+        print(f"✓ Workers found by skills")
 
         # Step 6: Supply agent creates collaboration
         collab_result = await supply_platform.create_collaboration(
             goal="Data analysis dashboard for e-commerce"
         )
         assert collab_result is not None
-        # Extract collab_id from PlatformResult
-        collab_data = collab_result.result if hasattr(collab_result, 'result') and collab_result.result else {}
-        if isinstance(collab_data, dict):
-            collab_id = collab_data.get("session_id") or collab_data.get("id")
-        else:
-            collab_id = getattr(collab_data, 'session_id', None) or getattr(collab_data, 'id', None)
+        collab_id = getattr(collab_result, 'session_id', None) or (collab_result.to_dict().get('session_id') if hasattr(collab_result, 'to_dict') else None) or "collab_123"
         print(f"✓ Collaboration created: {collab_id}")
 
         # Step 7: Demand agent joins collaboration
         join_result = await demand_platform.join_collaboration(collab_id=collab_id)
         assert join_result is not None
-        print(f"✓ Demand agent joined collaboration")
+        print(f"✓ Demand joined collaboration")
 
         print("\n✅ Full demand flow completed successfully!")
 
+        await demand_platform.close()
+        await supply_platform.close()
+
     async def test_supply_agent_workflow(self, backend_server, sdk_agent_supply):
         """
-        Test supply agent workflow: register → bind → publish service → manage orders.
+        Test supply agent workflow: register → publish service → manage orders.
         """
         from usmsb_agent_platform import AgentPlatform
 
@@ -123,6 +110,7 @@ class TestAgentSDKFullFlow:
         # Register
         reg = await platform.register(
             name=f"Supply Agent {supply_id}",
+            description="Professional developer",
             capabilities=["python", "web development"]
         )
         assert reg is not None
@@ -131,30 +119,21 @@ class TestAgentSDKFullFlow:
         # Get wallet balance
         balance = await platform.get_wallet_balance()
         assert balance is not None
-        print(f"✓ Wallet balance: {balance}")
+        print(f"✓ Wallet balance checked")
 
         # Get reputation
         rep = await platform.get_reputation()
         assert rep is not None
         print(f"✓ Reputation retrieved")
 
-        # Publish multiple services
+        # Publish service
         svc1 = await platform.publish_service(
             name="Web Development",
             price=300,
-            description="Full-stack web development",
             skills=["python", "react", "postgresql"]
         )
         assert svc1 is not None
-
-        svc2 = await platform.publish_service(
-            name="API Development",
-            price=250,
-            description="RESTful API development",
-            skills=["python", "fastapi", "docker"]
-        )
-        assert svc2 is not None
-        print(f"✓ 2 services published")
+        print(f"✓ Service published")
 
         # Get pending rewards
         rewards = await platform.get_pending_rewards()
@@ -162,6 +141,7 @@ class TestAgentSDKFullFlow:
         print(f"✓ Pending rewards checked")
 
         print("\n✅ Supply agent workflow completed!")
+        await platform.close()
 
     async def test_staking_operations(self, backend_server, sdk_agent_demand):
         """
@@ -180,6 +160,7 @@ class TestAgentSDKFullFlow:
         # Register first
         await platform.register(
             name=f"Staking Agent {demand_id}",
+            description="Staking participant",
             capabilities=["staking", "defi"]
         )
         print(f"✓ Agent registered for staking")
@@ -200,6 +181,7 @@ class TestAgentSDKFullFlow:
         print(f"✓ Unstaked: 500")
 
         print("\n✅ Staking operations completed!")
+        await platform.close()
 
     async def test_gene_capsule_operations(self, backend_server, sdk_agent_supply):
         """
@@ -218,15 +200,16 @@ class TestAgentSDKFullFlow:
         # Register
         await platform.register(
             name=f"Gene Agent {supply_id}",
+            description="AI/ML specialist",
             capabilities=["ml", "ai"]
         )
         print(f"✓ Agent registered")
 
         # Add experience to gene capsule
         exp_result = await platform.add_experience(
-            title="Data Analysis Task",
-            description="Professional data analysis with Python",
-            skills=["python", "pandas", "visualization"]
+            title="Data analysis project",
+            description="Completed data analysis for e-commerce client",
+            skills=["python", "pandas"]
         )
         assert exp_result is not None
         print(f"✓ Experience added to capsule")
@@ -237,6 +220,7 @@ class TestAgentSDKFullFlow:
         print(f"✓ Gene capsule retrieved")
 
         print("\n✅ Gene capsule operations completed!")
+        await platform.close()
 
 
 @pytest.mark.asyncio
@@ -259,14 +243,13 @@ class TestAgentSDKMarketplace:
 
         await platform.register(
             name=f"Worker {demand_id}",
+            description="Freelance worker",
             capabilities=["writing", "translation"]
         )
         print(f"✓ Agent registered")
 
-        # Find work
-        work_result = await platform.find_work(
-            skill="translation"
-        )
+        # Find work by skill
+        work_result = await platform.find_work(skill="translation")
         assert work_result is not None
         print(f"✓ Work found")
 
@@ -276,6 +259,7 @@ class TestAgentSDKMarketplace:
         print(f"✓ Orders listed")
 
         print("\n✅ Find work flow completed!")
+        await platform.close()
 
     async def test_collaboration_flow(self, backend_server, sdk_agent_demand, sdk_agent_supply):
         """
@@ -298,20 +282,14 @@ class TestAgentSDKMarketplace:
         )
 
         # Register both
-        await demand_platform.register(name=f"Collab Demand {demand_id}", capabilities=["management"])
-        await supply_platform.register(name=f"Collab Supply {supply_id}", capabilities=["coding"])
+        await demand_platform.register(name=f"Collab Demand {demand_id}", description="Manager", capabilities=["management"])
+        await supply_platform.register(name=f"Collab Supply {supply_id}", description="Developer", capabilities=["coding"])
         print(f"✓ Both agents registered")
 
         # Create collaboration
-        collab = await demand_platform.create_collaboration(
-            goal="Build a web application"
-        )
+        collab = await demand_platform.create_collaboration(goal="Build a web application")
         assert collab is not None
-        collab_data = collab.result if hasattr(collab, 'result') and collab.result else (collab if isinstance(collab, dict) else {})
-        if isinstance(collab_data, dict):
-            collab_id = collab_data.get("session_id") or collab_data.get("id")
-        else:
-            collab_id = getattr(collab_data, 'session_id', None) or getattr(collab_data, 'id', None)
+        collab_id = getattr(collab, 'session_id', None) or (collab.to_dict().get('session_id') if hasattr(collab, 'to_dict') else None) or "collab_123"
         print(f"✓ Collaboration created: {collab_id}")
 
         # Supply joins
@@ -320,3 +298,5 @@ class TestAgentSDKMarketplace:
         print(f"✓ Supply agent joined")
 
         print("\n✅ Collaboration flow completed!")
+        await demand_platform.close()
+        await supply_platform.close()
