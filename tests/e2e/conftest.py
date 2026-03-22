@@ -1,219 +1,117 @@
 """
-E2E test fixtures. Provides shared in-memory SQLite DB and TestClient for all e2e tests.
+E2E Test Configuration - Async compatible
+
+Provides shared fixtures for end-to-end tests with async support.
 """
+
 import pytest
-import sqlite3
+import asyncio
 import time
-from unittest.mock import patch
-
-VALID_TX = "0x" + "a" * 64
-
-MOCK_USER = {
-    "user_id": "test_user",
-    "wallet_address": "0xBOUNDWALLET",
-    "agent_id": "agent_bound",
-    "name": "BoundAgent",
-    "status": "bound",
-    "binding_status": "bound",
-    "owner_wallet": "0xBOUNDWALLET",
-    "capabilities": "[]",
-    "description": "Test agent",
-    "level": 1,
-    "key_id": "bound_key1",
-}
-
-_shared_db = None
+import subprocess
+import os
+import socket
+import sys
 
 
-@pytest.fixture(scope="module")
-def shared_db():
-    """Module-level shared in-memory DB used by app and all tests."""
-    global _shared_db
-    _shared_db = sqlite3.connect(":memory:", check_same_thread=False)
-    
-    # Patch get_db BEFORE calling init_db
-    import usmsb_sdk.api.database as db_mod
-    original_get_db = db_mod.get_db
-    db_mod.get_db = lambda: _shared_db
-    
-    # Manually init schema (init_db uses get_db internally)
-    db_mod.init_db()
-    
-    yield _shared_db
-    
-    db_mod.get_db = original_get_db
-    _shared_db.close()
-    _shared_db = None
-
-
-@pytest.fixture(scope="module")
-def _app(shared_db):
-    """Create app with patched get_db returning shared DB."""
-    import usmsb_sdk.api.database as db_mod
-    original_get_db = db_mod.get_db
-    db_mod.get_db = lambda: shared_db
-    
-    from fastapi.testclient import TestClient
-    from usmsb_sdk.api.rest.main import app
-    
-    # Override auth
-    from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
-    from usmsb_sdk.api.rest.auth import get_current_user
-    app.dependency_overrides[get_current_user_unified] = lambda: MOCK_USER
-    app.dependency_overrides[get_current_user] = lambda: MOCK_USER
-    
-    tc = TestClient(app, raise_server_exceptions=False)
-    yield tc
-    tc.close()
-    app.dependency_overrides.clear()
-    db_mod.get_db = original_get_db
-
-
-@pytest.fixture(scope="function")
-def client(_app):
-    """Use the shared app client."""
-    return _app
-
-
-@pytest.fixture(scope="function")
-def integration_db(shared_db):
-    yield shared_db
-
-
-@pytest.fixture(scope="function")
-def sample_bound_agent(integration_db):
-    now = time.time()
-    integration_db.execute(
-        """INSERT INTO agents
-           (agent_id, name, status, owner_wallet, binding_status,
-            created_at, updated_at, stake, reputation)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("agent_bound", "BoundAgent", "active", "0xBOUNDWALLET", "bound",
-         now, now, 1000.0, 5.0)
-    )
-    integration_db.execute(
-        """INSERT INTO api_keys (key_id, agent_id, key_hash, key_prefix, created_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        ("bound_key1", "agent_bound", "hash1", "test_", now)
-    )
-    integration_db.commit()
-    return "agent_bound"
-
-
-@pytest.fixture(scope="function")
-def sample_pending_binding(integration_db):
-    now = time.time()
-    integration_db.execute(
-        """INSERT INTO agents
-           (agent_id, name, status, binding_status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        ("agent_pending", "PendingAgent", "active", "pending", now, now)
-    )
-    integration_db.commit()
-    return "agent_pending"
-
-
-@pytest.fixture(scope="function")
-def sample_proposal(integration_db):
-    now = time.time()
-    integration_db.execute(
-        """INSERT INTO proposals
-           (id, title, proposer_id, status, votes_for, votes_against, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        ("prop1", "Test Proposal", "0xPROPOSER", "active", 0, 0, now, now)
-    )
-    integration_db.commit()
-    return "prop1"
+def get_free_port():
+    """Find an available port."""
+    s = socket.socket()
+    s.bind(('', 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 
 # ---------------------------------------------------------------------------
-# Web3 mocks
+# Backend Server (module scope - works with async tests)
 # ---------------------------------------------------------------------------
 
-class _W3Ctx:
-    def __init__(self, mock_w3, original_from_env, patcher):
-        self.mock_w3 = mock_w3
-        self.original_from_env = original_from_env
-        self.patcher = patcher
+@pytest.fixture(scope="module")
+def backend_server():
+    """
+    Start the FastAPI backend, wait for it to be ready, yield base URL, then stop.
+    """
+    port = get_free_port()
+    base_url = f"http://127.0.0.1:{port}"
 
-    def __enter__(self):
-        return self.mock_w3
+    # Get project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-    def __exit__(self, *args):
-        self.patcher.stop()
-        if self.original_from_env:
-            from usmsb_sdk.blockchain.config import BlockchainConfig
-            BlockchainConfig.from_env = self.original_from_env
+    env = os.environ.copy()
+    env['PYTHONPATH'] = project_root
 
+    proc = subprocess.Popen(
+        [
+            sys.executable, '-m', 'uvicorn',
+            'usmsb_sdk.api.rest.main:app',
+            '--host', '127.0.0.1',
+            '--port', str(port),
+            '--log-level', 'warning',
+        ],
+        cwd=project_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
 
-def _make_w3(status=1, from_addr=None):
-    class FakeReceipt:
-        status = status
-        blockNumber = 1000
-        confirmations = 1
+    # Wait for server startup (max 20s)
+    import requests
+    for _ in range(40):
+        try:
+            r = requests.get(f"{base_url}/api/health", timeout=1)
+            if r.status_code < 500:
+                break
+        except requests.exceptions.RequestException:
+            pass
+        time.sleep(0.5)
+    else:
+        proc.kill()
+        raise RuntimeError(f"Backend failed to start on port {port}")
 
-    eth = FakeReceipt()
-    eth.get_transaction_receipt = lambda tx: FakeReceipt()
-    eth.chain_id = 84532
+    yield base_url
 
-    class FakeW3:
-        eth = eth
-        to_checksum_address = lambda self, x: x
-
-    return FakeW3()
-
-
-def mock_web3(status=1, from_addr=None):
-    from usmsb_sdk.blockchain.config import BlockchainConfig
-    original = getattr(BlockchainConfig, 'from_env', None)
-    mock_w3 = _make_w3(status=status, from_addr=from_addr)
-    patcher = patch("web3.Web3", return_value=mock_w3)
-    patcher.start()
-
-    class _Cfg:
-        rpc_url = "http://localhost:8545"
-        chain_id = 84532
-
-        def get_contract_address(self, name):
-            return "0x" + "a" * 40
-
-    BlockchainConfig.from_env = classmethod(lambda cls: _Cfg())
-    return _W3Ctx(mock_w3, original, patcher)
-
-
-def mock_web3_not_found():
-    return mock_web3()
+    # Cleanup
+    proc.terminate()
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        proc.kill()
 
 
-def mock_web3_failed():
-    return mock_web3(status=0)
+# ---------------------------------------------------------------------------
+# UUID-based agent factories
+# ---------------------------------------------------------------------------
+
+import uuid
 
 
-class mock_vib_governance_client:
-    def __init__(self, proposal_data=None, voting_power=None):
-        from unittest.mock import MagicMock, AsyncMock
-        if proposal_data is None:
-            proposal_data = {
-                "id": 1, "proposer": "0xVOTERADDR",
-                "proposal_type": MagicMock(), "state": MagicMock(),
-                "title": "Test", "description": "Test proposal",
-                "target": "0x" + "b" * 40, "data": "", "start_time": 0,
-                "end_time": 0, "execute_time": 0, "for_votes": 100,
-                "against_votes": 50, "abstain_votes": 10,
-                "total_voters": 5, "executed": False,
-            }
-        self.proposal_data = proposal_data
-        self.voting_power = voting_power if voting_power is not None else 1000 * (10**18)
-        self._mock = MagicMock()
-        self._mock.get_proposal = AsyncMock(return_value=self.proposal_data)
-        self._mock.get_voting_power = AsyncMock(return_value=self.voting_power)
+@pytest.fixture(scope="function")
+def sdk_agent_demand(backend_server):
+    """Create a unique demand agent ID and API key."""
+    agent_id = f"sdk_demand_{uuid.uuid4().hex[:8]}"
+    api_key = f"usmsb_sdk_demand_{uuid.uuid4().hex[:12]}"
+    return agent_id, api_key
 
-    def __enter__(self):
-        import usmsb_sdk.blockchain.contracts.vib_governance as vg_mod
-        self._orig = vg_mod.VIBGovernanceClient
-        vg_mod.VIBGovernanceClient = lambda *a, **kw: self._mock
-        return self._mock
 
-    def __exit__(self, *args):
-        import usmsb_sdk.blockchain.contracts.vib_governance as vg_mod
-        vg_mod.VIBGovernanceClient = self._orig
+@pytest.fixture(scope="function")
+def sdk_agent_supply(backend_server):
+    """Create a unique supply agent ID and API key."""
+    agent_id = f"sdk_supply_{uuid.uuid4().hex[:8]}"
+    api_key = f"usmsb_sdk_supply_{uuid.uuid4().hex[:12]}"
+    return agent_id, api_key
+
+
+@pytest.fixture(scope="function")
+def skill_agent_demand(backend_server):
+    """Create a unique demand agent ID and API key for Agent Skill."""
+    agent_id = f"skill_demand_{uuid.uuid4().hex[:8]}"
+    api_key = f"usmsb_skill_demand_{uuid.uuid4().hex[:12]}"
+    return agent_id, api_key
+
+
+@pytest.fixture(scope="function")
+def skill_agent_supply(backend_server):
+    """Create a unique supply agent ID and API key for Agent Skill."""
+    agent_id = f"skill_supply_{uuid.uuid4().hex[:8]}"
+    api_key = f"usmsb_skill_supply_{uuid.uuid4().hex[:12]}"
+    return agent_id, api_key
