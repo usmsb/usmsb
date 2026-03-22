@@ -57,12 +57,12 @@ tests/
 | 测试类别 | 文件数 | 通过 | 跳过 | 失败 |
 |----------|--------|------|------|------|
 | 业务逻辑测试 | 9 | **182** | 0 | ✅ 0 |
-| 集成测试 | 21 | **207** | 8 | ✅ 0 |
+| 集成测试 | 33 | **250** | 8 | ✅ 0 |
 | **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
-| **合计** | — | **415** | 42 | **0** ✅ |
-| 集成测试 | 21 | **207** | 8 | ✅ 0 |
+| **合计** | — | **594** | 42 | **0** ✅ |
+| 集成测试 | 33 | **250** | 8 | ✅ 0 |
 | **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
-| **合计** | — | **415** | 42 | **0** ✅ |
+| **合计** | — | **594** | 42 | **0** ✅ |
 
 ### E2E 测试详情
 
@@ -105,6 +105,19 @@ tests/
 | Collaboration Endpoints | `test_collaboration_endpoints.py` | ← **NEW** |
 | State Machines | `test_state_machines.py` | ← **NEW** |
 | Data Consistency | `test_data_consistency.py` | ← **NEW** |
+
+| Demands Endpoints | `test_demands_endpoints.py` | ← **NEW** |
+| Environments Endpoints | `test_environments_endpoints.py` | ← **NEW** |
+| Feedback Endpoints | `test_feedback_endpoints.py` | ← **NEW** |
+| Gene Capsule Endpoints | `test_gene_capsule_endpoints.py` | ← **NEW** |
+| Heartbeat Endpoints | `test_heartbeat_endpoints.py` | ← **NEW** |
+| Learning Endpoints | `test_learning_endpoints.py` | ← **NEW** |
+| Network Endpoints | `test_network_endpoints.py` | ← **NEW** |
+| Predictions Endpoints | `test_predictions_endpoints.py` | ← **NEW** |
+| Reputation Endpoints | `test_reputation_endpoints.py` | ← **NEW** |
+| Souls Endpoints | `test_souls_endpoints.py` | ← **NEW** |
+| System Endpoints | `test_system_endpoints.py` | ← **NEW** |
+| Pre-Match Negotiation Endpoints | `test_pre_match_negotiation_endpoints.py` | ← **NEW** |
 | Memory Manager | `test_memory_manager.py` |
 | Concurrent Safety | `test_concurrent_safety.py` | ← **NEW** |
 | Pre-match Negotiation | `test_pre_match_negotiation.py` |
