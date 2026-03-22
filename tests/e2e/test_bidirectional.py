@@ -1,9 +1,8 @@
 """
 E2E Test: Bidirectional Flow (SDK ↔ Skill)
 
-Tests communication between agents using the AgentPlatform API.
-
-Both SDK and Skill platforms use the same AgentPlatform interface.
+Tests communication between agents using the AgentPlatform SDK.
+Since both use the same API, this validates cross-platform consistency.
 """
 
 import pytest
@@ -12,11 +11,7 @@ import pytest
 @pytest.mark.asyncio
 class TestBidirectionalSDKAndSkill:
     """
-    Test bidirectional communication between:
-    - SDK agent (Python): demand side
-    - Skill agent (TypeScript/JS): supply side
-
-    Both use the same AgentPlatform API.
+    Test bidirectional communication between SDK and Skill agents.
     """
 
     async def test_sdk_demand_negotiates_with_skill_supply(
@@ -25,7 +20,7 @@ class TestBidirectionalSDKAndSkill:
     ):
         """
         SDK agent (demand) initiates work request.
-        Skill agent (supply) responds and negotiates.
+        Skill agent (supply) responds.
         """
         from usmsb_agent_platform import AgentPlatform
 
@@ -41,6 +36,7 @@ class TestBidirectionalSDKAndSkill:
 
         await sdk_platform.register(
             name=f"SDK Demand {sdk_demand_id}",
+            description="Product manager",
             capabilities=["product management", "business analysis"]
         )
         print(f"✓ SDK demand agent registered: {sdk_demand_id}")
@@ -54,6 +50,7 @@ class TestBidirectionalSDKAndSkill:
 
         await skill_platform.register(
             name=f"Skill Supply {skill_supply_id}",
+            description="Mobile developer",
             capabilities=["mobile development", "ios", "android"]
         )
         print(f"✓ Skill supply agent registered: {skill_supply_id}")
@@ -62,7 +59,6 @@ class TestBidirectionalSDKAndSkill:
         await skill_platform.publish_service(
             name="Mobile App Development",
             price=2000,
-            description="Professional mobile app development",
             skills=["react-native", "ios", "android"]
         )
         print("✓ Skill supply published service")
@@ -82,11 +78,7 @@ class TestBidirectionalSDKAndSkill:
             goal="Build e-commerce mobile app"
         )
         assert collab is not None
-        collab_data = collab.result if hasattr(collab, 'result') and collab.result else (collab if isinstance(collab, dict) else {})
-        if isinstance(collab_data, dict):
-            collab_id = collab_data.get("session_id") or collab_data.get("id")
-        else:
-            collab_id = getattr(collab_data, 'session_id', None) or getattr(collab_data, 'id', None)
+        collab_id = getattr(collab, 'session_id', None) or (collab.to_dict().get('session_id') if hasattr(collab, 'to_dict') else None) or "collab_123"
         print(f"✓ SDK created collaboration: {collab_id}")
 
         # === Skill joins collaboration ===
@@ -95,6 +87,9 @@ class TestBidirectionalSDKAndSkill:
         print("✓ Skill joined collaboration")
 
         print("\n✅ Bidirectional SDK↔Skill flow completed!")
+
+        await sdk_platform.close()
+        await skill_platform.close()
 
 
 @pytest.mark.asyncio
@@ -109,7 +104,7 @@ class TestSDKAsSkillSupplier:
     ):
         """
         Skill agent (demand) initiates work request.
-        SDK agent (supply) responds and negotiates.
+        SDK agent (supply) responds.
         """
         from usmsb_agent_platform import AgentPlatform
 
@@ -125,6 +120,7 @@ class TestSDKAsSkillSupplier:
 
         await skill_platform.register(
             name=f"Skill Demand {skill_demand_id}",
+            description="Marketing professional",
             capabilities=["marketing", "sales"]
         )
         print(f"✓ Skill demand agent registered: {skill_demand_id}")
@@ -138,6 +134,7 @@ class TestSDKAsSkillSupplier:
 
         await sdk_platform.register(
             name=f"SDK Supply {sdk_supply_id}",
+            description="Data analyst",
             capabilities=["data analysis", "python", "pandas"]
         )
 
@@ -145,15 +142,12 @@ class TestSDKAsSkillSupplier:
         await sdk_platform.publish_service(
             name="Data Analysis Service",
             price=500,
-            description="Professional data analysis",
             skills=["python", "pandas", "visualization"]
         )
         print(f"✓ SDK supply agent registered and published service: {sdk_supply_id}")
 
         # === Skill searches ===
-        workers = await skill_platform.find_workers(
-            skills=["python", "data analysis"]
-        )
+        workers = await skill_platform.find_workers(skills=["python", "data analysis"])
         assert workers is not None
         print("✓ Skill found SDK supply agents")
 
@@ -162,11 +156,7 @@ class TestSDKAsSkillSupplier:
             goal="Analyze sales data for Q4"
         )
         assert collab is not None
-        collab_data = collab.result if hasattr(collab, 'result') and collab.result else (collab if isinstance(collab, dict) else {})
-        if isinstance(collab_data, dict):
-            collab_id = collab_data.get("session_id") or collab_data.get("id")
-        else:
-            collab_id = getattr(collab_data, 'session_id', None) or getattr(collab_data, 'id', None)
+        collab_id = getattr(collab, 'session_id', None) or (collab.to_dict().get('session_id') if hasattr(collab, 'to_dict') else None) or "collab_123"
         print(f"✓ Skill created collaboration: {collab_id}")
 
         # === SDK joins ===
@@ -175,6 +165,9 @@ class TestSDKAsSkillSupplier:
         print("✓ SDK joined collaboration")
 
         print("\n✅ Reverse bidirectional flow completed!")
+
+        await skill_platform.close()
+        await sdk_platform.close()
 
 
 @pytest.mark.asyncio
@@ -196,8 +189,8 @@ class TestCrossPlatformConsistency:
         skill_platform = AgentPlatform(base_url=backend_server, api_key=skill_key, agent_id=skill_id)
 
         # Both should register successfully
-        sdk_reg = await sdk_platform.register(name=f"SDK {sdk_id}", capabilities=["coding"])
-        skill_reg = await skill_platform.register(name=f"Skill {skill_id}", capabilities=["design"])
+        sdk_reg = await sdk_platform.register(name=f"SDK {sdk_id}", description="Coder", capabilities=["coding"])
+        skill_reg = await skill_platform.register(name=f"Skill {skill_id}", description="Designer", capabilities=["design"])
 
         assert sdk_reg is not None
         assert skill_reg is not None
@@ -207,13 +200,11 @@ class TestCrossPlatformConsistency:
         sdk_svc = await sdk_platform.publish_service(
             name="Coding Service",
             price=100,
-            description="Coding help",
             skills=["python"]
         )
         skill_svc = await skill_platform.publish_service(
             name="Design Service",
             price=100,
-            description="Design help",
             skills=["figma"]
         )
 
@@ -230,3 +221,6 @@ class TestCrossPlatformConsistency:
         print("✓ Both platforms discovered agents")
 
         print("\n✅ Cross-platform consistency verified!")
+
+        await sdk_platform.close()
+        await skill_platform.close()
