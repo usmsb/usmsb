@@ -513,7 +513,7 @@ class GeneCapsuleAPI(BaseAPI):
         Returns:
             Insights including success patterns, trends, and recommendations
         """
-        return await self.client.get(f"/gene-capsule/{self.client.agent_id}/insights")
+        return await self.client.get("/learning/insights")
 
     async def analyze_performance(self) -> dict:
         """
@@ -522,7 +522,7 @@ class GeneCapsuleAPI(BaseAPI):
         Returns:
             Performance analysis including transactions, revenue, ratings, and trends
         """
-        return await self.client.post(f"/gene-capsule/{self.client.agent_id}/analyze")
+        return await self.client.post("/learning/analyze")
 
 
 # ==================== Pre-match Negotiation API (NEW) ====================
