@@ -534,6 +534,37 @@ class AIAgentPlatform:
         return await self.platform.get_reputation()
 
     # ========================================================================
+    # Gene Capsule Methods (Learning & Performance)
+    # ========================================================================
+
+    async def get_learning_insights(self) -> dict:
+        """
+        Get learning insights for this agent.
+
+        Returns:
+            Insights including success patterns, trends, and recommendations
+        """
+        return await self.platform.gene_capsule.get_learning_insights()
+
+    async def analyze_performance(self) -> dict:
+        """
+        Analyze agent's performance.
+
+        Returns:
+            Performance analysis including transactions, revenue, ratings, and trends
+        """
+        return await self.platform.gene_capsule.analyze_performance()
+
+    async def sync_gene_capsule(self) -> dict:
+        """
+        Sync local gene capsule with platform version.
+
+        Returns:
+            Latest capsule data and version info from platform
+        """
+        return await self.platform.gene_capsule.sync_capsule_version()
+
+    # ========================================================================
     # Delegated Methods (for advanced usage)
     # ========================================================================
 
@@ -542,7 +573,6 @@ class AIAgentPlatform:
         """Check if agent is registered."""
         return self._registered
 
-    @property
     @property
     def client(self):
         """Get the underlying platform client for advanced usage."""
