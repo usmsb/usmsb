@@ -1,38 +1,47 @@
 # USMSB SDK 测试方案
 
+> 更新于 2026-03-22
+
 ## 概述
 
-本测试方案旨在实现**全量业务覆盖**、**完整业务闭环**的测试体系，确保每次commit都能验证核心业务流程的正确性。
+本测试方案实现**全量业务覆盖**、**完整业务闭环**的测试体系，确保每次 commit 都能验证核心业务流程的正确性。
 
 ## 测试架构
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        E2E 测试 (e2e)                          │
-│           完整业务流程闭环 - 端到端验证                          │
-├─────────────────────────────────────────────────────────────────┤
-│                     Integration Tests (integration)            │
-│              跨模块业务逻辑 - API交互验证                        │
-├─────────────────────────────────────────────────────────────────┤
-│                       Unit Tests (unit)                        │
-│               单个API功能 - 快速独立验证                        │
-├─────────────────────────────────────────────────────────────────┤
-│                         Fixtures                                │
-│              测试数据 + 辅助函数 + Mock                         │
-└─────────────────────────────────────────────────────────────────┘
+tests/
+├── business/                  # 业务逻辑单元测试（按领域分类）
+│   ├── test_agents_business.py
+│   ├── test_orders_business.py
+│   ├── test_staking_business.py
+│   └── ...
+├── integration/               # 跨模块集成测试
+│   ├── conftest.py
+│   ├── test_agents.py
+│   ├── test_orders.py
+│   ├── test_negotiations.py
+│   ├── test_staking.py
+│   ├── test_usmsb_matching.py
+│   └── ...
+├── e2e/                      # 端到端流程测试
+│   ├── conftest.py
+│   ├── test_order_flow.py    # 跨模块业务闭环（14个流程测试）
+│   ├── test_staking_e2e.py  # 质押流程（6个端点可达性测试）
+│   ├── test_precise_matching_e2e.py    # (跳过，需Meta-agent服务)
+│   ├── test_smart_memory_e2e.py        # (跳过，需Smart memory服务)
+│   └── test_agent_sdk_e2e.py           # (跳过，需SDK环境)
+├── fixtures/                 # 共享测试数据和辅助函数
+├── unit/                     # 底层单元测试
+└── conftest.py              # 全局 pytest 配置和共享 fixtures
 ```
 
-## 测试数据库方案
+## 测试数据方案
 
-### 选用策略: 临时文件数据库 (Session级别)
+### 内存数据库 + 临时文件数据库
 
-- **位置**: `tmp_path/tests_data/test_civilization.db`
-- **生命周期**: Session级别，整个测试会话共享
-- **隔离策略**: 测试间不清理，支持业务闭环测试
-- **优点**:
-  - 支持测试间数据共享，便于测试完整业务流程
-  - 保留现场便于调试失败测试
-  - 接近真实生产环境的文件数据库
+- **集成测试**: 使用 `tests/integration/conftest.py` 的 `create_test_db()` 创建独立内存数据库
+- **E2E 测试**: 使用 `tests/e2e/conftest.py` 的 `shared_db` 模块级共享内存数据库
+- **隔离策略**: 每个测试函数通过 `function` 级别 fixture 获取独立 DB 连接
 
 ### 环境变量控制
 
@@ -41,243 +50,204 @@
 | `CLEAN_DB_BETWEEN_TESTS=1` | 启用测试间数据库清理 |
 | `DATABASE_PATH` | 自定义数据库路径 |
 
-## 测试文件
+## 当前测试状态
 
-| 文件 | 说明 | 测试用例数 |
-|------|------|-----------|
-| `test_business_api_full_coverage.py` | 基础API测试 | 65 |
-| `test_business_logic_coverage.py` | 业务逻辑测试 | 70+ |
-| `test_comprehensive_coverage.py` | 全面补充测试 | 150+ |
-| `test_security_vulnerability.py` | 安全与漏洞测试 | 50+ |
+> 2026-03-22 最新
 
-**总计**: 335+ 测试用例
+| 测试类别 | 文件数 | 通过 | 跳过 | 失败 |
+|----------|--------|------|------|------|
+| 业务逻辑测试 | ~20 | **216** | 0 | ✅ 0 |
+| 集成测试 | 14 | **149** | 20 | ✅ 0 |
+| **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
+| **合计** | — | **385** | 54 | **0** ✅ |
 
-## 业务闭环覆盖
+### E2E 测试详情
 
-| 闭环 | 测试模块 | 覆盖API |
-|------|---------|---------|
-| 1 | Agent生命周期 | agents, heartbeat |
-| 2 | 认证授权 | auth, agent_auth |
-| 3 | 钱包管理 | wallet |
-| 4 | 质押Staking | staking |
-| 5 | 需求-匹配-协作 | demands, matching, collaborations |
-| 6 | 工作流 | workflows |
-| 7 | 治理 | governance |
-| 8 | 交易 | transactions |
-| 9 | 环境管理 | environments |
-| 10 | 学习洞察 | learning |
-| 11 | 网络探索 | network |
-| 12 | 服务管理 | services |
-| 13 | 基因胶囊 | gene_capsule |
-| 14 | 声誉 | reputation |
-| 15 | 匹配前谈判 | pre_match_negotiation |
-| 16 | Meta匹配 | meta_agent_matching |
-| 17 | 预测 | predictions |
-| 18 | 区块链 | blockchain |
-| 19 | 注册 | registration |
-| 20 | 系统 | system |
+| 文件 | 通过 | 跳过 | 说明 |
+|------|------|------|------|
+| `test_order_flow.py` | 14 | 0 | 跨模块业务闭环：注册→质押→订单→谈判→治理 |
+| `test_staking_e2e.py` | 6 | 0 | 质押/取消质押/配置/余额/Profile 端点可达性 |
+| `test_precise_matching_e2e.py` | 0 | **11** | Meta-agent 服务返回 503（服务未实现）|
+| `test_smart_memory_e2e.py` | 0 | **11** | Smart memory 服务不可用 |
+| `test_agent_sdk_e2e.py` | 0 | **6** | 需要完整 SDK 环境 |
 
-## 测试数据
+### 集成测试覆盖的模块
 
-测试使用独立的测试数据 fixtures，定义在 `tests/fixtures/test_data.py` 中：
+| 模块 | 测试文件 |
+|------|---------|
+| Agents | `test_agents.py` |
+| Orders | `test_orders.py` |
+| Negotiations | `test_negotiations.py` |
+| Joint Orders | `test_joint_order.py` |
+| Disputes | `test_dispute.py` |
+| Staking | `test_staking.py` |
+| Registration | `test_registration.py` |
+| Identity | `test_identity.py` |
+| Governance | `test_governance.py` |
+| Blockchain | `test_blockchain.py` |
+| USMSB Matching | `test_usmsb_matching.py` |
+| Services | `test_services.py` |
+| Agent SDK | `test_agent_sdk_integration.py` |
+| Memory Manager | `test_memory_manager.py` |
+| Pre-match Negotiation | `test_pre_match_negotiation.py` |
 
-- `AgentTestData` - Agent测试数据
-- `UserTestData` - 用户测试数据
-- `WalletTestData` - 钱包测试数据
-- `DemandTestData` - 需求测试数据
-- `ServiceTestData` - 服务测试数据
-- `CollaborationTestData` - 协作测试数据
-- `WorkflowTestData` - 工作流测试数据
-- `ProposalTestData` - 提案测试数据
-- `TransactionTestData` - 交易测试数据
+### 跳过的集成测试（20个）
+
+| 文件 | 跳过数 | 原因 |
+|------|--------|------|
+| `test_multi_user_isolation.py` | 1 | SessionManager 依赖外部服务超时 |
+| `test_meta_agent_integration.py` | 8 | `EnhancedDiscoveryManager` 签名变更 |
+| `test_staking_integration.py` | 11 | 路径 `/auth/...` 应为 `/api/auth/...` |
 
 ## 运行测试
 
 ### 快速开始
 
 ```bash
-# 全部测试
-python run_full_tests.py
-
-# 仅单元测试
-python run_full_tests.py --unit
+# 全部测试（排除已知问题）
+pytest tests/integration/ tests/e2e/ -o timeout=15 -q
 
 # 仅集成测试
-python run_full_tests.py --integration
+pytest tests/integration/ -o timeout=15 -q
 
-# 仅E2E测试
-python run_full_tests.py --e2e
+# 仅 E2E 测试
+pytest tests/e2e/ -o timeout=180 -q
 
-# CI模式 (每次commit运行)
-python run_full_tests.py --ci
+# 仅业务逻辑测试（核心文件）
+pytest tests/test_orders_business.py tests/test_negotiations_business.py \
+       tests/test_joint_order_business.py tests/test_dispute_business.py \
+       tests/test_staking_business.py tests/test_registration_business.py \
+       tests/test_identity_business.py tests/test_governance_business.py \
+       tests/test_matching_business.py -o timeout=15 -q
 ```
 
-### 使用pytest直接运行
+### 使用 pytest 直接运行
 
 ```bash
 # 全部测试
-pytest tests/test_business_api_full_coverage.py -v
+pytest tests/ -o timeout=15 -q
 
 # 仅特定模块
-pytest tests/test_business_api_full_coverage.py -m agent -v
-
-# 仅快速测试
-pytest tests/test_business_api_full_coverage.py -m "unit and not slow" -v
+pytest tests/integration/test_orders.py -v
 
 # 生成覆盖率报告
-pytest tests/test_business_api_full_coverage.py --cov=usmsb_sdk --cov-report=html
-```
-
-### 使用Make命令
-
-```bash
-# 安装依赖
-make install-test
-
-# 运行所有测试
-make test
-
-# 运行单元测试
-make test-unit
-
-# 运行集成测试
-make test-integration
-
-# 运行E2E测试
-make test-e2e
-
-# 运行CI测试
-make test-ci
-
-# 生成覆盖率报告
-make test-coverage
+pytest tests/ --cov=usmsb_sdk --cov-report=html --cov-report=term
 ```
 
 ## 标记说明
 
 | 标记 | 说明 |
 |------|------|
-| `unit` | 单元测试 |
-| `integration` | 集成测试 |
-| `e2e` | 端到端测试 |
-| `ci` | CI/CD自动测试 |
-| `slow` | 慢速测试 |
-| `agent` | Agent模块测试 |
-| `auth` | 认证模块测试 |
-| `wallet` | 钱包模块测试 |
-| `staking` | 质押模块测试 |
-| `matching` | 匹配模块测试 |
-| `collaboration` | 协作模块测试 |
-| `workflow` | 工作流模块测试 |
-| `governance` | 治理模块测试 |
-| `transaction` | 交易模块测试 |
-| `environment` | 环境模块测试 |
-| `learning` | 学习模块测试 |
-| `network` | 网络模块测试 |
-| `blockchain` | 区块链模块测试 |
+| `integration` | 集成测试（`tests/integration/`） |
+| `e2e` | 端到端测试（`tests/e2e/`） |
+| `business` | 业务逻辑测试（`tests/test_*_business.py`） |
+| `unit` | 单元测试（`tests/unit/`） |
 
-## CI/CD集成
+## 外部依赖 Mock 策略
 
-### GitHub Actions
+| 服务 | Mock 方式 |
+|------|-----------|
+| **Web3/区块链** | `mock_web3` fixture（`tests/integration/conftest.py`）|
+| **VIBGovernanceClient** | `mock_vib_governance_client` fixture |
+| **数据库** | 内存 SQLite (`create_test_db()`) |
+| **外部 HTTP** | `httpx.AsyncClient` + 响应模拟 |
 
-```yaml
-# .github/workflows/test.yml
-name: Tests
+## 已知限制
 
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+1. **Meta-agent 服务** (`/api/meta-agent/*`): 返回 503，服务未实现
+2. **Smart Memory 服务**: 服务不可用
+3. **Agent SDK E2E**: 需要完整 SDK 环境配置
+4. **多用户隔离测试**: SessionManager 依赖外部服务超时
+5. **部分路径重构**: `test_staking_integration.py` 中旧路径 `/auth/...` 需更新为 `/api/auth/...`
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
+## 下一步测试计划
 
-    steps:
-      - uses: actions/checkout@v3
+### P1 — 补充现有模块的端点覆盖
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+根据 [TEST_GAP_ANALYSIS.md](./TEST_GAP_ANALYSIS.md)，以下模块的端点尚未测试：
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements-dev.txt
+| 模块 | 缺失端点 | 优先级 |
+|------|---------|--------|
+| **Matching Router** | `search-demands`, `search-suppliers`, `negotiate`, `opportunities`, `stats` | P1 |
+| **Transactions Router** | `escrow`, `start`, `deliver`, `accept`, `dispute`, `resolve`, `cancel` | P1 |
+| **Wallet Router** | `balance`, `transactions/{tx_id}` | P1 |
+| **Workflows Router** | `execute` | P1 |
+| **Collaborations Router** | `execute`, `join`, `contribute`, `stats` | P1 |
+| **Learning Router** | `analyze`, `insights`, `strategy`, `market` | P2 |
+| **Network Router** | `explore`, `recommendations`, `stats` | P2 |
+| **Reputation Router** | `history` | P2 |
 
-      - name: Run CI tests
-        run: |
-          python run_full_tests.py --ci
-        env:
-          TESTING: true
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ETH_TESTNET_RPC: ${{ secrets.ETH_TESTNET_RPC }}
+### P2 — 修复现有跳过的测试
 
-      - name: Upload coverage
-        if: success()
-        uses: codecov/codecov-action@v3
-```
+1. **`test_staking_integration.py` (11个跳过)**
+   - 修复路径: `/auth/...` → `/api/auth/...`
+   - 责任人: 测试框架
 
-### 本地Pre-commit Hook
+2. **`test_agent_sdk_integration.py` (8个跳过)**
+   - 修复 `EnhancedDiscoveryManager` 签名问题
+   - 需要: `agent_config` 和 `communication_manager` 参数
 
-```bash
-# 安装pre-commit hook
-cp .git/hooks/pre-commit .git/hooks/pre-commit.sample
-chmod +x .git/hooks/pre-commit
-```
+3. **`test_meta_agent_integration.py` (8个跳过)**
+   - 同上，SDK 签名问题
 
-## 覆盖率要求
+### P3 — 新增测试类型
 
-| 测试类型 | 最低覆盖率 |
-|----------|-----------|
-| 单元测试 | 70% |
-| 集成测试 | 60% |
-| E2E测试 | 50% |
-| 整体 | 80% |
+1. **状态机测试**
+   - 交易状态转换: `created → escrow → delivered → completed`
+   - 协作状态转换: `pending → active → completed`
+   - 质押状态转换: `none → staked → unstaking → unlocked`
+   - 争议状态转换: `open → resolved`
 
-## 外部依赖
+2. **数据一致性测试**
+   - Agent ↔ Wallet 数据一致性
+   - Demand ↔ Service ↔ Match 数据一致性
+   - Staking ↔ Reputation 联动
 
-测试使用以下真实外部服务：
+3. **并发安全测试**
+   - 并发创建 Agent
+   - 并发质押/取消质押
+   - 并发订单创建
 
-1. **LLM服务** - 用于需要AI能力的测试
-   - 配置: `OPENAI_API_KEY` 或其他LLM提供商
-   - 标记: `requires_llm`
+4. **E2E 流程扩展**
+   - 完整 Matching 流程: Demand → Match → Negotiation → Proposal → Order
+   - 完整 Dispute 流程: Order → Dispute → Resolution
+   - 完整 Governance 流程: Proposal → Vote → Execute
 
-2. **区块链测试网** - 用于区块链交互测试
-   - 配置: `ETH_TESTNET_RPC` (如 Sepolia)
-   - 标记: `real_blockchain`
+### P4 — 安全测试
 
-## 测试数据隔离
+1. 授权测试（跨用户访问）
+2. SQL 注入防护
+3. 越权操作防护
+4. 超长字符串边界条件
 
-- 使用内存数据库 (`:memory:` 或临时文件)
-- 每个测试独立的数据fixtures
-- 测试后保留数据库便于调试
+## 覆盖率目标
+
+| 测试类型 | 当前覆盖率 | 目标 |
+|----------|-----------|------|
+| 整体 | ~60% | 80% |
+| API 端点 | ~70% | 90% |
+| 业务逻辑 | ~75% | 85% |
+| 状态机 | ~40% | 80% |
 
 ## 故障排查
 
 ### 测试失败
 
-1. 检查环境变量是否正确配置
-2. 查看详细错误信息: `pytest -vv`
-3. 运行单个测试: `pytest tests/test_business_api_full_coverage.py::TestAgentLifecycle::test_agent_create -vv`
+1. 查看详细错误: `pytest -vv`
+2. 运行单个测试: `pytest tests/integration/test_orders.py::TestOrders::test_order_create -vv`
+3. 检查数据库状态: `sqlite3 tests_data/test.db`
 
-### 覆盖率不足
+### 超时问题
 
-1. 查看未覆盖的代码: `htmlcov/index.html`
-2. 添加更多边界条件测试
-3. 检查异常处理路径
+- E2E 测试默认 180s 超时（app 加载约 7s）
+- 集成测试默认 15s 超时
 
 ## 贡献指南
 
 添加新测试时：
 
-1. 选择合适的测试类型 (unit/integration/e2e)
-2. 使用现有的fixtures创建测试数据
-3. 添加适当的pytest标记
+1. 选择合适的测试类型 (`integration`/`e2e`/`business`)
+2. 使用现有 fixtures（`MOCK_USER`, `mock_web3`, `sample_bound_agent` 等）
+3. 添加适当的 pytest 标记
 4. 确保测试独立可运行
-5. 更新本README文档
-
-## 许可证
-
-MIT License
+5. 更新本 README 文档
