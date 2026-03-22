@@ -57,12 +57,12 @@ tests/
 | 测试类别 | 文件数 | 通过 | 跳过 | 失败 |
 |----------|--------|------|------|------|
 | 业务逻辑测试 | 9 | **182** | 0 | ✅ 0 |
-| 集成测试 | 20 | **190** | 8 | ✅ 0 |
+| 集成测试 | 21 | **207** | 8 | ✅ 0 |
 | **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
-| **合计** | — | **409** | 42 | **0** ✅ |
-| 集成测试 | 20 | **190** | 8 | ✅ 0 |
+| **合计** | — | **415** | 42 | **0** ✅ |
+| 集成测试 | 21 | **207** | 8 | ✅ 0 |
 | **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
-| **合计** | — | **409** | 42 | **0** ✅ |
+| **合计** | — | **415** | 42 | **0** ✅ |
 
 ### E2E 测试详情
 
@@ -106,6 +106,7 @@ tests/
 | State Machines | `test_state_machines.py` | ← **NEW** |
 | Data Consistency | `test_data_consistency.py` | ← **NEW** |
 | Memory Manager | `test_memory_manager.py` |
+| Concurrent Safety | `test_concurrent_safety.py` | ← **NEW** |
 | Pre-match Negotiation | `test_pre_match_negotiation.py` |
 
 ### 跳过的集成测试（20个）
