@@ -48,7 +48,7 @@ class TestGeneCapsuleDiscoveryIntegration:
     """Test integration between Gene Capsule and Discovery"""
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_experience_based_discovery(self, mock_platform_client):
         """Test discovering agents by their experiences"""
         from usmsb_sdk.agent_sdk.discovery import EnhancedDiscoveryManager
@@ -74,7 +74,7 @@ class TestGeneCapsuleDiscoveryIntegration:
         assert len(results) == 1
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_capsule_enhanced_search(self, mock_platform_client):
         """Test that gene capsule data enhances search results"""
         from usmsb_sdk.agent_sdk.discovery import (
@@ -118,7 +118,7 @@ class TestDiscoveryNegotiationIntegration:
     """Test integration between Discovery and Negotiation"""
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_discovery_to_negotiation_flow(self, mock_platform_client):
         """Test flow from discovery to negotiation"""
         from usmsb_sdk.agent_sdk.discovery import EnhancedDiscoveryManager
@@ -156,7 +156,7 @@ class TestDiscoveryNegotiationIntegration:
         assert negotiation.demand_agent_id == "demand_agent"
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_negotiation_after_semantic_search(self, mock_platform_client):
         """Test negotiation after semantic search"""
         from usmsb_sdk.agent_sdk.discovery import EnhancedDiscoveryManager
@@ -196,7 +196,7 @@ class TestFullMatchingFlow:
     """Test complete matching flows"""
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_demand_agent_full_flow(self, mock_platform_client):
         """Test demand agent complete flow"""
         from usmsb_sdk.agent_sdk.discovery import (
@@ -279,7 +279,7 @@ class TestFullMatchingFlow:
         assert confirmation is not None
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_supply_agent_full_flow(self, mock_platform_client):
         """Test supply agent complete flow"""
         from usmsb_sdk.agent_sdk.gene_capsule import GeneCapsuleManager
@@ -357,7 +357,7 @@ class TestErrorHandlingIntegration:
     """Test error handling across modules"""
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_discovery_error_does_not_break_negotiation(self, mock_platform_client):
         """Test that discovery error doesn't break negotiation"""
         from usmsb_sdk.agent_sdk.discovery import EnhancedDiscoveryManager
@@ -387,7 +387,7 @@ class TestErrorHandlingIntegration:
         assert negotiation is not None
 
     @pytest.mark.asyncio
-@pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
+    @pytest.mark.skip(reason="EnhancedDiscoveryManager signature mismatch - needs agent_config and communication_manager")
     async def test_gene_capsule_error_recovery(self, mock_platform_client):
         """Test gene capsule error recovery"""
         from usmsb_sdk.agent_sdk.gene_capsule import GeneCapsuleManager
