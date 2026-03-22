@@ -80,7 +80,7 @@ class TestStakingE2E:
         headers = authenticated_user['headers']
 
         # Step 1: Check initial balance
-        response = client.get("/auth/balance", headers=headers)
+        response = client.get("/api/auth/balance", headers=headers)
         assert response.status_code == 200
         initial_balance = response.json()
         assert initial_balance['balance'] == 10000.0
@@ -89,7 +89,7 @@ class TestStakingE2E:
 
         # Step 2: Stake 500 VIBE
         response = client.post(
-            "/auth/stake",
+            "/api/auth/stake",
             json={"amount": 500},
             headers=headers
         )
@@ -99,7 +99,7 @@ class TestStakingE2E:
         assert stake_result['newStake'] == 500
 
         # Step 3 & 4: Verify balance deducted and status changed
-        response = client.get("/auth/balance", headers=headers)
+        response = client.get("/api/auth/balance", headers=headers)
         assert response.status_code == 200
         balance_after_stake = response.json()
         assert balance_after_stake['balance'] == 9500.0  # 10000 - 500
@@ -108,13 +108,13 @@ class TestStakingE2E:
 
         # Step 5: Add more stake
         response = client.post(
-            "/auth/stake",
+            "/api/auth/stake",
             json={"amount": 300},
             headers=headers
         )
         assert response.status_code == 200
 
-        response = client.get("/auth/balance", headers=headers)
+        response = client.get("/api/auth/balance", headers=headers)
         final_balance = response.json()
         assert final_balance['balance'] == 9200.0  # 9500 - 300
         assert final_balance['stakedAmount'] == 800  # 500 + 300
@@ -134,27 +134,27 @@ class TestStakingE2E:
         headers = authenticated_user['headers']
 
         # Step 1: Stake 1000 VIBE
-        client.post("/auth/stake", json={"amount": 1000}, headers=headers)
+        client.post("/api/auth/stake", json={"amount": 1000}, headers=headers)
 
         # Step 2: Request unstake
-        response = client.post("/auth/unstake", json={}, headers=headers)
+        response = client.post("/api/auth/unstake", json={}, headers=headers)
         assert response.status_code == 200
         unstake_result = response.json()
         assert unstake_result['success'] == True
         assert unstake_result['lockedAmount'] == 1000
 
         # Step 3: Verify status is 'unstaking'
-        response = client.get("/auth/balance", headers=headers)
+        response = client.get("/api/auth/balance", headers=headers)
         balance = response.json()
         assert balance['stakeStatus'] == 'unstaking'
         assert balance['lockedAmount'] == 1000
 
         # Step 4: Cancel unstake
-        response = client.post("/auth/unstake/cancel", headers=headers)
+        response = client.post("/api/auth/unstake/cancel", headers=headers)
         assert response.status_code == 200
 
         # Step 5: Verify status returned to 'staked'
-        response = client.get("/auth/balance", headers=headers)
+        response = client.get("/api/auth/balance", headers=headers)
         balance = response.json()
         assert balance['stakeStatus'] == 'staked'
         assert balance['lockedAmount'] == 0
@@ -174,21 +174,21 @@ class TestStakingE2E:
 
         with patch.dict(os.environ, {'STAKE_REQUIRED': 'false'}):
             # Step 2: Check config
-            response = client.get("/auth/config")
+            response = client.get("/api/auth/config")
             assert response.status_code == 200
             config = response.json()
             assert config['stakeRequired'] == False
 
             # Step 3: Attempt to stake
             response = client.post(
-                "/auth/stake",
+                "/api/auth/stake",
                 json={"amount": 500},
                 headers=headers
             )
             assert response.status_code == 200
 
             # Step 4: Verify balance unchanged (stake was skipped)
-            response = client.get("/auth/balance", headers=headers)
+            response = client.get("/api/auth/balance", headers=headers)
             balance = response.json()
             # Balance should still be 10000 because stake was skipped
             assert balance['balance'] == 10000.0
@@ -207,7 +207,7 @@ class TestStakingE2E:
 
         # Scenario 1: Below minimum
         response = client.post(
-            "/auth/stake",
+            "/api/auth/stake",
             json={"amount": 50},
             headers=headers
         )
@@ -215,7 +215,7 @@ class TestStakingE2E:
 
         # Scenario 2: More than balance
         response = client.post(
-            "/auth/stake",
+            "/api/auth/stake",
             json={"amount": 20000},
             headers=headers
         )
@@ -223,11 +223,11 @@ class TestStakingE2E:
         assert "Insufficient" in response.json()['detail']
 
         # Scenario 3: While unstaking
-        client.post("/auth/stake", json={"amount": 500}, headers=headers)
-        client.post("/auth/unstake", json={}, headers=headers)
+        client.post("/api/auth/stake", json={"amount": 500}, headers=headers)
+        client.post("/api/auth/unstake", json={}, headers=headers)
 
         response = client.post(
-            "/auth/stake",
+            "/api/auth/stake",
             json={"amount": 100},
             headers=headers
         )
@@ -244,7 +244,7 @@ class TestStakingE2E:
         headers = authenticated_user['headers']
 
         response = client.post(
-            "/auth/profile",
+            "/api/auth/profile",
             json={
                 "name": "Test User",
                 "bio": "A test user for e2e testing",
@@ -344,7 +344,7 @@ class TestStakingConfiguration:
             database.init_db()
 
             client = TestClient(app)
-            response = client.get("/auth/config")
+            response = client.get("/api/auth/config")
 
             assert response.status_code == 200
             data = response.json()
