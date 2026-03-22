@@ -28,6 +28,7 @@ E2E_TIMEOUT = float(os.getenv("E2E_TIMEOUT", "30.0"))
 
 # ==================== Gene Capsule E2E Tests ====================
 
+@pytest.mark.skip(reason="Agent SDK tests require full platform services")
 class TestE2EGeneCapsule:
     """E2E tests for Gene Capsule flow"""
 
@@ -86,6 +87,7 @@ class TestE2EGeneCapsule:
 
 # ==================== Discovery E2E Tests ====================
 
+@pytest.mark.skip(reason="Agent SDK tests require full platform services")
 class TestE2EDiscovery:
     """E2E tests for Discovery flow"""
 
@@ -152,6 +154,7 @@ class TestE2EDiscovery:
 
 # ==================== Negotiation E2E Tests ====================
 
+@pytest.mark.skip(reason="Agent SDK tests require full platform services")
 class TestE2ENegotiation:
     """E2E tests for Negotiation flow"""
 
@@ -235,6 +238,7 @@ class TestE2ENegotiation:
 
 # ==================== Meta Agent E2E Tests ====================
 
+@pytest.mark.skip(reason="Agent SDK tests require full platform services")
 class TestE2EMetaAgent:
     """E2E tests for Meta Agent flow"""
 
@@ -366,6 +370,7 @@ class TestE2EMetaAgent:
 
 # ==================== Complete Scenario Tests ====================
 
+@pytest.mark.skip(reason="Agent SDK tests require full platform services")
 class TestE2ECompleteScenarios:
     """Complete end-to-end scenario tests"""
 
@@ -487,6 +492,7 @@ class TestE2ECompleteScenarios:
 
 # ==================== Performance Tests ====================
 
+@pytest.mark.skip(reason="Agent SDK tests require full platform services")
 class TestE2EPerformance:
     """Performance tests"""
 
