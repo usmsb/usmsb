@@ -18,6 +18,7 @@ Features:
 """
 
 from .platform import AgentPlatform
+from .ai_agent_platform import AIAgentPlatform, Task
 from .registration import (
     APIKeyInfo,
     BindingRequestResult,
@@ -51,8 +52,10 @@ from .order import (
 
 __version__ = "1.2.0"
 __all__ = [
-    # Main class
+    # Main classes
     "AgentPlatform",
+    "AIAgentPlatform",
+    "Task",
 
     # Registration and binding
     "RegistrationClient",

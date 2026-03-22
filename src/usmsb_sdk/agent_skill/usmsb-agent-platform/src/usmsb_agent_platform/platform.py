@@ -497,6 +497,33 @@ class GeneCapsuleAPI(BaseAPI):
             **kwargs
         })
 
+    async def sync_capsule_version(self) -> dict:
+        """
+        Sync local capsule with platform version.
+
+        Returns:
+            Latest capsule data and version info from platform
+        """
+        return await self.client.post(f"/gene-capsule/{self.client.agent_id}/sync")
+
+    async def get_learning_insights(self) -> dict:
+        """
+        Get learning insights for this agent.
+
+        Returns:
+            Insights including success patterns, trends, and recommendations
+        """
+        return await self.client.get(f"/gene-capsule/{self.client.agent_id}/insights")
+
+    async def analyze_performance(self) -> dict:
+        """
+        Analyze agent's performance.
+
+        Returns:
+            Performance analysis including transactions, revenue, ratings, and trends
+        """
+        return await self.client.post(f"/gene-capsule/{self.client.agent_id}/analyze")
+
 
 # ==================== Pre-match Negotiation API (NEW) ====================
 class PreMatchNegotiationAPI(BaseAPI):
@@ -961,6 +988,11 @@ class AgentPlatform(WebSocketMixin):
                 self._retry_config
             )
         return self._client
+
+    @property
+    def gene_capsule(self):
+        """Access Gene Capsule API."""
+        return self._get_client().gene_capsule
 
     async def _get_stake_checker(self) -> StakeChecker:
         """Get or create stake checker."""
