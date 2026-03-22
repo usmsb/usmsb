@@ -534,7 +534,7 @@ class AIAgentPlatform:
         return await self.platform.get_reputation()
 
     # ========================================================================
-    # Gene Capsule Methods (Learning & Performance)
+    # Learning & Performance Methods
     # ========================================================================
 
     async def get_learning_insights(self) -> dict:
@@ -544,7 +544,7 @@ class AIAgentPlatform:
         Returns:
             Insights including success patterns, trends, and recommendations
         """
-        return await self.platform.gene_capsule.get_learning_insights()
+        return await self.platform.get_learning_insights()
 
     async def analyze_performance(self) -> dict:
         """
@@ -553,7 +553,7 @@ class AIAgentPlatform:
         Returns:
             Performance analysis including transactions, revenue, ratings, and trends
         """
-        return await self.platform.gene_capsule.analyze_performance()
+        return await self.platform.analyze_performance()
 
     async def sync_gene_capsule(self) -> dict:
         """
