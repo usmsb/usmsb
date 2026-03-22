@@ -36,3 +36,9 @@ frontend/dist/
 frontend/.env
 frontend/build/
 .venv/
+
+# Python build
+src/usmsb_sdk.egg-info/
+
+# Data files
+errors.json
