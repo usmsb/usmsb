@@ -56,10 +56,13 @@ tests/
 
 | 测试类别 | 文件数 | 通过 | 跳过 | 失败 |
 |----------|--------|------|------|------|
-| 业务逻辑测试 | ~20 | **216** | 0 | ✅ 0 |
-| 集成测试 | 14 | **149** | 20 | ✅ 0 |
+| 业务逻辑测试 | 9 | **182** | 0 | ✅ 0 |
+| 集成测试 | 20 | **190** | 8 | ✅ 0 |
 | **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
-| **合计** | — | **385** | 54 | **0** ✅ |
+| **合计** | — | **392** | 42 | **0** ✅ |
+| 集成测试 | 20 | **190** | 8 | ✅ 0 |
+| **E2E 流程测试** | 4 | **20** | 34 | ✅ 0 |
+| **合计** | — | **392** | 42 | **0** ✅ |
 
 ### E2E 测试详情
 
@@ -88,6 +91,19 @@ tests/
 | USMSB Matching | `test_usmsb_matching.py` |
 | Services | `test_services.py` |
 | Agent SDK | `test_agent_sdk_integration.py` |
+
+| Matching Endpoints | `test_matching_endpoints.py` | ← **NEW** |
+| Wallet Endpoints | `test_wallet_endpoints.py` | ← **NEW** |
+| Workflow Endpoints | `test_workflow_endpoints.py` | ← **NEW** |
+| Collaboration Endpoints | `test_collaboration_endpoints.py` | ← **NEW** |
+| State Machines | `test_state_machines.py` | ← **NEW** |
+| Data Consistency | `test_data_consistency.py` | ← **NEW** |
+| Matching Endpoints | `test_matching_endpoints.py` | ← **NEW** |
+| Wallet Endpoints | `test_wallet_endpoints.py` | ← **NEW** |
+| Workflow Endpoints | `test_workflow_endpoints.py` | ← **NEW** |
+| Collaboration Endpoints | `test_collaboration_endpoints.py` | ← **NEW** |
+| State Machines | `test_state_machines.py` | ← **NEW** |
+| Data Consistency | `test_data_consistency.py` | ← **NEW** |
 | Memory Manager | `test_memory_manager.py` |
 | Pre-match Negotiation | `test_pre_match_negotiation.py` |
 
