@@ -1,8 +1,5 @@
 """
-E2E test fixtures. Provides shared test database for all e2e tests.
-
-The shared DB is used by both the app (via _app fixture) and by
-test-specific fixtures (via shared_db fixture).
+E2E test fixtures. Provides shared in-memory SQLite DB and TestClient for all e2e tests.
 """
 import pytest
 import sqlite3
@@ -25,41 +22,35 @@ MOCK_USER = {
     "key_id": "bound_key1",
 }
 
-
-def create_test_db():
-    """Create in-memory SQLite with production schema."""
-    conn = sqlite3.connect(":memory:", check_same_thread=False)
-    from usmsb_sdk.api.database import init_db
-    init_db()
-    return conn
-
-
-# Module-level shared DB for all e2e tests
-_shared_db_conn = None
+_shared_db = None
 
 
 @pytest.fixture(scope="module")
 def shared_db():
-    """Module-level shared in-memory DB used by app and tests."""
-    global _shared_db_conn
-    _shared_db_conn = create_test_db()
+    """Module-level shared in-memory DB used by app and all tests."""
+    global _shared_db
+    _shared_db = sqlite3.connect(":memory:", check_same_thread=False)
     
+    # Patch get_db BEFORE calling init_db
     import usmsb_sdk.api.database as db_mod
-    original = db_mod.get_db
-    db_mod.get_db = lambda: _shared_db_conn
+    original_get_db = db_mod.get_db
+    db_mod.get_db = lambda: _shared_db
     
-    yield _shared_db_conn
+    # Manually init schema (init_db uses get_db internally)
+    db_mod.init_db()
     
-    db_mod.get_db = original
-    _shared_db_conn.close()
-    _shared_db_conn = None
+    yield _shared_db
+    
+    db_mod.get_db = original_get_db
+    _shared_db.close()
+    _shared_db = None
 
 
 @pytest.fixture(scope="module")
 def _app(shared_db):
-    """Create app with shared DB for all tests in module."""
+    """Create app with patched get_db returning shared DB."""
     import usmsb_sdk.api.database as db_mod
-    original = db_mod.get_db
+    original_get_db = db_mod.get_db
     db_mod.get_db = lambda: shared_db
     
     from fastapi.testclient import TestClient
@@ -71,11 +62,11 @@ def _app(shared_db):
     app.dependency_overrides[get_current_user_unified] = lambda: MOCK_USER
     app.dependency_overrides[get_current_user] = lambda: MOCK_USER
     
-    with TestClient(app, raise_server_exceptions=False) as tc:
-        yield tc
-    
+    tc = TestClient(app, raise_server_exceptions=False)
+    yield tc
+    tc.close()
     app.dependency_overrides.clear()
-    db_mod.get_db = original
+    db_mod.get_db = original_get_db
 
 
 @pytest.fixture(scope="function")
@@ -85,71 +76,54 @@ def client(_app):
 
 
 @pytest.fixture(scope="function")
-def integration_db():
-    """Function-level DB - shares same connection as app."""
-    # The shared_db is module-scoped, but we yield None here
-    # because tests should use the shared DB via the app fixtures
-    # This fixture exists for compatibility with test_staking_e2e.py
-    global _shared_db_conn
-    if _shared_db_conn is not None:
-        yield _shared_db_conn
-    else:
-        yield None
+def integration_db(shared_db):
+    yield shared_db
 
 
 @pytest.fixture(scope="function")
 def sample_bound_agent(integration_db):
-    if integration_db is None:
-        yield "agent_bound"
-        return
     now = time.time()
     integration_db.execute(
-        """ INSERT INTO agents
-            (agent_id, name, status, owner_wallet, binding_status,
-             created_at, updated_at, stake, reputation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) """,
+        """INSERT INTO agents
+           (agent_id, name, status, owner_wallet, binding_status,
+            created_at, updated_at, stake, reputation)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         ("agent_bound", "BoundAgent", "active", "0xBOUNDWALLET", "bound",
          now, now, 1000.0, 5.0)
     )
     integration_db.execute(
-        """ INSERT INTO api_keys (key_id, agent_id, key_hash, key_prefix, created_at)
-            VALUES (?, ?, ?, ?, ?) """,
+        """INSERT INTO api_keys (key_id, agent_id, key_hash, key_prefix, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
         ("bound_key1", "agent_bound", "hash1", "test_", now)
     )
     integration_db.commit()
-    yield "agent_bound"
+    return "agent_bound"
 
 
 @pytest.fixture(scope="function")
 def sample_pending_binding(integration_db):
-    if integration_db is None:
-        yield "agent_pending"
-        return
     now = time.time()
     integration_db.execute(
-        """ INSERT INTO agents
-            (agent_id, name, status, binding_status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?) """,
+        """INSERT INTO agents
+           (agent_id, name, status, binding_status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
         ("agent_pending", "PendingAgent", "active", "pending", now, now)
     )
     integration_db.commit()
-    yield "agent_pending"
+    return "agent_pending"
 
 
 @pytest.fixture(scope="function")
 def sample_proposal(integration_db):
-    if integration_db is None:
-        yield "prop1"
-        return
     now = time.time()
     integration_db.execute(
-        """ INSERT INTO proposals
-            (id, title, proposer_id, status, votes_for, votes_against, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?) """,
+        """INSERT INTO proposals
+           (id, title, proposer_id, status, votes_for, votes_against, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         ("prop1", "Test Proposal", "0xPROPOSER", "active", 0, 0, now, now)
     )
     integration_db.commit()
-    yield "prop1"
+    return "prop1"
 
 
 # ---------------------------------------------------------------------------
