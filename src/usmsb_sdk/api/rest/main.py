@@ -23,7 +23,8 @@ if env_path.exists():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
-                os.environ.setdefault(key, value)
+                # Use direct assignment so .env always takes precedence over shell env
+                os.environ[key] = value
 
 import asyncio
 import logging
@@ -236,9 +237,19 @@ async def lifespan(app: FastAPI):
     from usmsb_sdk.api.rest import gene_capsule_service as gene_service_module
     from usmsb_sdk.api.rest.routers.gene_capsule import set_gene_capsule_services
 
+    gene_capsule_service = None
     try:
         # Create a simple SQLite engine for gene capsule storage
-        gene_engine = create_engine('sqlite:///gene_capsule.db')
+        import os as _os
+        # Go up 5 levels: usmsb_sdk/api/rest -> usmsb_sdk/api -> usmsb_sdk -> src -> project root
+        _p = _os.path.dirname
+        _gene_default = _os.path.join(_p(_p(_p(_p(_p(__file__))))), 'data', 'db', 'gene_capsule.db')
+        gene_db_path = os.environ.get("GENE_CAPSULE_DB")
+        if gene_db_path is None:
+            gene_db_path = f"sqlite:///{_gene_default}"
+        elif not gene_db_path.startswith("sqlite://"):
+            gene_db_path = f"sqlite:///{gene_db_path}"
+        gene_engine = create_engine(gene_db_path)
         gene_service_module.Base.metadata.create_all(gene_engine)
         gene_session_factory = sessionmaker(bind=gene_engine)
         gene_db_session = gene_session_factory()
@@ -288,7 +299,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from usmsb_sdk.services.reputation_service import get_reputation_service
-        reputation_service = await get_reputation_service()
+        reputation_service = get_reputation_service()
         logger.info("ReputationService initialized")
     except Exception as e:
         logger.warning(f"ReputationService not available: {e}")
@@ -298,7 +309,7 @@ async def lifespan(app: FastAPI):
     try:
         from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
 
-        pre_match_service = PreMatchNegotiationService()
+        pre_match_service = PreMatchNegotiationService(gene_capsule_service=gene_capsule_service)
 
         # FIX断层1+9: Wire PreMatch → Order automatic bridge.
         # When both parties confirm a pre-match, auto-create the order.
@@ -366,7 +377,7 @@ async def lifespan(app: FastAPI):
     from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
 
     try:
-        permission_manager = PermissionManager("meta_agent.db")
+        permission_manager = PermissionManager(os.getenv("META_DB_PATH", "data/db/meta_agent/meta_agent.db"))
         await permission_manager.init()
         set_permission_manager(permission_manager)
         logger.info("Permission Manager initialized")

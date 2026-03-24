@@ -8,6 +8,7 @@ Implements a comprehensive reputation system:
 - Transaction-based updates
 - Periodic recalculation
 """
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
