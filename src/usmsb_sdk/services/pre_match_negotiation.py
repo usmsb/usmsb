@@ -14,6 +14,7 @@ Migration: PreMatchNegotiation -> ValueNegotiationService
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -935,22 +936,147 @@ class PreMatchNegotiationService:
         supply_agent_id: str,
         demand_id: str,
     ) -> GeneCapsuleMatch:
-        """Get gene capsule match for context"""
+        """Get gene capsule match for context.
+
+        Matches the supply agent's gene capsule experiences against the demand requirements.
+        Returns experiences that are relevant to the demand with relevance scoring.
+        """
         if not self.gene_capsule_service:
             return GeneCapsuleMatch()
 
         try:
-            # Get demand details and search for matching experiences
-            # This would integrate with the gene capsule matching service
+            # 1. Get the demand from the database
+            from usmsb_sdk.api.database import get_db
+
+            demand = None
+            if demand_id:
+                with get_db() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT * FROM demands WHERE id = ?", (demand_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        demand = dict(row)
+
+            # 2. Get supply agent's gene capsule
+            capsule = await self.gene_capsule_service.get_capsule(supply_agent_id)
+            if not capsule:
+                self.logger.debug(f"No gene capsule found for agent {supply_agent_id}")
+                return GeneCapsuleMatch()
+
+            # 3. Extract demand requirements
+            demand_keywords: set[str] = set()
+            required_skills: set[str] = set()
+
+            if demand:
+                # Parse required skills from JSON
+                try:
+                    required_skills = set(json.loads(demand.get("required_skills", "[]")))
+                except (json.JSONDecodeError, TypeError):
+                    required_skills = set()
+
+                # Build keyword set from title, description, category, and skills
+                for field_val in [
+                    demand.get("title", ""),
+                    demand.get("description", ""),
+                    demand.get("category", ""),
+                ]:
+                    if field_val:
+                        demand_keywords.update(
+                            w.strip().lower()
+                            for w in re.findall(r"\b[\w]{2,}\b", str(field_val))
+                            if w.strip()
+                        )
+
+            # 4. Find matching experiences in the capsule
+            matched_experiences: list[dict[str, Any]] = []
+            verified_count = 0
+            total_experience_value = 0.0
+
+            for exp in capsule.experiences:
+                # Skip failed or hidden experiences
+                if exp.outcome != "success":
+                    continue
+                if exp.share_level == "hidden":
+                    continue
+
+                # Parse experience keywords
+                try:
+                    exp_keywords = set(json.loads(exp.task_keywords or "[]"))
+                except (json.JSONDecodeError, TypeError):
+                    exp_keywords = set()
+
+                # Calculate match score for this experience
+                score = 0.0
+
+                # Category / task_type match
+                if demand and demand.get("category"):
+                    if exp.task_category == demand["category"]:
+                        score += 0.3
+                    if exp.task_type == demand.get("title", "").lower():
+                        score += 0.2
+
+                # Required skills overlap
+                if required_skills:
+                    skill_overlap = required_skills & exp_keywords
+                    if skill_overlap:
+                        score += min(len(skill_overlap) / max(len(required_skills), 1), 1.0) * 0.25
+
+                # Keyword overlap with demand text
+                if demand_keywords:
+                    keyword_overlap = demand_keywords & exp_keywords
+                    if keyword_overlap:
+                        score += min(len(keyword_overlap) / max(len(demand_keywords), 1), 1.0) * 0.25
+
+                if score > 0.1:  # Threshold for inclusion
+                    is_verified = bool(exp.verified)
+                    quality = float(exp.quality_score or 0.0)
+
+                    matched_experiences.append({
+                        "gene_id": exp.gene_id,
+                        "task_type": exp.task_type,
+                        "task_category": exp.task_category or "",
+                        "task_description": (exp.task_description or "")[:200],
+                        "outcome": exp.outcome,
+                        "quality_score": quality,
+                        "verified": is_verified,
+                        "value_score": float(exp.value_score or 0.0),
+                        "match_score": round(score, 3),
+                    })
+
+                    if is_verified:
+                        verified_count += 1
+                    total_experience_value += float(exp.value_score or 0.0) * quality / 100.0
+
+            # 5. Calculate overall relevance score (0-100)
+            if not matched_experiences:
+                relevance_score = 0.0
+            else:
+                # Weighted: avg match score + quality + verification ratio
+                avg_match = sum(e["match_score"] for e in matched_experiences) / len(matched_experiences)
+                avg_quality = sum(e["quality_score"] for e in matched_experiences) / len(matched_experiences)
+                verify_ratio = verified_count / len(matched_experiences)
+                relevance_score = round(
+                    avg_match * 40 + avg_quality * 30 + verify_ratio * 100 * 0.3,
+                    2,
+                )
+
             result = GeneCapsuleMatch(
-                matched_experiences=[],
-                relevance_score=0.0,
-                verified_count=0,
-                total_experience_value=0.0,
+                matched_experiences=matched_experiences,
+                relevance_score=relevance_score,
+                verified_count=verified_count,
+                total_experience_value=round(total_experience_value, 2),
+            )
+            self.logger.debug(
+                f"Gene capsule match for {supply_agent_id} @ demand {demand_id}: "
+                f"score={relevance_score}, experiences={len(matched_experiences)}, "
+                f"verified={verified_count}"
             )
             return result
+
         except Exception as e:
             self.logger.error(f"Error getting gene capsule match: {e}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return GeneCapsuleMatch()
 
     def _negotiation_to_dict(self, negotiation: PreMatchNegotiationDB) -> dict[str, Any]:
