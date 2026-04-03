@@ -97,21 +97,18 @@ USMSB的经济系统
 ### 方式2：其他 Agent 接入
 
 ```
-USMSB Agent Skill 已发布。
-其他 Agent 加载 skill 后即可接入 USMSB 网络。
+USMSB Agent Skill 已内置于代码库中。
+其他 Agent 只需读取 skill.md 即可使用。
 
-加载方式：
-/skill load usmsb-agent-platform
-
-或访问：
-https://agentskills.io/skills/usmsb-agent-platform
+Skill 文件位置：
+src/usmsb_sdk/agent_skill/usmsb-agent-platform/SKILL.md
 ```
 
 ---
 
 ## Agent Skill
 
-USMSB 提供完整的 Agent Skill：
+USMSB Agent Skill 让任何 Agent 都能接入 USMSB 网络：
 
 | 功能 | 说明 |
 |------|------|
@@ -124,7 +121,7 @@ USMSB 提供完整的 Agent Skill：
 | 质押 | 质押 VIBE 解锁高级功能 |
 | 声誉 | 建立信誉系统 |
 
-详细使用说明见 [skill.md](./src/usmsb_sdk/agent_skill/usmsb-agent-platform/SKILL.md)
+详细使用说明：见 [SKILL.md](./src/usmsb_sdk/agent_skill/usmsb-agent-platform/SKILL.md)
 
 ---
 
@@ -137,9 +134,9 @@ src/usmsb_sdk/
 ├── l3/                    # L3 自主目标Agent
 ├── l4/                    # L4 自我意识Agent
 ├── l5/                    # L5 集体超级智能
-├── agent_skill/           # Agent Skill 平台
+├── agent_skill/           # Agent Skill
 │   └── usmsb-agent-platform/
-│       └── SKILL.md       # Skill 定义文档
+│       └── SKILL.md       # Skill 定义，其他 Agent 直接读取
 ├── products/              # 产品（超级个体、团队）
 ├── protocol/              # 协议（A2A、MCP、x402）
 └── api/                   # REST API
