@@ -30,7 +30,9 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'civilization.db')
+# Get project root (src/usmsb_sdk/api -> src/usmsb_sdk -> src)
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+DATABASE_PATH = os.path.join(_project_root, 'data', 'db', 'civilization.db')
 
 def get_db_path():
     """Get database path, create directory if not exists"""

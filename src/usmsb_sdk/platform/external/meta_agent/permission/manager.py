@@ -384,12 +384,12 @@ class PermissionManager:
         return await loop.run_in_executor(None, self._query_user, wallet_address)
 
     def _query_user(self, wallet_address: str) -> UserPermission | None:
-        """查询用户"""
+        """查询用户（大小写不敏感）"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT * FROM user_permissions WHERE wallet_address = ?",
+            "SELECT * FROM user_permissions WHERE LOWER(wallet_address) = LOWER(?)",
             (wallet_address,),
         )
         row = cursor.fetchone()

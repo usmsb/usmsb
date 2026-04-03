@@ -614,7 +614,7 @@ async def on_chain_stake(
             raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
         # Transaction successful — update database
-        from usmsb_sdk.api.database import update_agent_balance
+        from usmsb_sdk.api.database import update_agent_balance, update_agent_stake
         amount_wei = int(request.amount * (10 ** 18))
 
         # Find agent by wallet address and update staking info
@@ -622,6 +622,7 @@ async def on_chain_stake(
         if agent_id:
             try:
                 update_agent_balance(agent_id, request.amount, deduct=False)
+                update_agent_stake(agent_id, request.amount, deduct=False)
             except Exception:
                 pass  # Non-agent users may not have agent_balance to update
 
@@ -674,15 +675,20 @@ async def on_chain_unstake(
         if receipt.status != 1:
             raise HTTPException(status_code=400, detail="Transaction failed on-chain")
 
-        # Update database
+        # Update database - unstake deducts from stake amount
         agent_id = current_user.get("agent_id")
         if agent_id:
             try:
-                from usmsb_sdk.api.database import update_agent_balance
-                # Unstake clears all staking - mark as unbound
-                pass
+                from usmsb_sdk.api.database import update_agent_stake
+                # Get current stake info to find amount to unstake
+                from usmsb_sdk.blockchain import VIBEBlockchainClient
+                client = VIBEBlockchainClient()
+                stake_info = await client.staking.get_stake_info(staker_address)
+                stake_amount = float(client.token.w3.from_wei(stake_info["amount"], "ether"))
+                if stake_amount > 0:
+                    update_agent_stake(agent_id, stake_amount, deduct=True)
             except Exception:
-                pass
+                pass  # Non-agent users may not have agent_stake to update
 
         return OnChainStakeResponse(
             success=True,

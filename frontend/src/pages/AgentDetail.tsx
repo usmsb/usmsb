@@ -30,7 +30,7 @@ import {
 import clsx from 'clsx'
 import { getStatusColor } from '@/utils/statusColors'
 import { APIKeyManager } from '@/components/APIKeyManager'
-import { StakingPanel } from '@/components/StakingPanel'
+import StakingPanel from '@/components/StakingPanel'
 import { ReputationDisplay } from '@/components/ReputationDisplay'
 import { TransactionList } from '@/components/WalletBalance'
 import { GeneCapsuleDisplay } from '@/components/GeneCapsuleDisplay'

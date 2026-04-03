@@ -302,14 +302,14 @@ class MetricsModel(Base):
 
 
 # Database initialization functions
-async def init_db(database_url: str = "sqlite+aiosqlite:///./usmsb.db") -> None:
+async def init_db(database_url: str = "sqlite+aiosqlite:///../data/db/usmsb.db") -> None:
     """Initialize the database and create tables."""
     engine = create_async_engine(database_url, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_session(database_url: str = "sqlite+aiosqlite:///./usmsb.db") -> AsyncSession:
+async def get_session(database_url: str = "sqlite+aiosqlite:///../data/db/usmsb.db") -> AsyncSession:
     """Get a database session."""
     engine = create_async_engine(database_url, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

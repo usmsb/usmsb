@@ -31,6 +31,11 @@ def set_permission_manager(manager):
     _permission_manager = manager
 
 
+def get_permission_manager():
+    """Get the global permission manager instance."""
+    return _permission_manager
+
+
 class ChatRequest(BaseModel):
     message: str
     wallet_address: str | None = None

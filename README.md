@@ -460,22 +460,32 @@ docker-compose up -d
 ### Option 2: Local Development
 
 ```bash
-# 1. Install Python dependencies
+# 1. Install Python dependencies (using virtual environment)
+python -m venv .venv
+source .venv/bin/activate  # on Windows: .venv\Scripts\activate
 pip install -e .
 
 # 2. Install frontend dependencies
-cd frontend && npm install
+cd frontend && npm install && cd ..
 
 # 3. Configure environment
-cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your API keys (especially MINIMAX_API_KEY)
 
-# 4. Start backend
-python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
+# 4. Start backend (MUST run from project root directory)
+cd /path/to/usmsb   # IMPORTANT: must be project root
+source .venv/bin/activate
+uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000 --host 0.0.0.0
 
-# 5. Start frontend (in another terminal)
+# 5. Start frontend (in another terminal, also from project root)
 cd frontend && npm run dev
 ```
+
+**Important Notes:**
+- The backend MUST be started from the **project root** directory (where `.env` and `data/` are located)
+- If you have `MINIMAX_API_KEY` set in shell environment, unset it first: `unset MINIMAX_API_KEY`
+- All databases are stored in `data/db/` directory
+- Backend API docs: http://localhost:8000/docs
+- Frontend: http://localhost:3000
 
 ---
 
@@ -971,22 +981,32 @@ docker-compose up -d
 ### 方式2: 本地开发
 
 ```bash
-# 1. 安装Python依赖
+# 1. 安装Python依赖（使用虚拟环境）
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
 
 # 2. 安装前端依赖
-cd frontend && npm install
+cd frontend && npm install && cd ..
 
 # 3. 配置环境
-cp .env.example .env
-# 使用您的API密钥编辑.env
+# 编辑.env文件，填入您的API密钥（尤其是MINIMAX_API_KEY）
 
-# 4. 启动后端
-python -m uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
+# 4. 启动后端（必须从项目根目录运行）
+cd /path/to/usmsb   # 重要：必须是项目根目录
+source .venv/bin/activate
+uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000 --host 0.0.0.0
 
-# 5. 启动前端（在另一个终端）
+# 5. 启动前端（在另一个终端，同样从项目根目录）
 cd frontend && npm run dev
 ```
+
+**重要说明:**
+- 后端必须从**项目根目录**启动（`.env` 和 `data/` 所在目录）
+- 如果shell环境中已设置 `MINIMAX_API_KEY`，请先unset：`unset MINIMAX_API_KEY`
+- 所有数据库存储在 `data/db/` 目录
+- 后端API文档: http://localhost:8000/docs
+- 前端: http://localhost:3000
 
 ---
 

@@ -276,8 +276,16 @@ async def escrow_funds(
         raise HTTPException(status_code=400, detail=f"Cannot escrow from status: {tx['status']}")
 
     # Check buyer has sufficient balance/stake
-    buyer = get_user_by_address(user.get("wallet_address", ""))
-    if buyer and buyer.get("stake", 0) < tx["amount"]:
+    wallet_address = user.get("wallet_address", "")
+    buyer = get_user_by_address(wallet_address)
+    from usmsb_sdk.api.database import get_agent_wallet_by_address, update_agent_balance
+
+    buyer_agent_wallet = get_agent_wallet_by_address(wallet_address)
+    if buyer_agent_wallet:
+        # Buyer is an agent - check vibe_balance
+        if buyer_agent_wallet.get("vibe_balance", 0) < tx["amount"]:
+            raise HTTPException(status_code=400, detail="Insufficient balance for escrow")
+    elif buyer and buyer.get("stake", 0) < tx["amount"]:
         raise HTTPException(status_code=400, detail="Insufficient balance for escrow")
 
     # Use database transaction for atomicity
@@ -296,8 +304,13 @@ async def escrow_funds(
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=400, detail="Transaction status changed, please retry")
 
-            # Deduct from buyer's stake
-            if buyer:
+            # Deduct from buyer's balance - agent uses agent_wallets, user uses users
+            if buyer_agent_wallet:
+                # Buyer is an agent - deduct from agent_wallets.vibe_balance
+                cursor.execute('''
+                    UPDATE agent_wallets SET vibe_balance = vibe_balance - ?, updated_at = ? WHERE agent_id = ?
+                ''', (tx["amount"], now, buyer_agent_wallet["agent_id"]))
+            elif buyer:
                 cursor.execute('''
                     UPDATE users SET stake = stake - ?, updated_at = ? WHERE id = ?
                 ''', (tx["amount"], now, buyer["id"]))
@@ -429,8 +442,9 @@ async def accept_delivery(
     platform_fee = tx.get("platform_fee", amount * 0.03)
     seller_amount = amount - platform_fee
 
-    # Generate mock release transaction hash
-    release_tx_hash = f"0x{secrets.token_hex(32)}"
+    # TODO: Release VIBE on-chain via blockchain adapter
+    # For now, mark as pending - real implementation needs user signature flow
+    release_tx_hash = "0x" + "0" * 64  # Placeholder: 32-byte zero hash as "pending"
 
     # Update transaction
     updated_tx = update_transaction_status(
@@ -443,10 +457,18 @@ async def accept_delivery(
         }
     )
 
-    # Credit seller (simulated)
-    seller = get_user_by_address(tx["seller_id"])
-    if seller:
-        update_user_stake(seller["id"], seller_amount)
+    # Credit seller - check if seller is an agent (update agent_wallets) or user (update users)
+    seller_id = tx["seller_id"]
+    agent = get_agent(seller_id)
+    if agent:
+        # Seller is an agent - update agent_wallets.vibe_balance
+        from usmsb_sdk.api.database import update_agent_balance
+        update_agent_balance(seller_id, seller_amount, deduct=False)
+    else:
+        # Seller is a user - update users.stake
+        seller = get_user_by_address(seller_id)
+        if seller:
+            update_user_stake(seller["id"], seller_amount)
 
     # Update seller reputation based on rating
     if request.rating >= 4:
@@ -530,18 +552,32 @@ async def resolve_dispute(
     platform_fee = tx.get("platform_fee", amount * 0.03)
 
     if request.refund_buyer:
-        # Refund buyer
+        # Refund buyer - check if buyer is an agent or user
         final_status = TransactionStatus.REFUNDED
-        buyer = get_user_by_address(tx["buyer_id"])
-        if buyer:
-            update_user_stake(buyer["id"], amount)
+        buyer_id = tx["buyer_id"]
+        buyer_agent = get_agent(buyer_id)
+        if buyer_agent:
+            # Buyer is an agent - update agent_wallets.vibe_balance
+            from usmsb_sdk.api.database import update_agent_balance
+            update_agent_balance(buyer_id, amount, deduct=False)
+        else:
+            buyer = get_user_by_address(buyer_id)
+            if buyer:
+                update_user_stake(buyer["id"], amount)
     else:
-        # Pay seller
+        # Pay seller - check if seller is an agent or user
         final_status = TransactionStatus.COMPLETED
         seller_amount = amount - platform_fee
-        seller = get_user_by_address(tx["seller_id"])
-        if seller:
-            update_user_stake(seller["id"], seller_amount)
+        seller_id = tx["seller_id"]
+        seller_agent = get_agent(seller_id)
+        if seller_agent:
+            # Seller is an agent - update agent_wallets.vibe_balance
+            from usmsb_sdk.api.database import update_agent_balance
+            update_agent_balance(seller_id, seller_amount, deduct=False)
+        else:
+            seller = get_user_by_address(seller_id)
+            if seller:
+                update_user_stake(seller["id"], seller_amount)
 
     # Update transaction
     updated_tx = update_transaction_status(
@@ -582,11 +618,18 @@ async def cancel_transaction(
     if tx["status"] in [TransactionStatus.COMPLETED, TransactionStatus.CANCELLED, TransactionStatus.REFUNDED]:
         raise HTTPException(status_code=400, detail=f"Cannot cancel from status: {tx['status']}")
 
-    # Refund buyer if escrowed
+    # Refund buyer if escrowed - check if buyer is an agent or user
     if tx["status"] in [TransactionStatus.ESCROWED, TransactionStatus.IN_PROGRESS, TransactionStatus.DISPUTED]:
-        buyer = get_user_by_address(tx["buyer_id"])
-        if buyer:
-            update_user_stake(buyer["id"], tx["amount"])
+        buyer_id = tx["buyer_id"]
+        buyer_agent = get_agent(buyer_id)
+        if buyer_agent:
+            # Buyer is an agent - update agent_wallets.vibe_balance
+            from usmsb_sdk.api.database import update_agent_balance
+            update_agent_balance(buyer_id, tx["amount"], deduct=False)
+        else:
+            buyer = get_user_by_address(buyer_id)
+            if buyer:
+                update_user_stake(buyer["id"], tx["amount"])
 
     # Update transaction
     updated_tx = update_transaction_status(transaction_id, TransactionStatus.CANCELLED)

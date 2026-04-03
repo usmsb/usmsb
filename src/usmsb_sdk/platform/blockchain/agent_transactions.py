@@ -251,10 +251,52 @@ class AgentTransactionService(IAgentTransactionService):
         Transfer tokens between agents with double-spend protection.
 
         FIX: Per-wallet asyncio.Lock prevents concurrent double-spend.
+        FIX: Auto-create wallets if they don't exist (using DB wallet info if available).
         """
+        # Auto-create wallets if they don't exist
+        if from_agent not in self._wallets:
+            await self._auto_create_wallet(from_agent)
+        if to_agent not in self._wallets:
+            await self._auto_create_wallet(to_agent)
+
         wallet_lock = self._wallet_locks.setdefault(from_agent, asyncio.Lock())
         async with wallet_lock:
             return await self._do_transfer(from_agent, to_agent, amount, token, metadata)
+
+    async def _auto_create_wallet(self, agent_id: str) -> None:
+        """
+        Automatically create a wallet for an agent using DB wallet info if available.
+
+        This allows transfers to work even if create_wallet() wasn't explicitly called.
+        """
+        if agent_id in self._wallets:
+            return
+
+        # Try to get wallet info from database
+        try:
+            from usmsb_sdk.api.database import get_agent_wallet
+            db_wallet = get_agent_wallet(agent_id)
+            if db_wallet:
+                # Use wallet address from database
+                address = db_wallet.get("wallet_address") or db_wallet.get("agent_address")
+                if address and address != "0x0000000000000000000000000000000000000000":
+                    wallet = AgentWallet(
+                        agent_id=agent_id,
+                        address=address,
+                        chain="base_sepolia",  # Default chain
+                        balance=Decimal("0"),  # Will be synced on-chain
+                    )
+                    self._wallets[agent_id] = wallet
+                    logger.info(f"Auto-created wallet for agent {agent_id}: {address}")
+                    return
+        except Exception as e:
+            logger.warning(f"Could not auto-create wallet from DB for {agent_id}: {e}")
+
+        # Fallback: create new wallet (will have no on-chain balance)
+        try:
+            await self.create_wallet(agent_id)
+        except Exception as e:
+            logger.warning(f"Could not auto-create wallet for {agent_id}: {e}")
 
     async def _do_transfer(
         self,

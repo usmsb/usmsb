@@ -990,10 +990,69 @@ class JointOrderService:
 _joint_order_service: JointOrderService | None = None
 
 
+class VIBEBlockchainAdapter:
+    """
+    Blockchain adapter that implements the interface expected by AgentTransactionService.
+
+    AgentTransactionService expects:
+        blockchain.transfer(from_address, to_address, value) -> { tx_hash: str }
+    """
+
+    def __init__(self):
+        from usmsb_sdk.blockchain import VIBEBlockchainClient
+        self._client = VIBEBlockchainClient()
+        self._web3 = self._client.token.w3
+
+    async def transfer(self, from_address: str, to_address: str, value) -> dict:
+        """
+        Transfer VIBE tokens from one address to another.
+
+        Args:
+            from_address: Sender address
+            to_address: Recipient address
+            value: Amount in VIBE (will be converted to wei)
+
+        Returns:
+            dict with tx_hash
+        """
+        # Convert value to wei (value could be Decimal, float, or int)
+        from decimal import Decimal
+        if isinstance(value, Decimal):
+            amount_wei = int(float(value) * (10 ** 18))
+        elif isinstance(value, (int, float)):
+            amount_wei = int(value * (10 ** 18))
+        else:
+            amount_wei = int(value)
+
+        # Look up agent wallet to get private key
+        from usmsb_sdk.api.database import get_agent_wallet_by_address
+        wallet = get_agent_wallet_by_address(from_address)
+
+        if not wallet or not wallet.get("agent_private_key"):
+            raise ValueError(f"No private key found for agent wallet: {from_address}")
+
+        private_key = wallet["agent_private_key"]
+
+        # Execute transfer on chain
+        tx_hash = self._client.token.transfer(
+            to=to_address,
+            amount=amount_wei,
+            from_address=from_address,
+            private_key=private_key,
+        )
+
+        return {"tx_hash": tx_hash}
+
+
 async def get_joint_order_service() -> JointOrderService:
     """Get or create joint order service instance."""
     global _joint_order_service
     if _joint_order_service is None:
-        _joint_order_service = JointOrderService()
+        # Create blockchain adapter for AgentTransactionService
+        blockchain_adapter = VIBEBlockchainAdapter()
+        from usmsb_sdk.platform.blockchain.agent_transactions import AgentTransactionService
+        transaction_service = AgentTransactionService(blockchain_adapter=blockchain_adapter)
+
+        _joint_order_service = JointOrderService(transaction_service=transaction_service)
         await _joint_order_service.start()
     return _joint_order_service

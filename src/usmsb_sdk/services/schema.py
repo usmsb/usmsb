@@ -31,7 +31,9 @@ from sqlalchemy.orm import Session, sessionmaker
 Base = declarative_base()
 
 # Database path (configurable via environment)
-DEFAULT_DB_PATH = "sqlite:///./usmsb_platform.db"
+import os
+_default = os.environ.get("USMSB_PLATFORM_DB", "sqlite:///./data/db/usmsb_platform.db")
+DEFAULT_DB_PATH = _default if _default.startswith("sqlite:///") else f"sqlite:///{_default}"
 
 
 # ============== Agent Soul Tables ==============
