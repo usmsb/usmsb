@@ -96,6 +96,26 @@ from .emergence_layer import (
     PatternDetection,
     GossipMessageType,
 )
+from .collective_goal_emergence import (
+    CollectiveGoalEmergence,
+    GoalAggregator,
+    CollectiveGoal,
+    IndividualGoal,
+    ConsensusState,
+)
+from .dynamic_negotiation import (
+    DynamicNegotiationProtocol,
+    NegotiationEngine,
+    NegotiationOffer,
+    NegotiationState,
+)
+from .emergent_governance import (
+    EmergentGovernance,
+    RuleRegistry,
+    Rule,
+    RuleState,
+    RuleType,
+)
 
 __all__ = [
     # Purpose Generator
@@ -145,4 +165,21 @@ __all__ = [
     "TeamFormation",
     "PatternDetection",
     "GossipMessageType",
+    # Collective Goal Emergence
+    "CollectiveGoalEmergence",
+    "GoalAggregator",
+    "CollectiveGoal",
+    "IndividualGoal",
+    "ConsensusState",
+    # Dynamic Negotiation
+    "DynamicNegotiationProtocol",
+    "NegotiationEngine",
+    "NegotiationOffer",
+    "NegotiationState",
+    # Emergent Governance
+    "EmergentGovernance",
+    "RuleRegistry",
+    "Rule",
+    "RuleState",
+    "RuleType",
 ]
