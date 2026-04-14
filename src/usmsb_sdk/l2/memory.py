@@ -56,6 +56,7 @@ class MemoryEntry:
     
     # 来源
     source: str = "unknown"
+    metadata: dict = field(default_factory=dict)
     
     def access(self) -> None:
         """访问记忆"""
@@ -427,10 +428,11 @@ class AgentMemory:
         self,
         content: Any,
         importance: float = 0.5,
-        tags: list[str] | None = None
+        tags: list[str] | None = None,
+        metadata: dict | None = None
     ) -> str:
         """添加情景记忆"""
-        return self.episodic.add_episode(content, importance, tags)
+        return self.episodic.add_episode(content, importance, tags, metadata)
     
     def search_episodes(self, query: str) -> list[MemoryEntry]:
         """搜索情景记忆"""
