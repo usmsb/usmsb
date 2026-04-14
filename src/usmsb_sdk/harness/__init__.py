@@ -50,6 +50,14 @@ from usmsb_sdk.harness.governance_layer import (
     ExperienceRepository,
 )
 
+from usmsb_sdk.harness.execution_engine import (
+    ExecutionEngine,
+    ExecutionContext,
+    ExecutionResult,
+    ExecutionStatus,
+    EvaluationEngine,
+)
+
 __all__ = [
     # Knowledge Layer
     "KnowledgeLayer",
