@@ -126,6 +126,7 @@ __all__ = [
     # Constraints
     "GeneConstraintChecker",
     "AutoElimination",
+    "EvolutionLoop",
     "ConstraintViolation",
     "SafetyReport",
 ]

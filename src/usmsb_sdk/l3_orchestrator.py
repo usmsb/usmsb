@@ -178,6 +178,12 @@ class L3Orchestrator:
             mutation_rate=0.1
         )
         
+        # 进化闭环
+        self.evolution_loop = EvolutionLoop(
+            evolution_controller=self.evolution_controller,
+            fitness_evaluator=self.fitness_evaluator
+        )
+        
         # 能力成长
         self.capability_growth = CapabilityGrowth()
         
@@ -470,10 +476,15 @@ class L3Orchestrator:
         这是"硅基生命"的标志性行为：
         goal = self.generate_goal()
         
+        增强：根据能力画像，优先生成弥补弱点的目标。
+        
         Returns:
             list[Goal]: 生成的目标列表
         """
         goals = []
+        
+        # Step 0: 分析能力画像，决定生成什么目标
+        weak_goals = self._generate_remedial_goals()
         
         # Step 1: 生成 Purpose
         purpose = self.purpose_generator.generate_purpose()
@@ -487,14 +498,78 @@ class L3Orchestrator:
             
             if not is_safe:
                 print(f"[L3Orchestrator] Goal blocked by value constraint: {goal.name}")
-                return goals
+            else:
+                goals.append(goal)
+                
+                # Step 4: 加入 Goal Pool
+                self._goal_pools[goal.id] = goal
+                
+                # Step 5: 创建 Loop 状态
+                loop_state = L3LoopState(
+                    loop_id=str(uuid.uuid4()),
+                    goal_id=goal.id,
+                    goal_name=goal.name,
+                )
+                self._active_loops[loop_state.loop_id] = loop_state
+                
+                print(f"[L3Orchestrator] 生成内在目标: {goal.name}")
+        
+        # 加入弥补性目标
+        goals.extend(weak_goals)
+        
+        return goals
+    
+    def _generate_remedial_goals(self) -> list[Goal]:
+        """
+        根据能力画像生成弥补弱点的目标
+        
+        如果某个能力等级 < 0.3，生成学习该能力的目标。
+        
+        Returns:
+            list[Goal]: 弥补性目标列表
+        """
+        goals = []
+        
+        # 获取能力画像
+        profile = self.capability_growth.get_profile(self.agent_id)
+        
+        # 找出弱点
+        for weakness in profile.weaknesses:
+            # 生成弥补目标
+            goal_name = f"学习{weakness}"
             
-            goals.append(goal)
+            # 检查是否已存在类似目标
+            existing = any(
+                goal_name in g.name or weakness in g.name
+                for g in self._goal_pools.values()
+            )
             
-            # Step 4: 加入 Goal Pool
+            if existing:
+                continue
+            
+            # 创建弥补性目标
+            goal = type('Goal', (), {
+                'id': str(uuid.uuid4()),
+                'name': goal_name,
+                'description': f'提升{weakness}能力',
+                'priority': 50,  # 中等优先级
+                'status': 'pending',
+                'metadata': {
+                    'is_intrinsic': True,
+                    'capability_focus': weakness,
+                    'goal_type': 'remedial',  # 标记为弥补性目标
+                },
+                'to_dict': lambda self: {
+                    'id': self.id,
+                    'name': self.name,
+                    'metadata': self.metadata
+                }
+            })()
+            
+            # 加入 Goal Pool
             self._goal_pools[goal.id] = goal
             
-            # Step 5: 创建 Loop 状态
+            # 创建 Loop 状态
             loop_state = L3LoopState(
                 loop_id=str(uuid.uuid4()),
                 goal_id=goal.id,
@@ -502,7 +577,8 @@ class L3Orchestrator:
             )
             self._active_loops[loop_state.loop_id] = loop_state
             
-            print(f"[L3Orchestrator] 生成内在目标: {goal.name}")
+            print(f"[L3Orchestrator] 生成弥补性目标: {goal.name} (能力: {weakness})")
+            goals.append(goal)
         
         return goals
     
@@ -634,6 +710,20 @@ class L3Orchestrator:
                 "total_tasks": 1,
                 "succeeded_tasks": 1 if outcome_score > 0.5 else 0,
             })
+            
+            # 记录 Outcome 到进化闭环
+            self.evolution_loop.record_outcome(self.agent_id, {
+                "success": outcome_score > 0.5,
+                "quality_score": outcome_score,
+                "value_created": outcome_score * 100,
+                "task_type": goal.name,
+            })
+            
+            # 检查是否触发进化
+            evolution_result = self.evolution_loop.evolve_if_needed(self.agent_id)
+            if evolution_result:
+                print(f"[L3Orchestrator] Evolution triggered: gen={evolution_result.generation}, "
+                      f"fitness {evolution_result.fitness_before:.3f} -> {evolution_result.fitness_after:.3f}")
             
             loop_state.outcome_score = outcome_score
             loop_state.status = "completed"
