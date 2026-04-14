@@ -8,6 +8,10 @@ L3 = 目的内生 Agent（Intrinsic Purpose Agent）
 - IntrinsicMotivationEngine: 内在动机引擎
 - NeedDetector: 需求检测器
 - GoalPersistence: 目标持久化（Gene Capsule 集成）
+- ValueSelfLoop: 价值自循环模块
+- ServiceRegistry: 服务注册与管理
+- ValueLedger: 价值账本
+- VIBEToken: VIBE Token 管理
 
 L3 硅基生命判断标准：
 - 工具：goal = user_input (外部赋予)
@@ -15,36 +19,23 @@ L3 硅基生命判断标准：
 
 使用方式：
 ```python
-from usmsb_sdk.l3 import PurposeGenerator, IntrinsicMotivationEngine, NeedDetector
+from usmsb_sdk.l3 import PurposeGenerator, ValueSelfLoop, ServiceType
 
 # 创建组件
-motivation = IntrinsicMotivationEngine()
-detector = NeedDetector()
-generator = PurposeGenerator(
-    agent_id="agent_001",
-    intrinsic_motivation=motivation,
-    need_detector=detector
-)
+generator = PurposeGenerator(agent_id="agent_001")
+value_loop = ValueSelfLoop(agent_id="agent_001")
 
 # 生成目标
 purpose = generator.generate_purpose()
-if purpose:
-    goal = generator.purpose_to_goal(purpose)
-    print(f"生成了目标: {goal.name}")
-```
+goal = generator.purpose_to_goal(purpose)
 
-或使用完整集成：
-```python
-from usmsb_sdk.l3 import PurposeGenerator, GoalPersistence
-
-persistence = GoalPersistence(agent_id="agent_001")
-generator = PurposeGenerator(
-    agent_id="agent_001",
-    goal_persistence=persistence
+# 执行价值循环
+result = value_loop.execute_complete_cycle(
+    provider_id="agent_001",
+    consumer_id="agent_002",
+    service_type=ServiceType.COMPUTATION,
+    description="数据处理"
 )
-
-# 重启后恢复目标
-goals = generator.recover_goals_from_persistence()
 ```
 """
 
@@ -67,6 +58,28 @@ from .goal_persistence import (
     GeneCapsule,
     GeneCapsuleDB,
 )
+from .vibe_token import (
+    VIBEToken,
+    VIBEBalance,
+)
+from .value_ledger import (
+    ValueLedger,
+    ValueRecord,
+    ValueType,
+    ValueStatus,
+)
+from .service_registry import (
+    ServiceRegistry,
+    Service,
+    ServiceType,
+    ServiceStatus,
+)
+from .value_self_loop import (
+    ValueSelfLoop,
+    ValueCalculationEngine,
+    VIBEConversionEngine,
+    CircularFlowStats,
+)
 
 __all__ = [
     # Purpose Generator
@@ -84,4 +97,22 @@ __all__ = [
     "GoalPersistence",
     "GeneCapsule",
     "GeneCapsuleDB",
+    # VIBE Token
+    "VIBEToken",
+    "VIBEBalance",
+    # Value Ledger
+    "ValueLedger",
+    "ValueRecord",
+    "ValueType",
+    "ValueStatus",
+    # Service Registry
+    "ServiceRegistry",
+    "Service",
+    "ServiceType",
+    "ServiceStatus",
+    # Value Self Loop
+    "ValueSelfLoop",
+    "ValueCalculationEngine",
+    "VIBEConversionEngine",
+    "CircularFlowStats",
 ]
