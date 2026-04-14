@@ -235,7 +235,7 @@ class RAG:
                 metadata={
                     "title": title,
                     "chunk_index": i,
-                    **metadata or {}
+                    **(metadata or {})
                 },
                 chunk_index=i,
                 total_chunks=len(chunks)

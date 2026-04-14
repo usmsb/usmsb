@@ -200,7 +200,7 @@ class CollectiveDecisionMaking:
                     topic=topic,
                     proposal=leading_proposal,
                     support_rate=support_rate,
-                    consensus_type=ConsensusType.STRONG if support_rate > 0.9 else ConsensusType.CONSENSUS,
+                    consensus_type=ConsensusType.STRONG if support_rate > 0.9 else ConsensusType.MAJORITY,
                     rounds_needed=round_num + 1,
                     participating_agents=[a.agent_id for a in agents],
                 )

@@ -979,6 +979,18 @@ class L3Orchestrator:
             "received_tasks": len(self.a2a_adapter.get_delegated_tasks()),
         }
 
+    def get_relationship(self, other_agent_id: str) -> str:
+        """
+        获取与其他 Agent 的关系摘要
+        
+        Args:
+            other_agent_id: 其他 Agent ID
+            
+        Returns:
+            关系摘要字符串
+        """
+        return self.l4_agent.get_relationship(other_agent_id)
+
     # ========== L4 自我意识集成 ==========
     
     def think(self, thought: str, evidence: list[str] | None = None) -> None:
