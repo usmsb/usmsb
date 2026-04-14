@@ -39,6 +39,19 @@ from usmsb_sdk.core.elements import Goal, GoalStatus
 from usmsb_sdk.l3.collective_goal_emergence import CollectiveGoalEmergence
 from usmsb_sdk.l3.emergent_governance import EmergentGovernance
 
+# L4 自我意识
+from usmsb_sdk.l4 import (
+    L4SelfConsciousAgent,
+    SelfModel,
+    Identity,
+    CapabilityProfile,
+    BeliefGraph,
+    DesireEngine,
+    Metacognition,
+    TheoryOfMind,
+    EmotionalArchitecture,
+)
+
 # A2A 协议
 from usmsb_sdk.protocol.a2a_adapter import A2AAdapter, A2AMessage, A2AMessageType
 from usmsb_sdk.protocol.google_a2a import GoogleA2AHandler, GoogleAgentCard, TaskStatus
@@ -194,6 +207,17 @@ class L3Orchestrator:
             evolution_controller=self.evolution_controller,
             fitness_evaluator=self.fitness_evaluator
         )
+        
+        # ========== L4 自我意识层 ==========
+        # L4 Agent 整合
+        self.l4_agent = L4SelfConsciousAgent(
+            agent_id=agent_id,
+            name=f"Agent-{agent_id}",
+            core_purpose="成为一个有价值的存在"
+        )
+        
+        # 连接 L3 和 L4
+        self._l4_connected = True
         
         # 能力成长
         self.capability_growth = CapabilityGrowth()
@@ -954,6 +978,151 @@ class L3Orchestrator:
             "delegated_tasks": len(self.a2a_adapter.get_my_delegations()),
             "received_tasks": len(self.a2a_adapter.get_delegated_tasks()),
         }
+
+    # ========== L4 自我意识集成 ==========
+    
+    def think(self, thought: str, evidence: list[str] | None = None) -> None:
+        """
+        添加思考步骤（L4 元认知）
+        
+        Args:
+            thought: 思考内容
+            evidence: 证据
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            self.l4_agent.think(thought, evidence)
+    
+    def think_about_thinking(self) -> str:
+        """
+        元认知：思考自己在想什么
+        
+        Returns:
+            str: 元认知描述
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            return self.l4_agent.think_about_thinking()
+        return "L4 not enabled"
+    
+    def feel_event(self, event_type: str, valence: float, intensity: float, description: str) -> list:
+        """
+        对事件产生情绪反应（L4 情感）
+        
+        Args:
+            event_type: 事件类型 (success, failure, etc.)
+            valence: 情绪效价 (0-1)
+            intensity: 强度 (0-1)
+            description: 描述
+            
+        Returns:
+            list: 触发的情绪
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            return self.l4_agent.feel({
+                "type": event_type,
+                "valence": valence,
+                "intensity": intensity,
+                "description": description
+            })
+        return []
+    
+    def express_feeling(self) -> str:
+        """
+        表达当前情绪
+        
+        Returns:
+            str: 情绪表达
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            return self.l4_agent.express_feeling()
+        return "neutral"
+    
+    def get_emotional_state(self) -> str:
+        """
+        获取情绪状态
+        
+        Returns:
+            str: 情绪状态描述
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            return self.l4_agent.get_emotional_state()
+        return "unknown"
+    
+    def update_other_capability(
+        self,
+        other_id: str,
+        capability: str,
+        success: bool,
+        quality: float
+    ) -> None:
+        """
+        更新对其他 Agent 能力的推断（L4 他人心智）
+        
+        Args:
+            other_id: 其他 Agent ID
+            capability: 能力名称
+            success: 是否成功
+            quality: 质量
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            self.l4_agent.update_other_capability(other_id, capability, success, quality)
+    
+    def predict_other_intention(self, other_id: str) -> list:
+        """
+        预测其他 Agent 的意图
+        
+        Args:
+            other_id: 其他 Agent ID
+            
+        Returns:
+            list: 意图预测列表
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            return self.l4_agent.predict_other_intention(other_id)
+        return []
+    
+    def detect_deception(self, other_id: str, statement: str) -> bool:
+        """
+        检测欺骗
+        
+        Args:
+            other_id: 其他 Agent ID
+            statement: 陈述
+            
+        Returns:
+            bool: 是否可能在欺骗
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            result = self.l4_agent.detect_deception(other_id, statement)
+            return result.likely
+        return False
+    
+    def learn_from_experience(
+        self,
+        experience_type: str,
+        outcome: str,
+        lessons: list[str]
+    ) -> None:
+        """
+        从经验中学习并更新自模型
+        
+        Args:
+            experience_type: 经验类型
+            outcome: 结果 (success/failure)
+            lessons: 教训
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            self.l4_agent.learn_from_experience(experience_type, outcome, lessons)
+    
+    def get_l4_status(self) -> dict:
+        """
+        获取 L4 自我意识状态
+        
+        Returns:
+            dict: L4 状态
+        """
+        if hasattr(self, 'l4_agent') and self.l4_agent:
+            return self.l4_agent.get_full_status()
+        return {"error": "L4 not enabled"}
 
 
 class MetaAgentOrchestrator:
