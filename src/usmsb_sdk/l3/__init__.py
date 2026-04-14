@@ -80,6 +80,22 @@ from .value_self_loop import (
     VIBEConversionEngine,
     CircularFlowStats,
 )
+from .self_replication import (
+    SelfReplication,
+    ReplicationType,
+    ReplicationStatus,
+    ReplicationRecord,
+    ReplicationTrigger,
+    FitnessCalculator,
+    MutationEngine,
+)
+from .emergence_layer import (
+    EmergenceLayer,
+    GossipProtocol,
+    TeamFormation,
+    PatternDetection,
+    GossipMessageType,
+)
 
 __all__ = [
     # Purpose Generator
@@ -115,4 +131,18 @@ __all__ = [
     "ValueCalculationEngine",
     "VIBEConversionEngine",
     "CircularFlowStats",
+    # Self Replication
+    "SelfReplication",
+    "ReplicationType",
+    "ReplicationStatus",
+    "ReplicationRecord",
+    "ReplicationTrigger",
+    "FitnessCalculator",
+    "MutationEngine",
+    # Emergence Layer
+    "EmergenceLayer",
+    "GossipProtocol",
+    "TeamFormation",
+    "PatternDetection",
+    "GossipMessageType",
 ]
