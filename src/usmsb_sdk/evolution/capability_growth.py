@@ -21,6 +21,14 @@ from typing import Any
 @dataclass
 class CapabilityRecord:
     """能力记录"""
+    id: str
+    agent_id: str
+    capability: str
+    level: float  # 0-1
+    experience: int  # 累计经验点
+    last_updated: float
+    growth_rate: float = 0.0  # 增长速率
+    """能力记录"""
     agent_id: str
     capability: str
     level: float  # 0-1
