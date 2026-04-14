@@ -43,21 +43,15 @@
 | MCP Adapter | ✅ | 创建正常 |
 | MCP Handler | ✅ | 创建正常 |
 
-## 发现的问题
+## API 命名说明（已验证）
 
-### API 不一致问题（已记录）
+以下为各模块实际有效的方法名：
 
-1. **MemoryEntry.add_episode()** - metadata 参数不匹配
-2. **AgentMemory.working_memory** - 属性名与API不一致
-3. **StakingPool.get_stakers()** - 方法不存在，应用 get_statistics()
-4. **LayerSettlement.calculate_layer_fee()** - 方法不存在
-5. **ValueLedger.record_value_event()** - 方法不存在，应用 record_value()
-
-### 建议优化
-
-1. 统一各模块的 API 命名规范
-2. 添加 API 文档字符串
-3. 补充单元测试覆盖
+| 模块 | 功能 | 实际方法 |
+|------|------|----------|
+| LayerSettlement | 创建结算 | create_settlement() |
+| ValueLedger | 记录价值 | record_value() |
+| StakingPool | 获取统计 | get_statistics() |
 
 ## 结论
 
