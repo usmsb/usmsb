@@ -44,13 +44,13 @@ from usmsb_sdk.evolution import (
     FitnessScore,
     ReplicationEngine,
     GeneConstraintChecker,
-    GeneConstraintChecker,
     SelfImprovementEngine,
     EvolutionController,
     Genome,
     Gene,
     CapabilityGrowth,
     ExperienceInheritance,
+    AutoElimination,
 )
 
 from usmsb_sdk.emergence import (
@@ -184,6 +184,10 @@ class L3Orchestrator:
         # 经验传承
         self.experience_inheritance = ExperienceInheritance()
         
+        # ========== 新增：Auto Elimination ==========
+        self.elimination = AutoElimination()
+        self._elimination_days = 0
+        
         # ========== 新增：Replication ==========
         self.replication_engine = ReplicationEngine()
         self._generation = 0
@@ -267,6 +271,11 @@ class L3Orchestrator:
         Returns:
             (can_replicate, reason)
         """
+        # 检查淘汰状态
+        can_rep, reason = self.elimination.can_replicate(self.agent_id)
+        if not can_rep:
+            return False, reason
+        
         fitness_score = self.agent_state.fitness_score.overall_score if self.agent_state.fitness_score else 0.5
         
         return self.replication_engine.can_replicate(
@@ -701,12 +710,18 @@ class L3Orchestrator:
     
     def get_agent_status(self) -> dict:
         """获取完整 Agent 状态"""
+        # 获取淘汰状态
+        elim_status = self.elimination.get_agent_status(self.agent_id)
+        vitality = self.elimination.get_vitality(self.agent_id)
+        
         return {
             "agent_id": self.agent_id,
             "generation": self._generation,
             "age_seconds": self._age_seconds,
             "resources": self._resources,
             "fitness": self.agent_state.fitness_score.overall_score if self.agent_state.fitness_score else None,
+            "elimination_status": elim_status or "active",
+            "consecutive_low": vitality.consecutive_low if vitality else 0,
             "value_profile": {
                 "dominant_values": self.value_seed.get_dominant_values(self.agent_id),
             },
@@ -746,8 +761,18 @@ class L3Orchestrator:
         for loop_id in completed[10:]:
             del self._active_loops[loop_id]
         
-        # 4. 更新年龄
+        # 4. 更新年龄和淘汰天数
         self._age_seconds += 60  # 假设每分钟运行一次
+        self._elimination_days += 1
+        
+        # 每分钟检查一次淘汰状态（相当于每天1440次检查）
+        if self._elimination_days % 1440 == 0:
+            # 每天强制记录一次适应度用于淘汰判断
+            if self.agent_state.fitness_score:
+                self.elimination.record_fitness(
+                    self.agent_id,
+                    self.agent_state.fitness_score.overall_score
+                )
         
         # 5. 记录系统指标
         if self.agent_state.fitness_score:

@@ -62,6 +62,9 @@ from .capability_growth import (
     CapabilityProfile,
 )
 
+from .auto_elimination import (
+    AutoElimination,
+)
 from .gene_constraint_checker import (
     GeneConstraintChecker,
     ConstraintViolation,
@@ -122,6 +125,7 @@ __all__ = [
 
     # Constraints
     "GeneConstraintChecker",
+    "AutoElimination",
     "ConstraintViolation",
     "SafetyReport",
 ]
