@@ -41,6 +41,7 @@ from usmsb_sdk.l3.emergent_governance import EmergentGovernance
 
 # A2A 协议
 from usmsb_sdk.protocol.a2a_adapter import A2AAdapter, A2AMessage, A2AMessageType
+from usmsb_sdk.protocol.google_a2a import GoogleA2AHandler, GoogleAgentCard, TaskStatus
 
 # Evolution 层
 from usmsb_sdk.evolution import (
@@ -209,7 +210,17 @@ class L3Orchestrator:
         # A2A 通信适配器
         self.a2a_adapter = A2AAdapter(
             agent_id=agent_id,
-            message_handler=lambda msg: None  # Placeholder, will be properly set
+            message_handler=lambda msg: None  # Placeholder
+        )
+        
+        # Google A2A Handler (official protocol)
+        self.google_a2a = GoogleA2AHandler(
+            agent_id=agent_id,
+            agent_card=GoogleAgentCard(
+                name=f"USMSB Agent {agent_id}",
+                description="Silicon-based Life Agent with self-evolution",
+                version="2.0",
+            )
         )
         
         # 已发现的 Agent
