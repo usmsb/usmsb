@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from usmsb_sdk.meta_agent.llm_client import LLMClient
 from usmsb_sdk.l3 import (
     PurposeGenerator,
     GoalPersistence,
@@ -139,11 +140,16 @@ class L3Orchestrator:
         self.services = services or {}  # 注入 L4 服务
         
         # ========== L3 核心组件 ==========
+        # LLM 客户端
+        self.llm_client = LLMClient()
+        
+        # PurposeGenerator with LLM
         self.purpose_generator = PurposeGenerator(
             agent_id=agent_id,
             goal_persistence=GoalPersistence(agent_id=agent_id),
             intrinsic_motivation=IntrinsicMotivationEngine(),
             need_detector=NeedDetector(),
+            llm_client=self.llm_client,
         )
         
         self.value_loop = ValueSelfLoop(agent_id=agent_id)
