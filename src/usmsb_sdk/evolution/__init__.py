@@ -43,6 +43,31 @@ from .experience_inheritance import (
     ExperienceSnapshot,
 )
 
+from .fitness_evaluator import (
+    FitnessEvaluator,
+    FitnessScore,
+    FitnessHistory,
+)
+
+from .replication_engine import (
+    ReplicationEngine,
+    ReplicationRequest,
+    Replica,
+)
+
+from .capability_growth import (
+    CapabilityGrowth,
+    CapabilityRecord,
+    LearningEvent,
+    CapabilityProfile,
+)
+
+from .gene_constraint_checker import (
+    GeneConstraintChecker,
+    ConstraintViolation,
+    SafetyReport,
+)
+
 __all__ = [
     # Core Evolution
     "EvolutionController",
@@ -78,4 +103,25 @@ __all__ = [
     "ExperienceInheritance",
     "InheritedExperience",
     "ExperienceSnapshot",
+
+    # Fitness
+    "FitnessEvaluator",
+    "FitnessScore",
+    "FitnessHistory",
+
+    # Replication
+    "ReplicationEngine",
+    "ReplicationRequest",
+    "Replica",
+
+    # Capability
+    "CapabilityGrowth",
+    "CapabilityRecord",
+    "LearningEvent",
+    "CapabilityProfile",
+
+    # Constraints
+    "GeneConstraintChecker",
+    "ConstraintViolation",
+    "SafetyReport",
 ]
