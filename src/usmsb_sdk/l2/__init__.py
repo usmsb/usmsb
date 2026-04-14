@@ -21,6 +21,9 @@ from usmsb_sdk.l2.memory import (
     ConversationTurn,
 )
 
+from usmsb_sdk.l2.vector_store import VectorStore, InMemoryVectorStore, VectorEntry
+from usmsb_sdk.l2.rag import RAG, TextSplitter, Chunk, Document
+
 from usmsb_sdk.l2.tools import (
     Tool,
     ToolCategory,
