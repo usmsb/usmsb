@@ -71,6 +71,10 @@ from .gene_constraint_checker import (
     SafetyReport,
 )
 
+from .evolution_loop import (
+    EvolutionLoop,
+)
+
 __all__ = [
     # Core Evolution
     "EvolutionController",

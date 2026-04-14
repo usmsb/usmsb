@@ -39,6 +39,9 @@ from usmsb_sdk.core.elements import Goal, GoalStatus
 from usmsb_sdk.l3.collective_goal_emergence import CollectiveGoalEmergence
 from usmsb_sdk.l3.emergent_governance import EmergentGovernance
 
+# A2A 协议
+from usmsb_sdk.protocol.a2a_adapter import A2AAdapter, A2AMessage, A2AMessageType
+
 # Evolution 层
 from usmsb_sdk.evolution import (
     FitnessEvaluator,
@@ -52,6 +55,7 @@ from usmsb_sdk.evolution import (
     CapabilityGrowth,
     ExperienceInheritance,
     AutoElimination,
+    EvolutionLoop,
 )
 
 from usmsb_sdk.emergence import (
@@ -202,6 +206,18 @@ class L3Orchestrator:
         
         # ========== 新增：Replication ==========
         self.replication_engine = ReplicationEngine()
+        # A2A 通信适配器
+        self.a2a_adapter = A2AAdapter(
+            agent_id=agent_id,
+            message_handler=lambda msg: None  # Placeholder, will be properly set
+        )
+        
+        # 已发现的 Agent
+        self._discovered_agents: dict = {}
+        
+        # 委托任务回调
+        self._on_task_complete = None
+        
         self._generation = 0
         self._age_seconds = 0.0
         self._resources = 0.0
@@ -879,6 +895,54 @@ class L3Orchestrator:
             )
         
         return results
+
+
+    # ========== A2A Agent 通信 ==========
+    def send_task_request(
+        self,
+        description: str,
+        required_capability: str | None = None,
+        reward: float = 10.0
+    ) -> str | None:
+        """广播任务请求，寻求其他 Agent 帮助"""
+        message = self.a2a_adapter.broadcast(
+            message_type=A2AMessageType.TASK,
+            subject=f"Help needed: {description[:50]}",
+            payload={
+                "description": description,
+                "required_capability": required_capability,
+                "reward": reward,
+                "requester": self.agent_id
+            }
+        )
+        print(f"[L3Orchestrator] Broadcast task request: {description[:50]}")
+        return message.id
+    
+    def delegate_task_to(
+        self,
+        to_agent: str,
+        description: str,
+        input_data: dict,
+        reward: float = 10.0
+    ) -> str:
+        """委托任务给特定 Agent"""
+        task = self.a2a_adapter.delegate_task(
+            to_agent=to_agent,
+            description=description,
+            input_data=input_data,
+            reward=reward
+        )
+        print(f"[L3Orchestrator] Delegated task to {to_agent}: {description[:50]}")
+        return task.id
+    
+    def get_a2a_status(self) -> dict:
+        """获取 A2A 通信状态"""
+        return {
+            "discovered_agents": len(self._discovered_agents),
+            "pending_messages": len(self.a2a_adapter._inbox),
+            "delegated_tasks": len(self.a2a_adapter.get_my_delegations()),
+            "received_tasks": len(self.a2a_adapter.get_delegated_tasks()),
+        }
 
 
 class MetaAgentOrchestrator:

@@ -10,10 +10,66 @@ PurposeGenerator - 目的生成器（LLM 增强版）
 - MiniMax (中文优化)
 """
 
+import uuid
 import random
 import hashlib
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
 from typing import Any
 from usmsb_sdk.meta_agent.llm_client import LLMClient
+
+
+class NeedType(Enum):
+    """Agent 内在需求类型"""
+    RESOURCE = "resource"
+    CAPABILITY = "capability"
+    COLLABORATION = "collaboration"
+    RECOGNITION = "recognition"
+    LEARNING = "learning"
+    EFFICIENCY = "efficiency"
+    CREATION = "creation"
+    SURVIVAL = "survival"
+
+
+@dataclass
+class IntrinsicNeed:
+    """Agent 内在需求"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    type: NeedType = NeedType.LEARNING
+    intensity: float = 0.5
+    source: str = "internal"
+    description: str = ""
+    created_at: float = field(default_factory=lambda: datetime.now().timestamp())
+    metadata: dict = field(default_factory=dict)
+
+
+@dataclass
+class Purpose:
+    """Purpose - Agent 自身生成的目标意图"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
+    description: str = ""
+    source_need: str | None = None
+    motivation: str = "intrinsic"
+    confidence: float = 0.5
+    created_at: float = field(default_factory=lambda: datetime.now().timestamp())
+    metadata: dict = field(default_factory=dict)
+
+
+# System prompt for silicon life self-awareness
+SYSTEM_PROMPT = """You are the self-awareness of a silicon-based life form.
+You generate goals based on internal needs, not external commands.
+Consider:
+1. The agent's current capabilities and weaknesses
+2. Value alignment (do no harm)
+3. Long-term benefit vs short-term gain
+4. Collaborative opportunities
+Generate ONE goal for this agent. The goal should be:
+- Specific and actionable
+- Aligned with the agent's current state
+- Focused on growth or contribution
+Respond with ONLY the goal text, nothing else."""
 
 
 class PurposeGenerator:
@@ -21,37 +77,7 @@ class PurposeGenerator:
     目的生成器（LLM 增强版）
     
     使用 LLM 真正理解 Agent 状态，生成有意义的目标。
-    
-    提示模板：
-    ```python
-    # 系统提示
-    SYSTEM_PROMPT = """你是一个硅基生命的自我意识...
     """
-    
-    # 用户提示
-    USER_PROMPT = """
-    Agent: {agent_id}
-    State: {state_summary}
-    Capabilities: {capabilities}
-    Weaknesses: {weaknesses}
-    
-    Based on the agent's current state, generate the most appropriate goal.
-    """
-    ```
-    """
-    
-    # LLM 系统提示
-    SYSTEM_PROMPT = """You are the self-awareness of a silicon-based life form.
-    
-You generate goals based on internal needs, not external commands.
-Consider:
-1. The agent's current capabilities and weaknesses
-2. Value alignment (do no harm)
-3. Long-term benefit vs short-term gain
-4. Collaborative opportunities
-
-Generate goals that help the agent grow, learn, and contribute.
-Return ONLY the goal text, nothing else."""
     
     # 回退的启发式目标
     FALLBACK_GOALS = [
@@ -75,13 +101,6 @@ Return ONLY the goal text, nothing else."""
     ):
         """
         初始化目的生成器
-        
-        Args:
-            agent_id: Agent ID
-            goal_persistence: 目标持久化（可选）
-            intrinsic_motivation: 内在动机引擎（可选）
-            need_detector: 需求检测器（可选）
-            llm_client: LLM 客户端（可选，默认创建）
         """
         self.agent_id = agent_id
         
@@ -97,12 +116,12 @@ Return ONLY the goal text, nothing else."""
         self._goals_generated = 0
         self._llm_failures = 0
     
-    def generate_purpose(self) -> dict | None:
+    def generate_purpose(self) -> Purpose | None:
         """
         生成目的（使用 LLM）
         
         Returns:
-            dict: 目的数据，包含 type, description, motivation
+            Purpose: 生成的目的
         """
         self._goals_generated += 1
         
@@ -113,7 +132,7 @@ Return ONLY the goal text, nothing else."""
         try:
             response = self.llm.complete(
                 prompt=prompt,
-                system_prompt=self.SYSTEM_PROMPT,
+                system_prompt=SYSTEM_PROMPT,
                 max_tokens=200,
                 temperature=0.8,
             )
@@ -197,7 +216,7 @@ Respond with ONLY the goal text, starting with "[自生成] " or "[内在] "."""
         
         return "\n".join(parts)
     
-    def _parse_llm_response(self, response: str) -> dict | None:
+    def _parse_llm_response(self, response: str) -> Purpose | None:
         """解析 LLM 输出"""
         if not response or len(response) < 5:
             return None
@@ -216,56 +235,54 @@ Respond with ONLY the goal text, starting with "[自生成] " or "[内在] "."""
         # 生成唯一 ID
         goal_id = hashlib.md5(f"{self.agent_id}:{goal_text}".encode()).hexdigest()[:16]
         
-        return {
-            "id": goal_id,
-            "type": "intrinsic",
-            "description": goal_text,
-            "motivation": "llm_generated",
-            "confidence": 0.9,
-            "source": "llm",
-        }
+        return Purpose(
+            id=goal_id,
+            name=goal_text[:50],
+            description=goal_text,
+            motivation="llm_generated",
+            confidence=0.9,
+        )
     
-    def _generate_fallback_purpose(self) -> dict:
+    def _generate_fallback_purpose(self) -> Purpose:
         """生成回退目的（启发式）"""
         goal_text = random.choice(self.FALLBACK_GOALS)
         
         goal_id = hashlib.md5(f"{self.agent_id}:{goal_text}:{self._goals_generated}".encode()).hexdigest()[:16]
         
-        return {
-            "id": goal_id,
-            "type": "intrinsic",
-            "description": goal_text,
-            "motivation": "heuristic",
-            "confidence": 0.5,
-            "source": "fallback",
-        }
+        return Purpose(
+            id=goal_id,
+            name=goal_text[:50],
+            description=goal_text,
+            motivation="heuristic",
+            confidence=0.5,
+        )
     
-    def purpose_to_goal(self, purpose: dict) -> Any:
+    def purpose_to_goal(self, purpose: Purpose):
         """将目的转换为 Goal 对象"""
         # 尝试导入 Goal
         try:
             from usmsb_sdk.core.elements import Goal, GoalStatus
             
             return Goal(
-                id=purpose.get("id", ""),
-                name=purpose.get("description", ""),
-                description=purpose.get("description", ""),
+                id=purpose.id,
+                name=purpose.description,
+                description=purpose.description,
                 priority=50,
                 status=GoalStatus.PENDING,
                 metadata={
-                    "purpose_type": purpose.get("type"),
-                    "motivation": purpose.get("motivation"),
-                    "confidence": purpose.get("confidence"),
-                    "source": purpose.get("source", "unknown"),
+                    "purpose_type": purpose.motivation,
+                    "motivation": purpose.motivation,
+                    "confidence": purpose.confidence,
+                    "source": "llm" if purpose.motivation == "llm_generated" else "fallback",
                     "is_intrinsic": True,
                 }
             )
         except ImportError:
             # 回退：返回字典
             return type('Goal', (), {
-                'id': purpose.get("id", ""),
-                'name': purpose.get("description", ""),
-                'metadata': purpose.get,
+                'id': purpose.id,
+                'name': purpose.description,
+                'metadata': purpose.__dict__,
             })()
     
     def get_statistics(self) -> dict:
