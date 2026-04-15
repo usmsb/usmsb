@@ -1,0 +1,575 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 HKUDS/OpenHarness Integration for USMSB
+# QueryAdapter - OpenHarness QueryEngine Integration
+
+"""
+OpenHarness QueryAdapter for USMSB.
+
+This adapter wraps the OpenHarness QueryEngine to provide:
+- LLM query execution with streaming
+- Tool-aware model loop
+- Cost tracking and budgeting
+- System prompt management
+- Context window management
+
+The adapter integrates USMSB's L3 (Goal Layer) with OH's
+query engine for LLM-based reasoning.
+
+Usage:
+    >>> adapter = QueryAdapter(engine=oh_engine)
+    >>> async for event in adapter.query("What is the capital of France?"):
+    ...     print(event)
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, AsyncIterator
+
+try:
+    from openharness.engine.query_engine import QueryEngine
+    from openharness.engine.messages import ConversationMessage, TextBlock, ToolResultBlock
+    from openharness.engine.stream_events import StreamEvent as OHStreamEvent, AssistantTurnComplete
+    from openharness.api.client import (
+        ApiMessageRequest,
+        ApiStreamEvent,
+        ApiTextDeltaEvent,
+        ApiMessageCompleteEvent,
+        ApiRetryEvent,
+        SupportsStreamingMessages,
+    )
+    from openharness.api.usage import UsageSnapshot
+    OPENHARNESS_AVAILABLE = True
+except ImportError:
+    OPENHARNESS_AVAILABLE = False
+    QueryEngine = None
+    ConversationMessage = None
+    StreamEvent = None
+
+from usmsb_sdk.adapters.openharness.config import LLMConfig
+from usmsb_sdk.adapters.openharness.exceptions import (
+    QueryError,
+    OpenHarnessNotAvailableError,
+)
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class CostSummary:
+    """
+    Summary of LLM costs.
+    
+    Attributes:
+        total_tokens: Total tokens used
+        prompt_tokens: Tokens in prompts
+        completion_tokens: Tokens in completions
+        total_cost: Estimated cost in USD
+        model: Model used
+    """
+    total_tokens: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_cost: float = 0.0
+    model: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "total_tokens": self.total_tokens,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_cost": self.total_cost,
+            "model": self.model,
+        }
+
+
+@dataclass
+class QueryResult:
+    """
+    Result of a query execution.
+    
+    Attributes:
+        message: Final assistant message
+        usage: Token usage snapshot
+        stop_reason: Why generation stopped
+        tool_calls: List of tool calls made during query
+        total_turns: Number of agent turns
+    """
+    message: str
+    usage: CostSummary | None = None
+    stop_reason: str | None = None
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    total_turns: int = 0
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class StreamEvent:
+    """
+    A streaming event from query execution.
+    
+    Event types:
+    - text: Incremental text delta
+    - tool_call: Tool call started
+    - tool_result: Tool call completed
+    - turn_complete: Agent turn finished
+    - message_complete: Query finished
+    - retry: Retry attempt
+    """
+    event_type: str
+    data: Any = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+class QueryAdapter:
+    """
+    OpenHarness QueryEngine Adapter.
+    
+    This adapter wraps OH's QueryEngine to provide:
+    - Async streaming query execution
+    - Tool integration with permission checking
+    - Cost tracking
+    - Context management
+    - System prompt injection
+    
+    The adapter is used by USMSB's Goal Layer to execute
+    LLM queries with tool access.
+    
+    Example:
+        >>> from openharness.engine.query_engine import QueryEngine
+        >>> from openharness.tools.base import ToolRegistry
+        >>> 
+        >>> engine = QueryEngine(
+        ...     api_client=client,
+        ...     tool_registry=registry,
+        ...     permission_checker=checker,
+        ...     model="minimax-m1",
+        ...     system_prompt="You are a helpful assistant.",
+        ... )
+        >>> 
+        >>> adapter = QueryAdapter(engine=engine)
+        >>> 
+        >>> # Streaming query
+        >>> async for event in adapter.query("What is 2+2?"):
+        ...     print(event.data, end="")
+        >>> 
+        >>> # Non-streaming query
+        >>> result = await adapter.query_complete("What is 2+2?")
+        >>> print(result.message)
+    """
+
+    def __init__(
+        self,
+        engine: QueryEngine | None = None,
+        config: LLMConfig | None = None,
+        cwd: str | Path = ".",
+    ):
+        """
+        Initialize QueryAdapter.
+        
+        Args:
+            engine: OH QueryEngine instance
+            config: LLM configuration
+            cwd: Current working directory
+        """
+        if not OPENHARNESS_AVAILABLE:
+            raise OpenHarnessNotAvailableError()
+        
+        self._engine = engine
+        self._config = config or LLMConfig()
+        self._cwd = Path(cwd).resolve()
+        
+        # Cost tracking
+        self._total_usage: UsageSnapshot | None = None
+        self._query_count: int = 0
+        self._turn_count: int = 0
+        
+        # Message history (for non-streaming convenience)
+        self._message_history: list[ConversationMessage] = []
+        
+        log.info("QueryAdapter initialized with model: %s", self._config.model)
+
+    @property
+    def engine(self) -> QueryEngine:
+        """Return the underlying query engine."""
+        if self._engine is None:
+            raise QueryError(
+                message="QueryEngine not initialized. Pass engine to constructor or set via set_engine().",
+            )
+        return self._engine
+
+    @property
+    def model(self) -> str:
+        """Return current model."""
+        return self._config.model
+
+    @property
+    def total_usage(self) -> CostSummary:
+        """Return total cost summary."""
+        if self._total_usage:
+            return CostSummary(
+                total_tokens=self._total_usage.total_tokens,
+                prompt_tokens=self._total_usage.promptTokens,
+                completion_tokens=self._total_usage.completionTokens,
+                total_cost=self._estimate_cost(self._total_usage),
+                model=self._config.model,
+            )
+        return CostSummary(model=self._config.model)
+
+    async def set_engine(self, engine: QueryEngine) -> None:
+        """
+        Set or update the query engine.
+        
+        Args:
+            engine: OH QueryEngine instance
+        """
+        self._engine = engine
+
+    def set_model(self, model: str) -> None:
+        """
+        Change the LLM model.
+        
+        Args:
+            model: New model identifier
+        """
+        self._config.model = model
+        if self._engine:
+            self._engine.set_model(model)
+        log.info("Model changed to: %s", model)
+
+    def set_system_prompt(self, prompt: str) -> None:
+        """
+        Update the system prompt.
+        
+        Args:
+            prompt: New system prompt
+        """
+        if self._engine:
+            self._engine.set_system_prompt(prompt)
+        log.debug("System prompt updated")
+
+    def set_max_turns(self, max_turns: int | None) -> None:
+        """
+        Set maximum agent turns per query.
+        
+        Args:
+            max_turns: Max turns, or None for unlimited
+        """
+        if self._engine:
+            self._engine.set_max_turns(max_turns)
+        log.debug("Max turns set to: %s", max_turns)
+
+    async def query(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        stream: bool = True,
+        max_turns: int | None = None,
+        message_history: list[ConversationMessage] | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """
+        Execute a query with optional streaming.
+        
+        This method:
+        1. Builds conversation message
+        2. Injects system prompt if provided
+        3. Submits to QueryEngine
+        4. Yields streaming events
+        
+        Args:
+            prompt: User prompt
+            system_prompt: Override system prompt
+            tools: Additional tools to make available
+            stream: Whether to yield streaming events
+            max_turns: Override max turns
+            message_history: Previous messages for context
+            
+        Yields:
+            StreamEvent objects
+            
+        Raises:
+            QueryError: If query execution fails
+        """
+        if self._engine is None:
+            raise QueryError(message="QueryEngine not initialized")
+        
+        try:
+            # Build message
+            user_message = ConversationMessage.from_user_text(prompt)
+            
+            # Use provided history or adapter's history
+            history = message_history or self._message_history
+            
+            # Inject system prompt if different from engine's
+            if system_prompt:
+                self._engine.set_system_prompt(system_prompt)
+            
+            # Override max turns if provided
+            original_max_turns = self._engine.max_turns
+            if max_turns is not None:
+                self._engine.set_max_turns(max_turns)
+            
+            # Track state
+            current_turn = 0
+            final_message = None
+            tool_calls = []
+            
+            # Execute query
+            async for event in self._engine.submit_message(user_message):
+                stream_event = self._convert_event(
+                    event,
+                    current_turn=current_turn,
+                )
+                
+                if stream_event:
+                    # Track turn completion
+                    if stream_event.event_type == "turn_complete":
+                        current_turn += 1
+                    
+                    # Track final message
+                    if stream_event.event_type == "message_complete":
+                        final_message = stream_event.data
+                    
+                    # Track tool calls
+                    if stream_event.event_type == "tool_call":
+                        tool_calls.append(stream_event.data)
+                    
+                    yield stream_event
+            
+            # Update state
+            self._query_count += 1
+            self._turn_count += current_turn
+            
+            if self._engine.total_usage:
+                self._total_usage = self._engine.total_usage
+            
+            # Add to message history
+            self._message_history.append(user_message)
+            if final_message:
+                self._message_history.append(final_message)
+            
+            # Restore max turns
+            if max_turns is not None:
+                self._engine.set_max_turns(original_max_turns)
+            
+        except Exception as e:
+            raise QueryError(
+                message=f"Query execution failed: {e}",
+                model=self._config.model,
+            )
+
+    async def query_complete(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        max_turns: int | None = None,
+    ) -> QueryResult:
+        """
+        Execute a query and return complete result.
+        
+        This is a convenience method that collects all streaming
+        events and returns the final result.
+        
+        Args:
+            prompt: User prompt
+            system_prompt: Override system prompt
+            tools: Additional tools
+            max_turns: Max turns
+            
+        Returns:
+            QueryResult with final message and metadata
+        """
+        message_parts = []
+        tool_calls = []
+        total_turns = 0
+        final_message = None
+        usage = None
+        
+        async for event in self.query(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            tools=tools,
+            max_turns=max_turns,
+        ):
+            if event.event_type == "text":
+                message_parts.append(event.data)
+            elif event.event_type == "tool_call":
+                tool_calls.append(event.data)
+            elif event.event_type == "turn_complete":
+                total_turns += 1
+            elif event.event_type == "message_complete":
+                final_message = event.data
+                usage = event.metadata.get("usage")
+        
+        return QueryResult(
+            message="".join(message_parts),
+            usage=usage,
+            stop_reason=final_message.stop_reason if hasattr(final_message, 'stop_reason') else None,
+            tool_calls=tool_calls,
+            total_turns=total_turns,
+        )
+
+    def _convert_event(
+        self,
+        event: Any,
+        current_turn: int,
+    ) -> StreamEvent | None:
+        """Convert OH stream event to USMSB StreamEvent."""
+        # Handle different OH event types
+        if hasattr(event, "text"):
+            # ApiTextDeltaEvent
+            return StreamEvent(
+                event_type="text",
+                data=event.text,
+            )
+        
+        if hasattr(event, "message") and hasattr(event, "usage"):
+            # ApiMessageCompleteEvent
+            msg = event.message
+            text = ""
+            if hasattr(msg, "text") and msg.text:
+                text = msg.text
+            elif hasattr(msg, "content"):
+                for block in msg.content:
+                    if hasattr(block, "text"):
+                        text += block.text
+            
+            return StreamEvent(
+                event_type="message_complete",
+                data=msg,
+                metadata={
+                    "usage": self._to_cost_summary(event.usage),
+                    "stop_reason": event.stop_reason,
+                },
+            )
+        
+        if hasattr(event, "message"):
+            # RetryEvent or other
+            if hasattr(event, "attempt"):
+                return StreamEvent(
+                    event_type="retry",
+                    data={
+                        "attempt": event.attempt,
+                        "max_attempts": event.max_attempts,
+                        "message": event.message if hasattr(event, "message") else "",
+                    },
+                )
+        
+        if isinstance(event, AssistantTurnComplete):
+            return StreamEvent(
+                event_type="turn_complete",
+                data={"turn": current_turn + 1},
+            )
+        
+        # Check for tool use in message
+        if hasattr(event, "tool_uses") and event.tool_uses:
+            for tool_use in event.tool_uses:
+                return StreamEvent(
+                    event_type="tool_call",
+                    data={
+                        "tool_name": tool_use.name,
+                        "tool_input": tool_use.input,
+                    },
+                )
+        
+        return None
+
+    def _to_cost_summary(self, usage: UsageSnapshot | None) -> CostSummary | None:
+        """Convert OH UsageSnapshot to CostSummary."""
+        if not usage:
+            return None
+        
+        return CostSummary(
+            total_tokens=usage.totalTokens,
+            prompt_tokens=usage.promptTokens,
+            completion_tokens=usage.completionTokens,
+            total_cost=self._estimate_cost(usage),
+            model=self._config.model,
+        )
+
+    def _estimate_cost(self, usage: UsageSnapshot) -> float:
+        """
+        Estimate cost in USD based on token usage.
+        
+        Pricing is approximate and varies by provider.
+        """
+        # Approximate pricing (USD per 1M tokens)
+        pricing = {
+            "minimax-m1": {"prompt": 0.5, "completion": 1.5},
+            "gpt-4o": {"prompt": 5.0, "completion": 15.0},
+            "gpt-4o-mini": {"prompt": 0.15, "completion": 0.6},
+            "claude-3-5-sonnet": {"prompt": 3.0, "completion": 15.0},
+            "claude-3-5-haiku": {"prompt": 0.8, "completion": 4.0},
+        }
+        
+        rates = pricing.get(self._config.model, {"prompt": 1.0, "completion": 3.0})
+        
+        prompt_cost = (usage.promptTokens / 1_000_000) * rates["prompt"]
+        completion_cost = (usage.completionTokens / 1_000_000) * rates["completion"]
+        
+        return prompt_cost + completion_cost
+
+    def get_message_history(self) -> list[ConversationMessage]:
+        """Get current message history."""
+        return list(self._message_history)
+
+    def load_message_history(self, messages: list[ConversationMessage]) -> None:
+        """Load message history into the adapter."""
+        self._message_history = list(messages)
+        if self._engine:
+            self._engine.load_messages(self._message_history)
+
+    def clear_message_history(self) -> None:
+        """Clear message history."""
+        self._message_history.clear()
+        if self._engine:
+            self._engine.clear()
+
+    def has_pending_continuation(self) -> bool:
+        """Check if there's a pending continuation."""
+        if self._engine:
+            return self._engine.has_pending_continuation()
+        return False
+
+    async def continue_pending(
+        self,
+        max_turns: int | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """
+        Continue an interrupted tool loop.
+        
+        Args:
+            max_turns: Override max turns
+            
+        Yields:
+            StreamEvent objects
+        """
+        if self._engine is None:
+            raise QueryError(message="QueryEngine not initialized")
+        
+        current_turn = self._turn_count
+        
+        async for event in self._engine.continue_pending(max_turns=max_turns):
+            stream_event = self._convert_event(event, current_turn=current_turn)
+            if stream_event:
+                yield stream_event
+
+    def get_statistics(self) -> dict[str, Any]:
+        """Get query statistics."""
+        return {
+            "query_count": self._query_count,
+            "total_turns": self._turn_count,
+            "avg_turns_per_query": (
+                self._turn_count / self._query_count if self._query_count > 0 else 0
+            ),
+            "current_model": self._config.model,
+            "message_history_size": len(self._message_history),
+            "total_usage": self.total_usage.to_dict() if self.total_usage else {},
+        }
