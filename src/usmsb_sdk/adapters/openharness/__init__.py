@@ -17,6 +17,11 @@ Key Components:
     6. HookAdapter     - Pre/Post tool execution hooks
     7. MetaAgentAdapter - Agent spawning and lifecycle management
 
+Integration Classes:
+    - OHL2Agent: L2 Agent with OpenHarness (LLM + Tools)
+    - L3OrchestratorWithOH: L3 Goal Loop with OpenHarness
+    - MetaAgentWithOH: L5 Collective Intelligence with OpenHarness
+
 Integration Phases:
     Phase 1: L2 基础集成 (Tool/Permission/Memory)
     Phase 2: L2 Agent Loop + QueryAdapter
@@ -160,7 +165,12 @@ from usmsb_sdk.adapters.openharness.openharness_integration import (
     IntegrationStatistics,
 )
 
-__version__ = "0.1.0"
+# L2/L3/L5 Integration with OpenHarness
+from usmsb_sdk.adapters.openharness.ohl2_agent import OHL2Agent, OHL2Config
+from usmsb_sdk.adapters.openharness.ohl3_orchestrator import L3OrchestratorWithOH, GoalExecutionContext
+from usmsb_sdk.adapters.openharness.oh_meta_agent import MetaAgentWithOH, ChildAgentInfo
+
+__version__ = "0.2.0"
 
 __all__ = [
     # Version
@@ -230,4 +240,11 @@ __all__ = [
     # Integration
     "OpenHarnessIntegration",
     "IntegrationStatistics",
+    # L2/L3/L5 Integration
+    "OHL2Agent",
+    "OHL2Config",
+    "L3OrchestratorWithOH",
+    "GoalExecutionContext",
+    "MetaAgentWithOH",
+    "ChildAgentInfo",
 ]
