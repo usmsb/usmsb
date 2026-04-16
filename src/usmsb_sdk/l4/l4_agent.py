@@ -289,9 +289,9 @@ class L4SelfConsciousAgent:
     
     # ========== 情感 ==========
     
-    def feel(self, event: dict) -> list[Emotion]:
+    def _feel_sync(self, event: dict) -> list[Emotion]:
         """
-        对事件产生情绪反应
+        对事件产生情绪反应（同步内部方法）
         
         event = {
             "type": "success",  # success, failure, threat, etc.
@@ -441,7 +441,7 @@ class L4SelfConsciousAgent:
 
     async def feel(self, stimulus: dict) -> EmotionResponse:
         """IL4: 情感反应"""
-        emotions = self.feel(stimulus)
+        emotions = self._feel_sync(stimulus)
         primary = emotions[0] if emotions else None
         if primary:
             emotion_type = getattr(primary.type, 'value', str(primary.type)) if hasattr(primary, 'type') else 'neutral'
