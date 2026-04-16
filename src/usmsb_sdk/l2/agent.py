@@ -86,7 +86,7 @@ class L2Agent:
         if config.llm_client:
             self.llm_client = config.llm_client
         elif config.model:
-            from ...meta_agent.llm_client import LLMClient
+            from ..meta_agent.llm_client import LLMClient
             self.llm_client = LLMClient()
         
         # 统计
@@ -120,24 +120,114 @@ class L2Agent:
         """列出所有工具"""
         return self.tools.list_all()
 
-    async def think(self, prompt: str, tools: list = None) -> dict:
+    async def think(self, prompt: str, tools: list = None, max_turns: int = 3) -> dict:
         """
-        IL2: LLM 推理（带工具选项）
-        
+        IL2: LLM 推理（带工具调用）
+
+        流程：LLM 决定是否调用工具 -> 执行 -> 喂回结果 -> LLM 生成最终回复
+
         Args:
-            prompt: 推理提示
-            tools: 可用工具列表
-            
+            prompt: 用户输入
+            tools: 可用工具列表（SimpleTool 对象列表）
+            max_turns: 最大工具调用轮数
+
         Returns:
-            dict: 包含 reasoning 和 tool_calls
+            dict: {
+                "reasoning": str,        # LLM 思考过程
+                "tool_calls": list,       # 工具调用记录
+                "message": str,           # 最终回复文本
+                "tool_results": list      # 各工具执行结果
+            }
         """
         messages = [{"role": "user", "content": prompt}]
-        response = await self.llm_client.chat(messages)
+        tool_calls_made = []
+        tool_results = []
+
+        for turn in range(max_turns):
+            # Step 1: LLM 生成回复（可能带工具调用）
+            response_text = await self.llm_client.chat(messages)
+
+            # Step 2: 尝试解析工具调用
+            tool_call = self._extract_tool_call(response_text)
+
+            if not tool_call:
+                # 无工具调用 -> 最终回复
+                return {
+                    "reasoning": self._extract_reasoning(messages),
+                    "tool_calls": tool_calls_made,
+                    "message": response_text,
+                    "tool_results": tool_results,
+                }
+
+            # Step 3: 执行工具
+            tool_name = tool_call.get("name", "")
+            tool_args = tool_call.get("arguments", {})
+            tool_result = await self._execute_tool(tool_name, tool_args, tools or [])
+
+            # Step 4: 记录
+            tool_calls_made.append({"turn": turn + 1, "name": tool_name, "args": tool_args})
+            tool_results.append({"name": tool_name, "result": tool_result})
+
+            # Step 5: 将工具结果追加到对话
+            messages.append({"role": "assistant", "content": response_text})
+            messages.append({
+                "role": "user",
+                "content": f"[工具调用结果]\n{tool_name}() = {tool_result}"
+            })
+
+        # 达到最大轮数仍未结束
         return {
-            "reasoning": response,
-            "tool_calls": [],
-            "message": response,
+            "reasoning": "已达到最大工具调用轮数",
+            "tool_calls": tool_calls_made,
+            "message": response_text,
+            "tool_results": tool_results,
         }
+
+    def _extract_tool_call(self, text: str) -> dict | None:
+        """从 LLM 回复中提取工具调用"""
+        import json, re
+
+        # 格式1: ```tool_call {...} ```
+        m = re.search(r'```(?:tool_call)?\s*\n?({.+?})\n?```', text, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except Exception:
+                pass
+
+        # 格式2: <tool_call>...</tool_call>
+        m = re.search(r'<tool_call>\s*({.+?})\s*</tool_call>', text, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(1))
+            except Exception:
+                pass
+
+
+        # 格式3: 纯 JSON {"name": "...", "arguments": {...}}
+        try:
+            data = json.loads(text.strip())
+            if isinstance(data, dict) and "name" in data and "arguments" in data:
+                return data
+        except Exception:
+            pass
+
+        return None
+
+    def _extract_reasoning(self, messages: list) -> str:
+        """从对话历史提取 LLM 推理过程"""
+        return ""
+
+    async def _execute_tool(self, name: str, args: dict, tools: list) -> str:
+        """根据名称查找并执行工具"""
+        for tool in tools:
+            if hasattr(tool, "name") and tool.name == name:
+                try:
+                    result = await tool.execute(**args)
+                    return str(result)
+                except Exception as e:
+                    return f"Error: {e}"
+        return f"Error: tool '{name}' not found"
 
     async def remember(self, key: str, value) -> None:
         """
