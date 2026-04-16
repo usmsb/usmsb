@@ -389,3 +389,66 @@ class L4SelfConsciousAgent:
     
     def __repr__(self) -> str:
         return f"L4SelfConsciousAgent({self.self_model.identity.name}, id={self.agent_id})"
+
+    # ─────────────────────────────────────────────────────────
+    # IL4 接口实现（适配层）
+    # ─────────────────────────────────────────────────────────
+
+    @dataclass
+    class MetacognitionResult:
+        thought: str
+        analysis: str
+        confidence: float
+
+    @dataclass
+    class TheoryOfMindResult:
+        other_agent_id: str
+        inferred_intent: str
+        confidence: float
+
+    @dataclass
+    class EmotionResponse:
+        emotion: str
+        intensity: float
+        action_tendency: str
+
+    async def build_self_model(self, experience: list[dict]) -> SelfModel:
+        """IL4: 根据经验构建/更新自模型"""
+        for exp in experience:
+            self.self_model.reflect_on_experience(
+                exp.get('type', 'general'),
+                exp.get('outcome', 'neutral'),
+                exp.get('lessons', [])
+            )
+        return self.self_model
+
+    async def metacognize(self, thought: str) -> MetacognitionResult:
+        """IL4: 元认知"""
+        analysis = self.think_about_thinking()
+        return self.MetacognitionResult(
+            thought=thought, analysis=analysis, confidence=0.7
+        )
+
+    async def infer_mind(self, other_agent_id: str, history: list[dict]) -> TheoryOfMindResult:
+        """IL4: 他人心智推断"""
+        predictions = self.theory_of_mind.predict_other_intention(other_agent_id)
+        inferred = predictions[0] if predictions else '未知意图'
+        return self.TheoryOfMindResult(
+            other_agent_id=other_agent_id,
+            inferred_intent=inferred,
+            confidence=0.6 if predictions else 0.3,
+        )
+
+    async def feel(self, stimulus: dict) -> EmotionResponse:
+        """IL4: 情感反应"""
+        emotions = self.feel(stimulus)
+        primary = emotions[0] if emotions else None
+        if primary:
+            emotion_type = getattr(primary.type, 'value', str(primary.type)) if hasattr(primary, 'type') else 'neutral'
+            intensity = getattr(primary, 'intensity', 0.5)
+            action = getattr(primary.type, 'name', 'neutral') if hasattr(primary, 'type') else 'none'
+        else:
+            emotion_type, intensity, action = 'neutral', 0.0, 'none'
+        return self.EmotionResponse(
+            emotion=emotion_type, intensity=intensity, action_tendency=action
+        )
