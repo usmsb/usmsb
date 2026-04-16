@@ -16,11 +16,11 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from ...l2.agent import L2Agent
-from ...l3.purpose_generator import PurposeGenerator
-from ...l4.l4_agent import L4Agent
-from ...l5.l5_collective import L5Collective
-from ...meta_agent.goals.engine import GoalEngine
+from ....l2.agent import L2Agent
+from ....l3.purpose_generator import PurposeGenerator
+from ....l4.l4_agent import L4SelfConsciousAgent as L4Agent
+from ....l5.l5_collective import L5CollectiveIntelligence as L5Collective
+from ....meta_agent.goals.engine import GoalEngine
 from ..loaders.loader import create_skill_loader
 from ..types import SkillCall, SkillInstance, SkillTier
 

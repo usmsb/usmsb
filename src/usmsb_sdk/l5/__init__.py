@@ -1,3 +1,38 @@
+# =============================================================================
+# IL5 Interface - 集体超级智能接口定义 (v2.0)
+# =============================================================================
+# L5 = 多个 L4 Agent 协调形成蜂群意识
+#
+# External agents access L5 capabilities via SkillPlatform:
+#
+#   from usmsb_sdk.l5 import L5CollectiveIntelligence
+#
+# Core IL5 Methods:
+#   coordinate(agents, task)          -> CoordinationResult
+#       Multi-agent coordination: dispatch task to agents, aggregate results
+#
+#   collective_think(problem)        -> CollectiveThought
+#       Parallel thinking + global workspace competition + synthesis
+#
+#   decide(topic, proposals)         -> CollectiveDecision
+#       Multi-round negotiation + consensus formation
+#
+#   create_together(prompt, agents)  -> CreativeIdea
+#       Cross-domain collision for creative output
+#
+#   share_memory(key, value, ttl)   -> None
+#       Write to global workspace, visible to all agents
+#
+#   recall_collective(query, top_k) -> list[Memory]
+#       Retrieve shared memories across the collective
+#
+#   detect_collective_mood()         -> CollectiveMood
+#       Aggregate emotional states of all agents
+#
+#   evolve_identity(insight)        -> CollectiveIdentity
+#       Update collective identity based on new learnings
+# =============================================================================
+
 # -*- coding: utf-8 -*-
 """
 L5: Collective Super Intelligence - 集体超级智能
