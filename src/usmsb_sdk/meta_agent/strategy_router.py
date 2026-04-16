@@ -9,11 +9,11 @@ import hashlib
 import json
 import logging
 import time
-from dataclasses import asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any
 
-from ..llm.manager import LLMManager
+from .llm.manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +250,7 @@ class StrategyRouter:
 
     async def _classify_scenario(self, task_text: str) -> ScenarioTag:
         """LLM 场景分类"""
-        prompt = SCENARIO_CLASSIFICATION_PROMPT.format(task_text=task_text)
+        prompt = SCENARIO_CLASSIFICATION_PROMPT.replace("{task_text}", task_text)
         response = await self.llm.generate(prompt)
         
         try:
@@ -322,16 +322,17 @@ class StrategyRouter:
         if not r_a or not r_b:
             return r_a or r_b
 
-        prompt = STRATEGY_EVALUATION_PROMPT.format(
-            task_description=task_text,
-            strategy_a_name="内部实现",
-            result_a=str(r_a.result)[:500] if r_a.result else f"错误: {r_a.error}",
-            time_a=round(r_a.execution_time, 2),
-            token_a=r_a.token_cost,
-            strategy_b_name="SDK实现",
-            result_b=str(r_b.result)[:500] if r_b.result else f"错误: {r_b.error}",
-            time_b=round(r_b.execution_time, 2),
-            token_b=r_b.token_cost,
+        prompt = (
+            STRATEGY_EVALUATION_PROMPT
+            .replace("{task_description}", task_text)
+            .replace("{strategy_a_name}", "内部实现")
+            .replace("{result_a}", str(r_a.result)[:500] if r_a.result else f"错误: {r_a.error}")
+            .replace("{time_a}", str(round(r_a.execution_time, 2)))
+            .replace("{token_a}", str(r_a.token_cost))
+            .replace("{strategy_b_name}", "SDK实现")
+            .replace("{result_b}", str(r_b.result)[:500] if r_b.result else f"错误: {r_b.error}")
+            .replace("{time_b}", str(round(r_b.execution_time, 2)))
+            .replace("{token_b}", str(r_b.token_cost))
         )
 
         response = await self.llm.generate(prompt)

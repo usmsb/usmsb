@@ -35,6 +35,7 @@ from .intent.recognizer import IntentRecognizer
 from .knowledge.base import KnowledgeBase
 from .knowledge.vector_store import VectorKnowledgeBase
 from .llm.manager import LLMManager
+from ..l1.rule_engine import RuleEngine, Stimulus
 from .memory.conversation import MessageRole, ParticipantType
 from .memory.conversation_manager import ConversationManager
 from .memory.error_learning import ErrorDrivenLearning
@@ -187,6 +188,7 @@ class MetaAgent:
 
         # 核心组件
         self.llm_manager = LLMManager(self.config.llm)
+        self.l1_engine = RuleEngine(name="meta_agent_l1")
         self.tool_registry = ToolRegistry()
         self.skills_manager = SkillsManager(self.config.database.path)
 
@@ -447,6 +449,12 @@ class MetaAgent:
             await self.llm_manager.init()
         except Exception as e:
             logger.warning(f"LLM initialization failed (may need API key): {e}")
+        # 初始化 L1 规则引擎
+        try:
+            self._register_l1_rules()
+            logger.info("L1 rule engine initialized")
+        except Exception as e:
+            logger.warning(f"L1 rule engine initialization failed: {e}")
 
         # 初始化向量知识库
         try:
@@ -506,6 +514,43 @@ class MetaAgent:
             await self._warmup_knowledge_base()
         except Exception as e:
             logger.warning(f"Failed to warmup knowledge base: {e}")
+
+    def _register_l1_rules(self):
+        """注册 L1 规则（MetaAgent 专用快速匹配规则）"""
+        from ..l1.rule_engine import Rule, Condition, ConditionType, ActionType
+
+        rules = [
+            # 简单查询类 - 直接响应
+            Rule(
+                name="ping_check",
+                conditions=[Condition(ConditionType.KEYWORD, pattern="ping")],
+                action_type=ActionType.RESPOND,
+                action_payload={"response": "pong"},
+                priority=10,
+            ),
+            # 状态查询
+            Rule(
+                name="status_query",
+                conditions=[Condition(ConditionType.KEYWORD, pattern="状态")],
+                action_type=ActionType.RESPOND,
+                action_payload={"response": "MetaAgent 运行正常"},
+                priority=10,
+            ),
+            # 帮助
+            Rule(
+                name="help_request",
+                conditions=[Condition(ConditionType.KEYWORD, pattern="help|帮助|命令")],
+                action_type=ActionType.RESPOND,
+                action_payload={"response": "我是 MetaAgent，有什么可以帮你的？"},
+                priority=10,
+            ),
+        ]
+
+        for rule in rules:
+            try:
+                self.l1_engine.add_rule(rule)
+            except Exception:
+                pass
 
     async def _register_default_tools(self):
         """注册默认工具"""
@@ -907,6 +952,19 @@ class MetaAgent:
         """
         # ========== DEBUG: Entry point ==========
         print(f"DEBUG [CHAT] ===== ENTRY ===== message={message[:50]}..., skip_complexity={skip_complexity_detection}")
+
+        # ========== L1 Fast Path: 规则引擎优先匹配 ==========
+        if not skip_complexity_detection:
+            try:
+                stimulus = Stimulus(text=message)
+                l1_response = await self.l1_engine.react(stimulus)
+                if l1_response.action_result and l1_response.action_result not in (
+                    "", "我没有理解您的问题。", "unknown"
+                ):
+                    logger.info(f"[L1 Fast Path] Matched rule, response: {l1_response.action_result[:50]}")
+                    return l1_response.action_result
+            except Exception as e:
+                logger.warning(f"[L1 Fast Path] Failed: {e}")
 
         # ========== 改造：使用 SessionManager 获取用户会话 ==========
 

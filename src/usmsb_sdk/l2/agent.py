@@ -26,6 +26,8 @@ class L2Config:
     """L2 Agent 配置"""
     agent_id: str
     name: str = "L2Agent"
+    model: str = "gpt-3.5-turbo"
+    llm_client = None  # LLM client instance
     model: str = "gpt-3.5-turbo"  # LLM 模型
     max_context_length: int = 4096
     tool_timeout: float = 30.0  # 工具超时（秒）
@@ -80,8 +82,12 @@ class L2Agent:
         else:
             self.tools = ToolRegistry()
         
-        # LLM 客户端（简化版）
-        self.llm_client = None  # 实际会初始化
+        # LLM 客户端
+        if config.llm_client:
+            self.llm_client = config.llm_client
+        elif config.model:
+            from ...meta_agent.llm_client import LLMClient
+            self.llm_client = LLMClient()
         
         # 统计
         self.stats = {
@@ -126,7 +132,7 @@ class L2Agent:
             dict: 包含 reasoning 和 tool_calls
         """
         messages = [{"role": "user", "content": prompt}]
-        response = await self.llm.chat(messages)
+        response = await self.llm_client.chat(messages)
         return {
             "reasoning": response,
             "tool_calls": [],
