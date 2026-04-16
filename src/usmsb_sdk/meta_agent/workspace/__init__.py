@@ -1,29 +1,9 @@
 """
-Meta Agent Workspace Module
+工作空间模块
 
-用户工作空间模块，提供用户专属的文件系统隔离功能。
+管理用户的文件系统隔离，所有文件操作限制在用户目录内。
 """
 
-from usmsb_sdk.meta_agent.workspace.user_workspace import (
-    DirectoryType,
-    FileInfo,
-    FileOperationError,
-    PathValidationError,
-    QuotaExceededError,
-    UserWorkspace,
-    WorkspaceConfig,
-    WorkspaceError,
-    create_workspace,
-)
+from .user_workspace import UserWorkspace
 
-__all__ = [
-    "DirectoryType",
-    "FileInfo",
-    "UserWorkspace",
-    "WorkspaceConfig",
-    "WorkspaceError",
-    "PathValidationError",
-    "QuotaExceededError",
-    "FileOperationError",
-    "create_workspace",
-]
+__all__ = ["UserWorkspace"]

@@ -85,7 +85,7 @@ class GeneCapsuleMatchRequest(BaseModel):
 def get_meta_agent_service():
     """获取 MetaAgentService 实例"""
     # 尝试从全局获取
-    from usmsb_sdk.platform.external.meta_agent.tools.precise_matching import (
+    from usmsb_sdk.meta_agent.tools.precise_matching import (
         _get_meta_agent_service,
     )
     service = _get_meta_agent_service()
@@ -469,7 +469,7 @@ async def notify_opportunity(
     verify_agent_access(user, request.agent_id)
 
     try:
-        from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import Opportunity
+        from usmsb_sdk.meta_agent.services.meta_agent_service import Opportunity
 
         opportunity_data = request.opportunity
         opportunity = Opportunity(

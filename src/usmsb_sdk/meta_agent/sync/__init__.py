@@ -1,21 +1,9 @@
 """
-Meta Agent Sync Module
+自动同步模块
 
-自动同步模块，提供用户数据的自动同步功能。
+管理用户数据的自动同步，包括变更触发、定期全量和生命周期同步。
 """
 
-from usmsb_sdk.meta_agent.sync.auto_sync_manager import (
-    AutoSyncManager,
-    SyncConfig,
-    SyncError,
-    SyncInProgressError,
-    SyncStatus,
-)
+from .auto_sync_manager import AutoSyncManager
 
-__all__ = [
-    "AutoSyncManager",
-    "SyncConfig",
-    "SyncStatus",
-    "SyncError",
-    "SyncInProgressError",
-]
+__all__ = ["AutoSyncManager"]

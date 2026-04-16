@@ -178,7 +178,7 @@ async def debug_tools_for_wallet(wallet_address: str):
         all_tools = _meta_agent.tool_registry.list_tools()
 
         # Filter tools by permission
-        from usmsb_sdk.platform.external.meta_agent.permission.models import (
+        from usmsb_sdk.meta_agent.permission.models import (
             get_tool_required_permissions,
         )
 
@@ -300,7 +300,7 @@ async def update_user_role(request: UpdateRoleRequest):
         raise HTTPException(status_code=500, detail="Permission manager not initialized")
 
     try:
-        from usmsb_sdk.platform.external.meta_agent.permission.models import UserRole
+        from usmsb_sdk.meta_agent.permission.models import UserRole
 
         new_role = UserRole(request.new_role)
 

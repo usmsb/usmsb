@@ -13,7 +13,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from usmsb_sdk.platform.external.meta_agent.evolution_v2 import (
+from usmsb_sdk.meta_agent.evolution_v2 import (
     SelfEvolutionEngine,
     create_evolution_engine,
 )

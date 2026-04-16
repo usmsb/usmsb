@@ -1,34 +1,18 @@
 """
-Meta Agent Module - 多用户隔离架构
-
-提供用户会话隔离、文件系统隔离、代码沙箱、浏览器上下文等功能。
+Meta Agent - 超级 Agent
+基于 USMSB 模型，具备自主运营、自主学习、自主进化能力
 """
 
-__version__ = "1.0.0"
-__author__ = "USMSB Team"
-
-# Workspace module
-from usmsb_sdk.meta_agent.workspace import (
-    DirectoryType,
-    FileInfo,
-    FileOperationError,
-    PathValidationError,
-    QuotaExceededError,
-    UserWorkspace,
-    WorkspaceConfig,
-    WorkspaceError,
-    create_workspace,
-)
+from .agent import MetaAgent
+from .meta_agent_config import MetaAgentConfig
+from .migrate.data_migration import DataMigration, MigrationProgress, MigrationResult
 
 __all__ = [
-    # Workspace
-    "DirectoryType",
-    "FileOperationError",
-    "FileInfo",
-    "UserWorkspace",
-    "WorkspaceConfig",
-    "WorkspaceError",
-    "PathValidationError",
-    "QuotaExceededError",
-    "create_workspace",
+    "MetaAgent",
+    "MetaAgentConfig",
+    "DataMigration",
+    "MigrationProgress",
+    "MigrationResult",
 ]
+
+__version__ = "1.0.0"

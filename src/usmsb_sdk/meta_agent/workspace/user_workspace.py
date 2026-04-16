@@ -60,7 +60,7 @@ class WorkspaceConfig:
     Attributes:
         workspace_root: 工作空间根目录
         max_file_size_mb: 单文件最大大小（MB），默认10MB
-        max_storage_mb: 存储空间限制（MB），默认100MB
+        max_storage_mb: 存储空间限制（MB），默认10GB
         max_files: 最大文件数量，默认1000个
         auto_cleanup_temp: 是否自动清理临时文件
         temp_file_ttl_seconds: 临时文件过期时间（秒），默认24小时
@@ -68,7 +68,7 @@ class WorkspaceConfig:
 
     workspace_root: str = "/data/users"
     max_file_size_mb: int = 10
-    max_storage_mb: int = 100
+    max_storage_mb: int = 10240  # 10GB
     max_files: int = 1000
     auto_cleanup_temp: bool = True
     temp_file_ttl_seconds: int = 86400  # 24 hours
@@ -134,26 +134,26 @@ class FileInfo:
 
 class UserWorkspace:
     """
-    用户工作空间
+        用户工作空间
 
-    管理用户专属的文件系统空间：
+        管理用户专属的文件系统空间：
 
-    1. 所有文件操作限制在用户目录内
-    2. 提供安全路径验证
-    3. 支持文件上传下载
-    4. 配额管理（文件大小、存储空间、文件数量）
+        1. 所有文件操作限制在用户目录内
+        2. 提供安全路径验证
+        3. 支持文件上传下载
+        4. 配额管理（文件大小、存储空间、文件数量）
 
-    目录结构:
-        /data/users/{wallet_address}/workspace/
-            ├── temp/       # 临时文件
-            ├── output/     # 输出文件
-            └── uploads/    # 用户上传文件
+        目录结构:
+            /data/users/{wallet_address}/workspace/
+                ├── temp/       # 临时文件
+                ├── output/     # 输出文件
+                └── uploads/    # 用户上传文件
 
-    安全特性:
-        - 路径验证：防止 ../ 等目录遍历攻击
-        - 文件大小限制：单文件不超过配置的大小
-        - 存储配额：总存储空间限制
-        - 文件数量限制：防止文件数过多
+        安全特性:
+            - 路径验证：防止 ../ 等目录遍历攻击
+            - 文件大小限制：单文件不超过配置的大小
+            - 存储配额：总存储空间限制
+            - 文件数量限制：防止文件数过多
 
     使用示例:
         >>> workspace = UserWorkspace("0x1234...")
@@ -179,9 +179,7 @@ class UserWorkspace:
         self.config = config or WorkspaceConfig()
 
         # 工作空间根目录
-        self.workspace_root = (
-            Path(self.config.workspace_root) / wallet_address / "workspace"
-        )
+        self.workspace_root = Path(self.config.workspace_root) / wallet_address / "workspace"
 
         # 子目录
         self.temp_dir = self.workspace_root / DirectoryType.TEMP.value
@@ -204,9 +202,7 @@ class UserWorkspace:
         # 写锁（用于并发控制）
         self._write_lock = asyncio.Lock()
 
-        logger.info(
-            f"UserWorkspace initialized for {wallet_address} at {self.workspace_root}"
-        )
+        logger.info(f"UserWorkspace initialized for {wallet_address} at {self.workspace_root}")
 
     async def init(self) -> None:
         """
@@ -244,9 +240,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise WorkspaceError(error_msg) from e
 
-    def resolve_path(
-        self, relative_path: str, subdir: DirectoryType | None = None
-    ) -> Path:
+    def resolve_path(self, relative_path: str, subdir: DirectoryType | None = None) -> Path:
         """
         解析相对路径为绝对路径（限制在工作空间内）
 
@@ -301,9 +295,7 @@ class UserWorkspace:
         else:
             # 如果没有指定子目录，检查是否在工作空间根目录内
             if not self.validate_path(resolved):
-                error_msg = (
-                    f"Path '{relative_path}' resolves outside workspace: {resolved}"
-                )
+                error_msg = f"Path '{relative_path}' resolves outside workspace: {resolved}"
                 logger.warning(error_msg)
                 raise PathValidationError(error_msg)
 
@@ -349,10 +341,7 @@ class UserWorkspace:
             QuotaExceededError: 如果文件大小超过限制
         """
         if size > self.config.max_file_size_bytes:
-            error_msg = (
-                f"File size {size} bytes exceeds maximum "
-                f"{self.config.max_file_size_mb}MB"
-            )
+            error_msg = f"File size {size} bytes exceeds maximum {self.config.max_file_size_mb}MB"
             logger.warning(error_msg)
             raise QuotaExceededError(error_msg)
 
@@ -373,18 +362,14 @@ class UserWorkspace:
         if storage_used + file_size > self.config.max_storage_bytes:
             used_mb = storage_used / (1024 * 1024)
             max_mb = self.config.max_storage_mb
-            error_msg = (
-                f"Storage quota exceeded: {used_mb:.2f}MB used "
-                f"({max_mb}MB limit)"
-            )
+            error_msg = f"Storage quota exceeded: {used_mb:.2f}MB used ({max_mb}MB limit)"
             logger.warning(error_msg)
             raise QuotaExceededError(error_msg)
 
         # 检查文件数量
         if file_count >= self.config.max_files:
             error_msg = (
-                f"File count quota exceeded: {file_count} files "
-                f"({self.config.max_files} limit)"
+                f"File count quota exceeded: {file_count} files ({self.config.max_files} limit)"
             )
             logger.warning(error_msg)
             raise QuotaExceededError(error_msg)
@@ -567,10 +552,7 @@ class UserWorkspace:
             # 按名称排序（目录优先）
             files.sort(key=lambda f: (not f.is_dir, f.name.lower()))
 
-            logger.debug(
-                f"Listed {len(files)} files in {directory} "
-                f"for {self.wallet_address}"
-            )
+            logger.debug(f"Listed {len(files)} files in {directory} for {self.wallet_address}")
 
             return files
 
@@ -579,9 +561,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def delete_file(
-        self, relative_path: str, subdir: DirectoryType | None = None
-    ) -> bool:
+    async def delete_file(self, relative_path: str, subdir: DirectoryType | None = None) -> bool:
         """
         删除文件或目录
 
@@ -622,9 +602,7 @@ class UserWorkspace:
             logger.error(error_msg)
             raise FileOperationError(error_msg) from e
 
-    async def exists(
-        self, relative_path: str, subdir: DirectoryType | None = None
-    ) -> bool:
+    async def exists(self, relative_path: str, subdir: DirectoryType | None = None) -> bool:
         """
         检查文件是否存在
 
@@ -737,9 +715,7 @@ class UserWorkspace:
         try:
             shutil.move(str(src_abs), str(dst_abs))
             self._invalidate_cache()
-            logger.debug(
-                f"Moved {src_path} to {dst_path} for {self.wallet_address}"
-            )
+            logger.debug(f"Moved {src_path} to {dst_path} for {self.wallet_address}")
             return dst_abs
         except OSError as e:
             error_msg = f"Failed to move {src_path} to {dst_path}: {e}"
@@ -789,9 +765,7 @@ class UserWorkspace:
             await self._check_quota(dst_abs.stat().st_size)
             self._invalidate_cache()
 
-            logger.debug(
-                f"Copied {src_path} to {dst_path} for {self.wallet_address}"
-            )
+            logger.debug(f"Copied {src_path} to {dst_path} for {self.wallet_address}")
             return dst_abs
         except OSError as e:
             error_msg = f"Failed to copy {src_path} to {dst_path}: {e}"
@@ -839,9 +813,7 @@ class UserWorkspace:
 
             self._invalidate_cache()
 
-            logger.info(
-                f"Cleaned up {deleted_count} temp files for {self.wallet_address}"
-            )
+            logger.info(f"Cleaned up {deleted_count} temp files for {self.wallet_address}")
 
             return deleted_count
 
@@ -947,9 +919,7 @@ class UserWorkspace:
                 "limit_mb": self.config.max_storage_mb,
                 "used_percent": (storage_used / self.config.max_storage_bytes) * 100,
                 "remaining_bytes": self.config.max_storage_bytes - storage_used,
-                "remaining_mb": (
-                    self.config.max_storage_bytes - storage_used
-                ) / (1024 * 1024),
+                "remaining_mb": (self.config.max_storage_bytes - storage_used) / (1024 * 1024),
             },
             "files": {
                 "count": file_count,

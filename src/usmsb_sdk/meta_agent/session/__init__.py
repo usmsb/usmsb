@@ -7,7 +7,7 @@ This module provides:
 - SessionManager: Centralized session lifecycle management
 
 Usage:
-    from usmsb_sdk.platform.external.meta_agent.session import UserSession, SessionConfig
+    from usmsb_sdk.meta_agent.session import UserSession, SessionConfig
 
     # Create a custom session configuration
     config = SessionConfig(

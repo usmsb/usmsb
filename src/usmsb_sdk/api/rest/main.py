@@ -374,7 +374,7 @@ async def lifespan(app: FastAPI):
 
     # ========== Initialize Permission Manager ==========
     from usmsb_sdk.api.rest.meta_agent import set_meta_agent, set_permission_manager
-    from usmsb_sdk.platform.external.meta_agent.permission import PermissionManager
+    from usmsb_sdk.meta_agent.permission import PermissionManager
 
     try:
         permission_manager = PermissionManager(os.getenv("META_DB_PATH", "data/db/meta_agent/meta_agent.db"))
@@ -390,8 +390,8 @@ async def lifespan(app: FastAPI):
         permission_manager = None
 
     # Initialize Meta Agent (pass permission_manager if available)
-    from usmsb_sdk.platform.external.meta_agent.agent import MetaAgent
-    from usmsb_sdk.platform.external.meta_agent.meta_agent_config import MetaAgentConfig
+    from usmsb_sdk.meta_agent.agent import MetaAgent
+    from usmsb_sdk.meta_agent.meta_agent_config import MetaAgentConfig
 
     meta_agent = MetaAgent(MetaAgentConfig.from_env())
 
@@ -419,8 +419,8 @@ async def lifespan(app: FastAPI):
     )
 
     # Initialize MetaAgentService for precise matching
-    from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import MetaAgentService
-    from usmsb_sdk.platform.external.meta_agent.tools.precise_matching import set_meta_agent_service
+    from usmsb_sdk.meta_agent.services.meta_agent_service import MetaAgentService
+    from usmsb_sdk.meta_agent.tools.precise_matching import set_meta_agent_service
 
     meta_agent_service = MetaAgentService(meta_agent=meta_agent)
     set_meta_agent_service(meta_agent_service)

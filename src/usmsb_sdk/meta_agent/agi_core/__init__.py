@@ -7,7 +7,7 @@ AGI Core - 知识库与记忆系统核心模块
 - agi_core/      - 记忆系统和知识图谱（本地实现）
 """
 
-from usmsb_sdk.platform.external.meta_agent.evolution_v2 import (
+from usmsb_sdk.meta_agent.evolution_v2 import (
     EvolutionPhase,
     KnowledgeState,
     SelfEvolutionEngine,

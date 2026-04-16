@@ -332,7 +332,7 @@ async def verify_signature(request: VerifyRequest):
     # Auto-register user to Meta Agent permission system (if first time or not registered)
     try:
         from usmsb_sdk.api.rest.meta_agent import get_permission_manager
-        from usmsb_sdk.platform.external.meta_agent.permission.models import UserRole
+        from usmsb_sdk.meta_agent.permission.models import UserRole
 
         permission_manager = get_permission_manager()
         if permission_manager:

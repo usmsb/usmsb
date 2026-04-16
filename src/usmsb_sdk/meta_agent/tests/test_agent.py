@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, "../../../../")
 
-from usmsb_sdk.platform.external.meta_agent import MetaAgent, MetaAgentConfig
+from usmsb_sdk.meta_agent import MetaAgent, MetaAgentConfig
 
 
 async def test_meta_agent():
