@@ -113,6 +113,40 @@ class L2Agent:
     def list_tools(self) -> list[Tool]:
         """列出所有工具"""
         return self.tools.list_all()
+
+    async def think(self, prompt: str, tools: list = None) -> dict:
+        """
+        IL2: LLM 推理（带工具选项）
+        
+        Args:
+            prompt: 推理提示
+            tools: 可用工具列表
+            
+        Returns:
+            dict: 包含 reasoning 和 tool_calls
+        """
+        messages = [{"role": "user", "content": prompt}]
+        response = await self.llm.chat(messages)
+        return {
+            "reasoning": response,
+            "tool_calls": [],
+            "message": response,
+        }
+
+    async def remember(self, key: str, value) -> None:
+        """
+        IL2: 存储记忆
+        """
+        self.add_memory(f"{key}: {value}", memory_type="semantic", importance=0.7)
+
+    async def recall(self, query: str) -> list:
+        """
+        IL2: 检索记忆
+        """
+        if self.memory and hasattr(self.memory, 'semantic'):
+            return self.memory.semantic.retrieve(query, top_k=5)
+        return []
+
     
     # ========== 记忆管理 ==========
     
@@ -188,7 +222,7 @@ class L2Agent:
     
     # ========== 核心运行 ==========
     
-    async def run(self, user_input: str) -> str:
+    async def run(self, user_input: str, context: dict = None) -> str:
         """
         运行 Agent 处理输入
         

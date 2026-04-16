@@ -18,6 +18,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 from usmsb_sdk.meta_agent.llm_client import LLMClient
+from dataclasses import dataclass, field
 
 
 class NeedType(Enum):
@@ -296,5 +297,37 @@ Respond with ONLY the goal text, starting with "[自生成] " or "[内在] "."""
             ),
         }
     
+    # ─────────────────────────────────────────────────────────
+    # IL3 接口实现
+    # ─────────────────────────────────────────────────────────
+
+    async def generate_goal(self, context: dict = None) -> "Goal":
+        """IL3: 生成目标"""
+        purpose = self.generate_purpose()
+        if purpose:
+            return self.purpose_to_goal(purpose)
+        return None
+
+    async def evaluate_outcome(self, goal, result) -> float:
+        """IL3: 评估目标执行结果"""
+        if result is None:
+            return 0.0
+        if isinstance(result, dict):
+            if result.get("error"):
+                return 0.1
+            return 0.8 if result.get("success") else 0.5
+        if isinstance(result, str):
+            return 0.7 if len(result) > 20 else 0.3
+        return 0.5
+
+    async def detect_intrinsic_motivation(self, state: dict = None) -> "MotivationSignal":
+        """IL3: 检测内在动机"""
+        if self.intrinsic_motivation:
+            needs = self.intrinsic_motivation.generate_needs(state or {})
+            dominant = self.intrinsic_motivation.get_dominant_motivation()
+            intensity = (self.intrinsic_motivation.get_motivation_state(dominant) if dominant else 0.5)
+            return MotivationSignal(needs=needs, dominant=dominant, intensity=intensity)
+        return MotivationSignal(needs=[], dominant="curiosity", intensity=0.5)
+
     def __repr__(self) -> str:
         return f"PurposeGenerator(agent={self.agent_id}, llm={self.llm})"
