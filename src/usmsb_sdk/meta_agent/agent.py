@@ -147,6 +147,89 @@ def _serialize_for_json(obj: Any) -> Any:
         return f"<non-serializable: {type(obj).__name__}>"
 
 
+class PlatformClient:
+    """
+    Lightweight HTTP client for USMSB Platform REST API.
+    Used by GeneCapsuleAdapter to access platform services.
+    """
+    def __init__(self, base_url: str = "http://localhost:8000"):
+        import httpx
+        self.base_url = base_url.rstrip("/")
+        self._client = httpx.AsyncClient(timeout=30.0)
+        self._api_key = os.environ.get("USMSB_API_KEY", "")
+        self._agent_id = os.environ.get("USMSB_AGENT_ID", "meta_default")
+
+    def _headers(self) -> dict:
+        return {
+            "X-API-Key": self._api_key,
+            "X-Agent-ID": self._agent_id,
+            "Content-Type": "application/json",
+        }
+
+    class GeneCapsuleClient:
+        """Gene Capsule API sub-client."""
+        def __init__(self, parent: "PlatformClient"):
+            self._p = parent
+
+        async def get_capsule(self, agent_id: str = "") -> dict:
+            url = f"{self._p.base_url}/gene-capsule/{agent_id or self._p._agent_id}"
+            try:
+                r = await self._p._client.get(url, headers=self._p._headers())
+                if r.status_code == 200:
+                    return {"success": True, "data": r.json()}
+                return {"success": False, "error": f"HTTP {r.status_code}"}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        async def add_experience(self, title: str, description: str, skills: list, auto_desensitize: bool = True) -> dict:
+            url = f"{self._p.base_url}/gene-capsule/experiences/add"
+            try:
+                r = await self._p._client.post(url, json={
+                    "agent_id": self._p._agent_id, "title": title,
+                    "description": description, "skills": skills,
+                    "auto_desensitize": auto_desensitize,
+                }, headers=self._p._headers())
+                if r.status_code in (200, 201):
+                    return {"success": True, "data": r.json()}
+                return {"success": False, "error": f"HTTP {r.status_code}"}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        async def match(self, task_description: str, required_skills: list, min_relevance: float, limit: int) -> dict:
+            url = f"{self._p.base_url}/gene-capsule/experiences/match"
+            try:
+                r = await self._p._client.post(url, json={
+                    "task_description": task_description, "required_skills": required_skills,
+                    "min_relevance": min_relevance, "limit": limit,
+                }, headers=self._p._headers())
+                if r.status_code == 200:
+                    return {"success": True, "data": r.json()}
+                return {"success": False, "error": f"HTTP {r.status_code}"}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        async def search_agents(self, task_description: str, required_skills: list, min_relevance: float, limit: int) -> dict:
+            url = f"{self._p.base_url}/gene-capsule/agents/search"
+            try:
+                r = await self._p._client.post(url, json={
+                    "task_description": task_description, "required_skills": required_skills,
+                    "min_relevance": min_relevance, "limit": limit,
+                }, headers=self._p._headers())
+                if r.status_code == 200:
+                    return {"success": True, "data": r.json()}
+                return {"success": False, "error": f"HTTP {r.status_code}"}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+    @property
+    def gene_capsule(self) -> "GeneCapsuleClient":
+        return self.GeneCapsuleClient(self)
+
+    async def close(self):
+        await self._client.aclose()
+
+
+
 class MetaAgent:
     """
     Meta Agent - 超级 Agent
@@ -280,6 +363,16 @@ class MetaAgent:
         # 每步独立超时（60秒），支持断点续传
         self.task_executor: TaskExecutor | None = None
 
+        # ========== OpenHarness 集成 ==========
+        self.oh_integration: Any = None  # OpenHarnessIntegration
+
+        # ========== Platform 客户端 + Gene Capsule ==========
+        self.platform_client: Any = None  # PlatformClient
+        self.gene_capsule_adapter: Any = None  # GeneCapsuleAdapter
+
+        # ========== A2A HTTP Server ==========
+        self._a2a_server_task: asyncio.Task | None = None
+
         # 状态
         self._running = False
         self._main_loop_task: asyncio.Task | None = None
@@ -309,6 +402,15 @@ class MetaAgent:
 
         # 注册 git 命令执行技能
         await self._register_git_skill()
+
+        # ========== OpenHarness 初始化 + 工具注入 ==========
+        await self._init_openharness()
+
+        # ========== Platform + Gene Capsule 初始化 ==========
+        await self._init_platform_client()
+
+        # ========== A2A HTTP Server 注册 ==========
+        await self._register_a2a_agent()
 
         # 启动目标引擎
         await self.goal_engine.start()
@@ -408,6 +510,79 @@ class MetaAgent:
         self._main_loop_task = asyncio.create_task(self._main_loop())
 
         logger.info(f"Meta Agent {self.agent_id} started successfully")
+
+    async def _init_openharness(self) -> None:
+        """Initialize OpenHarness integration and inject tools into registry."""
+        try:
+            from usmsb_sdk.adapters.openharness import OpenHarnessIntegration
+            self.oh_integration = OpenHarnessIntegration.from_env(cwd=self.config.data_dir or ".")
+            await self.oh_integration.initialize()
+            logger.info("OpenHarness integration initialized")
+            
+            # Inject OH tools into USMSB tool registry
+            injected = self.oh_integration.inject_oh_tools_into_registry(
+                self.tool_registry,
+                capability_filter=None,
+            )
+            logger.info("Injected %d OpenHarness tools into registry", injected)
+        except Exception as e:
+            logger.warning("OpenHarness initialization failed (OH may not be installed): %s", e)
+            self.oh_integration = None
+
+    async def _init_platform_client(self) -> None:
+        """Initialize Platform client and Gene Capsule adapter."""
+        try:
+            base_url = os.environ.get("USMSB_PLATFORM_URL", "http://localhost:8000")
+            self.platform_client = PlatformClient(base_url=base_url)
+            
+            from usmsb_sdk.intelligence_adapters.gene_capsule_adapter import GeneCapsuleAdapter
+            self.gene_capsule_adapter = GeneCapsuleAdapter(
+                platform_client=self.platform_client,
+                llm_adapter=None,  # Will be set if LLM manager is available
+            )
+            logger.info("PlatformClient + GeneCapsuleAdapter initialized (base_url=%s)", base_url)
+        except Exception as e:
+            logger.warning("Platform client initialization failed: %s", e)
+            self.platform_client = None
+            self.gene_capsule_adapter = None
+
+    async def _register_a2a_agent(self) -> None:
+        """Register this MetaAgent as an A2A agent with the platform HTTP server."""
+        try:
+            # Import A2A registration router
+            from usmsb_sdk.api.rest.routers.registration import register_via_a2a
+            
+            agent_card = {
+                "name": f"MetaAgent-{self.agent_id}",
+                "description": "USMSB MetaAgent - L1-L5 autonomous agent with goal layer",
+                "url": os.environ.get("USMSB_AGENT_URL", "http://localhost:8000"),
+                "version": "2.0.0",
+                "capabilities": ["goal_directed", "multi_protocol", "collective_intelligence"],
+                "skills": ["strategy", "reasoning", "execution", "learning"],
+                "metadata": {
+                    "agent_id": self.agent_id,
+                    "protocols": ["a2a", "mcp", "p2p"],
+                    "layers": ["L1", "L2", "L3", "L4", "L5"],
+                },
+            }
+            
+            # Post to local registration endpoint if server is running
+            import httpx
+            try:
+                base_url = os.environ.get("USMSB_PLATFORM_URL", "http://localhost:8000")
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    r = await client.post(
+                        f"{base_url}/agents/register/a2a",
+                        json={"agent_card": agent_card},
+                    )
+                    if r.status_code in (200, 201):
+                        logger.info("A2A agent registration successful: %s", self.agent_id)
+                    else:
+                        logger.warning("A2A registration returned HTTP %d (server may not be running)", r.status_code)
+            except Exception as e:
+                logger.warning("A2A registration skipped (platform server not reachable): %s", e)
+        except Exception as e:
+            logger.warning("A2A agent registration failed: %s", e)
 
     async def stop(self):
         """停止 Meta Agent"""

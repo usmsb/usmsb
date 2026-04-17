@@ -619,3 +619,57 @@ class OpenHarnessIntegration:
     def usmsb_config(self) -> USMSBConfig:
         """Get USMSB configuration."""
         return self._usmsb_config
+
+    # -------------------------------------------------------------------------
+    # OpenHarness Tool Discovery and Injection
+    # -------------------------------------------------------------------------
+
+    def _discover_openharness_tools(self) -> list[dict[str, Any]]:
+        """Discover all available OpenHarness tools."""
+        self._check_initialized()
+        if not self._tool_adapter:
+            return []
+        return self._tool_adapter.discover_tools()
+
+    def inject_oh_tools_into_registry(
+        self,
+        usmsb_tool_registry: Any,
+        capability_filter: str | None = None,
+    ) -> int:
+        """Inject discovered OH tools into USMSB ToolRegistry."""
+        from usmsb_sdk.meta_agent.tools.registry import Tool
+        self._check_initialized()
+        discovered = self._discover_openharness_tools()
+        injected = 0
+        for tool_info in discovered:
+            name = tool_info["name"]
+            if capability_filter and capability_filter not in tool_info.get("capabilities", []):
+                continue
+            if hasattr(usmsb_tool_registry, "get_tool"):
+                if usmsb_tool_registry.get_tool(name):
+                    continue
+            elif hasattr(usmsb_tool_registry, "tool_names"):
+                if name in usmsb_tool_registry.tool_names:
+                    continue
+            schema = tool_info.get("schema")
+            async def make_handler(_name=name, _schema=schema, **kw) -> Any:
+                return await self._tool_adapter.execute_tool(_name, check_permission=False, **kw)
+            usmsb_tool = Tool(
+                name=name,
+                description=tool_info["description"],
+                handler=make_handler,
+                required_permissions=[],
+                security_level="medium",
+                requires_session=False,
+                parameters=schema.get("parameters") if schema else {},
+            )
+            try:
+                if hasattr(usmsb_tool_registry, "register"):
+                    usmsb_tool_registry.register(usmsb_tool)
+                elif hasattr(usmsb_tool_registry, "register_tool"):
+                    usmsb_tool_registry.register_tool(usmsb_tool)
+                injected += 1
+            except Exception as e:
+                log.warning("Failed to inject OH tool %s: %s", name, e)
+        log.info("OH tool injection: %d/%d registered", injected, len(discovered))
+        return injected
