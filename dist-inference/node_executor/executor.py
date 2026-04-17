@@ -48,7 +48,7 @@ app = FastAPI(title="USMSB Node Executor")
 vllm_engine: VLLMEngine = None
 model_manager: ModelManager = None
 gpu_monitor: GPUMonitor = None
-node_id: str = None
+node_id: str = "unknown"  # Default, will be set by NodeExecutor
 
 
 @app.post("/inference")
@@ -162,6 +162,13 @@ class NodeExecutor:
     async def start(self):
         """Start Node Executor"""
         self._running = True
+
+        # Set global variables BEFORE starting uvicorn
+        import node_executor.executor as executor_module
+        executor_module.node_id = self.node_id
+        executor_module.vllm_engine = self.vllm_engine
+        executor_module.model_manager = self.model_manager
+        executor_module.gpu_monitor = self.gpu_monitor
 
         # Register to Global Scheduler
         await self._register()

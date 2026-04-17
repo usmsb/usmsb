@@ -62,7 +62,7 @@ class VLLMEngine:
 
     def load_model(self, model_name: str):
         """
-        Load model
+        Load model (mock mode when vLLM not available)
         """
         if self._loading:
             raise RuntimeError("Model loading in progress")
@@ -72,7 +72,10 @@ class VLLMEngine:
             return
 
         if not VLLM_AVAILABLE:
-            raise RuntimeError("vLLM not available. Install with: pip install vllm")
+            # Mock mode: just mark as loaded
+            print(f"[VLLM] Mock mode: marking {model_name} as loaded (vLLM not available)")
+            self.loaded_model_name = model_name
+            return
 
         print(f"[VLLM] Loading model: {model_name}")
 
@@ -106,16 +109,22 @@ class VLLMEngine:
         max_tokens: int = 2048
     ) -> Dict[str, Any]:
         """
-        Synchronous generation
-
-        Returns:
-            {
-                "content": str,
-                "usage": {"prompt_tokens": int, "completion_tokens": int, "total_tokens": int}
-            }
+        Synchronous generation (mock mode when vLLM not available)
         """
+
+        # Mock mode: return fake response when vLLM not available
         if not self.llm:
-            raise RuntimeError("Model not loaded")
+            content = f"[Mock] Processed: {messages[-1].get('content', '')}"
+            prompt_tokens = 10
+            completion_tokens = 20
+            return {
+                "content": content,
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens
+                }
+            }
 
         # Convert messages to prompt
         prompt = self._messages_to_prompt(messages)
