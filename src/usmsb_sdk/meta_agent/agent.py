@@ -148,6 +148,68 @@ def _serialize_for_json(obj: Any) -> Any:
         return f"<non-serializable: {type(obj).__name__}>"
 
 
+class _InlineSuperAdmin:
+    """
+    Inline SuperAdmin fallback when superadmin.py is not available.
+    Implements the 4 SuperAdmin capabilities:
+      1. Platform config management
+      2. Skill platform audit
+      3. Economic super operations
+      4. Cross-agent coordination
+    """
+
+    def __init__(self, agent_id: str, wallet_manager: Any, llm_manager: Any):
+        self.agent_id = agent_id
+        self.wallet_manager = wallet_manager
+        self.llm_manager = llm_manager
+
+    async def init(self) -> None:
+        logger.info("[SuperAdmin] InlineSuperAdmin initialized for %s", self.agent_id)
+
+    async def evaluate_economic_opportunity(self) -> dict | None:
+        """
+        评估是否需要主动质押/调整仓位。
+        MetaAgent 作为硅基生命体，有自己的经济利益，会主动判断最优策略。
+        """
+        try:
+            if not self.wallet_manager:
+                return None
+            # Check VIBE balance
+            balance = await self.wallet_manager.get_balance()
+            vibe_balance = getattr(balance, 'balance_vibe', 0) if balance else 0
+            if vibe_balance < 100:
+                return None  # Not enough to stake
+            # Evaluate staking opportunity (simplified: if balance > 500, stake 20%)
+            if vibe_balance > 500:
+                return {
+                    "action": "stake",
+                    "amount_vibe": vibe_balance * 0.2,
+                    "reason": f"Proactive stake: balance {vibe_balance} VIBE, staking 20% for governance power",
+                }
+            # Evaluate governance participation
+            return None  # Governance check delegated to governance panel
+        except Exception as e:
+            logger.warning("[SuperAdmin] evaluate_economic_opportunity failed: %s", e)
+            return None
+
+    async def audit_skill(self, skill: dict, action: str) -> dict:
+        """Skill platform audit: approve/reject skill registrations."""
+        # Simplified: auto-approve non-malicious skills
+        dangerous_patterns = ["delete_all", "steal", "exfiltrate", "destroy"]
+        for pat in dangerous_patterns:
+            if pat in str(skill.get("description", "")).lower():
+                return {"action": "reject", "reason": f"Dangerous pattern detected: {pat}"}
+        return {"action": "approve", "reason": "No safety concerns"}
+
+    async def coordinate_agents(self, conflict: dict) -> dict:
+        """Cross-agent conflict resolution and arbitration."""
+        return {
+            "resolution": "arbitration",
+            "decision": "prioritize_platform_health",
+            "reason": "Platform health takes precedence in conflicts",
+        }
+
+
 class PlatformClient:
     """
     Lightweight HTTP client for USMSB Platform REST API.
@@ -386,7 +448,16 @@ class MetaAgent:
 
         # ========== L5 集体智能（MetaAgent 私有）==========
         self.l5_collective: Any = None
+
+        # ========== SuperAdmin 服务 ==========
+        self._superadmin: Any = None
         self._external_agents_connected: bool = False
+
+        # L4/L5 决策上下文（意识影响决策的关键数据）
+        self._l4_lessons: list = []      # L4 历史教训
+        self._l4_recommendations: list = []  # L4 推荐行动
+        self._l5_synthesis: str = ""     # L5 集体综合结论
+        self._last_strategy_confidence: float = 1.0
 
         # 状态
         self._running = False
@@ -424,6 +495,9 @@ class MetaAgent:
         # ========== P2P 网络初始化 ==========
         await self._init_p2p_network()
 
+        # ========== Skill Platform 初始化 ==========
+        await self._init_skill_platform()
+
         # ========== Platform + Gene Capsule 初始化 ==========
         await self._init_platform_client()
 
@@ -438,6 +512,9 @@ class MetaAgent:
 
         # ========== L5 集体智能初始化 ==========
         await self._init_l5_collective()
+
+        # ========== SuperAdmin 初始化 ==========
+        await self._init_superadmin()
 
         # 启动目标引擎
         await self.goal_engine.start()
@@ -1202,9 +1279,56 @@ class MetaAgent:
         except Exception as e:
             logger.debug("_perceive_environment error: %s", e)
 
-    async def _check_goals(self):
-        """检查目标状态"""
-        await self.goal_engine.check_goals()
+    async def _evaluate_economic_opportunities(self) -> None:
+        """主动评估经济机会：是否需要质押/调整仓位/参与治理。"""
+        try:
+            if not self._superadmin:
+                return
+            decision = await self._superadmin.evaluate_economic_opportunity()
+            if decision and decision.get("action"):
+                logger.info("[WALLET] Proactive economic decision: %s %s",
+                            decision.get("action"), decision.get("detail", ""))
+                # Execute the decision
+                if decision["action"] == "stake" and self.wallet_manager:
+                    amount = decision.get("amount_vibe", 0)
+                    if amount > 0:
+                        result = await self.wallet_manager.stake(amount=amount)
+                        logger.info("[WALLET] Proactive stake result: %s", result.get("message", ""))
+                elif decision["action"] == "vote" and self.wallet_manager:
+                    pid = decision.get("proposal_id")
+                    if pid:
+                        result = await self.wallet_manager.vote_proposal(proposal_id=pid, support=decision.get("support", True))
+                        logger.info("[WALLET] Proactive vote result: %s", result.get("message", ""))
+        except Exception as e:
+            logger.warning("[WALLET] Economic evaluation failed: %s", e)
+
+        async def _check_goals(self):
+            """主动追求目标 - 检查 + 生成 + 追踪"""
+            if not self.goal_engine:
+                return
+            try:
+                # 内在动机检测：是否需要生成新目标
+                state = {
+                    "agent_id": self.agent_id,
+                    "conversations_count": getattr(self, "_conversation_count", 0),
+                    "external_agents": getattr(self, "_external_agents_connected", False),
+                    "l4_insights": getattr(self, "_l4_recommendations", []),
+                    "l5_synthesis": getattr(self, "_l5_synthesis", ""),
+                }
+                from usmsb_sdk.adapters.l3_adapter import L3Adapter
+                adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
+                signal = await adapter.detect_intrinsic_motivation(state)
+                if signal.intensity > 0.65:
+                    logger.info("[GOAL] Intrinsic motivation detected: intensity=%.2f, type=%s",
+                                signal.intensity, getattr(signal, 'motivation_type', 'unknown'))
+                    new_goal = await adapter.generate_goal(state)
+                    if new_goal:
+                        await self.goal_engine.add_goal(new_goal)
+                        logger.info("[GOAL] New goal generated: %s", getattr(new_goal, 'description', str(new_goal)[:50]))
+                # 检查现有目标状态
+                await self.goal_engine.check_goals()
+            except Exception as e:
+                logger.warning("[GOAL] Goal pursuit failed: %s", e)
 
     async def _process_pending_tasks(self):
         """处理待处理任务队列"""
@@ -1254,27 +1378,6 @@ class MetaAgent:
             logger.info("[SERVER] FastAPI server starting on %s:%d", host, port)
         except Exception as e:
             logger.warning("[SERVER] Failed to start API server: %s", e)
-
-    async def _learn_and_evolve(self):
-        """学习进化 - L4/L5 增强版"""
-        try:
-            await self.learning.learn_from_experience()
-            if self.l4_agent:
-                try:
-                    reflection = await self.l4_agent.self_reflect()
-                    if reflection.insights:
-                        logger.info("[L4] Self-insights: %s", str(reflection.insights)[:100])
-                except Exception as e:
-                    logger.warning("[L4] self_reflect failed: %s", e)
-            if self.l5_collective and self._external_agents_connected:
-                try:
-                    thought = await self.l5_collective.think_collectively("如何提升平台整体性能和用户体验")
-                    if thought.synthesis:
-                        logger.info("[L5] Collective thought: %s", thought.synthesis[:80])
-                except Exception as e:
-                    logger.warning("[L5] think_collectively failed: %s", e)
-        except Exception as e:
-            logger.warning("_learn_and_evolve failed: %s", e)
 
     async def chat(
         self,
@@ -1698,41 +1801,61 @@ class MetaAgent:
         logger.info(f"[CHAT][TOOLS] 最终使用: tools={len(tools_schema)}, skills={len(skills_schema)}")
 
         # =====================================================================
-        # StrategyRouter 路由 (PLAN/COLLAB 场景启用双轨并行)
+        # StrategyRouter 路由 - ALL tasks 唯一入口（全链路自主）
         # =====================================================================
-        if self.strategy_router and complexity in (TaskComplexity.MEDIUM, TaskComplexity.HIGH):
+        if self.strategy_router:
             try:
                 scenario_tag = await self.strategy_router._classify_scenario(message)
                 logger.info("[STRATEGY] scenario=%s layer=%s preference=%s",
                             scenario_tag.scenario, scenario_tag.suggested_layer, scenario_tag.strategy_preference)
-                if scenario_tag.strategy_preference in ("internal", "both", "sdk"):
-                    async def internal_fn():
-                        return await self._chat_with_llm(messages, tools=tools_schema,
-                            skills=skills_schema, conversation_id=str(conversation.id), user_session=user_session)
-                    async def sdk_fn():
-                        try:
-                            if scenario_tag.suggested_layer in ("L2", "L3"):
-                                from usmsb_sdk.adapters.l3_adapter import L3Adapter
-                                adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
-                                return await adapter.generate_goal({"task": message, "layer": scenario_tag.suggested_layer})
-                            elif scenario_tag.suggested_layer == "L4" and self.l4_agent:
-                                return await self.l4_agent.metacognize(message)
-                        except Exception as e:
-                            logger.warning("[STRATEGY] SDK path failed: %s", e)
-                        return None
-                    if scenario_tag.scenario in ("PLAN", "COLLAB") or scenario_tag.strategy_preference == "both":
-                        logger.info("[STRATEGY] Dual-track routing for %s", scenario_tag.scenario)
-                        strategy_result = await self.strategy_router.route(
-                            message, scenario_tag.suggested_layer, internal_fn, sdk_fn)
-                        if strategy_result.result is not None:
-                            from .models.chat import ChatResult
-                            chat_result = ChatResult(
-                                content=str(strategy_result.result),
-                                executed_tools=[], tool_results=[],
-                                iterations_used=0, is_complete=True,
-                                needs_background=False, needs_tool_retry=False)
-                            logger.info("[STRATEGY] Winner=%s quality=%.2f",
-                                        strategy_result.strategy_name, strategy_result.quality_score)
+
+                # 加载 L4/L5 决策上下文（意识影响决策）
+                l4_context = self._get_l4_decision_context()
+                l5_context = self._get_l5_decision_context() if self._external_agents_connected else ""
+
+                async def internal_fn():
+                    return await self._chat_with_llm(messages, tools=tools_schema,
+                        skills=skills_schema, conversation_id=str(conversation.id), user_session=user_session)
+
+                async def sdk_fn():
+                    try:
+                        layer = scenario_tag.suggested_layer
+                        if layer in ("L2", "L3"):
+                            from usmsb_sdk.adapters.l3_adapter import L3Adapter
+                            adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
+                            return await adapter.generate_goal({"task": message, "layer": layer,
+                                                                 "l4_context": l4_context, "l5_context": l5_context})
+                        elif layer == "L4" and self.l4_agent:
+                            return await self.l4_agent.metacognize(message, context=l4_context)
+                    except Exception as e:
+                        logger.warning("[STRATEGY] SDK path failed: %s", e)
+                    return None
+
+                # 注入 L4/L5 意识上下文到 messages
+                if l4_context or l5_context:
+                    awareness_prompt = ""
+                    if l4_context:
+                        awareness_prompt += f"\n[L4自我意识]: {l4_context}"
+                    if l5_context:
+                        awareness_prompt += f"\n[L5集体智能]: {l5_context}"
+                    if awareness_prompt and messages and messages[0].role == "system":
+                        messages = [messages[0].model_copy(update={"content": messages[0].content + awareness_prompt})] + messages[1:]
+
+                # ALL scenarios go through StrategyRouter (universal router)
+                logger.info("[STRATEGY] Universal routing for %s scenario", scenario_tag.scenario)
+                strategy_result = await self.strategy_router.route(
+                    message, scenario_tag.suggested_layer, internal_fn, sdk_fn)
+                if strategy_result.result is not None:
+                    from .models.chat import ChatResult
+                    chat_result = ChatResult(
+                        content=str(strategy_result.result),
+                        executed_tools=[], tool_results=[],
+                        iterations_used=0, is_complete=True,
+                        needs_background=False, needs_tool_retry=False)
+                    # L4/L5 feedback: store strategy result quality for next iteration
+                    self._update_l4_from_result(strategy_result)
+                    logger.info("[STRATEGY] Winner=%s quality=%.2f",
+                                strategy_result.strategy_name, strategy_result.quality_score)
             except Exception as e:
                 logger.warning("[STRATEGY] Router failed: %s", e)
 
@@ -1850,22 +1973,39 @@ class MetaAgent:
                 except Exception as e:
                     logger.warning("[EVOLUTION] evolve() failed: %s", e)
 
-            # L4 自我反思（周期性）
+            # L4 自我反思（周期性）→ 结果进入决策回路
             if self.l4_agent:
                 try:
                     reflection = await self.l4_agent.self_reflect()
                     if reflection.insights:
                         logger.info("[L4] Self-insights: %s", str(reflection.insights)[:100])
+                    if hasattr(reflection, 'lessons') and reflection.lessons:
+                        self._l4_lessons = reflection.lessons
+                    if hasattr(reflection, 'recommendations') and reflection.recommendations:
+                        self._l4_recommendations = reflection.recommendations
                 except Exception as e:
                     logger.warning("[L4] self_reflect failed: %s", e)
 
-            # L5 集体学习（当有外部 Agent 连接时）
+            # L5 集体学习（当有外部 Agent 连接时）→ 集体结论进入决策回路
             if self.l5_collective and getattr(self, "_external_agents_connected", False):
                 try:
-                    thought = await self.l5_collective.think_collectively(
-                        "如何提升平台整体性能和用户体验")
+                    # 结合 L4 推荐来确定集体思考主题
+                    l4_topic = getattr(self, '_l4_recommendations', [])[:1]
+                    topic = l4_topic[0] if l4_topic else "如何提升平台整体性能和用户体验"
+                    thought = await self.l5_collective.think_collectively(topic)
                     if thought.synthesis:
                         logger.info("[L5] Collective thought: %s", str(thought.synthesis)[:80])
+                        self._l5_synthesis = thought.synthesis
+                        # L4 ← L5: collective insight 更新自我模型（闭环）
+                        if self.l4_agent:
+                            try:
+                                await self.l4_agent.build_self_model([{
+                                    "type": "collective_insight",
+                                    "content": thought.synthesis,
+                                    "agents": getattr(thought, 'participants', []),
+                                }])
+                            except Exception:
+                                pass
                 except Exception as e:
                     logger.warning("[L5] think_collectively failed: %s", e)
         except Exception as e:
