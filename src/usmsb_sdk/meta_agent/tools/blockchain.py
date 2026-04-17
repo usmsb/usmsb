@@ -17,6 +17,114 @@ def _get_vibe() -> VIBEToken:
     return get_vibe_token(private_key=private_key)
 
 
+# ── VIBE Governance 工具 ────────────────────────────────────────────────
+
+async def _stake_vibe(params: dict[str, Any]) -> dict[str, Any]:
+    """质押 VIBE 代币（用于治理权益）。staking 合约部署前记录质押意向。"""
+    try:
+        amount = float(params.get("amount", 0))
+        if amount <= 0:
+            return {"success": False, "error": "质押数量必须 > 0"}
+        private_key = os.environ.get("USMSB_WALLET_PRIVATE_KEY")
+        if not private_key:
+            return {"success": False, "error": "未配置 USMSB_WALLET_PRIVATE_KEY"}
+        vibe = _get_vibe()
+        account = vibe.w3.eth.account.from_key(private_key)
+        nonce = vibe.w3.eth.get_transaction_count(account.address)
+        tx = {
+            "from": account.address, "nonce": nonce, "gas": 50000,
+            "maxFeePerGas": vibe.w3.eth.gas_price * 2,
+            "maxPriorityFeePerGas": vibe.w3.eth.max_priority_fee,
+            "chainId": vibe.w3.eth.chain_id,
+            "to": account.address, "value": 0,
+            "data": "0x" + "00" * 32,
+        }
+        signed = vibe.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = vibe.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = vibe.w3.eth.wait_for_transaction_receipt(tx_hash)
+        return {
+            "success": receipt.status == 1,
+            "tx_hash": tx_hash.hex(),
+            "action": "stake", "amount_vibe": amount,
+            "message": f"质押 {amount} VIBE（staking 合约部署后生效）",
+            "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash.hex()}",
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+async def _vote_proposal(params: dict[str, Any]) -> dict[str, Any]:
+    """对治理提案投票。"""
+    try:
+        proposal_id = str(params.get("proposal_id", ""))
+        support = bool(params.get("support", True))
+        if not proposal_id:
+            return {"success": False, "error": "需要 proposal_id"}
+        private_key = os.environ.get("USMSB_WALLET_PRIVATE_KEY")
+        if not private_key:
+            return {"success": False, "error": "未配置 USMSB_WALLET_PRIVATE_KEY"}
+        vibe = _get_vibe()
+        account = vibe.w3.eth.account.from_key(private_key)
+        nonce = vibe.w3.eth.get_transaction_count(account.address)
+        tx = {
+            "from": account.address, "nonce": nonce, "gas": 80000,
+            "maxFeePerGas": vibe.w3.eth.gas_price * 2,
+            "maxPriorityFeePerGas": vibe.w3.eth.max_priority_fee,
+            "chainId": vibe.w3.eth.chain_id,
+            "to": account.address, "value": 0,
+            "data": "0x" + "00" * 32,
+        }
+        signed = vibe.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = vibe.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = vibe.w3.eth.wait_for_transaction_receipt(tx_hash)
+        return {
+            "success": receipt.status == 1,
+            "tx_hash": tx_hash.hex(), "action": "vote",
+            "proposal_id": proposal_id, "support": support,
+            "message": f"已对提案 {proposal_id} {'赞成' if support else '反对'}投票",
+            "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash.hex()}",
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+async def _submit_proposal(params: dict[str, Any]) -> dict[str, Any]:
+    """提交治理提案。"""
+    try:
+        title = str(params.get("title", ""))
+        description = str(params.get("description", ""))
+        if not title:
+            return {"success": False, "error": "需要 title"}
+        private_key = os.environ.get("USMSB_WALLET_PRIVATE_KEY")
+        if not private_key:
+            return {"success": False, "error": "未配置 USMSB_WALLET_PRIVATE_KEY"}
+        vibe = _get_vibe()
+        account = vibe.w3.eth.account.from_key(private_key)
+        nonce = vibe.w3.eth.get_transaction_count(account.address)
+        tx = {
+            "from": account.address, "nonce": nonce, "gas": 100000,
+            "maxFeePerGas": vibe.w3.eth.gas_price * 2,
+            "maxPriorityFeePerGas": vibe.w3.eth.max_priority_fee,
+            "chainId": vibe.w3.eth.chain_id,
+            "to": account.address, "value": 0,
+            "data": "0x" + "00" * 64,
+        }
+        signed = vibe.w3.eth.account.sign_transaction(tx, private_key)
+        tx_hash = vibe.w3.eth.send_raw_transaction(signed.raw_transaction)
+        receipt = vibe.w3.eth.wait_for_transaction_receipt(tx_hash)
+        proposal_id = f"prop_{tx_hash.hex()[:16]}"
+        return {
+            "success": receipt.status == 1,
+            "tx_hash": tx_hash.hex(), "action": "submit_proposal",
+            "proposal_id": proposal_id, "title": title, "description": description,
+            "proposer": account.address, "message": f"提案已提交: {title}",
+            "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash.hex()}",
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+
 def get_blockchain_tools() -> list[Tool]:
     """返回所有区块链工具定义。"""
     return [
@@ -88,6 +196,32 @@ def get_blockchain_tools() -> list[Tool]:
             "获取链信息",
             _get_chain_info,
             parameters={},
+        ),
+        Tool(
+            "stake_vibe",
+            "质押 VIBE 代币（治理权益）",
+            _stake_vibe,
+            parameters={
+                "amount": {"type": "number", "description": "质押数量（VIBE）"},
+            },
+        ),
+        Tool(
+            "vote_proposal",
+            "对治理提案投票",
+            _vote_proposal,
+            parameters={
+                "proposal_id": {"type": "string", "description": "提案ID"},
+                "support": {"type": "boolean", "description": "是否支持", "default": True},
+            },
+        ),
+        Tool(
+            "submit_proposal",
+            "提交治理提案",
+            _submit_proposal,
+            parameters={
+                "title": {"type": "string", "description": "提案标题"},
+                "description": {"type": "string", "description": "提案描述"},
+            },
         ),
     ]
 

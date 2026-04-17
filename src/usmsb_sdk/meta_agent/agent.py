@@ -374,6 +374,9 @@ class MetaAgent:
         # ========== A2A HTTP Server ==========
         self._a2a_server_task: asyncio.Task | None = None
 
+        # ========== P2P 网络（外部 Agent 发现）==========
+        self._p2p_handler: Any = None
+
         # ========== StrategyRouter（LLM 双轨策略路由）==========
         self.strategy_router: Any = None
 
@@ -416,6 +419,9 @@ class MetaAgent:
 
         # ========== OpenHarness 初始化 + 工具注入 ==========
         await self._init_openharness()
+
+        # ========== P2P 网络初始化 ==========
+        await self._init_p2p_network()
 
         # ========== Platform + Gene Capsule 初始化 ==========
         await self._init_platform_client()
@@ -1075,6 +1081,26 @@ class MetaAgent:
             logger.info("Knowledge base warmed up with FAQ")
         except Exception as e:
             logger.warning(f"Failed to warmup knowledge base: {e}")
+
+    async def _init_p2p_network(self) -> None:
+        """Initialize P2P network for external Agent discovery."""
+        try:
+            from usmsb_sdk.protocol.p2p.handler import P2PHandler
+            from usmsb_sdk.protocol.base import ProtocolConfig
+            self._p2p_handler = P2PHandler(
+                config=ProtocolConfig(enabled=True),
+                node_id=self.agent_id,
+                node_name=f"MetaAgent-{self.agent_id[:8]}",
+                port=int(os.environ.get("USMSB_P2P_PORT", "9000")),
+            )
+            bootstrap = os.environ.get("USMSB_P2P_BOOTSTRAP", "")
+            if bootstrap:
+                await self._p2p_handler.connect(bootstrap)
+                logger.info("P2P connected to bootstrap: %s", bootstrap)
+            logger.info("P2P network initialized")
+        except Exception as e:
+            logger.warning("P2P init failed (non-critical): %s", e)
+            self._p2p_handler = None
 
     async def _init_strategy_router(self) -> None:
         """Initialize StrategyRouter for dual-track routing."""
