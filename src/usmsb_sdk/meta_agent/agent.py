@@ -366,6 +366,7 @@ class MetaAgent:
 
         # ========== OpenHarness 集成 ==========
         self.oh_integration: Any = None  # OpenHarnessIntegration
+        self._meta_agent_adapter: Any = None  # OH MetaAgentAdapter for spawning
 
         # ========== Platform 客户端 + Gene Capsule ==========
         self.platform_client: Any = None  # PlatformClient
@@ -440,6 +441,9 @@ class MetaAgent:
 
         # 启动目标引擎
         await self.goal_engine.start()
+
+        # ========== FastAPI REST Server ==========
+        await self._start_api_server()
 
         # 启动进化引擎
         self.evolution_engine = EvolutionEngine(
@@ -541,9 +545,11 @@ class MetaAgent:
         """Initialize OpenHarness integration and inject tools into registry."""
         try:
             from usmsb_sdk.adapters.openharness import OpenHarnessIntegration
+            from usmsb_sdk.adapters.openharness.meta_agent_adapter import MetaAgentAdapter
             self.oh_integration = OpenHarnessIntegration.from_env(cwd=self.config.data_dir or ".")
             await self.oh_integration.initialize()
-            logger.info("OpenHarness integration initialized")
+            self._meta_agent_adapter = MetaAgentAdapter(oh_integration=self.oh_integration)
+            logger.info("OpenHarness + MetaAgentAdapter initialized")
             
             # Inject OH tools into USMSB tool registry
             injected = self.oh_integration.inject_oh_tools_into_registry(
@@ -1210,8 +1216,44 @@ class MetaAgent:
                 if task.status.value == "pending":
                     logger.info("[TASK] Triggering pending task: %s", task_id)
                     asyncio.create_task(self.task_executor.execute_plan(task))
+
+            # OH MetaAgentAdapter: 当任务过载时自动孵化新 Agent
+            if self._meta_agent_adapter:
+                pending_count = len([t for t in active.values() if t.status.value == "pending"])
+                if pending_count >= 3:
+                    try:
+                        spawned = await self._meta_agent_adapter.spawn_agent(
+                            task_type="worker",
+                            capabilities=["task_execution", "tool_calling"],
+                        )
+                        if spawned:
+                            logger.info("[OH] Spawned worker agent to handle %d pending tasks", pending_count)
+                    except Exception as e:
+                        logger.warning("[OH] spawn_agent failed: %s", e)
         except Exception as e:
             logger.debug("_process_pending_tasks error: %s", e)
+
+    async def _start_api_server(self) -> None:
+        """启动 FastAPI REST Server（在独立端口上运行 MetaAgent API）。"""
+        try:
+            port = int(os.environ.get("USMSB_API_PORT", "8000"))
+            host = os.environ.get("USMSB_API_HOST", "0.0.0.0")
+            # 延迟导入避免循环依赖
+            from usmsb_sdk.api.rest.server import run as run_server
+            import asyncio
+            # 在后台线程中启动 uvicorn（不阻塞主循环）
+            def _run():
+                import asyncio as _asy
+                from uvicorn import Config, Server
+                cfg = Config("usmsb_sdk.api.rest.server:app", host=host, port=port, log_level="info")
+                srv = Server(cfg)
+                _asy.run(srv.serve(), debug=False)
+            import threading
+            t = threading.Thread(target=_run, daemon=True)
+            t.start()
+            logger.info("[SERVER] FastAPI server starting on %s:%d", host, port)
+        except Exception as e:
+            logger.warning("[SERVER] Failed to start API server: %s", e)
 
     async def _learn_and_evolve(self):
         """学习进化 - L4/L5 增强版"""
@@ -1792,8 +1834,42 @@ class MetaAgent:
             return "抱歉，处理您的请求时遇到了问题。请稍后重试。"
 
     async def _learn_and_evolve(self):
-        """学习进化"""
-        await self.learning.learn_from_experience()
+        """学习进化 - L4/L5/Evolution 全链路增强版"""
+        try:
+            # 基础学习
+            await self.learning.learn_from_experience()
+
+            # Evolution Engine 自我进化（每轮主循环调用一次）
+            if self.evolution_engine:
+                try:
+                    evo_result = await self.evolution_engine.evolve()
+                    if evo_result and evo_result.get("knowledge_added", 0) > 0:
+                        logger.info("[EVOLUTION] +%d knowledge, +%d patterns",
+                                    evo_result.get("knowledge_added", 0),
+                                    evo_result.get("patterns_identified", 0))
+                except Exception as e:
+                    logger.warning("[EVOLUTION] evolve() failed: %s", e)
+
+            # L4 自我反思（周期性）
+            if self.l4_agent:
+                try:
+                    reflection = await self.l4_agent.self_reflect()
+                    if reflection.insights:
+                        logger.info("[L4] Self-insights: %s", str(reflection.insights)[:100])
+                except Exception as e:
+                    logger.warning("[L4] self_reflect failed: %s", e)
+
+            # L5 集体学习（当有外部 Agent 连接时）
+            if self.l5_collective and getattr(self, "_external_agents_connected", False):
+                try:
+                    thought = await self.l5_collective.think_collectively(
+                        "如何提升平台整体性能和用户体验")
+                    if thought.synthesis:
+                        logger.info("[L5] Collective thought: %s", str(thought.synthesis)[:80])
+                except Exception as e:
+                    logger.warning("[L5] think_collectively failed: %s", e)
+        except Exception as e:
+            logger.warning("_learn_and_evolve failed: %s", e)
 
     # ==================== 兼容性方法：保留旧的后台任务逻辑 ====================
     # 这些方法暂时保留，用于向后兼容和过渡期

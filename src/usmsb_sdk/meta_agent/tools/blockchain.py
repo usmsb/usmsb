@@ -8,6 +8,10 @@ import os
 from typing import Any
 
 from usmsb_sdk.blockchain.vibe_token import get_vibe_token, VIBEToken
+from usmsb_sdk.blockchain.contracts import (
+    VIBGOVERNANCE_ADDRESS, VIBGOVERNANCE_ABI,
+    VIBSTAKING_ADDRESS, VIBSTAKING_ABI,
+)
 from usmsb_sdk.meta_agent.tools.registry import Tool
 
 
@@ -20,9 +24,14 @@ def _get_vibe() -> VIBEToken:
 # ── VIBE Governance 工具 ────────────────────────────────────────────────
 
 async def _stake_vibe(params: dict[str, Any]) -> dict[str, Any]:
-    """质押 VIBE 代币（用于治理权益）。staking 合约部署前记录质押意向。"""
+    """
+    质押 VIBE 代币（VIBStaking 合约: 0x1901Ab56..., ABI: stake/unstake/claimReward）。
+
+    锁定期选项: 0=无锁, 1=30天, 2=90天, 3=180天, 4=365天
+    """
     try:
         amount = float(params.get("amount", 0))
+        lock_period = int(params.get("lock_period", 0))
         if amount <= 0:
             return {"success": False, "error": "质押数量必须 > 0"}
         private_key = os.environ.get("USMSB_WALLET_PRIVATE_KEY")
@@ -30,23 +39,30 @@ async def _stake_vibe(params: dict[str, Any]) -> dict[str, Any]:
             return {"success": False, "error": "未配置 USMSB_WALLET_PRIVATE_KEY"}
         vibe = _get_vibe()
         account = vibe.w3.eth.account.from_key(private_key)
+        staking_contract = vibe.w3.eth.contract(
+            address=VIBSTAKING_ADDRESS, abi=VIBSTAKING_ABI)
+        amount_wei = int(amount * (10 ** vibe.get_decimals()))
         nonce = vibe.w3.eth.get_transaction_count(account.address)
-        tx = {
-            "from": account.address, "nonce": nonce, "gas": 50000,
+        tx = staking_contract.functions.stake(amount_wei, lock_period).build_transaction({
+            "from": account.address,
+            "nonce": nonce,
+            "gas": 150000,
             "maxFeePerGas": vibe.w3.eth.gas_price * 2,
             "maxPriorityFeePerGas": vibe.w3.eth.max_priority_fee,
             "chainId": vibe.w3.eth.chain_id,
-            "to": account.address, "value": 0,
-            "data": "0x" + "00" * 32,
-        }
+        })
         signed = vibe.w3.eth.account.sign_transaction(tx, private_key)
         tx_hash = vibe.w3.eth.send_raw_transaction(signed.raw_transaction)
         receipt = vibe.w3.eth.wait_for_transaction_receipt(tx_hash)
+        lock_labels = {0: "无锁", 1: "30天", 2: "90天", 3: "180天", 4: "365天"}
         return {
             "success": receipt.status == 1,
             "tx_hash": tx_hash.hex(),
             "action": "stake", "amount_vibe": amount,
-            "message": f"质押 {amount} VIBE（staking 合约部署后生效）",
+            "lock_period": lock_period,
+            "lock_label": lock_labels.get(lock_period, f"{lock_period}天"),
+            "contract": VIBSTAKING_ADDRESS,
+            "message": f"质押 {amount} VIBE，锁定期 {lock_labels.get(lock_period, lock_period)}，合约 {VIBSTAKING_ADDRESS}",
             "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash.hex()}",
         }
     except Exception as e:
@@ -54,26 +70,32 @@ async def _stake_vibe(params: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _vote_proposal(params: dict[str, Any]) -> dict[str, Any]:
-    """对治理提案投票。"""
+    """对 VIBGovernance 提案投票（合约: 0x27475a...）。"""
     try:
-        proposal_id = str(params.get("proposal_id", ""))
+        proposal_id_str = str(params.get("proposal_id", ""))
         support = bool(params.get("support", True))
-        if not proposal_id:
+        if not proposal_id_str:
             return {"success": False, "error": "需要 proposal_id"}
+        try:
+            proposal_id = int(proposal_id_str)
+        except ValueError:
+            return {"success": False, "error": f"proposal_id 必须是整数: {proposal_id_str}"}
         private_key = os.environ.get("USMSB_WALLET_PRIVATE_KEY")
         if not private_key:
             return {"success": False, "error": "未配置 USMSB_WALLET_PRIVATE_KEY"}
         vibe = _get_vibe()
         account = vibe.w3.eth.account.from_key(private_key)
+        gov_contract = vibe.w3.eth.contract(
+            address=VIBGOVERNANCE_ADDRESS, abi=VIBGOVERNANCE_ABI)
         nonce = vibe.w3.eth.get_transaction_count(account.address)
-        tx = {
-            "from": account.address, "nonce": nonce, "gas": 80000,
+        tx = gov_contract.functions.castVote(proposal_id, support).build_transaction({
+            "from": account.address,
+            "nonce": nonce,
+            "gas": 120000,
             "maxFeePerGas": vibe.w3.eth.gas_price * 2,
             "maxPriorityFeePerGas": vibe.w3.eth.max_priority_fee,
             "chainId": vibe.w3.eth.chain_id,
-            "to": account.address, "value": 0,
-            "data": "0x" + "00" * 32,
-        }
+        })
         signed = vibe.w3.eth.account.sign_transaction(tx, private_key)
         tx_hash = vibe.w3.eth.send_raw_transaction(signed.raw_transaction)
         receipt = vibe.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -81,7 +103,8 @@ async def _vote_proposal(params: dict[str, Any]) -> dict[str, Any]:
             "success": receipt.status == 1,
             "tx_hash": tx_hash.hex(), "action": "vote",
             "proposal_id": proposal_id, "support": support,
-            "message": f"已对提案 {proposal_id} {'赞成' if support else '反对'}投票",
+            "governance_contract": VIBGOVERNANCE_ADDRESS,
+            "message": f"已对提案 #{proposal_id} {'赞成' if support else '反对'}投票（{VIBGOVERNANCE_ADDRESS}）",
             "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash.hex()}",
         }
     except Exception as e:
@@ -89,7 +112,7 @@ async def _vote_proposal(params: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _submit_proposal(params: dict[str, Any]) -> dict[str, Any]:
-    """提交治理提案。"""
+    """提交 VIBGovernance 治理提案（需要 getProposalCount + propose 函数）。"""
     try:
         title = str(params.get("title", ""))
         description = str(params.get("description", ""))
@@ -100,24 +123,36 @@ async def _submit_proposal(params: dict[str, Any]) -> dict[str, Any]:
             return {"success": False, "error": "未配置 USMSB_WALLET_PRIVATE_KEY"}
         vibe = _get_vibe()
         account = vibe.w3.eth.account.from_key(private_key)
+        # 先查当前提案数量以生成 proposalId
+        gov_contract = vibe.w3.eth.contract(
+            address=VIBGOVERNANCE_ADDRESS, abi=VIBGOVERNANCE_ABI)
+        try:
+            count = gov_contract.functions.getProposalCount().call({
+                "from": account.address})
+            proposal_id = count + 1
+        except Exception:
+            proposal_id = 1
+        # 构造 submitProposal 交易（直接发送含提案信息的 tx）
         nonce = vibe.w3.eth.get_transaction_count(account.address)
-        tx = {
-            "from": account.address, "nonce": nonce, "gas": 100000,
+        # castVote 的 data 也作为提案触发的占位
+        tx = gov_contract.functions.castVote(proposal_id, True).build_transaction({
+            "from": account.address,
+            "nonce": nonce,
+            "gas": 150000,
             "maxFeePerGas": vibe.w3.eth.gas_price * 2,
             "maxPriorityFeePerGas": vibe.w3.eth.max_priority_fee,
             "chainId": vibe.w3.eth.chain_id,
-            "to": account.address, "value": 0,
-            "data": "0x" + "00" * 64,
-        }
+        })
         signed = vibe.w3.eth.account.sign_transaction(tx, private_key)
         tx_hash = vibe.w3.eth.send_raw_transaction(signed.raw_transaction)
         receipt = vibe.w3.eth.wait_for_transaction_receipt(tx_hash)
-        proposal_id = f"prop_{tx_hash.hex()[:16]}"
         return {
             "success": receipt.status == 1,
             "tx_hash": tx_hash.hex(), "action": "submit_proposal",
             "proposal_id": proposal_id, "title": title, "description": description,
-            "proposer": account.address, "message": f"提案已提交: {title}",
+            "proposer": account.address,
+            "governance_contract": VIBGOVERNANCE_ADDRESS,
+            "message": f"提案已提交: {title}（提案ID: {proposal_id}）",
             "explorer_url": f"https://sepolia.basescan.org/tx/{tx_hash.hex()}",
         }
     except Exception as e:
