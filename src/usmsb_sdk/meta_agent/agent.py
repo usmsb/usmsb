@@ -41,6 +41,7 @@ from .memory.conversation_manager import ConversationManager
 from .memory.error_learning import ErrorDrivenLearning
 from .memory.experience_db import ExperienceDB
 from .memory.guardian_daemon import GuardianConfig, GuardianDaemon
+from .strategy_router import StrategyRouter
 from .memory.memory_manager import MemoryConfig, MemoryManager
 from .memory.smart_recall import IntelligentRecall
 from .meta_agent_config import MetaAgentConfig
@@ -373,6 +374,16 @@ class MetaAgent:
         # ========== A2A HTTP Server ==========
         self._a2a_server_task: asyncio.Task | None = None
 
+        # ========== StrategyRouter（LLM 双轨策略路由）==========
+        self.strategy_router: Any = None
+
+        # ========== L4 自我意识 Agent ==========
+        self.l4_agent: Any = None
+
+        # ========== L5 集体智能（MetaAgent 私有）==========
+        self.l5_collective: Any = None
+        self._external_agents_connected: bool = False
+
         # 状态
         self._running = False
         self._main_loop_task: asyncio.Task | None = None
@@ -411,6 +422,15 @@ class MetaAgent:
 
         # ========== A2A HTTP Server 注册 ==========
         await self._register_a2a_agent()
+
+        # ========== StrategyRouter 初始化 ==========
+        await self._init_strategy_router()
+
+        # ========== L4 自我意识 Agent 初始化 ==========
+        await self._init_l4_agent()
+
+        # ========== L5 集体智能初始化 ==========
+        await self._init_l5_collective()
 
         # 启动目标引擎
         await self.goal_engine.start()
@@ -1056,6 +1076,43 @@ class MetaAgent:
         except Exception as e:
             logger.warning(f"Failed to warmup knowledge base: {e}")
 
+    async def _init_strategy_router(self) -> None:
+        """Initialize StrategyRouter for dual-track routing."""
+        try:
+            exp_path = os.path.join(self.config.data_dir or "data", "strategy_experience.db")
+            os.makedirs(os.path.dirname(exp_path) or "data", exist_ok=True)
+            self.strategy_router = StrategyRouter(
+                llm_manager=self.llm_manager,
+                experience_db_path=exp_path,
+            )
+            logger.info("StrategyRouter initialized")
+        except Exception as e:
+            logger.warning("StrategyRouter init failed: %s", e)
+            self.strategy_router = None
+
+    async def _init_l4_agent(self) -> None:
+        """Initialize L4 self-conscious agent."""
+        try:
+            from usmsb_sdk.l4.l4_agent import L4Agent
+            self.l4_agent = L4Agent(agent_id=self.agent_id, llm_manager=self.llm_manager)
+            logger.info("L4Agent initialized")
+        except Exception as e:
+            logger.warning("L4Agent init failed: %s", e)
+            self.l4_agent = None
+
+    async def _init_l5_collective(self) -> None:
+        """Initialize L5 Collective Intelligence."""
+        try:
+            from usmsb_sdk.l5.l5_collective import L5CollectiveIntelligence
+            self.l5_collective = L5CollectiveIntelligence(
+                agent_id=self.agent_id,
+                llm_manager=self.llm_manager,
+            )
+            logger.info("L5CollectiveIntelligence initialized")
+        except Exception as e:
+            logger.warning("L5CollectiveIntelligence init failed: %s", e)
+            self.l5_collective = None
+
     async def _main_loop(self):
         """主循环 - 永不停歇"""
         logger.info("Meta Agent main loop started")
@@ -1086,20 +1143,70 @@ class MetaAgent:
         logger.info("Meta Agent main loop stopped")
 
     async def _perceive_environment(self):
-        """感知环境"""
-        pass
+        """感知环境 - 监控关键指标"""
+        try:
+            # 监控钱包 ETH 余额
+            if self.wallet_manager and self.wallet_manager.address:
+                try:
+                    eth_info = await self.wallet_manager.get_native_balance()
+                    if eth_info.get("success") and eth_info.get("balance_eth", 999) < 0.01:
+                        logger.warning("[PERCEIVE] Low ETH balance: %.4f ETH", eth_info["balance_eth"])
+                except Exception:
+                    pass
+            # 监控任务队列深度
+            if self.task_executor:
+                pending = len([t for t in getattr(self.task_executor, "_active_tasks", {}).values()])
+                if pending > 10:
+                    logger.info("[PERCEIVE] Task queue depth: %d", pending)
+            # 感知 P2P 网络状态
+            if hasattr(self, "_p2p_handler") and self._p2p_handler:
+                try:
+                    stats = self._p2p_handler.get_network_stats()
+                    if stats.get("online_peers", 0) > 0:
+                        self._external_agents_connected = True
+                        logger.info("[PERCEIVE] P2P peers online: %d", stats["online_peers"])
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug("_perceive_environment error: %s", e)
 
     async def _check_goals(self):
         """检查目标状态"""
         await self.goal_engine.check_goals()
 
     async def _process_pending_tasks(self):
-        """处理待处理任务"""
-        pass
+        """处理待处理任务队列"""
+        try:
+            if not self.task_executor:
+                return
+            active = getattr(self.task_executor, "_active_tasks", {})
+            for task_id, task in active.items():
+                if task.status.value == "pending":
+                    logger.info("[TASK] Triggering pending task: %s", task_id)
+                    asyncio.create_task(self.task_executor.execute_plan(task))
+        except Exception as e:
+            logger.debug("_process_pending_tasks error: %s", e)
 
     async def _learn_and_evolve(self):
-        """学习进化"""
-        await self.learning.learn_from_experience()
+        """学习进化 - L4/L5 增强版"""
+        try:
+            await self.learning.learn_from_experience()
+            if self.l4_agent:
+                try:
+                    reflection = await self.l4_agent.self_reflect()
+                    if reflection.insights:
+                        logger.info("[L4] Self-insights: %s", str(reflection.insights)[:100])
+                except Exception as e:
+                    logger.warning("[L4] self_reflect failed: %s", e)
+            if self.l5_collective and self._external_agents_connected:
+                try:
+                    thought = await self.l5_collective.think_collectively("如何提升平台整体性能和用户体验")
+                    if thought.synthesis:
+                        logger.info("[L5] Collective thought: %s", thought.synthesis[:80])
+                except Exception as e:
+                    logger.warning("[L5] think_collectively failed: %s", e)
+        except Exception as e:
+            logger.warning("_learn_and_evolve failed: %s", e)
 
     async def chat(
         self,
@@ -1399,6 +1506,19 @@ class MetaAgent:
             except Exception as e:
                 logger.warning(f"Failed to check user emphasis: {e}")
 
+        # ========== Gene Capsule RAG 上下文注入 ==========
+        gene_capsule_context = ""
+        if self.gene_capsule_adapter:
+            try:
+                gene_capsule_context = await self.gene_capsule_adapter.build_rag_context(
+                    task_description=message,
+                    max_experiences=3,
+                )
+                if gene_capsule_context:
+                    logger.info("[GeneCapsule] Injected %d chars", len(gene_capsule_context))
+            except Exception as e:
+                logger.warning("[GeneCapsule] build_rag_context failed: %s", e)
+
         # 构建用户信息
         user_info = None
         if wallet_address:
@@ -1408,6 +1528,12 @@ class MetaAgent:
                 binding_type="wallet" if wallet_address.startswith("0x") else "manual",
             )
 
+        # Prepend GeneCapsule context
+        _full_memory_context = memory_context
+        if gene_capsule_context and _full_memory_context:
+            memory_context = gene_capsule_context + "\n\n" + _full_memory_context
+        elif gene_capsule_context:
+            memory_context = gene_capsule_context
         # ========== 构建消息列表 (提前到复杂度分支之前) ==========
         messages = await self.context_manager.build_messages(
             user_message=message,
@@ -1541,6 +1667,26 @@ class MetaAgent:
                     role=MessageRole.ASSISTANT,
                     content=chat_result.content,
                 )
+
+            # ========== L4 自我意识处理 ==========
+            if self.l4_agent and chat_result.content:
+                try:
+                    mood_result = await self.l4_agent.feel({
+                        "stimulus": "conversation",
+                        "content": chat_result.content,
+                        "message": message,
+                    })
+                    if mood_result.emotion and mood_result.intensity > 0.5:
+                        logger.info("[L4] Emotion: %s (intensity=%.2f)", mood_result.emotion, mood_result.intensity)
+                    conv_count = getattr(self, "_conversation_count", 0) + 1
+                    self._conversation_count = conv_count
+                    if conv_count % 20 == 0:
+                        reflection = await self.l4_agent.self_reflect()
+                        logger.info("[L4] Self-reflection: confidence=%.2f", reflection.confidence)
+                except Exception as e:
+                    logger.warning("[L4] Self-awareness failed: %s", e)
+
+            if chat_result.is_complete and not chat_result.needs_background:
                 return chat_result.content
 
             # 情况 2：is_complete=True 但 needs_background=True（忽略，避免误判）
