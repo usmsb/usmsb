@@ -1656,142 +1656,140 @@ class MetaAgent:
         logger.info(f"[CHAT][TOOLS] 最终使用: tools={len(tools_schema)}, skills={len(skills_schema)}")
 
         # =====================================================================
+        # StrategyRouter 路由 (PLAN/COLLAB 场景启用双轨并行)
+        # =====================================================================
+        if self.strategy_router and complexity in (TaskComplexity.MEDIUM, TaskComplexity.HIGH):
+            try:
+                scenario_tag = await self.strategy_router._classify_scenario(message)
+                logger.info("[STRATEGY] scenario=%s layer=%s preference=%s",
+                            scenario_tag.scenario, scenario_tag.suggested_layer, scenario_tag.strategy_preference)
+                if scenario_tag.strategy_preference in ("internal", "both", "sdk"):
+                    async def internal_fn():
+                        return await self._chat_with_llm(messages, tools=tools_schema,
+                            skills=skills_schema, conversation_id=str(conversation.id), user_session=user_session)
+                    async def sdk_fn():
+                        try:
+                            if scenario_tag.suggested_layer in ("L2", "L3"):
+                                from usmsb_sdk.adapters.l3_adapter import L3Adapter
+                                adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
+                                return await adapter.generate_goal({"task": message, "layer": scenario_tag.suggested_layer})
+                            elif scenario_tag.suggested_layer == "L4" and self.l4_agent:
+                                return await self.l4_agent.metacognize(message)
+                        except Exception as e:
+                            logger.warning("[STRATEGY] SDK path failed: %s", e)
+                        return None
+                    if scenario_tag.scenario in ("PLAN", "COLLAB") or scenario_tag.strategy_preference == "both":
+                        logger.info("[STRATEGY] Dual-track routing for %s", scenario_tag.scenario)
+                        strategy_result = await self.strategy_router.route(
+                            message, scenario_tag.suggested_layer, internal_fn, sdk_fn)
+                        if strategy_result.result is not None:
+                            from .models.chat import ChatResult
+                            chat_result = ChatResult(
+                                content=str(strategy_result.result),
+                                executed_tools=[], tool_results=[],
+                                iterations_used=0, is_complete=True,
+                                needs_background=False, needs_tool_retry=False)
+                            logger.info("[STRATEGY] Winner=%s quality=%.2f",
+                                        strategy_result.strategy_name, strategy_result.quality_score)
+            except Exception as e:
+                logger.warning("[STRATEGY] Router failed: %s", e)
+
+        # =====================================================================
         # 核心 LLM 调用逻辑 (MEDIUM/HIGH 复杂度)
         # =====================================================================
+        if chat_result is None:
+            try:
+                logger.info(f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value})")
 
-        try:
-            logger.info(f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value})")
-
-            # 调用 LLM 获取完整结果
-            chat_result = await self._chat_with_llm(
-                messages,
-                tools=tools_schema,
-                skills=skills_schema,
-                conversation_id=str(conversation.id),
-                user_session=user_session,
-            )
-
-            logger.info(f"[CHAT][RESULT] ChatResult: is_complete={chat_result.is_complete}, needs_background={chat_result.needs_background}, needs_tool_retry={chat_result.needs_tool_retry}, needs_continuation={chat_result.needs_continuation}")
-
-            # =====================================================================
-            # 根据 ChatResult 状态决定后续处理
-            #
-            # 处理原则：
-            # 1. is_complete=True + needs_background=False → 正常完成，返回内容
-            # 2. is_complete=True + needs_background=True  → 忽略background，正常返回（避免误判）
-            # 3. is_complete=False + needs_tool_retry=True → 工具参数错误，触发重试
-            # 4. is_complete=False + needs_continuation=True + 有实质工具结果 → 继续处理
-            # 5. is_complete=False + 其他情况 → 返回内容或错误信息
-            # =====================================================================
-
-            # 情况 1：正常完成，直接返回
-            if chat_result.is_complete and not chat_result.needs_background:
-                logger.info("[CHAT][RESULT] 情况1: 正常完成，直接返回")
-
-                await self.conversation_manager.add_message(
-                    conversation_id=conversation.id,
-                    role=MessageRole.ASSISTANT,
-                    content=chat_result.content,
+                # 调用 LLM 获取完整结果
+                chat_result = await self._chat_with_llm(
+                    messages,
+                    tools=tools_schema,
+                    skills=skills_schema,
+                    conversation_id=str(conversation.id),
+                    user_session=user_session,
                 )
 
-            # ========== L4 自我意识处理 ==========
-            if self.l4_agent and chat_result.content:
-                try:
-                    mood_result = await self.l4_agent.feel({
-                        "stimulus": "conversation",
-                        "content": chat_result.content,
-                        "message": message,
-                    })
-                    if mood_result.emotion and mood_result.intensity > 0.5:
-                        logger.info("[L4] Emotion: %s (intensity=%.2f)", mood_result.emotion, mood_result.intensity)
-                    conv_count = getattr(self, "_conversation_count", 0) + 1
-                    self._conversation_count = conv_count
-                    if conv_count % 20 == 0:
-                        reflection = await self.l4_agent.self_reflect()
-                        logger.info("[L4] Self-reflection: confidence=%.2f", reflection.confidence)
-                except Exception as e:
-                    logger.warning("[L4] Self-awareness failed: %s", e)
+            except Exception as e:
+                logger.error("[CHAT] LLM call failed: %s", e)
+                chat_result = None
 
-            if chat_result.is_complete and not chat_result.needs_background:
-                return chat_result.content
+        logger.info(f"[CHAT][RESULT] is_complete=%s needs_tool_retry=%s",
+                    chat_result.is_complete if chat_result else False,
+                    chat_result.needs_tool_retry if chat_result else False)
 
-            # 情况 2：is_complete=True 但 needs_background=True（忽略，避免误判）
-            if chat_result.is_complete and chat_result.needs_background:
-                logger.warning("[CHAT][RESULT] 情况2: is_complete=True但needs_background=True，忽略background，正常返回")
+        # =====================================================================
+        # 根据 ChatResult 状态决定后续处理
+        #
+        # 处理原则：
+        # 1. is_complete=True + needs_background=False → 正常完成，返回内容
+        # 2. is_complete=True + needs_background=True  → 忽略background，正常返回（避免误判）
+        # 3. is_complete=False + needs_tool_retry=True → 工具参数错误，触发重试
+        # 4. is_complete=False + needs_continuation=True + 有实质工具结果 → 继续处理
+        # 5. is_complete=False + 其他情况 → 返回内容或错误信息
+        # =====================================================================
 
-                await self.conversation_manager.add_message(
-                    conversation_id=conversation.id,
-                    role=MessageRole.ASSISTANT,
-                    content=chat_result.content,
-                )
-                return chat_result.content
+        # 情况 1：正常完成，直接返回
+        if chat_result and chat_result.is_complete and not chat_result.needs_background:
+            logger.info("[CHAT][RESULT] 情况1: 正常完成，直接返回")
+            await self.conversation_manager.add_message(
+                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
 
-            # 情况 3：需要工具重试（参数错误）
-            if chat_result.needs_tool_retry:
-                logger.info("[CHAT][RESULT] 情况3: 需要工具重试 (参数错误)")
+        # ========== L4 自我意识处理 ==========
+        if self.l4_agent and chat_result and chat_result.content:
+            try:
+                mood_result = await self.l4_agent.feel({
+                    "stimulus": "conversation", "content": chat_result.content, "message": message})
+                if mood_result.emotion and mood_result.intensity > 0.5:
+                    logger.info("[L4] Emotion: %s (intensity=%.2f)", mood_result.emotion, mood_result.intensity)
+                conv_count = getattr(self, "_conversation_count", 0) + 1
+                self._conversation_count = conv_count
+                if conv_count % 20 == 0:
+                    reflection = await self.l4_agent.self_reflect()
+                    logger.info("[L4] Self-reflection: confidence=%.2f", reflection.confidence)
+            except Exception as e:
+                logger.warning("[L4] Self-awareness failed: %s", e)
 
-                # 启动后台任务处理器
+        if chat_result and chat_result.is_complete and not chat_result.needs_background:
+            return chat_result.content
+
+        # 情况 2：is_complete=True 但 needs_background=True
+        if chat_result and chat_result.is_complete and chat_result.needs_background:
+            logger.warning("[CHAT][RESULT] 情况2: needs_background=True，忽略，正常返回")
+            await self.conversation_manager.add_message(
+                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
+            return chat_result.content
+
+        # 情况 3：需要工具重试
+        if chat_result and chat_result.needs_tool_retry:
+            logger.info("[CHAT][RESULT] 情况3: 需要工具重试")
+            processor = BackgroundTaskProcessor(self)
+            asyncio.create_task(processor.process(
+                conversation_id=str(conversation.id), owner_id=owner_id, chat_result=chat_result,
+                messages=messages, user_session=user_session, wallet_address=wallet_address))
+            return self.chat_config.task_submitted_message
+
+        # 情况 4：需要继续处理
+        if chat_result and chat_result.needs_continuation:
+            logger.info("[CHAT][RESULT] 情况4: 需要继续处理")
+            if chat_result.tool_results:
                 processor = BackgroundTaskProcessor(self)
-                asyncio.create_task(
-                    processor.process(
-                        conversation_id=str(conversation.id),
-                        owner_id=owner_id,
-                        chat_result=chat_result,
-                        messages=messages,
-                        user_session=user_session,
-                        wallet_address=wallet_address,
-                    )
-                )
+                asyncio.create_task(processor.process(
+                    conversation_id=str(conversation.id), owner_id=owner_id, chat_result=chat_result,
+                    messages=messages, user_session=user_session, wallet_address=wallet_address))
                 return self.chat_config.task_submitted_message
-
-            # 情况 4：需要继续处理
-            if chat_result.needs_continuation:
-                logger.info(f"[CHAT][RESULT] 情况4: 需要继续处理, tool_results={len(chat_result.tool_results)}")
-
-                # 如果有实质性工具结果，启动后台处理
-                if chat_result.tool_results:
-                    processor = BackgroundTaskProcessor(self)
-                    asyncio.create_task(
-                        processor.process(
-                            conversation_id=str(conversation.id),
-                            owner_id=owner_id,
-                            chat_result=chat_result,
-                            messages=messages,
-                            user_session=user_session,
-                            wallet_address=wallet_address,
-                        )
-                    )
-                    return self.chat_config.task_submitted_message
-                else:
-                    # 没有工具结果，说明LLM没有执行任何工具
-                    # 直接返回内容（即使是空的），不返回错误
-                    logger.warning("[CHAT][RESULT] 没有工具结果，不启动后台处理")
-                    if chat_result.content:
-                        await self.conversation_manager.add_message(
-                            conversation_id=conversation.id,
-                            role=MessageRole.ASSISTANT,
-                            content=chat_result.content,
-                        )
-                        return chat_result.content
-                    else:
-                        return "抱歉，我无法处理这个请求。请稍后重试或换一个方式描述。"
-
-            # 情况 5：其他异常情况
-            logger.warning(f"[CHAT][RESULT] 情况5: 异常情况 - is_complete={chat_result.is_complete}, needs_background={chat_result.needs_background}")
-
-            if chat_result.content:
+            elif chat_result.content:
                 await self.conversation_manager.add_message(
-                    conversation_id=conversation.id,
-                    role=MessageRole.ASSISTANT,
-                    content=chat_result.content,
-                )
+                    conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
                 return chat_result.content
-            else:
-                return "抱歉，处理您的请求时遇到了问题。请稍后重试。"
 
-        except Exception as e:
-            logger.error(f"[CHAT] LLM call failed: {e}")
-            return self.chat_config.llm_unavailable_message
+        # 情况 5：其他异常情况
+        if chat_result and chat_result.content:
+            await self.conversation_manager.add_message(
+                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
+            return chat_result.content
+        else:
+            return "抱歉，处理您的请求时遇到了问题。请稍后重试。"
 
     async def _learn_and_evolve(self):
         """学习进化"""
