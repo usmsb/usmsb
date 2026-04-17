@@ -1119,7 +1119,7 @@ class MetaAgent:
     async def _init_l4_agent(self) -> None:
         """Initialize L4 self-conscious agent."""
         try:
-            from usmsb_sdk.l4.l4_agent import L4Agent
+            from usmsb_sdk.l4.l4_agent import L4SelfConsciousAgent as L4Agent
             self.l4_agent = L4Agent(agent_id=self.agent_id, llm_manager=self.llm_manager)
             logger.info("L4Agent initialized")
         except Exception as e:
