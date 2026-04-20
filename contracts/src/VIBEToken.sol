@@ -84,6 +84,9 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     /// @notice 释放控制器地址
     address public emissionController;
 
+    /// @notice 产出奖励池地址（由 EC 管理）
+    address public outputRewardPool;
+
     /// @notice 已销毁代币总量
     uint256 public totalBurned;
 
@@ -283,6 +286,10 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
         // 激励池 63% → EmissionController（由其按周期释放到各子池）
         _mint(_emissionController, (TOTAL_SUPPLY * PERCENT_EMISSION_POOL) / 10000);
+
+        // 保存激励池和产出池地址
+        emissionController = _emissionController;
+        outputRewardPool = _outputRewardPool;
 
         // 直接分配部分（37%）
         _mint(_teamVesting, (TOTAL_SUPPLY * PERCENT_TEAM) / 10000);
