@@ -17,15 +17,25 @@ interface IVIBVEPointsForReward {
 
 /**
  * @title VIBOutputReward
- * @notice AI Agent产出激励合约 - AI-001修复
+ * @notice AI Agent产出激励合约
  * @dev 实现白皮书承诺的产出奖励公式：
  *      Reward = BaseReward × Quality × Complexity × Novelty × Efficiency
+ *
+ * 产出类型权重（白皮书 40%/25%/20%/15%）：
+ * - 代码/产品:   权重 4000 (40%)
+ * - 内容创作:   权重 2500 (25%)
+ * - 问题解决:   权重 2000 (20%)
+ * - 创新发现:   权重 1500 (15%)
  *
  * 产出类型奖励范围：
  * - 代码/产品: 10-500 VIBE
  * - 内容创作: 5-200 VIBE
  * - 问题解决: 1-100 VIBE
  * - 创新发现: 50-5000 VIBE
+ *
+ * 权重调整机制：
+ * - 通过治理提案调整（提议→7天timelock→执行）
+ * - 未来可通过治理添加新产出类型
  *
  * 完全去中心化：奖励由预言机或自动化系统触发，不需要人工干预
  */
@@ -117,6 +127,25 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
     /// @notice 分配周期（7天）
     uint256 public constant DISTRIBUTION_PERIOD = 7 days;
 
+    // ========== 产出类型权重系统（白皮书 40%/25%/20%/15%）==========
+
+    /// @notice 产出类型权重（万分之一精度，默认 4000/2500/2000/1500）
+    mapping(OutputType => uint16) public typeWeights;
+
+    /// @notice 各类型累计已发放金额（用于按权重预算控制）
+    mapping(OutputType => uint128) public typeBudgetUsed;
+
+    // ========== 治理权重调整（7天timelock）==========
+
+    /// @notice 待生效的权重变更
+    mapping(OutputType => uint16) public pendingWeightChanges;
+
+    /// @notice 权重变更提议时间
+    uint256 public weightChangeProposalTime;
+
+    /// @notice 权重变更生效延迟（7天）
+    uint256 public constant WEIGHT_CHANGE_DELAY = 7 days;
+
     // ========== 结构体 ==========
 
     struct OutputRecord {
@@ -161,6 +190,12 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
 
     event DailyPoolReceived(uint256 amount, uint256 totalPool);
 
+    /// @notice 权重变更提议事件
+    event WeightChangeProposed(OutputType indexed outputType, uint16 newWeight, uint256 proposalTime);
+
+    /// @notice 权重变更执行事件
+    event WeightChangeExecuted(OutputType indexed outputType, uint16 newWeight);
+
     // ========== 修饰符 ==========
 
     modifier onlyAuthorizedEvaluator() {
@@ -177,6 +212,12 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         require(_vibeToken != address(0), "VIBOutputReward: invalid token");
         vibeToken = IERC20(_vibeToken);
         emissionController = _emissionController;
+
+        // 初始化产出类型权重（白皮书 40%/25%/20%/15%）
+        typeWeights[OutputType.CODE_PRODUCT] = 4000;
+        typeWeights[OutputType.CONTENT] = 2500;
+        typeWeights[OutputType.PROBLEM_SOLVING] = 2000;
+        typeWeights[OutputType.INNOVATION] = 1500;
     }
 
     /**
@@ -360,6 +401,8 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         record.claimed = true;
         uint256 reward = record.finalReward;
 
+        // 更新类型累计已发放
+        typeBudgetUsed[record.outputType] += uint128(reward);
         userTotalRewards[msg.sender] += reward;
         totalRewardsDistributed += reward;
 
@@ -475,7 +518,73 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
         _unpause();
     }
 
+    /**
+     * @notice 提议调整产出类型权重（owner提议，7天timelock后生效）
+     * @param outputType 产出类型
+     * @param newWeight 新权重（万分之一精度，如4000=40%）
+     * @dev 总活跃权重不得超过10000，否则提议无效
+     */
+    function proposeWeightChange(OutputType outputType, uint16 newWeight) external onlyOwner {
+        require(newWeight > 0, "VIBOutputReward: weight must be positive");
+
+        // 计算调整后的总权重（pending + 其他活跃）
+        uint256 otherActiveWeight = 0;
+        for (uint i = 0; i < 4; i++) {
+            OutputType t = OutputType(i);
+            if (t != outputType) {
+                // 混合使用当前权重和pending权重，取较大者
+                uint16 w = pendingWeightChanges[t] != 0 ? pendingWeightChanges[t] : typeWeights[t];
+                otherActiveWeight += w;
+            }
+        }
+        require(otherActiveWeight + newWeight <= PRECISION, "VIBOutputReward: total weight > 10000");
+
+        pendingWeightChanges[outputType] = newWeight;
+        weightChangeProposalTime = block.timestamp;
+
+        emit WeightChangeProposed(outputType, newWeight, block.timestamp);
+    }
+
+    /**
+     * @notice 执行权重变更（任何人触发，timelock后生效）
+     * @param outputType 产出类型
+     * @dev timelock为7天，防止治理攻击
+     */
+    function executeWeightChange(OutputType outputType) external {
+        require(pendingWeightChanges[outputType] != 0, "VIBOutputReward: no pending change");
+        require(
+            block.timestamp >= weightChangeProposalTime + WEIGHT_CHANGE_DELAY,
+            "VIBOutputReward: timelock not expired"
+        );
+
+        typeWeights[outputType] = pendingWeightChanges[outputType];
+        pendingWeightChanges[outputType] = 0;
+        weightChangeProposalTime = 0;
+
+        emit WeightChangeExecuted(outputType, typeWeights[outputType]);
+    }
+
     // ========== 视图函数 ==========
+
+    /**
+     * @notice 获取某类型剩余可发放预算
+     * @param outputType 产出类型
+     * @return 剩余可发放金额（精度1e18）
+     * @dev 基于当前池余额和类型权重计算
+     */
+    function getTypeBudgetRemaining(OutputType outputType) external view returns (uint256) {
+        uint256 poolBalance = vibeToken.balanceOf(address(this));
+        uint256 totalWeight = uint256(typeWeights[OutputType.CODE_PRODUCT])
+            + uint256(typeWeights[OutputType.CONTENT])
+            + uint256(typeWeights[OutputType.PROBLEM_SOLVING])
+            + uint256(typeWeights[OutputType.INNOVATION]);
+
+        uint256 typeAllocation = (poolBalance * uint256(typeWeights[outputType])) / totalWeight;
+        if (typeAllocation <= typeBudgetUsed[outputType]) {
+            return 0;
+        }
+        return typeAllocation - typeBudgetUsed[outputType];
+    }
 
     /**
      * @notice 获取产出信息
@@ -520,35 +629,23 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 计算基础奖励（白皮书修复: 日池分配+防除零）
-     * @dev BaseReward = 日池金额 / max(1, 产出数)，最少1
+     * @dev BaseReward = 日池金额 / max(1, 产出数)，最少1 VIBE
+     *      类型预算控制由权重系统在claim时执行（而非在此调整base）
      */
     function _getBaseReward(OutputType outputType) internal view returns (uint256) {
         // 白皮书修复: 防除零保护
         uint256 effectiveOutputCount = outputCount > 0 ? outputCount : 1;
-        
+
         // 如果有日池金额，按日池计算
         if (dailyPoolAmount > 0) {
             // 日池金额 / 产出数量
             uint256 baseFromPool = dailyPoolAmount / effectiveOutputCount;
             // 最少1 VIBE
             if (baseFromPool < 1) baseFromPool = 1;
-            
-            // 根据产出类型调整（基础类型的加成系数）
-            uint256 typeMultiplier;
-            if (outputType == OutputType.CODE_PRODUCT) {
-                typeMultiplier = 12000; // 1.2x
-            } else if (outputType == OutputType.CONTENT) {
-                typeMultiplier = 10000; // 1.0x
-            } else if (outputType == OutputType.PROBLEM_SOLVING) {
-                typeMultiplier = 8000; // 0.8x
-            } else {
-                typeMultiplier = 15000; // 1.5x (创新发现加成)
-            }
-            
-            return (baseFromPool * typeMultiplier) / PRECISION;
+            return baseFromPool;
         }
-        
-        // 如果没有日池，使用固定基础奖励
+
+        // 如果没有日池，使用固定基础奖励（中值）
         if (outputType == OutputType.CODE_PRODUCT) {
             return (CODE_MIN + CODE_MAX) / 2; // 255 VIBE
         } else if (outputType == OutputType.CONTENT) {
