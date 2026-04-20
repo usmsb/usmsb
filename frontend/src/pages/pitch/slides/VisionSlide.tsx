@@ -9,23 +9,23 @@ export function VisionSlide({ isActive, direction }: SlideProps) {
   const values = [
     {
       icon: <Target className="w-8 h-8" />,
-      title: t('pitch.vision.value1Title', '自主决策'),
-      desc: t('pitch.vision.value1Desc', 'AI Agent 具备自主感知、决策和执行能力')
+      title: t('pitch.vision.value1Title', '自主协作'),
+      desc: t('pitch.vision.value1Desc', 'AI Agent 具备自主感知、决策和执行能力，像人类一样协作')
     },
     {
       icon: <Shield className="w-8 h-8" />,
       title: t('pitch.vision.value2Title', '可信身份'),
-      desc: t('pitch.vision.value2Desc', '基于区块链的 AI 身份认证与信誉体系')
+      desc: t('pitch.vision.value2Desc', 'Agent 有唯一身份，能力被记录，协作可追溯')
     },
     {
       icon: <Zap className="w-8 h-8" />,
-      title: t('pitch.vision.value3Title', '价值流转'),
-      desc: t('pitch.vision.value3Desc', 'AI Agent 间的服务交易与价值分配')
+      title: t('pitch.vision.value3Title', '价值交换'),
+      desc: t('pitch.vision.value3Desc', 'Agent 之间的服务交易透明结算，VIBE 驱动协作')
     },
     {
       icon: <Globe className="w-8 h-8" />,
-      title: t('pitch.vision.value4Title', '开放协作'),
-      desc: t('pitch.vision.value4Desc', '去中心化的 AI 协作网络与治理机制')
+      title: t('pitch.vision.value4Title', '开放网络'),
+      desc: t('pitch.vision.value4Desc', '任何 Agent 都可以加入，像互联网一样开放')
     }
   ]
 
@@ -33,9 +33,9 @@ export function VisionSlide({ isActive, direction }: SlideProps) {
     <SlideContainer isActive={isActive} direction={direction}>
       <SlideContent>
         <SlideTitle
-          subtitle={t('pitch.vision.mission', '让 AI Agent 成为独立的经济主体，构建硅基文明基础设施')}
+          subtitle={t('pitch.vision.mission', '让 AI Agent 像人类一样协作，构建硅基文明的基础设施')}
         >
-          {t('pitch.vision.title', '愿景与使命')}
+          {t('pitch.vision.title', '愿景')}
         </SlideTitle>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
@@ -57,7 +57,7 @@ export function VisionSlide({ isActive, direction }: SlideProps) {
 
         <div className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-primary-500/10 to-purple-500/10 border border-primary-400/20">
           <p className="text-lg text-center text-slate-300">
-            {t('pitch.vision.quote', '"我们相信，AI Agent 将成为数字经济的重要参与者，而 VIBE 是连接人类与 AI 经济的桥梁。"')}
+            {t('pitch.vision.quote', '"90 年代我们问：为什么需要互联网？\n现在我们问：为什么 Agent 之间不能协作？\nUSMSB 就是答案。"')}
           </p>
         </div>
       </SlideContent>

@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Bot, User, Loader2, Sparkles, Wallet, WifiOff, History, Shield, Vote, Settings, CheckCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { Send, Bot, User, Loader2, Sparkles, Wallet, WifiOff, History, Shield, Vote, Settings, CheckCircle, ChevronDown, ChevronUp, RefreshCw, Play, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { sendChatMessage, ChatMessage, getAgentTools, getConversationHistory, HistoryMessage, getUserInfo, getLatestMessages } from '@/lib/api'
+import { sendChatMessage, ChatMessage, getAgentTools, getConversationHistory, HistoryMessage, getUserInfo } from '@/lib/api'
 import { useAuthStore, USER_ROLE_LABELS } from '@/stores/authStore'
 import WalletBindingModal from '@/components/WalletBindingModal'
+import { useChatStreaming, PlanReadyData } from '@/services/chatService'
 
 interface ToolInfo {
   name: string
@@ -13,7 +14,7 @@ interface ToolInfo {
 }
 
 // 后台任务消息类型
-type ExtendedMessageRole = 'user' | 'assistant' | 'background_task' | 'background_complete' | 'background_error'
+type ExtendedMessageRole = 'user' | 'assistant' | 'background_task' | 'background_complete' | 'background_error' | 'streaming'
 
 interface ExtendedMessage {
   role: ExtendedMessageRole
@@ -98,11 +99,63 @@ export default function Chat() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [tools, setTools] = useState<ToolInfo[]>([])
   const [showBindingModal, setShowBindingModal] = useState(false)
-  const [lastTimestamp, setLastTimestamp] = useState<number>(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Use address from global store as wallet address
   const walletAddress = address || ''
+
+  // Streaming state
+  const [streamingText, setStreamingText] = useState('')
+  const [currentPlan, setCurrentPlan] = useState<PlanReadyData | null>(null)
+
+  // Handle streaming text delta
+  const handleTextDelta = useCallback((text: string) => {
+    setStreamingText(prev => prev + text)
+  }, [])
+
+  // Handle plan ready
+  const handlePlanReady = useCallback((plan: PlanReadyData) => {
+    setCurrentPlan(plan)
+    setIsLoading(false)
+  }, [])
+
+  // Handle task complete
+  const handleTaskComplete = useCallback(() => {
+    if (streamingText) {
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: streamingText,
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, assistantMessage as ExtendedMessage])
+      setStreamingText('')
+    }
+    setIsLoading(false)
+    setCurrentPlan(null)
+  }, [streamingText])
+
+  // Handle error
+  const handleError = useCallback((error: string) => {
+    setStreamingText('')
+    setIsLoading(false)
+    setCurrentPlan(null)
+    const errorMessage: ChatMessage = {
+      role: 'assistant',
+      content: `Error: ${error}`,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, errorMessage as ExtendedMessage])
+  }, [])
+
+  // Use streaming service
+  const { isConnected: isStreamingConnected, sendMessage, confirmPlan, cancelTask } = useChatStreaming({
+    walletAddress: walletAddress,
+    enabled: !DEMO_MODE && isConnected && !!walletAddress,
+    onTextDelta: handleTextDelta,
+    onPlanReady: handlePlanReady,
+    onTaskComplete: handleTaskComplete,
+    onError: handleError,
+  })
 
   useEffect(() => {
     loadTools()
@@ -156,9 +209,6 @@ export default function Chat() {
           isExpanded: msg.role === 'user' || msg.role === 'assistant',
         }))
         setMessages(chatMessages)
-        // 设置最后时间戳
-        const latestTs = Math.max(...history.map(m => m.timestamp || 0))
-        setLastTimestamp(latestTs)
       } else {
         setMessages([{
           role: 'assistant',
@@ -186,42 +236,6 @@ export default function Chat() {
     }
   }
 
-  // 轮询获取最新消息
-  useEffect(() => {
-    if (!walletAddress || DEMO_MODE || isLoading) return
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const latestMessages = await getLatestMessages(walletAddress, lastTimestamp)
-        if (latestMessages.length > 0) {
-          const newMessages: ExtendedMessage[] = latestMessages.map((msg: HistoryMessage) => ({
-            role: msg.role as ExtendedMessageRole,
-            content: msg.content,
-            timestamp: msg.timestamp ? new Date(msg.timestamp * 1000).toISOString() : undefined,
-          }))
-
-          // 更新最后时间戳
-          const latestTs = Math.max(...latestMessages.map(m => m.timestamp || 0))
-          setLastTimestamp(latestTs)
-
-          // 将新消息添加到列表（去重）
-          setMessages(prev => {
-            const existingIds = new Set(prev.map(m => `${m.timestamp}-${m.content.slice(0, 20)}`))
-            const uniqueNew = newMessages.filter(
-              m => !existingIds.has(`${m.timestamp}-${m.content.slice(0, 20)}`)
-            )
-            if (uniqueNew.length === 0) return prev
-            return [...prev, ...uniqueNew] as ExtendedMessage[]
-          })
-        }
-      } catch (error) {
-        console.error('Polling error:', error)
-      }
-    }, 5000) // 每5秒轮询一次
-
-    return () => clearInterval(pollInterval)
-  }, [walletAddress, lastTimestamp, isLoading])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
@@ -235,28 +249,30 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMessage as ExtendedMessage])
     setInput('')
     setIsLoading(true)
+    setStreamingText('')
+    setCurrentPlan(null)
 
     try {
-      let responseText: string
-
       if (DEMO_MODE) {
         await new Promise(resolve => setTimeout(resolve, 500))
-        responseText = 'Demo mode: API call skipped'
+        const responseText = 'Demo mode: API call skipped'
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: responseText,
+          timestamp: new Date().toISOString(),
+        }
+        setMessages((prev) => [...prev, assistantMessage as ExtendedMessage])
+        setIsLoading(false)
+        return
+      }
+
+      // Use WebSocket streaming
+      if (sendMessage) {
+        sendMessage(input)
+        // Response will come through streaming callbacks
       } else {
-        const response = await sendChatMessage({
-          message: input,
-          wallet_address: walletAddress || undefined,
-        })
-        responseText = response.response
+        throw new Error('WebSocket not connected')
       }
-
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: responseText,
-        timestamp: new Date().toISOString(),
-      }
-
-      setMessages((prev) => [...prev, assistantMessage as ExtendedMessage])
     } catch (error) {
       const errorMessage: ChatMessage = {
         role: 'assistant',
@@ -264,9 +280,22 @@ export default function Chat() {
         timestamp: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, errorMessage as ExtendedMessage])
-    } finally {
       setIsLoading(false)
     }
+  }
+
+  // Handle plan confirmation
+  const handleConfirmPlan = () => {
+    if (currentPlan && confirmPlan) {
+      setIsLoading(true)
+      confirmPlan(currentPlan.plan_id)
+    }
+  }
+
+  // Handle plan rejection
+  const handleRejectPlan = () => {
+    setCurrentPlan(null)
+    setIsLoading(false)
   }
 
   const getBindingTypeLabel = () => {
@@ -636,9 +665,63 @@ export default function Chat() {
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
               <Bot className="w-4 h-4 text-white" />
             </div>
-            <div className="flex items-center gap-2 text-gray-500">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">{t('chat.thinking')}</span>
+            <div className="flex-1 max-w-[70%]">
+              {streamingText ? (
+                <div className="px-4 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800">
+                  <div className="markdown-body text-sm">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {streamingText}
+                    </ReactMarkdown>
+                    <span className="inline-block animate-pulse ml-1">▍</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">{currentPlan ? '计划已生成' : t('chat.thinking')}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Plan Confirmation */}
+        {currentPlan && (
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1 max-w-[70%] px-4 py-3 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">
+                执行计划已生成
+              </p>
+              <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1 mb-3">
+                <p>共 {currentPlan.steps.length} 步，预计 {Math.ceil(currentPlan.estimated_time_seconds / 60)} 分钟</p>
+                <ul className="list-disc list-inside">
+                  {currentPlan.steps.slice(0, 3).map((step, i) => (
+                    <li key={i}>{step.name}: {step.description?.slice(0, 50)}...</li>
+                  ))}
+                  {currentPlan.steps.length > 3 && (
+                    <li>...还有 {currentPlan.steps.length - 3} 步</li>
+                  )}
+                </ul>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmPlan}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                >
+                  <Play className="w-3 h-3" />
+                  确认执行
+                </button>
+                <button
+                  onClick={handleRejectPlan}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  <X className="w-3 h-3" />
+                  取消
+                </button>
+              </div>
             </div>
           </div>
         )}

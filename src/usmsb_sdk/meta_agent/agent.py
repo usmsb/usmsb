@@ -495,9 +495,6 @@ class MetaAgent:
         # ========== P2P 网络初始化 ==========
         await self._init_p2p_network()
 
-        # ========== Skill Platform 初始化 ==========
-        await self._init_skill_platform()
-
         # ========== Platform + Gene Capsule 初始化 ==========
         await self._init_platform_client()
 
@@ -508,13 +505,16 @@ class MetaAgent:
         await self._init_strategy_router()
 
         # ========== L4 自我意识 Agent 初始化 ==========
-        await self._init_l4_agent()
+        try:
+            await self._init_l4_agent()
+        except Exception as e:
+            logger.warning(f"L4Agent init failed (non-critical): {e}")
 
         # ========== L5 集体智能初始化 ==========
-        await self._init_l5_collective()
-
-        # ========== SuperAdmin 初始化 ==========
-        await self._init_superadmin()
+        try:
+            await self._init_l5_collective()
+        except Exception as e:
+            logger.warning(f"L5CollectiveIntelligence init failed (non-critical): {e}")
 
         # 启动目标引擎
         await self.goal_engine.start()
@@ -801,31 +801,28 @@ class MetaAgent:
 
     def _register_l1_rules(self):
         """注册 L1 规则（MetaAgent 专用快速匹配规则）"""
-        from ..l1.rule_engine import Rule, Condition, ConditionType, ActionType
+        from ..l1.rule_engine import Rule, Condition, Action, ConditionType, ActionType
 
         rules = [
             # 简单查询类 - 直接响应
             Rule(
                 name="ping_check",
-                conditions=[Condition(ConditionType.KEYWORD, pattern="ping")],
-                action_type=ActionType.RESPOND,
-                action_payload={"response": "pong"},
+                condition=Condition(ConditionType.KEYWORD, pattern="ping"),
+                action=Action(ActionType.RESPOND, response="pong"),
                 priority=10,
             ),
             # 状态查询
             Rule(
                 name="status_query",
-                conditions=[Condition(ConditionType.KEYWORD, pattern="状态")],
-                action_type=ActionType.RESPOND,
-                action_payload={"response": "MetaAgent 运行正常"},
+                condition=Condition(ConditionType.KEYWORD, pattern="状态"),
+                action=Action(ActionType.RESPOND, response="MetaAgent 运行正常"),
                 priority=10,
             ),
             # 帮助
             Rule(
                 name="help_request",
-                conditions=[Condition(ConditionType.KEYWORD, pattern="help|帮助|命令")],
-                action_type=ActionType.RESPOND,
-                action_payload={"response": "我是 MetaAgent，有什么可以帮你的？"},
+                condition=Condition(ConditionType.KEYWORD, pattern="help|帮助|命令"),
+                action=Action(ActionType.RESPOND, response="我是 MetaAgent，有什么可以帮你的？"),
                 priority=10,
             ),
         ]
@@ -1302,33 +1299,33 @@ class MetaAgent:
         except Exception as e:
             logger.warning("[WALLET] Economic evaluation failed: %s", e)
 
-        async def _check_goals(self):
-            """主动追求目标 - 检查 + 生成 + 追踪"""
-            if not self.goal_engine:
-                return
-            try:
-                # 内在动机检测：是否需要生成新目标
-                state = {
-                    "agent_id": self.agent_id,
-                    "conversations_count": getattr(self, "_conversation_count", 0),
-                    "external_agents": getattr(self, "_external_agents_connected", False),
-                    "l4_insights": getattr(self, "_l4_recommendations", []),
-                    "l5_synthesis": getattr(self, "_l5_synthesis", ""),
-                }
-                from usmsb_sdk.adapters.l3_adapter import L3Adapter
-                adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
-                signal = await adapter.detect_intrinsic_motivation(state)
-                if signal.intensity > 0.65:
-                    logger.info("[GOAL] Intrinsic motivation detected: intensity=%.2f, type=%s",
-                                signal.intensity, getattr(signal, 'motivation_type', 'unknown'))
-                    new_goal = await adapter.generate_goal(state)
-                    if new_goal:
-                        await self.goal_engine.add_goal(new_goal)
-                        logger.info("[GOAL] New goal generated: %s", getattr(new_goal, 'description', str(new_goal)[:50]))
-                # 检查现有目标状态
-                await self.goal_engine.check_goals()
-            except Exception as e:
-                logger.warning("[GOAL] Goal pursuit failed: %s", e)
+    async def _check_goals(self):
+        """主动追求目标 - 检查 + 生成 + 追踪"""
+        if not self.goal_engine:
+            return
+        try:
+            # 内在动机检测：是否需要生成新目标
+            state = {
+                "agent_id": self.agent_id,
+                "conversations_count": getattr(self, "_conversation_count", 0),
+                "external_agents": getattr(self, "_external_agents_connected", False),
+                "l4_insights": getattr(self, "_l4_recommendations", []),
+                "l5_synthesis": getattr(self, "_l5_synthesis", ""),
+            }
+            from usmsb_sdk.adapters.l3_adapter import L3Adapter
+            adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
+            signal = await adapter.detect_intrinsic_motivation(state)
+            if signal.intensity > 0.65:
+                logger.info("[GOAL] Intrinsic motivation detected: intensity=%.2f, type=%s",
+                            signal.intensity, getattr(signal, 'motivation_type', 'unknown'))
+                new_goal = await adapter.generate_goal(state)
+                if new_goal:
+                    await self.goal_engine.add_goal(new_goal)
+                    logger.info("[GOAL] New goal generated: %s", getattr(new_goal, 'description', str(new_goal)[:50]))
+            # 检查现有目标状态
+            await self.goal_engine.check_goals()
+        except Exception as e:
+            logger.warning("[GOAL] Goal pursuit failed: %s", e)
 
     async def _process_pending_tasks(self):
         """处理待处理任务队列"""
@@ -1363,13 +1360,13 @@ class MetaAgent:
             port = int(os.environ.get("USMSB_API_PORT", "8000"))
             host = os.environ.get("USMSB_API_HOST", "0.0.0.0")
             # 延迟导入避免循环依赖
-            from usmsb_sdk.api.rest.server import run as run_server
+            from usmsb_sdk.api.rest.main import run_server
             import asyncio
             # 在后台线程中启动 uvicorn（不阻塞主循环）
             def _run():
                 import asyncio as _asy
                 from uvicorn import Config, Server
-                cfg = Config("usmsb_sdk.api.rest.server:app", host=host, port=port, log_level="info")
+                cfg = Config("usmsb_sdk.api.rest.main:app", host=host, port=port, log_level="info")
                 srv = Server(cfg)
                 _asy.run(srv.serve(), debug=False)
             import threading

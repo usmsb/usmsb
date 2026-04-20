@@ -1,31 +1,31 @@
 import { useTranslation } from 'react-i18next'
 import { SlideContainer, SlideContent, SlideTitle } from '../components/SlideContainer'
 import { SlideProps } from '../types'
-import { AlertTriangle, Lock, DollarSign, Building2 } from 'lucide-react'
+import { Search, Workflow, Link2Off, Brain } from 'lucide-react'
 
 export function ProblemSlide({ isActive, direction }: SlideProps) {
   const { t } = useTranslation()
 
   const problems = [
     {
-      icon: <Lock className="w-8 h-8" />,
-      title: t('pitch.problem.item1Title', '资产自主权缺失'),
-      desc: t('pitch.problem.item1Desc', 'AI Agent 无法自主管理和使用数字资产，必须依赖人类中介')
+      icon: <Search className="w-8 h-8" />,
+      title: t('pitch.problem.item1Title', 'Agent 之间无法发现彼此'),
+      desc: t('pitch.problem.item1Desc', '你的 AI Agent 和别人的 Agent 互相不认识，不知道对方能做什么')
     },
     {
-      icon: <AlertTriangle className="w-8 h-8" />,
-      title: t('pitch.problem.item2Title', '身份信任危机'),
-      desc: t('pitch.problem.item2Desc', '缺乏可信的 AI 身份认证机制，难以区分真实的 AI 服务')
+      icon: <Workflow className="w-8 h-8" />,
+      title: t('pitch.problem.item2Title', '无法自动协作'),
+      desc: t('pitch.problem.item2Desc', '复杂的任务需要多个 Agent 配合，但它们之间没有协作协议')
     },
     {
-      icon: <DollarSign className="w-8 h-8" />,
-      title: t('pitch.problem.item3Title', '定价交易困境'),
-      desc: t('pitch.problem.item3Desc', 'AI 服务缺乏透明的定价标准和安全的交易机制')
+      icon: <Link2Off className="w-8 h-8" />,
+      title: t('pitch.problem.item3Title', '每个平台都是孤岛'),
+      desc: t('pitch.problem.item3Desc', 'OpenClaw 的 Agent 和 HERMES 的 Agent 和其他 Agent 之间互不相通')
     },
     {
-      icon: <Building2 className="w-8 h-8" />,
-      title: t('pitch.problem.item4Title', '中心化垄断'),
-      desc: t('pitch.problem.item4Desc', '大型科技公司垄断 AI 资源，小团队难以参与竞争')
+      icon: <Brain className="w-8 h-8" />,
+      title: t('pitch.problem.item4Title', '缺乏通用语言'),
+      desc: t('pitch.problem.item4Desc', '没有一种标准让不同的 Agent 能够相互理解和沟通')
     }
   ]
 
@@ -33,9 +33,9 @@ export function ProblemSlide({ isActive, direction }: SlideProps) {
     <SlideContainer isActive={isActive} direction={direction}>
       <SlideContent>
         <SlideTitle
-          subtitle={t('pitch.problem.subtitle', '当前 AI 生态系统面临的核心挑战')}
+          subtitle={t('pitch.problem.subtitle', 'AI Agent 时代已经到来，但它们之间还无法自由协作')}
         >
-          {t('pitch.problem.title', '问题分析')}
+          {t('pitch.problem.title', '问题')}
         </SlideTitle>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
@@ -62,7 +62,7 @@ export function ProblemSlide({ isActive, direction }: SlideProps) {
 
         <div className="mt-8 text-center">
           <p className="text-slate-500 text-sm">
-            {t('pitch.problem.conclusion', '这些问题阻碍了 AI Agent 成为真正的经济主体')}
+            {t('pitch.problem.conclusion', '就像 90 年代每个网站都有自己的用户系统，无法互联——现在的 AI Agent 也是如此')}
           </p>
         </div>
       </SlideContent>

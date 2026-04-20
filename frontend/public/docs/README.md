@@ -35,7 +35,18 @@
 | 文档 | 描述 |
 |------|------|
 | [概念介绍](./concepts.md) | USMSB模型概念 |
-| [区块链白皮书](./blockchain-whitepaper.md) | 代币经济与治理 |
+| [区块链白皮书（英）](./blockchain-whitepaper.md) | 代币经济与治理（English） |
+| [区块链白皮书（中）](./blockchain-whitepaper.zh.md) | 代币经济与治理（中文） |
+
+---
+
+## Documentation Index / 文档索引
+
+| | Document | Language | Description |
+|------|----------|----------|
+| [whitepaper.md](./whitepaper.md) | EN | USMSB SDK Whitepaper (Technical Theory) |
+| [blockchain-whitepaper.md](./blockchain-whitepaper.md) | EN | VIBE Token Economics Whitepaper |
+| [blockchain-whitepaper.zh.md](./blockchain-whitepaper.zh.md) | 中文 | VIBE 代币经济学白皮书 |
 
 ---
 

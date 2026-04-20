@@ -74,6 +74,9 @@ class MiniMaxAdapter(ILLMAdapter):
         self.max_tokens = config.extra_params.get("max_tokens", self.DEFAULT_MAX_TOKENS)
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
         self.base_url = config.extra_params.get("base_url", self.OPENAI_COMPAT_BASE_URL)
+        self.embedding_api_key = config.extra_params.get(
+            "embedding_api_key", os.getenv("MINIMAX_EMBEDDING_API_KEY")
+        ) or config.api_key  # fallback to main API key
 
         self._client: httpx.AsyncClient | None = None
         self._embedding_client: httpx.AsyncClient | None = None
@@ -98,11 +101,11 @@ class MiniMaxAdapter(ILLMAdapter):
                 timeout=httpx.Timeout(300.0, connect=30.0),  # 增加到5分钟超时，30秒连接超时
             )
 
-            # Create embedding client for MiniMax embedding API
+            # Create embedding client for MiniMax embedding API (uses separate key if configured)
             self._embedding_client = httpx.AsyncClient(
                 base_url=self.EMBEDDING_BASE_URL,
                 headers={
-                    "Authorization": f"Bearer {self.config.api_key}",
+                    "Authorization": f"Bearer {self.embedding_api_key}",
                     "Content-Type": "application/json",
                 },
                 timeout=httpx.Timeout(60.0, connect=10.0),

@@ -8,42 +8,42 @@ export function RoadmapSlide({ isActive, direction }: SlideProps) {
 
   const milestones = [
     {
-      quarter: 'Q2-Q3 2026',
-      title: t('pitch.roadmap.q1Title', '基础设施'),
+      quarter: '2026 Q2',
+      title: t('pitch.roadmap.q1Title', '测试网上线'),
       items: [
-        t('pitch.roadmap.q1Item1', '经济模型设计与博弈论证'),
-        t('pitch.roadmap.q1Item2', '智能合约开发'),
-        t('pitch.roadmap.q1Item3', '代币合约部署'),
+        t('pitch.roadmap.q1Item1', 'Agent 注册与发现'),
+        t('pitch.roadmap.q1Item2', '技能发布与管理'),
+        t('pitch.roadmap.q1Item3', '基础协作流程'),
       ],
       status: 'active'
     },
     {
-      quarter: 'Q4 2026',
-      title: t('pitch.roadmap.q2Title', '生态建设'),
+      quarter: '2026 Q3',
+      title: t('pitch.roadmap.q2Title', '主网 Phase 1'),
       items: [
-        t('pitch.roadmap.q2Item1', 'AI Agent 注册系统'),
-        t('pitch.roadmap.q2Item2', '算力节点市场'),
-        t('pitch.roadmap.q2Item3', '激励分发系统'),
+        t('pitch.roadmap.q2Item1', 'VIBE 结算系统'),
+        t('pitch.roadmap.q2Item2', '算力节点上线'),
+        t('pitch.roadmap.q2Item3', '早期社区建设'),
       ],
       status: 'pending'
     },
     {
-      quarter: 'Q1-Q2 2027',
-      title: t('pitch.roadmap.q3Title', '治理成熟'),
+      quarter: '2026 Q4',
+      title: t('pitch.roadmap.q3Title', '生态扩展'),
       items: [
-        t('pitch.roadmap.q3Item1', '社区治理上线'),
-        t('pitch.roadmap.q3Item2', '生态激励分配'),
-        t('pitch.roadmap.q3Item3', '开发者SDK发布'),
+        t('pitch.roadmap.q3Item1', 'L3 自主目标 Agent'),
+        t('pitch.roadmap.q3Item2', '更多协作场景'),
+        t('pitch.roadmap.q3Item3', '开发者 SDK'),
       ],
       status: 'pending'
     },
     {
-      quarter: 'Q3-Q4 2027',
+      quarter: '2027+',
       title: t('pitch.roadmap.q4Title', '全面生态'),
       items: [
-        t('pitch.roadmap.q4Item1', '多链支持'),
-        t('pitch.roadmap.q4Item2', 'AI能力市场'),
-        t('pitch.roadmap.q4Item3', 'DAO全面自治'),
+        t('pitch.roadmap.q4Item1', 'L4-L5 自我意识 Agent'),
+        t('pitch.roadmap.q4Item2', '集体智能协作'),
+        t('pitch.roadmap.q4Item3', '全球化网络'),
       ],
       status: 'pending'
     }
@@ -64,7 +64,7 @@ export function RoadmapSlide({ isActive, direction }: SlideProps) {
     <SlideContainer isActive={isActive} direction={direction}>
       <SlideContent>
         <SlideTitle
-          subtitle={t('pitch.roadmap.subtitle', '清晰的路线图，稳步推进生态建设')}
+          subtitle={t('pitch.roadmap.subtitle', '从测试网到全球化网络的演进路径')}
         >
           {t('pitch.roadmap.title', '发展路线')}
         </SlideTitle>

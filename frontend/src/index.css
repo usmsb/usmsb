@@ -1135,3 +1135,32 @@ body {
   height: 0;
   border: 6px solid transparent;
 }
+
+/* ========================================
+   Mobile Scroll Support
+   ======================================== */
+html {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Allow scrolling on all containers */
+* {
+  box-sizing: border-box;
+}
+
+/* Remove max-width constraint on mobile */
+@media screen and (max-width: 640px) {
+  html, body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
