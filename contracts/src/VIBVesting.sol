@@ -31,6 +31,19 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     /// @notice 最大批量大小限制
     uint256 public constant MAX_BATCH_SIZE = 100;
 
+    // ========== 白皮书分配目标（用于财务完整性验证） ==========
+    // 与 VIBEToken.PERCENT_TEAM / PERCENT_EARLY_SUPPORTER 保持一致
+    // VIBEToken.sol 版本: v1.3 (2026-04-22)
+
+    /// @notice 团队分配目标: 8% = 80,000,000 VIBE
+    uint256 public constant TARGET_TEAM_ALLOCATION = 80_000_000 * 10**18;
+
+    /// @notice 早期支持者分配目标: 4% = 40,000,000 VIBE
+    uint256 public constant TARGET_EARLY_SUPPORTER_ALLOCATION = 40_000_000 * 10**18;
+
+    /// @notice vestingStart 最长允许偏移量（30天）
+    uint256 public constant VESTING_START_MAX_FUTURE_SECONDS = 30 days;
+
     /// @notice 待提取地址
     address public pendingWithdrawRecipient;
 
@@ -165,6 +178,22 @@ contract VIBVesting is Ownable, ReentrancyGuard {
         require(amount > 0, "VIBVesting: amount must be positive");
         require(!isBeneficiary[beneficiary], "VIBVesting: beneficiary already exists");
 
+        // vestingStart 不能过远，防止误操作导致受益人长期无法提取
+        require(
+            vestingStart <= block.timestamp + VESTING_START_MAX_FUTURE_SECONDS,
+            "VIBVesting: vestingStart too far in future"
+        );
+
+        // 财务完整性验证：每次注册后，该类型累加总量不能超过白皮书目标
+        uint256 target = beneficiaryType == BeneficiaryType.TEAM
+            ? TARGET_TEAM_ALLOCATION
+            : TARGET_EARLY_SUPPORTER_ALLOCATION;
+        uint256 typeTotal = _getTotalAllocatedByType(beneficiaryType);
+        require(
+            typeTotal + amount <= target,
+            "VIBVesting: exceeds allocation target for this beneficiary type"
+        );
+
         // CEI 模式：先更新状态，再执行外部调用
         // 存储受益人信息
         beneficiaries[beneficiary] = BeneficiaryInfo({
@@ -218,11 +247,27 @@ contract VIBVesting is Ownable, ReentrancyGuard {
         require(amount > 0, "VIBVesting: amount must be positive");
         require(!isBeneficiary[beneficiary], "VIBVesting: beneficiary already exists");
 
+        // vestingStart 不能过远，防止误操作导致受益人长期无法提取
+        require(
+            vestingStart <= block.timestamp + VESTING_START_MAX_FUTURE_SECONDS,
+            "VIBVesting: vestingStart too far in future"
+        );
+
         // 检查合约余额是否足够
         uint256 totalAllocated = _getTotalAllocated();
         require(
             totalAllocated + amount <= vibeToken.balanceOf(address(this)),
             "VIBVesting: insufficient contract balance"
+        );
+
+        // 财务完整性验证：每次注册后，累加总量不能超过白皮书目标
+        uint256 target = beneficiaryType == BeneficiaryType.TEAM
+            ? TARGET_TEAM_ALLOCATION
+            : TARGET_EARLY_SUPPORTER_ALLOCATION;
+        uint256 typeTotal = _getTotalAllocatedByType(beneficiaryType);
+        require(
+            typeTotal + amount <= target,
+            "VIBVesting: exceeds allocation target for this beneficiary type"
         );
 
         beneficiaries[beneficiary] = BeneficiaryInfo({
@@ -309,6 +354,22 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice 内部函数：获取指定类型的已分配总额
+     * @param beneficiaryType 受益人类型
+     */
+    function _getTotalAllocatedByType(BeneficiaryType beneficiaryType) internal view returns (uint256) {
+        uint256 total = 0;
+        uint256 bType = uint256(beneficiaryType);
+        for (uint256 i = 0; i < beneficiaryList.length; i++) {
+            BeneficiaryInfo memory info = beneficiaries[beneficiaryList[i]];
+            if (info.isActive && info.vestingType == bType) {
+                total += info.totalAmount;
+            }
+        }
+        return total;
+    }
+
+    /**
      * @notice 内部函数：批量注册受益人（不转移代币）
      */
     function _registerBeneficiaries(
@@ -326,11 +387,27 @@ contract VIBVesting is Ownable, ReentrancyGuard {
         require(beneficiaries_.length > 0, "VIBVesting: empty arrays");
         require(beneficiaries_.length <= MAX_BATCH_SIZE, "VIBVesting: exceeds max batch size");
 
-        // 计算总金额
+        // vestingStart 不能过远，防止误操作导致受益人长期无法提取
+        require(
+            vestingStart <= block.timestamp + VESTING_START_MAX_FUTURE_SECONDS,
+            "VIBVesting: vestingStart too far in future"
+        );
+
+        // 计算本次批次总金额
         uint256 totalAmount = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             totalAmount += amounts[i];
         }
+
+        // 财务完整性验证：注册后该类型总量不能超过白皮书目标
+        uint256 target = beneficiaryType == BeneficiaryType.TEAM
+            ? TARGET_TEAM_ALLOCATION
+            : TARGET_EARLY_SUPPORTER_ALLOCATION;
+        uint256 typeTotal = _getTotalAllocatedByType(beneficiaryType);
+        require(
+            typeTotal + totalAmount <= target,
+            "VIBVesting: exceeds allocation target for this beneficiary type"
+        );
 
         // 检查合约余额是否足够
         uint256 currentAllocated = _getTotalAllocated();
@@ -376,7 +453,7 @@ contract VIBVesting is Ownable, ReentrancyGuard {
     /**
      * @notice 释放代币
      */
-    function release() external nonReentrant onlyBeneficiary {
+    function release() external nonReentrant onlyBeneficiary isActiveBeneficiary(msg.sender) {
         BeneficiaryInfo storage info = beneficiaries[msg.sender];
 
         uint256 releasable = _releasableAmount(msg.sender);
