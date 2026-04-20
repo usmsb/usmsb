@@ -180,22 +180,49 @@ contract VIBOutputReward is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @notice 接收日池资金（白皮书修复: 日池分配机制）
+    /**接收日池资金（白皮书修复: 日池分配机制）
      * @dev 由EmissionController定期调用
      */
     function receiveDailyPool(uint256 amount) external {
         require(msg.sender == emissionController || msg.sender == owner(), "VIBOutputReward: not authorized");
         require(amount > 0, "VIBOutputReward: amount must be greater than 0");
-        
+
         // 从发送者接收代币
         vibeToken.safeTransferFrom(msg.sender, address(this), amount);
-        
+
         // 更新日池金额
         dailyPoolAmount += amount;
         lastDistributionTime = block.timestamp;
-        
+
         emit DailyPoolReceived(amount, dailyPoolAmount);
     }
+
+    /**
+     * @notice 接收直接转账（与safeTransfer配合使用）
+     * @dev 用于接收EmissionController的safeTransfer转账
+     *      需要手动调用syncBalance()同步余额
+     */
+    function syncBalance() external {
+        uint256 actualBalance = vibeToken.balanceOf(address(this));
+        if (actualBalance > dailyPoolAmount) {
+            dailyPoolAmount = actualBalance;
+            lastDistributionTime = block.timestamp;
+        }
+    }
+
+    /**
+     * @notice 接收直接转账（自动同步余额）
+     * @dev 用于接收EmissionController的safeTransfer，自动同步余额
+     */
+    receive() external payable {
+        // 被动接收ETH（用于Gas奖励等）
+    }
+
+    /**
+     * @notice 存款接口（用于接收safeTransfer的代币）
+     * @dev 外部调用者（如EOA）可以存款，但EmissionController转账后需要手动触发
+     *      推荐流程：EmissionController转账 → 任何人调用syncBalance() → 日池更新
+     */
 
     // ========== 外部函数 ==========
 

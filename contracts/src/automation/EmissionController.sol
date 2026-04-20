@@ -8,11 +8,19 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
+ * @title IVIBOutputReward
+ * @notice VIBOutputReward 接口
+ */
+interface IVIBOutputReward {
+    function receiveDailyPool(uint256 amount) external;
+}
+
+/**
  * @title EmissionController
  * @notice 激励池释放控制器
  * @dev 功能：
  *      - 5年线性释放 6.3亿 VIBE
- *      - 自动分配到各奖励池（质押45%/生态30%/治理15%/储备10%）
+ *      - 自动分配到各奖励池（质押40%/生态25%/治理12%/储备10%/产出13%）
  *      - 混合触发机制（7天周期 + 紧急补充）
  *      - 触发者获得 Gas 补贴 + 时间累积奖励
  */
@@ -30,11 +38,12 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
     /// @notice 周期时长 (7天)
     uint256 public constant EPOCH_DURATION = 7 days;
 
-    /// @notice 分配比例
-    uint256 public constant STAKING_RATIO = 4500;    // 45%
-    uint256 public constant ECOSYSTEM_RATIO = 3000;  // 30%
-    uint256 public constant GOVERNANCE_RATIO = 1500; // 15%
-    uint256 public constant RESERVE_RATIO = 1000;    // 10%
+    /// @notice 分配比例（白皮书修正: 2026-03）
+    uint256 public constant STAKING_RATIO = 4000;     // 40%
+    uint256 public constant ECOSYSTEM_RATIO = 2500;   // 25%
+    uint256 public constant GOVERNANCE_RATIO = 1200;   // 12%
+    uint256 public constant RESERVE_RATIO = 1000;      // 10%
+    uint256 public constant OUTPUT_RATIO = 1300;       // 13%
 
     /// @notice 触发奖励参数
     uint256 public constant BASE_REWARD = 0.0005 ether;
@@ -61,6 +70,7 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
     address public ecosystemPool;
     address public governancePool;
     address public reservePool;
+    address public outputRewardPool;
 
     /// @notice 释放开始时间
     uint256 public startTime;
@@ -98,6 +108,7 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         uint256 ecosystemAmount;
         uint256 governanceAmount;
         uint256 reserveAmount;
+        uint256 outputAmount;
     }
 
     // ========== 事件 ==========
@@ -123,7 +134,8 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         address _stakingPool,
         address _ecosystemPool,
         address _governancePool,
-        address _reservePool
+        address _reservePool,
+        address _outputRewardPool
     ) Ownable(msg.sender) {
         require(_vibeToken != address(0), "Invalid token");
 
@@ -132,6 +144,7 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         ecosystemPool = _ecosystemPool;
         governancePool = _governancePool;
         reservePool = _reservePool;
+        outputRewardPool = _outputRewardPool;
 
         startTime = block.timestamp;
         lastEpochTime = block.timestamp;
@@ -185,7 +198,7 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         totalReleased += amount;
         lastTriggerTime = block.timestamp;
 
-        // 记录释放
+        // 记录释放（紧急情况只给质押池）
         releaseRecords.push(ReleaseRecord({
             amount: amount,
             timestamp: block.timestamp,
@@ -194,7 +207,8 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
             stakingAmount: amount,
             ecosystemAmount: 0,
             governanceAmount: 0,
-            reserveAmount: 0
+            reserveAmount: 0,
+            outputAmount: 0
         }));
 
         // 支付触发者奖励（如果有 ETH）
@@ -288,6 +302,12 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         require(_pool != address(0), "EmissionController: invalid reserve pool");
         reservePool = _pool;
         emit PoolUpdated("reserve", _pool);
+    }
+
+    function setOutputRewardPool(address _pool) external onlyOwner {
+        require(_pool != address(0), "EmissionController: invalid output pool");
+        outputRewardPool = _pool;
+        emit PoolUpdated("output", _pool);
     }
 
     function setMinPoolBalance(uint256 _balance) external onlyOwner {
@@ -404,9 +424,10 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         uint256 ecosystemAmount = (amount * ECOSYSTEM_RATIO) / PRECISION;
         uint256 governanceAmount = (amount * GOVERNANCE_RATIO) / PRECISION;
         uint256 reserveAmount = (amount * RESERVE_RATIO) / PRECISION;
+        uint256 outputAmount = (amount * OUTPUT_RATIO) / PRECISION;
 
         // 计算预期分配总量
-        uint256 expectedTotal = stakingAmount + ecosystemAmount + governanceAmount + reserveAmount;
+        uint256 expectedTotal = stakingAmount + ecosystemAmount + governanceAmount + reserveAmount + outputAmount;
 
         // 计算并跟踪整数除法截断造成的余数
         uint256 actualDistributed = expectedTotal;
@@ -427,6 +448,10 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
         if (reservePool != address(0) && reserveAmount > 0) {
             vibeToken.safeTransfer(reservePool, reserveAmount);
         }
+        if (outputRewardPool != address(0) && outputAmount > 0) {
+            // 直接转账到outputRewardPool
+            vibeToken.safeTransfer(outputRewardPool, outputAmount);
+        }
 
         // 更新状态
         totalReleased += actualDistributed;
@@ -440,7 +465,8 @@ contract EmissionController is Ownable, ReentrancyGuard, Pausable {
             stakingAmount: stakingAmount,
             ecosystemAmount: ecosystemAmount,
             governanceAmount: governanceAmount,
-            reserveAmount: reserveAmount
+            reserveAmount: reserveAmount,
+            outputAmount: outputAmount
         }));
 
         // 支付触发者奖励（如果有 ETH）
