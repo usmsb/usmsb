@@ -207,12 +207,10 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
      * @return VIBE数量
      */
     function usdToVibe(uint256 usdAmount) public view returns (uint256) {
-        if (priceOracle == address(0) || usdAmount == 0) {
-            return usdAmount; // Fallback: 1:1
-        }
-        // 获取VIBE价格（假设预言机返回USD价格，乘以10^18）
+        require(priceOracle != address(0), "VIBNodeReward: priceOracle not set");
+        require(usdAmount > 0, "VIBNodeReward: zero amount");
         uint256 vibePrice = IPriceOracle(priceOracle).getVibePrice();
-        // USD金额 / VIBE价格 = VIBE数量
+        require(vibePrice > 0, "VIBNodeReward: invalid vibe price");
         return (usdAmount * 10**18) / vibePrice;
     }
 
@@ -283,6 +281,7 @@ contract VIBNodeReward is Ownable, ReentrancyGuard, Pausable {
         uint256 reliabilityFactor,
         bytes32 serviceHash
     ) external onlyAuthorizedAssessor whenNotPaused returns (bytes32 serviceId) {
+        require(priceOracle != address(0), "VIBNodeReward: priceOracle not set");
         require(nodes[node].owner != address(0), "VIBNodeReward: node not registered");
         require(nodes[node].isActive, "VIBNodeReward: node not active");
         require(duration > 0, "VIBNodeReward: invalid duration");
