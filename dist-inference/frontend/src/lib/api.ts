@@ -62,3 +62,8 @@ export const fetchNodeHistory = (params?: { page?: number; page_size?: number })
   apiClient.get('/node/history', { params }).then(r => r.data)
 export const updateNodeSettings = (settings: Record<string, unknown>) =>
   apiClient.put('/node/settings', settings).then(r => r.data)
+
+// Platform settings
+export const fetchSettings = () => apiClient.get('/settings').then(r => r.data)
+export const updateSettings = (settings: Record<string, unknown>) =>
+  apiClient.put('/settings', settings).then(r => r.data)

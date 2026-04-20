@@ -21,7 +21,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        // Keep /api prefix when proxying to backend
+        ws: true,
       },
     },
   },

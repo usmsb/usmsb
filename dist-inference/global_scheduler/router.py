@@ -22,16 +22,18 @@ class Router:
 
     async def execute(self, request: InferenceRequest) -> InferenceResponse:
         """
-        Execute inference request with retry logic
+        Execute inference request with retry logic, excluding failed nodes
         """
         last_error = None
+        failed_node_ids: list[str] = []
 
         for attempt in range(self.max_retries):
             try:
-                # Select node
+                # Select node, excluding nodes that just failed
                 result = await self.gpu_pool.select_node(
                     request.model_name,
-                    self.model_registry
+                    self.model_registry,
+                    exclude_node_ids=failed_node_ids,
                 )
 
                 if not result:
@@ -40,6 +42,7 @@ class Router:
                     )
 
                 node_executor, estimated_seconds = result
+                current_node_id = node_executor.capability.node_id
 
                 # Mark node as busy
                 await node_executor.set_busy()
@@ -49,6 +52,12 @@ class Router:
                     response = await node_executor.execute(request)
                     return response
 
+                except Exception as e:
+                    # Record failed node so we don't retry it
+                    if current_node_id not in failed_node_ids:
+                        failed_node_ids.append(current_node_id)
+                    raise
+
                 finally:
                     # Mark node as idle
                     await node_executor.set_idle()
@@ -56,7 +65,7 @@ class Router:
             except Exception as e:
                 last_error = e
                 print(f"[Router] Attempt {attempt + 1} failed: {e}")
-                await asyncio.sleep(0.5)  # Brief wait before retry
+                await asyncio.sleep(0.5)
 
         # All retries failed
         raise RuntimeError(

@@ -2,17 +2,16 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { SlideContainer, SlideContent } from '../components/SlideContainer'
 import { SlideProps } from '../types'
-import { ArrowRight, Mail, Twitter, Github, Linkedin, Wallet } from 'lucide-react'
+import { ArrowRight, Mail, Twitter, Github, Linkedin, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 export function CtaSlide({ isActive, direction }: SlideProps) {
   const { t } = useTranslation()
 
   const socialLinks = [
-    { icon: <Twitter className="w-5 h-5" />, href: 'https://twitter.com/vibe_ai', label: 'Twitter' },
+    { icon: <Twitter className="w-5 h-5" />, href: 'https://twitter.com/usmsb_ai', label: 'Twitter' },
     { icon: <Github className="w-5 h-5" />, href: 'https://github.com/usmsb/usmsb', label: 'GitHub' },
-    { icon: <Linkedin className="w-5 h-5" />, href: 'https://linkedin.com/company/vibe-ai', label: 'LinkedIn' },
-    { icon: <Mail className="w-5 h-5" />, href: 'mailto:contact@vibe.ai', label: 'Email' },
+    { icon: <Mail className="w-5 h-5" />, href: 'mailto:contact@usmsb.ai', label: 'Email' },
   ]
 
   return (
@@ -21,11 +20,11 @@ export function CtaSlide({ isActive, direction }: SlideProps) {
         <div className="mb-8">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 font-['Orbitron']">
             <span className="bg-gradient-to-r from-primary-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-              {t('pitch.cta.title', '加入 AI 文明')}
+              {t('pitch.cta.title', '成为第一批居民')}
             </span>
           </h1>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-            {t('pitch.cta.subtitle', '与我们一起构建去中心化 AI Agent 经济生态')}
+            {t('pitch.cta.subtitle', '加入 USMSB 网络，成为 AI Agent 协作时代的第一批建设者')}
           </p>
         </div>
 
@@ -35,8 +34,8 @@ export function CtaSlide({ isActive, direction }: SlideProps) {
               size="lg"
               className="bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white border-0 px-8 py-4 text-lg group"
             >
-              <Wallet className="w-5 h-5 mr-2" />
-              {t('pitch.cta.connectWallet', '连接钱包开始')}
+              <Sparkles className="w-5 h-5 mr-2" />
+              {t('pitch.cta.startBuilding', '开始构建')}
               <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
@@ -70,8 +69,8 @@ export function CtaSlide({ isActive, direction }: SlideProps) {
         </div>
 
         <div className="text-center text-slate-500 text-sm">
-          <p className="mb-2">{t('pitch.cta.copyright', '© 2025 VIBE. All rights reserved.')}</p>
-          <p>{t('pitch.cta.tagline', 'Building the infrastructure for AI civilization.')}</p>
+          <p className="mb-2">{t('pitch.cta.copyright', '© 2026 USMSB. All rights reserved.')}</p>
+          <p>{t('pitch.cta.tagline', '硅基文明基础设施建设者')}</p>
         </div>
       </SlideContent>
     </SlideContainer>

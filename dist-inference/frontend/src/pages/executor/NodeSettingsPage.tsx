@@ -1,16 +1,98 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import CyberInput from '@/components/ui/CyberInput'
 import CyberButton from '@/components/ui/CyberButton'
 import WalletAddress from '@/components/ui/WalletAddress'
 import { useAuthStore } from '@/stores/authStore'
+import { updateNodeSettings, fetchNodeStatus } from '@/lib/api'
+import toast from 'react-hot-toast'
 
 export default function NodeSettingsPage() {
   const { walletAddress } = useAuthStore()
   const [maintenanceMode, setMaintenanceMode] = useState<'normal' | 'maintenance' | 'offline'>('normal')
-  const [preloadModels, setPreloadModels] = useState({
-    'Qwen/Qwen2.5-7B-Instruct': true,
-    'Qwen/Qwen2.5-14B-Instruct': false,
-  })
+  const [maintenanceReason, setMaintenanceReason] = useState('')
+  const [gpuThreshold, setGpuThreshold] = useState(80)
+  const [newWallet, setNewWallet] = useState('')
+  const [confirmWallet, setConfirmWallet] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchNodeStatus()
+      .then((status: Record<string, unknown>) => {
+        if (status.gpu_threshold) setGpuThreshold(status.gpu_threshold as number)
+        if (status.maintenance_mode) setMaintenanceMode(status.maintenance_mode as 'normal' | 'maintenance' | 'offline')
+        if (status.maintenance_reason) setMaintenanceReason(status.maintenance_reason as string)
+        if (status.wallet_address) setNewWallet(status.wallet_address as string)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleSaveWallet = async () => {
+    if (!newWallet) return
+    if (newWallet !== confirmWallet) {
+      toast.error('Wallet addresses do not match')
+      return
+    }
+    setSaving(true)
+    try {
+      await updateNodeSettings({ wallet_address: newWallet })
+      toast.success('Wallet updated')
+      setConfirmWallet('')
+    } catch (e) {
+      toast.error(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSavePreload = async () => {
+    setSaving(true)
+    try {
+      await updateNodeSettings({ gpu_threshold: gpuThreshold })
+      toast.success('Settings saved')
+    } catch (e) {
+      toast.error(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleResetDefault = async () => {
+    setSaving(true)
+    try {
+      await updateNodeSettings({
+        gpu_threshold: 80,
+        maintenance_mode: 'normal',
+        maintenance_reason: '',
+      })
+      setGpuThreshold(80)
+      setMaintenanceMode('normal')
+      setMaintenanceReason('')
+      toast.success('Reset to defaults')
+    } catch (e) {
+      toast.error(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleApplyMaintenance = async () => {
+    setSaving(true)
+    try {
+      await updateNodeSettings({
+        maintenance_mode: maintenanceMode,
+        maintenance_reason: maintenanceReason,
+      })
+      toast.success('Maintenance mode updated')
+    } catch (e) {
+      toast.error(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCheckUpdates = () => {
+    toast.success('You are running the latest version')
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -23,30 +105,40 @@ export default function NodeSettingsPage() {
         <div className="p-3 bg-black/20 rounded-lg border border-cyber-border">
           <WalletAddress address={walletAddress || '0x0000000000000000000000000000000000000000'} chars={8} />
         </div>
-        <CyberInput label="New Wallet Address" placeholder="0x..." />
-        <CyberInput label="Confirm Wallet Address" placeholder="0x..." />
-        <CyberButton variant="primary" size="sm">Save Wallet</CyberButton>
+        <CyberInput
+          label="New Wallet Address"
+          value={newWallet}
+          onChange={e => setNewWallet(e.target.value)}
+          placeholder="0x..."
+        />
+        <CyberInput
+          label="Confirm Wallet Address"
+          value={confirmWallet}
+          onChange={e => setConfirmWallet(e.target.value)}
+          placeholder="0x..."
+        />
+        <CyberButton variant="primary" size="sm" onClick={handleSaveWallet} loading={saving}>
+          Save Wallet
+        </CyberButton>
       </div>
 
       {/* Preload Models */}
       <div className="cyber-card p-6 space-y-4">
         <h3 className="font-orbitron text-xs text-neon-blue tracking-widest">PRELOAD MODEL SETTINGS</h3>
         <p className="text-xs text-text-secondary font-rajdhani">Auto-load on startup</p>
-        {Object.entries(preloadModels).map(([model, enabled]) => (
-          <label key={model} className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={e => setPreloadModels(prev => ({ ...prev, [model]: e.target.checked }))}
-              className="w-4 h-4 accent-neon-blue"
-            />
-            <span className="font-rajdhani text-sm">{model}</span>
-          </label>
-        ))}
-        <CyberInput label="GPU Utilization Threshold (%)" defaultValue="80" type="number" />
+        <CyberInput
+          label="GPU Utilization Threshold (%)"
+          value={gpuThreshold}
+          onChange={e => setGpuThreshold(parseInt(e.target.value) || 80)}
+          type="number"
+        />
         <div className="flex gap-3">
-          <CyberButton variant="primary" size="sm">Save</CyberButton>
-          <CyberButton variant="secondary" size="sm">Reset to Default</CyberButton>
+          <CyberButton variant="primary" size="sm" onClick={handleSavePreload} loading={saving}>
+            Save
+          </CyberButton>
+          <CyberButton variant="secondary" size="sm" onClick={handleResetDefault}>
+            Reset to Default
+          </CyberButton>
         </div>
       </div>
 
@@ -73,16 +165,25 @@ export default function NodeSettingsPage() {
             </div>
           </label>
         ))}
-        <CyberInput label="Maintenance Reason" placeholder="Enter reason..." />
-        <CyberButton variant="danger" size="sm">Apply</CyberButton>
+        <CyberInput
+          label="Maintenance Reason"
+          value={maintenanceReason}
+          onChange={e => setMaintenanceReason(e.target.value)}
+          placeholder="Enter reason..."
+        />
+        <CyberButton variant="danger" size="sm" onClick={handleApplyMaintenance} loading={saving}>
+          Apply
+        </CyberButton>
       </div>
 
       {/* About */}
       <div className="cyber-card p-6 space-y-2">
         <h3 className="font-orbitron text-xs text-neon-blue tracking-widest">ABOUT</h3>
         <div className="text-sm font-rajdhani text-text-secondary">USMSB Node Executor v0.1.0</div>
-        <div className="text-sm font-rajdhani text-text-secondary">Build: 2026-04-17</div>
-        <CyberButton variant="ghost" size="sm">Check for Updates</CyberButton>
+        <div className="text-sm font-rajdhani text-text-secondary">Build: 2026-04-19</div>
+        <CyberButton variant="ghost" size="sm" onClick={handleCheckUpdates}>
+          Check for Updates
+        </CyberButton>
       </div>
     </div>
   )

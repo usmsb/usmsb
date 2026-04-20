@@ -1386,3 +1386,19 @@ export const syncGeneCapsule = async (
   const response = await api.post(`/gene-capsule/${agentId}/sync`, {})
   return response.data
 }
+
+// ============ Streaming Chat APIs (OpenHarness StreamEvent Pattern) ============
+
+export interface ChatStats {
+  active_sessions: number
+  active_sse_connections: number
+  sessions: Record<string, any>
+}
+
+export const getChatStats = async (): Promise<ChatStats> => {
+  const response = await api.get<ChatStats>('/meta-agent/chat/stats')
+  return response.data
+}
+
+// Note: The actual streaming uses WebSocket + SSE, not HTTP
+// See: src/services/chatService.ts for the streaming implementation

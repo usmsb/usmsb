@@ -206,7 +206,8 @@ async def lifespan(app: FastAPI):
             extra_params={
                 "temperature": settings.llm.temperature,
                 "max_tokens": settings.llm.max_tokens,
-                "base_url": os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/anthropic"),
+                "base_url": os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1"),
+                "embedding_api_key": os.getenv("MINIMAX_EMBEDDING_API_KEY"),
             },
         )
         adapter = MiniMaxAdapter(llm_config)
@@ -426,6 +427,15 @@ async def lifespan(app: FastAPI):
     set_meta_agent_service(meta_agent_service)
     logger.info("MetaAgentService initialized")
 
+    # ========== Initialize Chat Session Manager (OpenHarness StreamEvent Pattern) ==========
+    from usmsb_sdk.meta_agent.communication.session_manager import ChatSessionManager
+    from usmsb_sdk.api.rest.meta_agent import set_chat_session_manager
+
+    chat_session_manager = ChatSessionManager(meta_agent=meta_agent)
+    await chat_session_manager.start()
+    set_chat_session_manager(chat_session_manager)
+    logger.info("ChatSessionManager initialized (WebSocket + SSE)")
+
     logger.info("USMSB SDK API started successfully")
 
     # Start heartbeat monitor background task
@@ -463,6 +473,11 @@ async def lifespan(app: FastAPI):
 
     if source_manager:
         await source_manager.shutdown_all()
+
+    # Shutdown ChatSessionManager
+    if 'chat_session_manager' in dir():
+        await chat_session_manager.stop()
+
     logger.info("USMSB SDK API shutdown complete")
 
 

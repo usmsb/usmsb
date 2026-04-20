@@ -3,7 +3,10 @@
 
 使用轻量级方案：
 - SQLite 存储向量和元数据
-- MiniMax Embedding API 生成向量
+- 支持三种 Embedding Provider（见 EMBEDDING_PROVIDER 环境变量）：
+    1. minimax - MiniMax Embedding API（付费）
+    2. sentence_transformers - Sentence Transformers 本地模型（免费，需预下载或网络访问）
+    3. local_hash - Local Hash 伪向量（默认，无语义理解）
 - 余弦相似度进行检索
 
 不依赖大型数据库或分布式存储
@@ -48,30 +51,86 @@ class SearchResult:
     distance: float
 
 
+def _get_embedding_provider() -> str:
+    """从环境变量读取 embedding provider，默认 local_hash"""
+    return os.getenv("EMBEDDING_PROVIDER", "local_hash").lower()
+
+
+def _get_st_model_path() -> str | None:
+    """获取 SentenceTransformer 模型本地路径"""
+    return os.getenv("SENTENCE_TRANSFORMERS_MODEL_PATH")
+
+
 class LocalEmbeddingService:
     """
     本地向量嵌入服务
 
-    支持多种嵌入方式：
-    1. MiniMax Embedding API（推荐）
-    2. 本地 hash 向量（降级方案）
-    3. TF-IDF 风格的简单向量（降级方案）
+    支持三种嵌入方式（通过 EMBEDDING_PROVIDER 环境变量切换）：
+    1. minimax - MiniMax Embedding API（付费）
+    2. sentence_transformers - Sentence Transformers 本地模型（免费）
+       - 如设置 SENTENCE_TRANSFORMERS_MODEL_PATH，从本地路径加载
+       - 否则从 HuggingFace 下载（需要网络访问）
+    3. local_hash - 本地 hash 向量（默认，无语义理解）
     """
+
+    _st_model = None  # 类级别缓存 SentenceTransformer 实例
 
     def __init__(self, llm_manager=None, vector_dim: int = 384):
         self.llm_manager = llm_manager
         self.vector_dim = vector_dim
-        self._use_api = llm_manager is not None and hasattr(llm_manager, "_adapter")
+        self._provider = _get_embedding_provider()
+        self._use_api = (
+            self._provider == "minimax"
+            and llm_manager is not None
+            and hasattr(llm_manager, "_adapter")
+        )
+
+    @classmethod
+    def _get_st_model(cls):
+        """获取或初始化 SentenceTransformer 模型（类级别单例）
+
+        优先从 SENTENCE_TRANSFORMERS_MODEL_PATH 加载本地模型，
+        否则从 HuggingFace 下载（需要网络访问）。
+        建议预下载模型到本地目录，避免生产环境依赖网络。
+        """
+        if cls._st_model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+
+                local_path = _get_st_model_path()
+                # 设置 HF_HUB_OFFLINE=1 避免已缓存模型仍尝试联网校验
+                os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
+                if local_path:
+                    # 从本地路径加载预下载的模型
+                    cls._st_model = SentenceTransformer(local_path, device="cpu")
+                    logger.info(f"SentenceTransformer model loaded from local path: {local_path}")
+                else:
+                    # 从 HuggingFace 下载（需要网络访问）
+                    cls._st_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+                    logger.info("SentenceTransformer model loaded: all-MiniLM-L6-v2 (downloaded)")
+            except ImportError:
+                raise ImportError(
+                    "sentence-transformers not installed. "
+                    "Run: pip install sentence-transformers"
+                )
+        return cls._st_model
 
     async def embed(self, text: str) -> list[float]:
         """生成文本向量"""
-        if self._use_api:
+        if self._provider == "sentence_transformers":
+            return await self._embed_with_st(text)
+        elif self._provider == "local_hash":
+            return self._embed_local(text)
+        elif self._use_api:
             try:
                 return await self._embed_with_api(text)
             except Exception as e:
-                logger.warning(f"API embedding failed, fallback to local: {e}")
-
-        return self._embed_local(text)
+                logger.warning(f"MiniMax API embedding failed, fallback to local_hash: {e}")
+                return self._embed_local(text)
+        else:
+            # 没有 API 且非 sentence_transformers，走 local_hash
+            return self._embed_local(text)
 
     async def _embed_with_api(self, text: str) -> list[float]:
         """使用 MiniMax API 生成向量"""
@@ -80,12 +139,22 @@ class LocalEmbeddingService:
             if hasattr(adapter, "embed"):
                 return await adapter.embed(text)
 
-        raise ValueError("No embedding API available")
+        raise ValueError("MiniMax embedding API not available")
+
+    async def _embed_with_st(self, text: str) -> list[float]:
+        """使用 Sentence Transformers 本地模型生成向量"""
+        model = self._get_st_model()
+        loop = asyncio.get_event_loop()
+        # encode 是同步的，放在 executor 里避免阻塞事件循环
+        embedding = await loop.run_in_executor(
+            None, lambda: model.encode(text).tolist()
+        )
+        return embedding
 
     def _embed_local(self, text: str) -> list[float]:
         """
         本地生成简单向量（降级方案）
-        基于 hash 和文本特征
+        基于 hash 和文本特征，无语义理解能力
         """
         vector = [0.0] * self.vector_dim
 

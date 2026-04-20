@@ -1,12 +1,19 @@
 """
 Meta Agent Router
+
+Communication Protocol (OpenHarness 精髓):
+- WebSocket (/ws/chat/{wallet_address}): 指令通道
+  - user_message, confirm_plan, cancel_task
+- SSE (/sse/chat/{session_id}): 进度通道
+  - text_delta, tool_call, tool_result, progress, plan_ready
 """
 
 import asyncio
 import json
 import logging
+from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -17,6 +24,15 @@ router = APIRouter(prefix="/meta-agent", tags=["Meta Agent"])
 # Global Meta Agent instance
 _meta_agent = None
 _permission_manager = None
+
+# Global Chat Session Manager (初始化后在 main.py 设置)
+_chat_session_manager: Any = None
+
+
+def set_chat_session_manager(manager: Any) -> None:
+    """设置 Chat Session Manager"""
+    global _chat_session_manager
+    _chat_session_manager = manager
 
 
 def set_meta_agent(agent):
@@ -570,6 +586,85 @@ async def stream_task_progress(task_id: str):
                 logger.error(f"SSE error: {e}")
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 break
+
+
+# ==================== New Communication Protocol Endpoints ====================
+# OpenHarness StreamEvent Pattern
+
+
+@router.websocket("/ws/chat/{wallet_address}")
+async def chat_websocket(websocket: WebSocket, wallet_address: str):
+    """
+    WebSocket 指令通道
+
+    协议:
+    - 客户端 → 服务端: user_message, confirm_plan, cancel_task, pause_task, resume_task
+    - 服务端 → 客户端: message_received, error
+
+    OpenHarness 精髓: 全双工事件驱动通信
+    """
+    global _chat_session_manager
+
+    if _chat_session_manager is None:
+        await websocket.close(code=1011, reason="Chat session manager not initialized")
+        return
+
+    await _chat_session_manager.ws_handler.handle_connection(websocket, wallet_address)
+
+
+@router.get("/sse/chat/{wallet_address}")
+async def chat_sse(wallet_address: str):
+    """
+    SSE 进度通道
+
+    推送:
+    - text_delta: 增量文本
+    - tool_call / tool_result: 工具调用
+    - progress: 进度更新
+    - plan_ready: 计划就绪
+    - task_complete: 任务完成
+
+    OpenHarness 精髓: AsyncIterator[StreamEvent] 模式
+    """
+    global _chat_session_manager
+
+    if _chat_session_manager is None:
+        return StreamingResponse(
+            iter([f"data: {json.dumps({'error': 'Chat session manager not initialized'})}\n\n"]),
+            media_type="text/event-stream",
+        )
+
+    # Derive session_id the same way the frontend does:
+    # f"ws_{wallet_address}_{timestamp}"
+    # We use the current minute-level timestamp to match frontend's Date.now() // 60000 * 60000
+    import time
+    ts = int(time.time() // 60) * 60 * 1000
+    session_id = f"ws_{wallet_address}_{ts}"
+
+    async def event_stream():
+        async for event_str in _chat_session_manager.create_sse_stream(session_id):
+            yield event_str
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/chat/stats")
+async def chat_stats():
+    """获取 Chat 系统统计"""
+    global _chat_session_manager
+
+    if _chat_session_manager is None:
+        return {"error": "Chat session manager not initialized"}
+
+    return _chat_session_manager.get_stats()
 
     return StreamingResponse(
         event_generator(),
