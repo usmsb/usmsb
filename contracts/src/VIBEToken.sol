@@ -220,7 +220,9 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     //   直接分配(37%): team 8% / early 4% / community 6% / liquidity 12% / airdrop 7%
     //   激励池(63%): 全部进入EmissionController，由其按周期释放
     //     EC内部分配: staking 40% / ecosystem 25% / governance 12% / reserve 10% / output 13%
-    uint256 public constant PERCENT_EMISSION_POOL = 6300;   // 63% - 激励池(进入EC)
+    uint256 public constant PERCENT_EMISSION_POOL = 5000;   // 50% - 激励池(进入EC)
+    // 注意: EC内部会分配13%给outputRewardPool，所以EC实际控制: 50%+13%=63% ✓
+    // 白皮书63%激励池 = 5亿(EC本体) + 1.3亿(EC分配给output的部分) = 6.3亿 ✓
     uint256 public constant PERCENT_OUTPUT = 1300;           // 13% - 产出池(EC分配)
     uint256 public constant PERCENT_TEAM = 800;              //  8.00%
     uint256 public constant PERCENT_EARLY_SUPPORTER = 400;   //  4.00%
@@ -228,13 +230,15 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     uint256 public constant PERCENT_LIQUIDITY = 1200;        // 12.00%
     uint256 public constant PERCENT_AIRDROP = 700;           //  7.00%
     // 直接分配小计: 800+400+600+1200+700 = 3700 (37%) ✓
-    // 激励池: 6300 (63%) ✓
-    // 总计: 3700+6300 = 10000 ✓
+    // 激励池: 5000 (50%) + 产出池: 1300 (13%) = 6300 (63%) ✓
+    // 直接分配: team 800 + early 400 + community 600 + liquidity 1200 + airdrop 700 = 3700 (37%) ✓
+    // 总计: 3700 + 5000 + 1300 = 10000 ✓
 
-    /// @notice 代币分配事件（白皮书 v1.2）
+    /// @notice 代币分配事件（白皮书 v1.3 规范）
+    /// @dev 激励池63% = 50%→EC + 13%→outputRewardPool(EC管理)
     event TokensDistributed(
-        address emissionController,   // 63%激励池
-        address outputRewardPool,     // 13%产出池(由EC管理)
+        address emissionController,   // 50%激励池
+        address outputRewardPool,   // 13%产出池(由EC分配)
         address teamVesting,         // 8%
         address earlySupporterVesting, // 4%
         address communityFund,       // 6%
@@ -243,16 +247,18 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     );
 
     /**
-     * @notice 将 100% 代币分配到各池合约（白皮书 v1.2 规范）
+     * @notice 将 100% 代币分配到各池合约（白皮书 v1.3 规范）
      * @dev 只能由 owner 调用一次
      *
      * 分配比例（占总供应量，10000 bps）：
-     * - 激励池: 63% → emissionController（由EC按周期释放到各子池）
+     * - 激励池: 50% → emissionController（由EC按周期释放到各子池）
+     * - 产出池: 13% → outputRewardPool（由EC按周期自动分配，EC内部转移）
      * - 团队锁仓: 8% → teamVesting（1年cliff + 4年线性释放）
      * - 早期支持者: 4% → earlySupporterVesting（6个月cliff + 2年线性释放）
      * - 社区基金: 6% → communityFund
      * - 流动性池: 12% → liquidityManager
-     * - 空投分发: 7% → airdropDistributor
+     * - 空投: 7% → airdropDistributor
+     * - 激励池控制总量: 5亿(EC) + 1.3亿(分配给output) = 6.3亿 ✓
      *
      * 激励池(63%)通过EmissionController按周期释放:
      * - 质押池: 40% of EC → VIBStaking
@@ -284,8 +290,13 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
             _communityFund != address(0) && _liquidityManager != address(0) &&
             _airdropDistributor != address(0), "VIBEToken: invalid pool address");
 
-        // 激励池 63% → EmissionController（由其按周期释放到各子池）
+        // 激励池 50% → EmissionController（由其按周期释放到子池，不含output）
+        // EC内部分配: staking 40% / ecosystem 25% / governance 12% / reserve 10% / output 13%
+        // EC控制总量: 5亿(EC) + 1.3亿(分配给output) = 6.3亿 ✓
         _mint(_emissionController, (TOTAL_SUPPLY * PERCENT_EMISSION_POOL) / 10000);
+
+        // 产出激励池 13% → outputRewardPool（由EC按周期自动分配）
+        _mint(_outputRewardPool, (TOTAL_SUPPLY * PERCENT_OUTPUT) / 10000);
 
         // 保存激励池和产出池地址
         emissionController = _emissionController;

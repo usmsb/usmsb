@@ -21,7 +21,8 @@ describe("VIBEToken DistributeToPools", function () {
   const STABLE_FUND_AMOUNT = ethers.parseUnits("60000000", 18); // 6%
   const LIQUIDITY_AMOUNT = ethers.parseUnits("120000000", 18);  // 12%
   const AIRDROP_AMOUNT = ethers.parseUnits("70000000", 18);     // 7%
-  const EMISSION_AMOUNT = ethers.parseUnits("630000000", 18);   // 63%
+  const EMISSION_AMOUNT = ethers.parseUnits("500000000", 18);   // 50% → EC
+  const OUTPUT_AMOUNT = ethers.parseUnits("130000000", 18);     // 13% → outputRewardPool
 
   beforeEach(async function () {
     [owner, addr1, addr2] = await ethers.getSigners();
@@ -129,6 +130,7 @@ describe("VIBEToken DistributeToPools", function () {
       expect(await vibeToken.balanceOf(await liquidityManager.getAddress())).to.equal(LIQUIDITY_AMOUNT);
       expect(await vibeToken.balanceOf(await airdropDistributor.getAddress())).to.equal(AIRDROP_AMOUNT);
       expect(await vibeToken.balanceOf(await emissionController.getAddress())).to.equal(EMISSION_AMOUNT);
+      expect(await vibeToken.balanceOf(await vibOutputReward.getAddress())).to.equal(OUTPUT_AMOUNT);
     });
 
     it("Should set tokensDistributed to true after distribution", async function () {
