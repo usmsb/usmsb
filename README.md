@@ -169,12 +169,25 @@ pip install -e .
 cp .env.example .env
 # Edit .env with your API Key
 
-# 4. Start backend
-uvicorn src.usmsb_sdk.api.rest.main:app --reload --port 8000
+# 4. Start backend (IMPORTANT: run from src directory)
+cd src
+python -c "
+import os
+os.environ['USMSB_UVICORN_MODE'] = '1'
+import uvicorn
+from usmsb_sdk.api.rest.main import app
+uvicorn.run(app, host='0.0.0.0', port=8000)
+"
 
 # 5. Start frontend (optional)
 cd frontend && npm install && npm run dev
 ```
+
+**启动说明：**
+- 后端必须从 `src` 目录启动，否则会遇到 Python 内置 `platform` 模块名冲突问题
+- `USMSB_UVICORN_MODE=1` 环境变量防止端口重复绑定
+- 启动后访问 http://localhost:8000/docs 查看 API 文档
+- WebSocket 地址: `ws://localhost:8000/api/meta-agent/ws/chat/{wallet_address}`
 
 ---
 

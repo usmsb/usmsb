@@ -453,17 +453,21 @@ export function useChatStreaming(options: UseChatStreamingOptions) {
   useEffect(() => {
     if (!enabled || !walletAddress) return
 
-    const service = new ChatService()
+    let mounted = true
+    let service: ChatService | null = new ChatService()
     serviceRef.current = service
 
     const connect = async () => {
       try {
-        const sid = await service.connect(walletAddress)
+        const sid = await service!.connect(walletAddress)
+        if (!mounted) return
         setSessionId(sid)
-        await service.startSSE(walletAddress)
-        service.subscribe(handleEvent)
+        await service!.startSSE(walletAddress)
+        if (!mounted) return
+        service!.subscribe(handleEvent)
         setIsConnected(true)
       } catch (error) {
+        if (!mounted) return
         console.error('[useChatStreaming] Connection failed:', error)
         onError?.('Failed to connect to chat service')
       }
@@ -472,7 +476,8 @@ export function useChatStreaming(options: UseChatStreamingOptions) {
     connect()
 
     return () => {
-      service.disconnect()
+      mounted = false
+      service?.disconnect()
       serviceRef.current = null
       setIsConnected(false)
     }

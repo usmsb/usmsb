@@ -339,6 +339,38 @@ class EvolutionEngine:
                 logger.error(f"Evolution loop error: {e}")
                 await asyncio.sleep(60)
 
+    async def evolve(self) -> dict[str, Any]:
+        """
+        执行一次进化迭代。
+
+        Returns:
+            dict with keys: knowledge_added, patterns_identified
+        """
+        try:
+            # 获取最近的对话进行学习
+            recent_conversations = await self.conversations.get_recent(limit=5)
+            knowledge_added = 0
+            patterns_identified = 0
+
+            for conv in recent_conversations:
+                messages = await self.conversations.get_messages(conv.id)
+                if messages:
+                    records = await self.learn_from_conversation(conv.id, messages)
+                    knowledge_added += sum(
+                        1 for r in records if r.type == EvolutionType.KNOWLEDGE_GAIN
+                    )
+                    patterns_identified += sum(
+                        1 for r in records if r.type == EvolutionType.PATTERN_LEARNING
+                    )
+
+            return {
+                "knowledge_added": knowledge_added,
+                "patterns_identified": patterns_identified,
+            }
+        except Exception as e:
+            logger.error(f"Evolution.evolve() failed: {e}")
+            return {"knowledge_added": 0, "patterns_identified": 0}
+
     def get_evolution_stats(self) -> dict[str, Any]:
         """获取进化统计"""
         return {

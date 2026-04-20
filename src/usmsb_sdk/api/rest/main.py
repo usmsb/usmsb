@@ -617,6 +617,9 @@ def run_server():
     """Run the API server."""
     import uvicorn
 
+    # 通知 MetaAgent 已在 uvicorn 模式运行，不再启动内嵌服务器
+    os.environ["USMSB_UVICORN_MODE"] = "1"
+
     uvicorn.run(
         "usmsb_sdk.api.rest.main:app",
         host=settings.api.host if settings else "0.0.0.0",

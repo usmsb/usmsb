@@ -92,6 +92,7 @@ class ChatEventType(StrEnum):
     # 系统
     STREAM_END = "stream_end"         # 流结束
     HEARTBEAT = "heartbeat"           # 心跳
+    ERROR = "error"                   # 错误信息
 
 
 # ==================== Data Classes ====================

@@ -1200,7 +1200,7 @@ class MetaAgent:
         """Initialize L4 self-conscious agent."""
         try:
             from usmsb_sdk.l4.l4_agent import L4SelfConsciousAgent as L4Agent
-            self.l4_agent = L4Agent(agent_id=self.agent_id, llm_manager=self.llm_manager)
+            self.l4_agent = L4Agent(agent_id=self.agent_id, name=f"Agent-{self.agent_id}")
             logger.info("L4Agent initialized")
         except Exception as e:
             logger.warning("L4Agent init failed: %s", e)
@@ -1211,8 +1211,7 @@ class MetaAgent:
         try:
             from usmsb_sdk.l5.l5_collective import L5CollectiveIntelligence
             self.l5_collective = L5CollectiveIntelligence(
-                agent_id=self.agent_id,
-                llm_manager=self.llm_manager,
+                collective_id=self.agent_id,
             )
             logger.info("L5CollectiveIntelligence initialized")
         except Exception as e:
@@ -1357,7 +1356,12 @@ class MetaAgent:
     async def _start_api_server(self) -> None:
         """启动 FastAPI REST Server（在独立端口上运行 MetaAgent API）。"""
         try:
-            port = int(os.environ.get("USMSB_API_PORT", "8000"))
+            # 如果已在 uvicorn 模式运行（通过环境变量检测），跳过
+            if os.environ.get("USMSB_UVICORN_MODE") == "1":
+                logger.info("[SERVER] Skipping embedded server (uvicorn mode)")
+                return
+
+            port = int(os.environ.get("USMSB_API_PORT", "8001"))
             host = os.environ.get("USMSB_API_HOST", "0.0.0.0")
             # 延迟导入避免循环依赖
             from usmsb_sdk.api.rest.main import run_server

@@ -642,7 +642,8 @@ async def chat_sse(wallet_address: str):
     session_id = f"ws_{wallet_address}_{ts}"
 
     async def event_stream():
-        async for event_str in _chat_session_manager.create_sse_stream(session_id):
+        stream = await _chat_session_manager.create_sse_stream(session_id)
+        async for event_str in stream:
             yield event_str
 
     return StreamingResponse(

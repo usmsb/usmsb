@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
 from .protocol import (
+    ChatMessageType,
     ChatEventType,
     ChatStreamEvent,
     ChatSessionState,
@@ -314,7 +315,7 @@ class ChatSession:
         """
         # 发送开始流式输出
         yield ChatStreamEvent(
-            event_type=ChatEventType.STREAM_START,
+            event_type=ChatMessageType.STREAM_START,
             data={"task_id": task_id},
             metadata={"session_id": self.session_id},
         )
@@ -324,13 +325,11 @@ class ChatSession:
         # 直接调用 LLM（简化版本）
         # 实际应该调用 meta_agent._call_llm_simple()
         try:
-            # 模拟流式输出
-            response = await self._call_llm_streaming(
+            # 直接遍历 async generator，不需要 await
+            async for text_chunk in self._call_llm_streaming(
                 message,
                 self.wallet_address,
-            )
-
-            async for text_chunk in response:
+            ):
                 yield ChatStreamEvent(
                     event_type=ChatEventType.TEXT_DELTA,
                     data={"text": text_chunk},
@@ -367,7 +366,7 @@ class ChatSession:
         - 多轮循环直到 LLM 决定完成
         """
         yield ChatStreamEvent(
-            event_type=ChatEventType.STREAM_START,
+            event_type=ChatMessageType.STREAM_START,
             data={"task_id": task_id},
             metadata={"session_id": self.session_id},
         )
