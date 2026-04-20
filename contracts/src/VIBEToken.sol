@@ -213,100 +213,98 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
     // ========== 外部函数 ==========
 
     // ========== 代币分配（白皮书规范，10000 bps = 100%） ==========
-    // 白皮书: staking 45%/ecosystem 30%/governance 15%/reserve 10% (of 63% emission) + direct: team 8%/early 4%/community 6%/liquidity 12%/airdrop 7%
-    uint256 public constant PERCENT_STAKING = 2835;      // 28.35%
-    uint256 public constant PERCENT_ECOSYSTEM = 1890;     // 18.90%
-    uint256 public constant PERCENT_GOVERNANCE = 945;   //  9.45%
-    uint256 public constant PERCENT_RESERVE = 630;      //  6.30%
-    uint256 public constant PERCENT_TEAM = 800;         //  8.00%
-    uint256 public constant PERCENT_EARLY_SUPPORTER = 400; // 4.00%
-    uint256 public constant PERCENT_COMMUNITY = 600;   //  6.00%
-    uint256 public constant PERCENT_LIQUIDITY = 1200;  // 12.00%
-    uint256 public constant PERCENT_AIRDROP = 700;     //  7.00%
-    // Total: 2835+1890+945+630+800+400+600+1200+700 = 10000 ✓
+    // 白皮书 v1.2 (2026-03-12):
+    //   直接分配(37%): team 8% / early 4% / community 6% / liquidity 12% / airdrop 7%
+    //   激励池(63%): 全部进入EmissionController，由其按周期释放
+    //     EC内部分配: staking 40% / ecosystem 25% / governance 12% / reserve 10% / output 13%
+    uint256 public constant PERCENT_EMISSION_POOL = 6300;   // 63% - 激励池(进入EC)
+    uint256 public constant PERCENT_OUTPUT = 1300;           // 13% - 产出池(EC分配)
+    uint256 public constant PERCENT_TEAM = 800;              //  8.00%
+    uint256 public constant PERCENT_EARLY_SUPPORTER = 400;   //  4.00%
+    uint256 public constant PERCENT_COMMUNITY = 600;         //  6.00%
+    uint256 public constant PERCENT_LIQUIDITY = 1200;        // 12.00%
+    uint256 public constant PERCENT_AIRDROP = 700;           //  7.00%
+    // 直接分配小计: 800+400+600+1200+700 = 3700 (37%) ✓
+    // 激励池: 6300 (63%) ✓
+    // 总计: 3700+6300 = 10000 ✓
 
-    /// @notice 代币分配事件（白皮书 10000 bps 分配）
+    /// @notice 代币分配事件（白皮书 v1.2）
     event TokensDistributed(
-        address stakingPool,
-        address ecosystemPool,
-        address governancePool,
-        address reservePool,
-        address teamVesting,
-        address earlySupporterVesting,
-        address communityFund,
-        address liquidityManager,
-        address airdropDistributor
+        address emissionController,   // 63%激励池
+        address outputRewardPool,     // 13%产出池(由EC管理)
+        address teamVesting,         // 8%
+        address earlySupporterVesting, // 4%
+        address communityFund,       // 6%
+        address liquidityManager,   // 12%
+        address airdropDistributor  // 7%
     );
 
     /**
-     * @notice 将 100% 代币分配到各池合约（白皮书规范）
+     * @notice 将 100% 代币分配到各池合约（白皮书 v1.2 规范）
      * @dev 只能由 owner 调用一次
      *
      * 分配比例（占总供应量，10000 bps）：
-     * - 质押池: 28.35% → stakingPool
-     * - 生态池: 18.90% → ecosystemPool
-     * - 治理池:  9.45% → governancePool
-     * - 储备池:  6.30% → reservePool
-     * - 团队锁仓: 8.00% → teamVesting
-     * - 早期支持者: 4.00% → earlySupporterVesting
-     * - 社区基金: 6.00% → communityFund
-     * - 流动性池: 12.00% → liquidityManager
-     * - 空投分发:  7.00% → airdropDistributor
+     * - 激励池: 63% → emissionController（由EC按周期释放到各子池）
+     * - 团队锁仓: 8% → teamVesting（1年cliff + 4年线性释放）
+     * - 早期支持者: 4% → earlySupporterVesting（6个月cliff + 2年线性释放）
+     * - 社区基金: 6% → communityFund
+     * - 流动性池: 12% → liquidityManager
+     * - 空投分发: 7% → airdropDistributor
      *
-     * @param stakingPool 质押池地址
-     * @param ecosystemPool 生态池地址
-     * @param governancePool 治理池地址
-     * @param reservePool 储备池地址
-     * @param teamVesting 团队锁仓合约地址
-     * @param earlySupporterVesting 早期支持者锁仓合约地址
-     * @param communityFund 社区基金地址
-     * @param liquidityManager 流动性管理合约地址
-     * @param airdropDistributor 空投分发合约地址
+     * 激励池(63%)通过EmissionController按周期释放:
+     * - 质押池: 40% of EC → VIBStaking
+     * - 生态池: 25% of EC → VIBEcosystemPool
+     * - 治理池: 12% of EC → VIBGovernance
+     * - 储备池: 10% of EC → VIBReserve
+     * - 产出池: 13% of EC → VIBOutputReward
+     *
+     * @param _emissionController 激励池合约地址（接收63%）
+     * @param _outputRewardPool 产出池地址（由EC管理，接收13%分配）
+     * @param _teamVesting 团队锁仓合约地址（8%）
+     * @param _earlySupporterVesting 早期支持者锁仓合约地址（4%）
+     * @param _communityFund 社区基金地址（6%）
+     * @param _liquidityManager 流动性管理合约地址（12%）
+     * @param _airdropDistributor 空投分发合约地址（7%）
      */
     function distributeToPools(
-        address stakingPool,
-        address ecosystemPool,
-        address governancePool,
-        address reservePool,
-        address teamVesting,
-        address earlySupporterVesting,
-        address communityFund,
-        address liquidityManager,
-        address airdropDistributor
+        address _emissionController,     // 63%激励池
+        address _outputRewardPool,       // 13%产出池(由EC管理)
+        address _teamVesting,           // 8%
+        address _earlySupporterVesting, // 4%
+        address _communityFund,         // 6%
+        address _liquidityManager,      // 12%
+        address _airdropDistributor     // 7%
     ) external onlyOwner {
         require(!tokensDistributed, "VIBEToken: tokens already distributed");
-        require(stakingPool != address(0) && ecosystemPool != address(0) &&
-            governancePool != address(0) && reservePool != address(0) &&
-            teamVesting != address(0) && earlySupporterVesting != address(0) &&
-            communityFund != address(0) && liquidityManager != address(0) &&
-            airdropDistributor != address(0), "VIBEToken: invalid pool address");
+        require(_emissionController != address(0) && _outputRewardPool != address(0) &&
+            _teamVesting != address(0) && _earlySupporterVesting != address(0) &&
+            _communityFund != address(0) && _liquidityManager != address(0) &&
+            _airdropDistributor != address(0), "VIBEToken: invalid pool address");
 
-        _mint(stakingPool, (TOTAL_SUPPLY * PERCENT_STAKING) / 10000);
-        _mint(ecosystemPool, (TOTAL_SUPPLY * PERCENT_ECOSYSTEM) / 10000);
-        _mint(governancePool, (TOTAL_SUPPLY * PERCENT_GOVERNANCE) / 10000);
-        _mint(reservePool, (TOTAL_SUPPLY * PERCENT_RESERVE) / 10000);
-        _mint(teamVesting, (TOTAL_SUPPLY * PERCENT_TEAM) / 10000);
-        _mint(earlySupporterVesting, (TOTAL_SUPPLY * PERCENT_EARLY_SUPPORTER) / 10000);
-        _mint(communityFund, (TOTAL_SUPPLY * PERCENT_COMMUNITY) / 10000);
-        _mint(liquidityManager, (TOTAL_SUPPLY * PERCENT_LIQUIDITY) / 10000);
-        _mint(airdropDistributor, (TOTAL_SUPPLY * PERCENT_AIRDROP) / 10000);
+        // 激励池 63% → EmissionController（由其按周期释放到各子池）
+        _mint(_emissionController, (TOTAL_SUPPLY * PERCENT_EMISSION_POOL) / 10000);
+
+        // 直接分配部分（37%）
+        _mint(_teamVesting, (TOTAL_SUPPLY * PERCENT_TEAM) / 10000);
+        _mint(_earlySupporterVesting, (TOTAL_SUPPLY * PERCENT_EARLY_SUPPORTER) / 10000);
+        _mint(_communityFund, (TOTAL_SUPPLY * PERCENT_COMMUNITY) / 10000);
+        _mint(_liquidityManager, (TOTAL_SUPPLY * PERCENT_LIQUIDITY) / 10000);
+        _mint(_airdropDistributor, (TOTAL_SUPPLY * PERCENT_AIRDROP) / 10000);
 
         // 设置免税地址
-        taxExemptedAddresses[stakingPool] = true;
-        taxExemptedAddresses[ecosystemPool] = true;
-        taxExemptedAddresses[governancePool] = true;
-        taxExemptedAddresses[reservePool] = true;
-        taxExemptedAddresses[teamVesting] = true;
-        taxExemptedAddresses[earlySupporterVesting] = true;
-        taxExemptedAddresses[communityFund] = true;
-        taxExemptedAddresses[liquidityManager] = true;
-        taxExemptedAddresses[airdropDistributor] = true;
+        taxExemptedAddresses[_emissionController] = true;
+        taxExemptedAddresses[_outputRewardPool] = true;
+        taxExemptedAddresses[_teamVesting] = true;
+        taxExemptedAddresses[_earlySupporterVesting] = true;
+        taxExemptedAddresses[_communityFund] = true;
+        taxExemptedAddresses[_liquidityManager] = true;
+        taxExemptedAddresses[_airdropDistributor] = true;
 
         tokensDistributed = true;
         emit TokensDistributed(
-            stakingPool, ecosystemPool, governancePool, reservePool,
-            teamVesting, earlySupporterVesting, communityFund,
-            liquidityManager, airdropDistributor
+            _emissionController, _outputRewardPool,
+            _teamVesting, _earlySupporterVesting, _communityFund,
+            _liquidityManager, _airdropDistributor
         );
     }
 

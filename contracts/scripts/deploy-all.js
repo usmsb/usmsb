@@ -128,25 +128,30 @@ async function main() {
   console.log(' Stage 7: Agent & System');
   console.log('='.repeat(60));
   save('AgentWallet', await freshDeploy('AgentWallet', 'AgentWallet', [walletAddress, walletAddress, vibeToken, deployed.AgentRegistry, deployed.VIBStaking]));
-  save('EmissionController', await freshDeploy('EmissionController', 'src/automation/EmissionController.sol:EmissionController', [vibeToken, deployed.VIBStaking, deployed.VIBEcosystemPool, deployed.VIBGovernance, deployed.VIBReserve]));
+  // Stage 7 now includes VIBOutputReward first (needed for EC constructor)
+  // Then deploy EC with 6 params: (vibeToken, staking, ecosystem, governance, reserve, output)
+  save('VIBOutputReward', deployed.VIBOutputReward); // Already deployed in Stage 5
+  save('EmissionController', await freshDeploy('EmissionController', 'src/automation/EmissionController.sol:EmissionController', [vibeToken, deployed.VIBStaking, deployed.VIBEcosystemPool, deployed.VIBGovernance, deployed.VIBReserve, deployed.VIBOutputReward]));
 
   // ================================================================
-  // Stage 8: Token Distribution (Whitepaper 10000 bps)
+  // Stage 8: Token Distribution (Whitepaper v1.2 - 2026-03-12)
   // ================================================================
   console.log('\n' + '='.repeat(60));
-  console.log(' Stage 8: Token Distribution (Whitepaper 10000 bps)');
+  console.log(' Stage 8: Token Distribution (Whitepaper v1.2)');
   console.log('='.repeat(60));
 
+  // 白皮书 v1.2 分配方案:
+  //   直接分配(37%): team 8% / early 4% / community 6% / liquidity 12% / airdrop 7%
+  //   激励池(63%): 全部进入EmissionController，由其按周期释放到各子池
+  //     EC内部分配: staking 40% / ecosystem 25% / governance 12% / reserve 10% / output 13%
   const pools = {
-    stakingPool:           deployed.VIBStaking,
-    ecosystemPool:         deployed.VIBEcosystemPool,
-    governancePool:        deployed.VIBGovernance,
-    reservePool:           deployed.VIBReserve,
-    teamVesting:           deployed.VIBVesting,
-    earlySupporterVesting: deployed.VIBVesting,
-    communityFund:         deployed.CommunityStableFund,
-    liquidityManager:      deployed.LiquidityManager,
-    airdropDistributor:    deployed.AirdropDistributor,
+    emissionController:     deployed.EmissionController,  // 63% - 激励池
+    outputRewardPool:      deployed.VIBOutputReward,    // 13% - 产出池(由EC管理)
+    teamVesting:           deployed.VIBVesting,          // 8%
+    earlySupporterVesting: deployed.VIBVesting,         // 4%
+    communityFund:          deployed.CommunityStableFund, // 6%
+    liquidityManager:       deployed.LiquidityManager,   // 12%
+    airdropDistributor:    deployed.AirdropDistributor, // 7%
   };
 
   console.log('\n  Pool addresses:');
@@ -155,21 +160,36 @@ async function main() {
   const TOTAL_SUPPLY = ethers.parseUnits('1000000000', 18);
   const bps = 10000n;
   const amounts = {
-    stakingPool:           TOTAL_SUPPLY * 2835n / bps,
-    ecosystemPool:        TOTAL_SUPPLY * 1890n / bps,
-    governancePool:       TOTAL_SUPPLY * 945n / bps,
-    reservePool:          TOTAL_SUPPLY * 630n / bps,
-    teamVesting:          TOTAL_SUPPLY * 800n / bps,
-    earlySupporterVesting:TOTAL_SUPPLY * 400n / bps,
-    communityFund:        TOTAL_SUPPLY * 600n / bps,
-    liquidityManager:     TOTAL_SUPPLY * 1200n / bps,
-    airdropDistributor:   TOTAL_SUPPLY * 700n / bps,
+    // 激励池 63% (进入EmissionController，由其按周期释放)
+    emissionController:     TOTAL_SUPPLY * 6300n / bps,  // 6.3亿
+    // 直接分配 37%
+    outputRewardPool:       0n,  // 产出池由EC分配，不需要直接mint
+    teamVesting:           TOTAL_SUPPLY * 800n / bps,   // 0.8亿
+    earlySupporterVesting: TOTAL_SUPPLY * 400n / bps,   // 0.4亿
+    communityFund:         TOTAL_SUPPLY * 600n / bps,   // 0.6亿
+    liquidityManager:      TOTAL_SUPPLY * 1200n / bps,  // 1.2亿
+    airdropDistributor:    TOTAL_SUPPLY * 700n / bps,  // 0.7亿
   };
 
-  console.log('\n  Distribution:');
-  for (const [k, v] of Object.entries(amounts)) console.log(`    ${k.padEnd(24)}: ${ethers.formatUnits(v, 18)} VIBE`);
-  const total = Object.values(amounts).reduce((a, b) => a + b, 0n);
-  console.log(`    Total: ${ethers.formatUnits(total, 18)} VIBE`);
+  console.log('\n  Distribution (Whitepaper v1.2):');
+  console.log('  --- 激励池 (63% = 6.3亿, 进入EmissionController) ---');
+  console.log(`    emissionController:    ${ethers.formatUnits(amounts.emissionController, 18)} VIBE (由EC按周期释放)`);
+  console.log('  --- 直接分配 (37% = 3.7亿) ---');
+  console.log(`    teamVesting:          ${ethers.formatUnits(amounts.teamVesting, 18)} VIBE`);
+  console.log(`    earlySupporterVesting:${ethers.formatUnits(amounts.earlySupporterVesting, 18)} VIBE`);
+  console.log(`    communityFund:        ${ethers.formatUnits(amounts.communityFund, 18)} VIBE`);
+  console.log(`    liquidityManager:    ${ethers.formatUnits(amounts.liquidityManager, 18)} VIBE`);
+  console.log(`    airdropDistributor:   ${ethers.formatUnits(amounts.airdropDistributor, 18)} VIBE`);
+  const directTotal = amounts.teamVesting + amounts.earlySupporterVesting + amounts.communityFund + amounts.liquidityManager + amounts.airdropDistributor;
+  console.log(`    直接分配小计:         ${ethers.formatUnits(directTotal, 18)} VIBE`);
+  const total = amounts.emissionController + directTotal;
+  console.log(`    总计:                 ${ethers.formatUnits(total, 18)} VIBE`);
+  console.log('\n  EC内部分配比例 (由EmissionController管理):');
+  console.log('    stakingPool (40%):    2.52亿 → VIBStaking');
+  console.log('    ecosystemPool (25%):  1.575亿 → VIBEcosystemPool');
+  console.log('    governancePool (12%): 0.756亿 → VIBGovernance');
+  console.log('    reservePool (10%):    0.63亿 → VIBReserve');
+  console.log('    outputPool (13%):      0.819亿 → VIBOutputReward');
 
   // Call distributeToPools with fresh wallet
   const prov = new ethers.JsonRpcProvider(RPC_URL);
@@ -179,23 +199,38 @@ async function main() {
   const nonce = parseInt(await prov.send('eth_getTransactionCount', [w.address, 'latest']), 16);
   console.log(`\n  Calling distributeToPools (nonce=${nonce})...`);
   const tx = await tokenContract.distributeToPools(
-    pools.stakingPool, pools.ecosystemPool, pools.governancePool, pools.reservePool,
-    pools.teamVesting, pools.earlySupporterVesting, pools.communityFund,
-    pools.liquidityManager, pools.airdropDistributor,
+    pools.emissionController,    // 63%
+    pools.outputRewardPool,      // 13%(由EC管理)
+    pools.teamVesting,           // 8%
+    pools.earlySupporterVesting, // 4%
+    pools.communityFund,         // 6%
+    pools.liquidityManager,      // 12%
+    pools.airdropDistributor,    // 7%
     { nonce }
   );
   await tx.wait();
   console.log('  Tokens distributed!');
   await new Promise(r => setTimeout(r, 3000));
 
-  // Verify balances
-  console.log('\n  Verifying balances:');
-  for (const [k, addr] of Object.entries(pools)) {
+  // Verify balances (only direct distribution pools, EC balance is checked separately)
+  console.log('\n  Verifying direct distribution balances:');
+  const directPools = {
+    teamVesting: pools.teamVesting,
+    earlySupporterVesting: pools.earlySupporterVesting,
+    communityFund: pools.communityFund,
+    liquidityManager: pools.liquidityManager,
+    airdropDistributor: pools.airdropDistributor,
+  };
+  for (const [k, addr] of Object.entries(directPools)) {
     const bal = await tokenContract.balanceOf(addr);
     const exp = amounts[k];
     const ok = bal === exp ? '✓' : '✗';
     console.log(`  ${ok} ${k.padEnd(24)}: ${ethers.formatUnits(bal, 18)} VIBE`);
   }
+  const ecBal = await tokenContract.balanceOf(pools.emissionController);
+  const ecExp = amounts.emissionController;
+  const ecOk = ecBal === ecExp ? '✓' : '✗';
+  console.log(`  ${ecOk} emissionController:      ${ethers.formatUnits(ecBal, 18)} VIBE`);
 
   // ================================================================
   // Stage 9: Wire Governance
