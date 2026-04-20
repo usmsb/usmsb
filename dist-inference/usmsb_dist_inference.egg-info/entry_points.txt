@@ -1,0 +1,3 @@
+[console_scripts]
+usmsb-executor = node_executor.main:main
+usmsb-scheduler = global_scheduler.main:main
