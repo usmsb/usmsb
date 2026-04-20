@@ -171,7 +171,7 @@ async function main() {
     airdropDistributor:    TOTAL_SUPPLY * 700n / bps,  // 0.7亿
   };
 
-  console.log('\n  Distribution (Whitepaper v1.2):');
+  console.log('\n  Distribution (Whitepaper v1.3):');
   console.log('  --- 激励池 (63% = 6.3亿, 进入EmissionController) ---');
   console.log(`    emissionController:    ${ethers.formatUnits(amounts.emissionController, 18)} VIBE (由EC按周期释放)`);
   console.log('  --- 直接分配 (37% = 3.7亿) ---');
@@ -211,6 +211,19 @@ async function main() {
   await tx.wait();
   console.log('  Tokens distributed!');
   await new Promise(r => setTimeout(r, 3000));
+
+  // 注册EC所有子池为免税地址（重要：EC转账给子池时不能扣0.8%税）
+  // EC 持有 6.3亿，每次向 5 个子池转账时都必须免税
+  console.log('\n  Registering EC sub-pools as tax-exempt...');
+  const tx2 = await tokenContract.registerECSubPools(
+    deployed.VIBStaking,
+    deployed.VIBEcosystemPool,
+    deployed.VIBGovernance,
+    deployed.VIBReserve,
+    deployed.VIBOutputReward
+  );
+  await tx2.wait();
+  console.log('  EC sub-pools registered as tax-exempt!');
 
   // Verify balances (only direct distribution pools, EC balance is checked separately)
   console.log('\n  Verifying direct distribution balances:');

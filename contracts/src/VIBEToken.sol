@@ -215,35 +215,38 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
 
     // ========== 外部函数 ==========
 
-    // ========== 代币分配（白皮书规范，10000 bps = 100%） ==========
-    // 白皮书 v1.2 (2026-03-12):
+    // ========== 代币分配（白皮书 v1.3 规范，10000 bps = 100%） ==========
+    // 白皮书 v1.3 (2026-04-22):
     //   直接分配(37%): team 8% / early 4% / community 6% / liquidity 12% / airdrop 7%
     //   激励池(63%): 全部进入EmissionController，由其按周期释放
     //     EC内部分配: staking 40% / ecosystem 25% / governance 12% / reserve 10% / output 13%
-    uint256 public constant PERCENT_EMISSION_POOL = 5000;   // 50% - 激励池(进入EC)
-    // 注意: EC内部会分配13%给outputRewardPool，所以EC实际控制: 50%+13%=63% ✓
-    // 白皮书63%激励池 = 5亿(EC本体) + 1.3亿(EC分配给output的部分) = 6.3亿 ✓
-    uint256 public constant PERCENT_OUTPUT = 1300;           // 13% - 产出池(EC分配)
+    //
+    // 重要架构说明:
+    //   VIBEToken 把完整的 63% (6.3亿) mint 给 EC
+    //   EC 在每个 epoch 内部转账 13% (8190万) 给 outputRewardPool
+    //   这要求 outputRewardPool 必须是 EC 的子池且设为免税，否则 EC 转账会被扣 0.8% 税
+    //   通过 registerECSubPools() 将 EC 的5个子池全部注册为免税地址
+    //
+    uint256 public constant PERCENT_EMISSION_POOL = 6300;   // 63% - 全部激励池进入EC，EC统一分配
     uint256 public constant PERCENT_TEAM = 800;              //  8.00%
     uint256 public constant PERCENT_EARLY_SUPPORTER = 400;   //  4.00%
     uint256 public constant PERCENT_COMMUNITY = 600;         //  6.00%
     uint256 public constant PERCENT_LIQUIDITY = 1200;        // 12.00%
     uint256 public constant PERCENT_AIRDROP = 700;           //  7.00%
-    // 直接分配小计: 800+400+600+1200+700 = 3700 (37%) ✓
-    // 激励池: 5000 (50%) + 产出池: 1300 (13%) = 6300 (63%) ✓
-    // 直接分配: team 800 + early 400 + community 600 + liquidity 1200 + airdrop 700 = 3700 (37%) ✓
-    // 总计: 3700 + 5000 + 1300 = 10000 ✓
+    // 直接分配: 800+400+600+1200+700 = 3700 (37%) ✓
+    // 激励池:   6300 (63%) → EC，EC内部分配13%给outputRewardPool ✓
+    // 总计:     3700 + 6300 = 10000 (100%) ✓
 
     /// @notice 代币分配事件（白皮书 v1.3 规范）
-    /// @dev 激励池63% = 50%→EC + 13%→outputRewardPool(EC管理)
+    /// @dev 激励池63%全部进入EC，EC内部分配13%给outputRewardPool
     event TokensDistributed(
-        address emissionController,   // 50%激励池
-        address outputRewardPool,   // 13%产出池(由EC分配)
-        address teamVesting,         // 8%
-        address earlySupporterVesting, // 4%
-        address communityFund,       // 6%
-        address liquidityManager,   // 12%
-        address airdropDistributor  // 7%
+        address emissionController,       // 63%激励池（EC控制全部激励池）
+        address outputRewardPool,          // 13%产出池（由EC内部转账分配）
+        address teamVesting,               // 8%
+        address earlySupporterVesting,     // 4%
+        address communityFund,             // 6%
+        address liquidityManager,          // 12%
+        address airdropDistributor        // 7%
     );
 
     /**
@@ -251,24 +254,23 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      * @dev 只能由 owner 调用一次
      *
      * 分配比例（占总供应量，10000 bps）：
-     * - 激励池: 50% → emissionController（由EC按周期释放到各子池）
-     * - 产出池: 13% → outputRewardPool（由EC按周期自动分配，EC内部转移）
+     * - 激励池: 63% → emissionController（由EC按周期释放到子池）
+     * - 产出池: 13% → outputRewardPool（由EC内部转账，从EC余额中转出）
      * - 团队锁仓: 8% → teamVesting（1年cliff + 4年线性释放）
      * - 早期支持者: 4% → earlySupporterVesting（6个月cliff + 2年线性释放）
      * - 社区基金: 6% → communityFund
      * - 流动性池: 12% → liquidityManager
      * - 空投: 7% → airdropDistributor
-     * - 激励池控制总量: 5亿(EC) + 1.3亿(分配给output) = 6.3亿 ✓
      *
      * 激励池(63%)通过EmissionController按周期释放:
      * - 质押池: 40% of EC → VIBStaking
      * - 生态池: 25% of EC → VIBEcosystemPool
      * - 治理池: 12% of EC → VIBGovernance
      * - 储备池: 10% of EC → VIBReserve
-     * - 产出池: 13% of EC → VIBOutputReward
+     * - 产出池: 13% of EC → VIBOutputReward（EC内部转账）
      *
-     * @param _emissionController 激励池合约地址（接收63%）
-     * @param _outputRewardPool 产出池地址（由EC管理，接收13%分配）
+     * @param _emissionController 激励池合约地址（接收63%=6.3亿）
+     * @param _outputRewardPool 产出池地址（由EC内部转账分配）
      * @param _teamVesting 团队锁仓合约地址（8%）
      * @param _earlySupporterVesting 早期支持者锁仓合约地址（4%）
      * @param _communityFund 社区基金地址（6%）
@@ -277,7 +279,7 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
      */
     function distributeToPools(
         address _emissionController,     // 63%激励池
-        address _outputRewardPool,       // 13%产出池(由EC管理)
+        address _outputRewardPool,       // 13%产出池（由EC管理，EC内部转账）
         address _teamVesting,           // 8%
         address _earlySupporterVesting, // 4%
         address _communityFund,         // 6%
@@ -290,15 +292,11 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
             _communityFund != address(0) && _liquidityManager != address(0) &&
             _airdropDistributor != address(0), "VIBEToken: invalid pool address");
 
-        // 激励池 50% → EmissionController（由其按周期释放到子池，不含output）
-        // EC内部分配: staking 40% / ecosystem 25% / governance 12% / reserve 10% / output 13%
-        // EC控制总量: 5亿(EC) + 1.3亿(分配给output) = 6.3亿 ✓
+        // 激励池 63% → EmissionController（由其按周期释放到子池，含13%分配给outputRewardPool）
+        // EC控制总量: 6.3亿（全部激励池）
         _mint(_emissionController, (TOTAL_SUPPLY * PERCENT_EMISSION_POOL) / 10000);
 
-        // 产出激励池 13% → outputRewardPool（由EC按周期自动分配）
-        _mint(_outputRewardPool, (TOTAL_SUPPLY * PERCENT_OUTPUT) / 10000);
-
-        // 保存激励池和产出池地址
+        // 保存激励池和产出池地址（注意：outputRewardPool 由 EC 内部转账，不再直接 mint）
         emissionController = _emissionController;
         outputRewardPool = _outputRewardPool;
 
@@ -435,6 +433,31 @@ contract VIBEToken is ERC20, ERC20Permit, Ownable, Pausable {
         require(addr != address(0), "VIBEToken: invalid address");
         taxExemptedAddresses[addr] = isExempted;
         emit TaxExemptStatusUpdated(addr, isExempted);
+    }
+
+    /**
+     * @notice 注册EmissionController的所有子池为免税地址
+     * @dev 在 distributeToPools() 之后调用一次。EC 需要向 5 个子池转账，必须免税
+     *      否则 EC 每次转账（staking/ecosystem/governance/reserve/output 各 40/25/12/10/13%）
+     *      都会被扣除 0.8% 交易税，累计损耗巨大
+     * @param _stakingPool 质押池地址
+     * @param _ecosystemPool 生态池地址
+     * @param _governancePool 治理池地址
+     * @param _reservePool 储备池地址
+     * @param _outputRewardPool 产出池地址
+     */
+    function registerECSubPools(
+        address _stakingPool,
+        address _ecosystemPool,
+        address _governancePool,
+        address _reservePool,
+        address _outputRewardPool
+    ) external onlyOwner {
+        if (_stakingPool != address(0)) taxExemptedAddresses[_stakingPool] = true;
+        if (_ecosystemPool != address(0)) taxExemptedAddresses[_ecosystemPool] = true;
+        if (_governancePool != address(0)) taxExemptedAddresses[_governancePool] = true;
+        if (_reservePool != address(0)) taxExemptedAddresses[_reservePool] = true;
+        if (_outputRewardPool != address(0)) taxExemptedAddresses[_outputRewardPool] = true;
     }
 
     /**
