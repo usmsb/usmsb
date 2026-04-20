@@ -35,6 +35,26 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
     /// @notice 精度
     uint256 public constant PRECISION = 10000;
 
+    /// @notice 价格历史窗口（天数）
+    uint256 public constant PRICE_WINDOW_DAYS = 7;
+
+    /// @notice 触发回购所需的连续跌破天数（至少4天）
+    uint256 public constant CONSECUTIVE_BREACH_THRESHOLD = 4;
+
+    /// @notice 价格记录最小间隔（24小时）
+    uint256 public constant PRICE_RECORD_INTERVAL = 24 hours;
+
+    // ========== 价格历史（循环缓冲区） ==========
+
+    /// @notice 最近7天的价格快照
+    mapping(uint256 => uint256) public priceHistory; // index -> price
+
+    /// @notice 价格历史长度
+    uint256 public priceHistoryLength;
+
+    /// @notice 最后一次记录价格的时间
+    uint256 public lastPriceRecordTime;
+
     // ========== 安全修复: 防抢跑机制 ==========
 
     /// @notice 提交-揭示方案的提交窗口（秒）
@@ -51,6 +71,9 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
 
     /// @notice 揭示事件
     event BuybackRevealed(bytes32 indexed commitHash, address indexed committer, uint256 ethSpent, uint256 vibeBought);
+
+    /// @notice 价格记录事件
+    event PriceRecorded(uint256 indexed index, uint256 price, uint256 historyLength);
 
     // ========== 状态变量 ==========
 
@@ -146,6 +169,25 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
     receive() external payable {}
 
     // ========== 外部函数 ==========
+
+    /**
+     * @notice 记录当前价格到历史（任何人可调用，每天最多一次）
+     * @dev 自动在触发回购/流动性注入时由合约内部调用
+     *      也可由 keeper/外部脚本定期调用
+     * @return recorded 是否成功记录（需满足间隔条件）
+     */
+    function recordPrice() external returns (bool recorded) {
+        if (block.timestamp < lastPriceRecordTime + PRICE_RECORD_INTERVAL) {
+            return false;
+        }
+        uint256 currentPrice = IPriceOracle(priceOracle).getPrice();
+        uint256 index = priceHistoryLength % PRICE_WINDOW_DAYS;
+        priceHistory[index] = currentPrice;
+        priceHistoryLength++;
+        lastPriceRecordTime = block.timestamp;
+        emit PriceRecorded(index, currentPrice, priceHistoryLength);
+        return true;
+    }
 
     /**
      * @notice 提交回购意图（Commit阶段 - 防抢跑）
@@ -300,6 +342,9 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice 检查是否可以触发回购
+     * @dev 白皮书要求：连续7天内至少4天价格跌破20%均线
+     *      价格数据通过 recordPrice() 记录，每天最多一条
+     *      如果历史数据不足7天，不满足条件（白皮书要求7天窗口）
      */
     function canTriggerBuyback() external view returns (bool, string memory) {
         if (address(this).balance == 0) {
@@ -312,11 +357,31 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
         (uint256 currentPrice, uint256 avgPrice) = _getPriceData();
         uint256 threshold = (avgPrice * (PRECISION - buybackThreshold)) / PRECISION;
 
+        // 先检查当前价格是否跌破（快速路径）
         if (currentPrice >= threshold) {
             return (false, "Price not low enough");
         }
 
+        // 统计最近7天的跌破天数
+        uint256 breachDays = _countBreachDays(threshold);
+        if (breachDays < CONSECUTIVE_BREACH_THRESHOLD) {
+            return (false, "Not enough breach days");
+        }
+
         return (true, "Can trigger");
+    }
+
+    /**
+     * @notice 获取最近N天的跌破天数（用于透明验证）
+     * @param lookbackDays 往前看多少天（最大7）
+     */
+    function getBreachDays(uint256 lookbackDays) external view returns (uint256 breachDays, uint256 actualDays) {
+        if (lookbackDays > PRICE_WINDOW_DAYS) {
+            lookbackDays = PRICE_WINDOW_DAYS;
+        }
+        (uint256 currentPrice, uint256 avgPrice) = _getPriceData();
+        uint256 threshold = (avgPrice * (PRECISION - buybackThreshold)) / PRECISION;
+        return (_countBreachDays(threshold), lookbackDays);
     }
 
     /**
@@ -390,6 +455,30 @@ contract CommunityStableFund is Ownable, ReentrancyGuard, Pausable {
      */
     function _getCurrentPrice() internal view returns (uint256) {
         return IPriceOracle(priceOracle).getPrice();
+    }
+
+    /**
+     * @notice 统计最近7天价格跌破阈值的次数
+     * @dev 循环缓冲区：index = (priceHistoryLength - 1 - i) % PRICE_WINDOW_DAYS
+     *      priceHistoryLength < PRICE_WINDOW_DAYS 时表示还未积累够7天数据
+     * @param threshold 价格阈值
+     * @return breachDays 跌破天数
+     */
+    function _countBreachDays(uint256 threshold) internal view returns (uint256 breachDays) {
+        uint256 totalRecords = priceHistoryLength;
+
+        // 还没积累够7天数据（白皮书要求7天窗口）
+        if (totalRecords < PRICE_WINDOW_DAYS) {
+            return 0;
+        }
+
+        // 从最新的记录往前数7天
+        for (uint256 i = 0; i < PRICE_WINDOW_DAYS; i++) {
+            uint256 index = (totalRecords - 1 - i) % PRICE_WINDOW_DAYS;
+            if (priceHistory[index] < threshold) {
+                breachDays++;
+            }
+        }
     }
 
     /**
