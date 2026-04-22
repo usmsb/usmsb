@@ -31,7 +31,7 @@ class MiniMaxAdapter(ILLMAdapter):
     Uses httpx directly for proper Bearer token authentication.
     """
 
-    DEFAULT_MODEL = "abab6.5s-chat"
+    DEFAULT_MODEL = "MiniMax-M2.7-highspeed"
     DEFAULT_EMBEDDING_MODEL = "embo-01"
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
@@ -92,6 +92,7 @@ class MiniMaxAdapter(ILLMAdapter):
             # Create httpx client with proper Bearer token authentication
             # MiniMax requires Authorization: Bearer {api_key}
             # 增加超时时间以避免连接断开
+            # 注意：trust_env=False 用于避免代理环境变量干扰
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers={
@@ -99,6 +100,7 @@ class MiniMaxAdapter(ILLMAdapter):
                     "Content-Type": "application/json",
                 },
                 timeout=httpx.Timeout(300.0, connect=30.0),  # 增加到5分钟超时，30秒连接超时
+                trust_env=False,  # 禁用环境变量代理，避免连接问题
             )
 
             # Create embedding client for MiniMax embedding API (uses separate key if configured)
@@ -109,6 +111,7 @@ class MiniMaxAdapter(ILLMAdapter):
                     "Content-Type": "application/json",
                 },
                 timeout=httpx.Timeout(60.0, connect=10.0),
+                trust_env=False,  # 禁用环境变量代理，避免连接问题
             )
 
             self.status = IntelligenceSourceStatus.READY

@@ -98,6 +98,7 @@ class ChatWebSocketHandler:
         self,
         websocket: WebSocket,
         wallet_address: str,
+        frontend_session_id: str | None = None,
     ) -> None:
         """
         处理新的 WebSocket 连接
@@ -105,14 +106,32 @@ class ChatWebSocketHandler:
         Args:
             websocket: WebSocket 连接
             wallet_address: 钱包地址
+            frontend_session_id: 前端传递的 session_id，确保与 SSE 一致
         """
-        # Use the same session_id derivation as frontend:
-        # f"ws_{wallet_address}_{timestamp}" with minute-level timestamp
-        ts = int(time.time() // 60) * 60 * 1000
-        session_id = f"ws_{wallet_address}_{ts}"
+        # 优先使用前端传递的 session_id，确保与 SSE 使用同一 session_id
+        # 如果前端未传递，则派生一个（兼容旧版本）
+        if frontend_session_id:
+            session_id = frontend_session_id
+        else:
+            import time
+            ts = int(time.time() // 60) * 60 * 1000
+            session_id = f"ws_{wallet_address}_{ts}"
+            logger.warning(f"[WSHandler] 前端未传递 session_id，使用派生值: {session_id}")
 
+        logger.info(f"[WSHandler] handle_connection START: session_id={session_id}, wallet={wallet_address}")
+        
+        # 拒绝重复连接：如果已有同 session_id 的连接，先关闭旧连接
+        existing = self._clients.get(session_id)
+        if existing:
+            logger.warning(f"[WSHandler] Duplicate WS connection for session_id={session_id}, closing old connection")
+            try:
+                await existing.websocket.close(code=1000, reason="Replaced by new connection")
+            except Exception:
+                pass
+        
         try:
             await websocket.accept()
+            logger.info(f"[WSHandler] WebSocket accepted: {session_id}")
 
             client = WSClient(
                 websocket=websocket,
@@ -138,6 +157,8 @@ class ChatWebSocketHandler:
             while True:
                 try:
                     data = await websocket.receive_json()
+                    logger.info(f"[WSHandler] RECEIVED MESSAGE: {data}")
+                    logger.info(f"[WSHandler] Current clients BEFORE _handle_message: {list(self._clients.keys())}")
                     await self._handle_message(session_id, data)
                 except WebSocketDisconnect:
                     logger.info(f"[WSHandler] Client disconnected: {session_id}")
@@ -147,6 +168,9 @@ class ChatWebSocketHandler:
                         websocket,
                         "Invalid JSON format",
                     )
+                except Exception as e:
+                    logger.error(f"[WSHandler] Error in message loop: {e}", exc_info=True)
+                    await self._send_error(websocket, f"Error: {e}")
 
         except Exception as e:
             logger.error(f"[WSHandler] Connection error: {e}")
@@ -212,8 +236,10 @@ class ChatWebSocketHandler:
         3. 启动 chat_stream
         4. SSE 连接监听同一 session
         """
+        logger.info(f"[WSHandler] _handle_user_message ENTRY: session_id={session_id}, clients={list(self._clients.keys())}")
         client = self._clients.get(session_id)
         if not client:
+            logger.warning(f"[WSHandler] _handle_user_message: client not found for session_id={session_id}")
             return
 
         message = command.payload.get("message", "")
@@ -246,9 +272,14 @@ class ChatWebSocketHandler:
         # 通知 SSE 管理器有新的 chat_stream
         # (SSE 管理器会负责推送事件到前端)
         if self._session_manager:
-            asyncio.create_task(
-                self._session_manager.broadcast_session_events(session_id, chat_session, message)
-            )
+            async def broadcast_with_error_handling():
+                try:
+                    async for event in chat_session.chat_stream(message):
+                        await self._session_manager._sse_manager.push_event(session_id, event)
+                except Exception as e:
+                    logger.error(f"[WSHandler] broadcast_session_events error: {e}", exc_info=True)
+            
+            asyncio.create_task(broadcast_with_error_handling())
 
     async def _handle_confirm_plan(
         self,
