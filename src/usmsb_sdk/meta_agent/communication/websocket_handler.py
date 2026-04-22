@@ -66,6 +66,7 @@ class ChatWebSocketHandler:
         self._clients: dict[str, WSClient] = {}  # session_id -> WSClient
         self._running = False
         self._ping_task: asyncio.Task | None = None
+        self._tasks: dict[str, asyncio.Task] = {}  # 跟踪每个 session_id 的活跃任务
 
     async def start(self) -> None:
         """启动处理器"""
@@ -177,6 +178,11 @@ class ChatWebSocketHandler:
         finally:
             if session_id in self._clients:
                 del self._clients[session_id]
+            # 取消该 session_id 的活跃任务
+            if session_id in self._tasks:
+                task = self._tasks.pop(session_id)
+                task.cancel()
+                logger.info(f"[WSHandler] Cancelled task on disconnect for session_id={session_id}")
 
     async def _handle_message(
         self,
@@ -272,14 +278,24 @@ class ChatWebSocketHandler:
         # 通知 SSE 管理器有新的 chat_stream
         # (SSE 管理器会负责推送事件到前端)
         if self._session_manager:
+            # 取消该 session_id 的旧任务（如果有）
+            if session_id in self._tasks:
+                old_task = self._tasks.pop(session_id)
+                old_task.cancel()
+                logger.info(f"[WSHandler] Cancelled old task for session_id={session_id}")
+
             async def broadcast_with_error_handling():
                 try:
                     async for event in chat_session.chat_stream(message):
                         await self._session_manager._sse_manager.push_event(session_id, event)
+                except asyncio.CancelledError:
+                    logger.info(f"[WSHandler] Broadcast task cancelled for session_id={session_id}")
+                    raise
                 except Exception as e:
                     logger.error(f"[WSHandler] broadcast_session_events error: {e}", exc_info=True)
-            
-            asyncio.create_task(broadcast_with_error_handling())
+
+            task = asyncio.create_task(broadcast_with_error_handling())
+            self._tasks[session_id] = task
 
     async def _handle_confirm_plan(
         self,

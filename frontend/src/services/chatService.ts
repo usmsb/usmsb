@@ -97,12 +97,13 @@ class ChatWebSocketClient {
 
   connect(): Promise<string> {
     return new Promise((resolve, reject) => {
+      // Use VITE_API_URL env variable if set, otherwise use current host (for proxy)
+      const apiHost = import.meta.env.VITE_API_URL || window.location.host
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.host
-      // Use the pre-generated session ID in the URL path
-      const wsUrl = `${protocol}//${host}/api/meta-agent/ws/chat/${this.walletAddress}`
+      // 将 session_id 通过 query parameter 传递给后端，确保 WS 和 SSE 使用同一 session_id
+      const wsUrl = `${protocol}//${apiHost}/api/meta-agent/ws/chat/${this.walletAddress}?session_id=${encodeURIComponent(this._sessionId)}`
 
-      console.log('[ChatWS] Connecting to', wsUrl, 'with sessionId', this._sessionId)
+      console.log('[ChatWS] Connecting to', wsUrl, 'sessionId:', this._sessionId)
 
       this.ws = new WebSocket(wsUrl)
 
@@ -189,14 +190,20 @@ class ChatWebSocketClient {
   }
 
   send(type: string, payload: Record<string, any>) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
+    const readyState = this.ws?.readyState
+    console.log(`[ChatWS] send() called: type=${type}, readyState=${readyState}, OPEN=${WebSocket.OPEN}`)
+    if (readyState === WebSocket.OPEN) {
+      const data = JSON.stringify({
         type,
         payload,
         session_id: this._sessionId,
         wallet_address: this.walletAddress,
         timestamp: Date.now() / 1000,
-      }))
+      })
+      console.log('[ChatWS] Sending:', data)
+      this.ws.send(data)
+    } else {
+      console.warn('[ChatWS] send() dropped message - WebSocket not OPEN')
     }
   }
 
@@ -237,22 +244,25 @@ class ChatWebSocketClient {
 class ChatSSEClient {
   private eventSource: EventSource | null = null
   private walletAddress: string = ''
+  private sessionId: string = ''
   private handlers: Set<ChatEventHandler> = new Set()
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
 
-  constructor(walletAddress: string) {
+  constructor(walletAddress: string, sessionId: string) {
     this.walletAddress = walletAddress
+    this.sessionId = sessionId
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const host = window.location.host
-      // Use wallet_address like backend does to derive session_id
-      const sseUrl = `${window.location.protocol}//${host}/api/meta-agent/sse/chat/${this.walletAddress}`
+      // Use VITE_API_URL env variable if set, otherwise use current host (for proxy)
+      const apiHost = import.meta.env.VITE_API_URL || window.location.host
+      // CRITICAL: Pass session_id so SSE uses the SAME session as WebSocket
+      const sseUrl = `${window.location.protocol}//${apiHost}/api/meta-agent/sse/chat/${this.walletAddress}?session_id=${encodeURIComponent(this.sessionId)}`
 
-      console.log('[ChatSSE] Connecting to', sseUrl)
+      console.log('[ChatSSE] Connecting to', sseUrl, 'with sessionId', this.sessionId)
 
       this.eventSource = new EventSource(sseUrl)
 
@@ -285,7 +295,12 @@ class ChatSSEClient {
       eventTypes.forEach(type => {
         this.eventSource?.addEventListener(type, (e: MessageEvent) => {
           try {
-            const data = JSON.parse(e.data)
+            // Handle undefined or null data
+            if (e.data === undefined || e.data === null || e.data === 'undefined') {
+              console.warn('[ChatSSE] Received empty/undefined event data, skipping')
+              return
+            }
+            const data = JSON.parse(e.data as string)
             const event: ChatStreamEvent = {
               event: type,
               data: data.data,
@@ -294,7 +309,11 @@ class ChatSSEClient {
             }
             this.emit(event)
           } catch (error) {
-            console.error('[ChatSSE] Failed to parse event:', error)
+            console.error('[ChatSSE] Failed to parse event:', error, 'Raw data:', e.data)
+            // If parsing fails due to stale session, trigger reconnection
+            if (this.reconnectAttempts === 0) {
+              console.log('[ChatSSE] Parsing error on first connection, will retry with same session')
+            }
           }
         })
       })
@@ -351,8 +370,8 @@ export class ChatService {
     return sessionId
   }
 
-  async startSSE(walletAddress: string): Promise<void> {
-    this.sseClient = new ChatSSEClient(walletAddress)
+  async startSSE(walletAddress: string, sessionId: string): Promise<void> {
+    this.sseClient = new ChatSSEClient(walletAddress, sessionId)
     await this.sseClient.connect()
   }
 
@@ -453,21 +472,39 @@ export function useChatStreaming(options: UseChatStreamingOptions) {
   useEffect(() => {
     if (!enabled || !walletAddress) return
 
-    let mounted = true
+    // React StrictMode 会立即重新执行 effect，然后执行 cleanup
+    // 如果 serviceRef.current 已有实例，说明是 StrictMode 触发的重复执行
+    // 此时应该复用现有实例，而不是创建新的
+    if (serviceRef.current) {
+      // 确保状态同步
+      if (!isConnected) {
+        setIsConnected(true)
+        setSessionId(serviceRef.current.getSessionId())
+      }
+      return
+    }
+
     let service: ChatService | null = new ChatService()
     serviceRef.current = service
 
     const connect = async () => {
       try {
         const sid = await service!.connect(walletAddress)
-        if (!mounted) return
+        // 检查 serviceRef 是否仍指向当前实例（可能被 StrictMode 清理后重建）
+        if (serviceRef.current !== service) {
+          service?.disconnect()
+          return
+        }
         setSessionId(sid)
-        await service!.startSSE(walletAddress)
-        if (!mounted) return
+        await service!.startSSE(walletAddress, sid)
+        if (serviceRef.current !== service) {
+          service?.disconnect()
+          return
+        }
         service!.subscribe(handleEvent)
         setIsConnected(true)
       } catch (error) {
-        if (!mounted) return
+        if (serviceRef.current !== service) return
         console.error('[useChatStreaming] Connection failed:', error)
         onError?.('Failed to connect to chat service')
       }
@@ -476,7 +513,13 @@ export function useChatStreaming(options: UseChatStreamingOptions) {
     connect()
 
     return () => {
-      mounted = false
+      // StrictMode 下 cleanup 会在下一次 effect 执行之后才运行
+      // 此时 serviceRef.current 可能已被新的 service 替换
+      // 如果被替换了，不清理当前实例（让新的 instance 继续使用）
+      if (serviceRef.current !== service) {
+        return
+      }
+      // 只有当前 instance 仍是活跃的，才清理
       service?.disconnect()
       serviceRef.current = null
       setIsConnected(false)
