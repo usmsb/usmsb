@@ -97,6 +97,13 @@ class ChatWebSocketClient {
 
   connect(): Promise<string> {
     return new Promise((resolve, reject) => {
+      // 如果已有 open 的连接，复用它而不是创建新的
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        console.log('[ChatWS] Reusing existing WebSocket connection, sessionId:', this._sessionId)
+        resolve(this._sessionId)
+        return
+      }
+
       // Use VITE_API_URL env variable if set, otherwise use current host (for proxy)
       const apiHost = import.meta.env.VITE_API_URL || window.location.host
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -116,9 +123,12 @@ class ChatWebSocketClient {
       }
 
       this.ws.onclose = (event) => {
-        console.log('[ChatWS] Disconnected:', event.reason)
-        if (!this.isIntentionalClose) {
-          this.scheduleReconnect()
+        console.log('[ChatWS] Disconnected:', event.reason, 'wasIntentional:', this.isIntentionalClose)
+        // 如果不是主动关闭且有待处理消息，不自动重连
+        // 等待消息响应或显式重连
+        if (!this.isIntentionalClose && this.ws?.readyState !== WebSocket.CONNECTING) {
+          // 检查是否真的需要重连（不是被新的连接替代）
+          console.log('[ChatWS] Connection closed, not scheduling reconnect (will reconnect on next send if needed)')
         }
       }
 
@@ -273,7 +283,10 @@ class ChatSSEClient {
       }
 
       this.eventSource.onerror = (error) => {
-        console.error('[ChatSSE] Error:', error)
+        // EventSource error events don't have a message property like WebSocket
+        // This error often fires when the server closes the connection (e.g., during session refresh)
+        // We don't need to log it as an error since reconnection will handle it
+        console.warn('[ChatSSE] Connection interrupted, reconnecting...')
         if (this.eventSource) {
           this.eventSource.close()
         }

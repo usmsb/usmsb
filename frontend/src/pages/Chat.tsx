@@ -107,10 +107,13 @@ export default function Chat() {
   // Streaming state
   const [streamingText, setStreamingText] = useState('')
   const [currentPlan, setCurrentPlan] = useState<PlanReadyData | null>(null)
+  // Ref to track latest streaming text (avoids causing reconnection on every text update)
+  const streamingTextRef = useRef('')
 
   // Handle streaming text delta
   const handleTextDelta = useCallback((text: string) => {
-    setStreamingText(prev => prev + text)
+    streamingTextRef.current += text
+    setStreamingText(streamingTextRef.current)
   }, [])
 
   // Handle plan ready
@@ -121,18 +124,19 @@ export default function Chat() {
 
   // Handle task complete
   const handleTaskComplete = useCallback(() => {
-    if (streamingText) {
+    if (streamingTextRef.current) {
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: streamingText,
+        content: streamingTextRef.current,
         timestamp: new Date().toISOString(),
       }
       setMessages(prev => [...prev, assistantMessage as ExtendedMessage])
+      streamingTextRef.current = ''
       setStreamingText('')
     }
     setIsLoading(false)
     setCurrentPlan(null)
-  }, [streamingText])
+  }, [])
 
   // Handle error
   const handleError = useCallback((error: string) => {
