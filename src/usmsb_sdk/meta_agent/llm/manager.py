@@ -60,6 +60,47 @@ class LLMManager:
             return await self._chat_local(message, system_prompt)
         return "LLM not configured"
 
+    def complete(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.7,
+        **kwargs
+    ) -> str:
+        """
+        同步补全方法（供 PurposeGenerator 等使用）
+        
+        Args:
+            prompt: 用户提示
+            system_prompt: 系统提示
+            max_tokens: 最大 token 数
+            temperature: 温度参数
+            **kwargs: 其他参数
+            
+        Returns:
+            str: LLM 响应文本
+        """
+        import asyncio
+        import concurrent.futures
+        
+        def run_async():
+            """在线程中运行异步代码"""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self.chat(prompt, system_prompt))
+            finally:
+                loop.close()
+        
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_async)
+                return future.result(timeout=60)
+        except Exception as e:
+            logger.error(f"[LLMManager] complete() error: {e}")
+            return f"LLM error: {str(e)}"
+
     async def _chat_openai(self, message: str, system_prompt: str | None) -> str:
         """OpenAI 聊天"""
         return f"OpenAI response to: {message}"

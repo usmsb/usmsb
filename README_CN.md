@@ -184,6 +184,8 @@ cd frontend && npm install && npm run dev
 - [L1-L5技术路线图](./docs/roadmap/L1_L5_TECH_ROADMAP.md)
 - [执行计划](./docs/roadmap/v2.0_PLAN.md)
 - [Agent Skill](./src/usmsb_sdk/agent_skill/usmsb-agent-platform/SKILL.md)
+- [去中心化跨组织Agent协作场景分析](./docs/analysis/decentralized_agent_collaboration_scenarios.md)
+- [场景痛点与机遇分析](./docs/analysis/scenario_pain_points_and_opportunities.md)
 
 ---
 

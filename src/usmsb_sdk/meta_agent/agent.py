@@ -437,6 +437,9 @@ class MetaAgent:
         # ========== A2A HTTP Server ==========
         self._a2a_server_task: asyncio.Task | None = None
 
+        # ========== FastAPI REST Server (同一进程，同一事件循环，无多进程问题) ==========
+        self._api_server_task: asyncio.Task | None = None
+
         # ========== P2P 网络（外部 Agent 发现）==========
         self._p2p_handler: Any = None
 
@@ -716,6 +719,19 @@ class MetaAgent:
 
         await self.goal_engine.stop()
         await self.context_manager.save()
+
+        # ========== 停止 FastAPI REST Server（asyncio task，同一进程） ==========
+        if self._api_server_task:
+            self._api_server_task.cancel()
+            try:
+                await self._api_server_task
+            except asyncio.CancelledError:
+                pass
+            self._api_server_task = None
+            logger.info("[SERVER] API server task cancelled")
+
+        # 重置引用，确保下次 start() 时幂等检查正确工作
+        self._api_server_task = None
 
         # ========== 新增：停止会话管理器 ==========
         try:
@@ -1354,29 +1370,55 @@ class MetaAgent:
             logger.debug("_process_pending_tasks error: %s", e)
 
     async def _start_api_server(self) -> None:
-        """启动 FastAPI REST Server（在独立端口上运行 MetaAgent API）。"""
-        try:
-            # 如果已在 uvicorn 模式运行（通过环境变量检测），跳过
-            if os.environ.get("USMSB_UVICORN_MODE") == "1":
-                logger.info("[SERVER] Skipping embedded server (uvicorn mode)")
-                return
+        """启动 FastAPI REST Server（在主 asyncio 事件循环中运行，无多进程问题）。
 
+        旧方案用 threading.Thread + uvicorn，缺点：
+        - macOS 上 uvicorn 会 fork 出 worker 进程，导致子进程看不到 _chat_session_manager
+        - 模块级变量不跨进程共享
+
+        新方案用 asyncio.create_task() 直接在主事件循环中运行 uvicorn，
+        确保所有请求与 MetaAgent 在同一进程共享 _chat_session_manager。
+        """
+        logger.info("[SERVER] _start_api_server() called")
+        try:
             port = int(os.environ.get("USMSB_API_PORT", "8001"))
             host = os.environ.get("USMSB_API_HOST", "0.0.0.0")
-            # 延迟导入避免循环依赖
-            from usmsb_sdk.api.rest.main import run_server
-            import asyncio
-            # 在后台线程中启动 uvicorn（不阻塞主循环）
-            def _run():
+
+            # 幂等检查：已有任务运行中则跳过
+            if self._api_server_task is not None:
+                logger.info("[SERVER] API server task already running, skipping")
+                return
+
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.bind((host, port))
+                sock.close()
+            except OSError:
+                logger.info("[SERVER] FastAPI server already running (port %d in use), skipping", port)
+                return
+
+            # 方案：用 asyncio.create_task() 在当前事件循环中运行 uvicorn
+            # uvicorn.Config(..., loop=None) 会使用当前线程的事件循环，避免多进程
+            async def _run_uvicorn():
                 import asyncio as _asy
                 from uvicorn import Config, Server
-                cfg = Config("usmsb_sdk.api.rest.main:app", host=host, port=port, log_level="info")
+                # loop=None 确保 uvicorn 使用当前线程的事件循环（就是 MetaAgent 的那个）
+                cfg = Config(
+                    "usmsb_sdk.api.rest.main:app",
+                    host=host,
+                    port=port,
+                    log_level="info",
+                    loop=None,          # 关键：复用当前事件循环
+                    reload=False,
+                    workers=1,          # 单进程，彻底避免 fork 问题
+                )
                 srv = Server(cfg)
-                _asy.run(srv.serve(), debug=False)
-            import threading
-            t = threading.Thread(target=_run, daemon=True)
-            t.start()
-            logger.info("[SERVER] FastAPI server starting on %s:%d", host, port)
+                await srv.serve()
+
+            self._api_server_task = asyncio.create_task(_run_uvicorn())
+            logger.info("[SERVER] FastAPI server starting on %s:%d (same process, same event loop)", host, port)
+
         except Exception as e:
             logger.warning("[SERVER] Failed to start API server: %s", e)
 
@@ -1804,6 +1846,7 @@ class MetaAgent:
         # =====================================================================
         # StrategyRouter 路由 - ALL tasks 唯一入口（全链路自主）
         # =====================================================================
+        chat_result = None  # 初始化，避免 UnboundLocalError
         if self.strategy_router:
             try:
                 scenario_tag = await self.strategy_router._classify_scenario(message)
@@ -1964,7 +2007,9 @@ class MetaAgent:
             await self.learning.learn_from_experience()
 
             # Evolution Engine 自我进化（每轮主循环调用一次）
-            if self.evolution_engine:
+            # DISABLED: Evolution consumes too much LLM resources, causing chat requests to timeout
+            # TODO: Re-enable when LLM quota is sufficient or run Evolution as a separate background task
+            if False and self.evolution_engine:
                 try:
                     evo_result = await self.evolution_engine.evolve()
                     if evo_result and evo_result.get("knowledge_added", 0) > 0:
@@ -1978,12 +2023,14 @@ class MetaAgent:
             if self.l4_agent:
                 try:
                     reflection = await self.l4_agent.self_reflect()
-                    if reflection.insights:
-                        logger.info("[L4] Self-insights: %s", str(reflection.insights)[:100])
+                    if hasattr(reflection, 'observations') and reflection.observations:
+                        logger.info("[L4] Self-insights: %s", str(reflection.observations)[:100])
                     if hasattr(reflection, 'lessons') and reflection.lessons:
                         self._l4_lessons = reflection.lessons
                     if hasattr(reflection, 'recommendations') and reflection.recommendations:
                         self._l4_recommendations = reflection.recommendations
+                    if hasattr(reflection, 'metacognitive_insight') and reflection.metacognitive_insight:
+                        logger.info("[L4] Metacognitive insight: %s", str(reflection.metacognitive_insight)[:100])
                 except Exception as e:
                     logger.warning("[L4] self_reflect failed: %s", e)
 

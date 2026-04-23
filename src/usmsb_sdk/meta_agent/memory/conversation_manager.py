@@ -700,6 +700,77 @@ class ConversationManager:
             for row in rows
         ]
 
+    async def get_recent(self, limit: int = 10) -> list[dict]:
+        """获取最近的所有会话（用于 Evolution 引擎学习）"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_recent, limit)
+
+    def _get_recent(self, limit: int) -> list[dict]:
+        """获取最近会话实现（不限用户）"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, summary, created_at, updated_at, status
+            FROM conversations
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "title": row[1] if row[1] else "未命名会话",
+                "created_at": row[2],
+                "updated_at": row[3],
+                "status": row[4],
+            }
+            for row in rows
+        ]
+
+    async def get_messages(self, conversation_id: str) -> list[dict]:
+        """获取会话的所有消息（用于 Evolution 引擎学习）"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._get_messages, conversation_id)
+
+    def _get_messages(self, conversation_id: str) -> list[dict]:
+        """获取消息实现"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, role, content, timestamp, intent, sentiment, tool_calls, metadata
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY timestamp ASC
+            """,
+            (conversation_id,),
+        )
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "role": row[1],
+                "content": row[2],
+                "timestamp": row[3],
+                "intent": row[4],
+                "sentiment": row[5],
+                "tool_calls": json.loads(row[6]) if row[6] else [],
+                "metadata": json.loads(row[7]) if row[7] else {},
+            }
+            for row in rows
+        ]
+
     async def get_recent_conversations(self, owner_id: str, limit: int = 10) -> list[dict]:
         """获取用户最近的会话列表"""
         loop = asyncio.get_event_loop()

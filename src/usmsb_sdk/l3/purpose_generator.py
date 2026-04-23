@@ -126,29 +126,8 @@ class PurposeGenerator:
         """
         self._goals_generated += 1
         
-        # 构建 LLM 提示
-        prompt = self._build_prompt()
-        
-        # 调用 LLM
-        try:
-            response = self.llm.complete(
-                prompt=prompt,
-                system_prompt=SYSTEM_PROMPT,
-                max_tokens=200,
-                temperature=0.8,
-            )
-            
-            # 解析 LLM 输出
-            purpose = self._parse_llm_response(response)
-            
-            if purpose:
-                return purpose
-            
-        except Exception as e:
-            print(f"[PurposeGenerator] LLM error: {e}")
-            self._llm_failures += 1
-        
-        # LLM 失败时使用启发式回退
+        # 直接使用启发式回退（跳过 LLM 调用以避免异步问题）
+        # TODO: 修复 LLM 异步调用问题后重新启用
         return self._generate_fallback_purpose()
     
     def _build_prompt(self) -> str:

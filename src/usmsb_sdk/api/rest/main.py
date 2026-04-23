@@ -403,8 +403,13 @@ async def lifespan(app: FastAPI):
     await meta_agent._init_components()
     await meta_agent._register_default_tools()
 
-    # Start Meta Agent (initializes TaskExecutor and other services)
-    await meta_agent.start()
+    # NOTE: Do NOT call meta_agent.start() here!
+    # When using uvicorn to run the REST API (uvicorn usmsb_sdk.api.rest.main:app),
+    # the MetaAgent API server is already provided by this FastAPI app.
+    # Calling meta_agent.start() would start a SECOND uvicorn instance on the same port,
+    # causing Errno 48 address already in use.
+    # The MetaAgent's internal API endpoints (chat_websocket, chat_sse, etc.) are
+    # served by the FastAPI app via meta_agent_router.
 
     # Set the global meta_agent reference
     set_meta_agent(meta_agent)
@@ -434,6 +439,8 @@ async def lifespan(app: FastAPI):
     chat_session_manager = ChatSessionManager(meta_agent=meta_agent)
     await chat_session_manager.start()
     set_chat_session_manager(chat_session_manager)
+    # ALSO store in app.state so embedded uvicorn subprocess can access it
+    app.state.chat_session_manager = chat_session_manager
     logger.info("ChatSessionManager initialized (WebSocket + SSE)")
 
     logger.info("USMSB SDK API started successfully")
@@ -488,6 +495,20 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# ========== DEBUG ENDPOINTS ==========
+@app.get("/api/meta-agent/debug/pid")
+async def debug_pid():
+    """Return current process PID for diagnosing fork issues."""
+    import os
+    from usmsb_sdk.api.rest.meta_agent import _chat_session_manager, _meta_agent, _chat_mgr_from_state
+    return {
+        "pid": os.getpid(),
+        "parent_pid": os.getppid(),
+        "_meta_agent": str(type(_meta_agent).__name__) if _meta_agent else None,
+        "_chat_session_manager": str(type(_chat_session_manager).__name__) if _chat_session_manager else None,
+        "_chat_mgr_from_state": str(type(_chat_mgr_from_state.get()).__name__) if _chat_mgr_from_state.get() else None,
+    }
 
 # Add CORS middleware
 app.add_middleware(

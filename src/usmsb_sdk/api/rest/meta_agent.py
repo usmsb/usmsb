@@ -13,7 +13,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -29,10 +29,26 @@ _permission_manager = None
 _chat_session_manager: Any = None
 
 
+from contextvars import ContextVar
+from starlette.requests import Request as StarletteRequest
+
+# Context variable for accessing app state in sub-processes
+_chat_mgr_from_state: ContextVar[Any] = ContextVar('_chat_mgr_from_state', default=None)
+
+def set_chat_mgr_in_context(manager: Any) -> None:
+    _chat_mgr_from_state.set(manager)
+
+def get_chat_mgr_from_context() -> Any:
+    """Get chat manager from context (set by middleware or directly)."""
+    return _chat_mgr_from_state.get()
+
+
 def set_chat_session_manager(manager: Any) -> None:
     """设置 Chat Session Manager"""
     global _chat_session_manager
     _chat_session_manager = manager
+    # Also set in context for sub-process access
+    _chat_mgr_from_state.set(manager)
 
 
 def set_meta_agent(agent):
@@ -602,18 +618,28 @@ async def chat_websocket(websocket: WebSocket, wallet_address: str):
     - 服务端 → 客户端: message_received, error
 
     OpenHarness 精髓: 全双工事件驱动通信
-    """
-    global _chat_session_manager
 
-    if _chat_session_manager is None:
+    注意: session_id 由前端通过 query parameter 传递，确保与 SSE 使用同一 session_id。
+    格式: f"ws_{wallet_address}_{timestamp}" (minute-level, ms)
+    """
+    # Priority: app.state.chat_session_manager > module-level global
+    chat_mgr = getattr(websocket.app.state, 'chat_session_manager', None)
+    if chat_mgr is None:
+        global _chat_session_manager
+        chat_mgr = _chat_session_manager
+
+    if chat_mgr is None:
         await websocket.close(code=1011, reason="Chat session manager not initialized")
         return
 
-    await _chat_session_manager.ws_handler.handle_connection(websocket, wallet_address)
+    # 从 query parameter 获取前端传递的 session_id
+    session_id = websocket.query_params.get("session_id")
+    
+    await chat_mgr.ws_handler.handle_connection(websocket, wallet_address, session_id)
 
 
 @router.get("/sse/chat/{wallet_address}")
-async def chat_sse(wallet_address: str):
+async def chat_sse(wallet_address: str, session_id: str | None = None):
     """
     SSE 进度通道
 
@@ -625,24 +651,38 @@ async def chat_sse(wallet_address: str):
     - task_complete: 任务完成
 
     OpenHarness 精髓: AsyncIterator[StreamEvent] 模式
-    """
-    global _chat_session_manager
 
-    if _chat_session_manager is None:
+    重要: session_id 必须从前端传入，与 WebSocket 的 session_id 完全一致。
+    格式: f"ws_{wallet_address}_{timestamp}" (minute-level, JS timestamp ms)
+    """
+    # Priority: context var > app.state > module-level global
+    # Context var is set when set_chat_session_manager() is called in the main process
+    chat_mgr = _chat_mgr_from_state.get()
+    if chat_mgr is None:
+        chat_mgr = _chat_session_manager
+
+    if chat_mgr is None:
         return StreamingResponse(
             iter([f"data: {json.dumps({'error': 'Chat session manager not initialized'})}\n\n"]),
             media_type="text/event-stream",
         )
 
-    # Derive session_id the same way the frontend does:
-    # f"ws_{wallet_address}_{timestamp}"
-    # We use the current minute-level timestamp to match frontend's Date.now() // 60000 * 60000
-    import time
-    ts = int(time.time() // 60) * 60 * 1000
-    session_id = f"ws_{wallet_address}_{ts}"
+    # CRITICAL: Always use the session_id provided by frontend
+    # The frontend generates session_id in ChatWebSocketClient constructor using Date.now()
+    # minute-level timestamp, then passes it to SSE. The backend MUST use this exact session_id
+    # to ensure SSE subscribes to the same session that WebSocket publishes to.
+    #
+    # Session_id format: f"ws_{wallet_address}_{timestamp}" (minute-level, ms)
+    if not session_id:
+        import time
+        ts = int(time.time() // 60) * 60 * 1000
+        session_id = f"ws_{wallet_address}_{ts}"
+        logger.warning(f"[chat_sse] No session_id from frontend, using server-generated: {session_id}")
+    
+    derived_session_id = session_id
 
     async def event_stream():
-        stream = await _chat_session_manager.create_sse_stream(session_id)
+        stream = await chat_mgr.create_sse_stream(derived_session_id)
         async for event_str in stream:
             yield event_str
 

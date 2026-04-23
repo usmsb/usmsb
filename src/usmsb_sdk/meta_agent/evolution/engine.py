@@ -248,6 +248,11 @@ class EvolutionEngine:
             self._capabilities[name] = CapabilityMetric(name=name)
 
         cap = self._capabilities[name]
+        # Ensure improvement is a float (LLM might return stringified numbers)
+        try:
+            improvement = float(improvement)
+        except (ValueError, TypeError):
+            improvement = 0.0
         cap.current_score = min(1.0, cap.current_score + improvement)
         cap.improvement_rate = improvement
         cap.last_updated = datetime.now().timestamp()
@@ -353,9 +358,9 @@ class EvolutionEngine:
             patterns_identified = 0
 
             for conv in recent_conversations:
-                messages = await self.conversations.get_messages(conv.id)
+                messages = await self.conversations.get_messages(conv['id'])
                 if messages:
-                    records = await self.learn_from_conversation(conv.id, messages)
+                    records = await self.learn_from_conversation(conv['id'], messages)
                     knowledge_added += sum(
                         1 for r in records if r.type == EvolutionType.KNOWLEDGE_GAIN
                     )

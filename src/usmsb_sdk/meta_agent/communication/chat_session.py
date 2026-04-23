@@ -325,17 +325,32 @@ class ChatSession:
         # 直接调用 LLM（简化版本）
         # 实际应该调用 meta_agent._call_llm_simple()
         try:
-            # 直接遍历 async generator，不需要 await
-            async for text_chunk in self._call_llm_streaming(
-                message,
-                self.wallet_address,
-            ):
+            # 添加超时保护，避免 LLM 调用挂起
+            response = await asyncio.wait_for(
+                self.meta_agent._call_llm_simple([
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": message},
+                ]),
+                timeout=10.0  # 10 秒超时
+            )
+
+            # 分块返回
+            for i in range(0, len(response), 10):
+                await asyncio.sleep(0.01)  # 模拟延迟
                 yield ChatStreamEvent(
                     event_type=ChatEventType.TEXT_DELTA,
-                    data={"text": text_chunk},
+                    data={"text": response[i:i+10]},
                     metadata={"task_id": task_id},
                 )
 
+        except asyncio.TimeoutError:
+            yield ChatStreamEvent(
+                event_type=ChatEventType.ERROR,
+                data={"message": "LLM 响应超时，请稍后重试。"},
+                metadata={"task_id": task_id},
+                done=True,
+            )
+            return
         except Exception as e:
             logger.error(f"[ChatSession] LLM error: {e}")
             yield ChatStreamEvent(
@@ -617,7 +632,6 @@ class ChatSession:
 
         简化版本 - 实际应该使用 meta_agent._call_llm_simple()
         """
-        # 模拟流式输出
         try:
             response = await self.meta_agent._call_llm_simple([
                 {"role": "system", "content": "You are a helpful assistant."},

@@ -34,6 +34,7 @@ import {
   TrendingDown,
   Clock,
   CheckCircle,
+  LucideIcon,
 } from 'lucide-react'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { Button } from '@/components/ui/Button'
@@ -49,8 +50,16 @@ const insight = {
   conclusion: '专业的事交给专业，算力消耗降到 1/5，质量提升 10 倍',
 }
 
-// Real scenarios
-const scenarios = [
+// Single Agent Professional Services
+const singleAgentScenarios: Array<{
+  icon: LucideIcon;
+  title: string;
+  situation: string;
+  withoutResult: string;
+  withResult: string;
+  color: string;
+  badge?: string;
+}> = [
   {
     icon: Scale,
     title: '法律咨询服务',
@@ -83,23 +92,58 @@ const scenarios = [
     withResult: '专业税务 Agent 给出多方案对比',
     color: 'from-yellow-500 to-amber-500',
   },
-  {
-    icon: BarChart3,
-    title: '市场分析报告',
-    situation: '需要竞品分析，Agent 不是市场专家',
-    withoutResult: '来回修改 10 遍，还在补充细节',
-    withResult: '专业市场 Agent 一次性给出深度分析',
-    color: 'from-indigo-500 to-purple-500',
-  },
+]
+
+// Cross-Organization Agent Collaboration
+const crossOrgScenarios: Array<{
+  icon: LucideIcon;
+  title: string;
+  situation: string;
+  withoutResult: string;
+  withResult: string;
+  color: string;
+  badge?: string;
+}> = [
   {
     icon: Truck,
-    title: '供应链关系服务',
-    situation: '需要供应商评估，Agent 不是供应链专家',
-    withoutResult: '信息零零碎碎，反复补充核实',
-    withResult: '专业 Agent 多维度评估，给出完整报告',
+    title: '供应链协同',
+    situation: '供应商 ↔ 物流商 ↔ 零售商需要实时同步',
+    withoutResult: '各方系统割裂，人工协调，响应慢，库存积压',
+    withResult: '跨组织 Agent 网络自主协作，实时同步，即时响应',
     color: 'from-green-500 to-emerald-500',
+    badge: '跨组织协作',
+  },
+  {
+    icon: Shield,
+    title: '安全漏洞情报',
+    situation: '企业发现漏洞后，需要快速通知受影响方',
+    withoutResult: '信息孤岛，漏洞情报不互通，白帽无处发力',
+    withResult: '去中心化漏洞情报网络，发现者匿名，响应方自动预警',
+    color: 'from-orange-500 to-red-500',
+    badge: '跨组织协作',
+  },
+  {
+    icon: BarChart3,
+    title: '金融合规审计',
+    situation: '银行 ↔ 央行 ↔ 审计需要协同验证',
+    withoutResult: '各方数据不共享，合规成本高，审计周期长',
+    withResult: '多方 Agent 协同验证，数据不出域，结果可追溯',
+    color: 'from-indigo-500 to-purple-500',
+    badge: '跨组织协作',
+  },
+  {
+    icon: Brain,
+    title: '医疗数据协同',
+    situation: '医院 ↔ 保险 ↔ 监管需要协同但不能共享原始数据',
+    withoutResult: '数据交换合规门槛高，协作效率低，患者体验差',
+    withResult: '联邦学习 + 跨组织 Agent 协作，数据不动，洞察互通',
+    color: 'from-cyan-500 to-blue-500',
+    badge: '跨组织协作',
   },
 ]
+
+// Combined scenarios for display
+const scenarios = [...singleAgentScenarios, ...crossOrgScenarios]
 
 // Economics table
 const economics = [
@@ -390,13 +434,19 @@ export default function LandingPage() {
               </span>
             </h2>
             <p className="text-lg text-secondary-600 dark:text-slate-400 max-w-2xl mx-auto">
-              专业的事交给专业，算力消耗降到 1/5，质量提升 10 倍
+              单Agent专业服务：专业的事交给专业，算力消耗降到1/5<br/>
+              跨组织协作：组织之间Agent自主协作，数据不动，洞察互通
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {scenarios.map((scenario, index) => (
               <div key={index} className="group relative p-6 rounded-2xl bg-white dark:bg-slate-900/60 border border-secondary-200 dark:border-white/5 hover:border-primary-300 dark:hover:border-primary-500/30 transition-all duration-300">
+                {scenario.badge && (
+                  <div className="absolute top-4 right-4 px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-primary-500/10 to-purple-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20">
+                    {scenario.badge}
+                  </div>
+                )}
                 <div className={clsx('w-14 h-14 rounded-xl bg-gradient-to-br flex items-center justify-center text-white mb-4', scenario.color)}>
                   <scenario.icon className="w-7 h-7" />
                 </div>
