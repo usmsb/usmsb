@@ -68,6 +68,7 @@ class SSEManager:
         Returns:
             asyncio.Queue - 事件队列
         """
+        logger.info(f"[SSEManager] subscribe: session_id={session_id!r}, existing queues={list(self._queues.keys())}")
         if session_id not in self._queues:
             self._queues[session_id] = asyncio.Queue(maxsize=100)
         return self._queues[session_id]
@@ -76,11 +77,9 @@ class SSEManager:
         """
         取消订阅
 
-        Args:
-            session_id: 会话 ID
+        Note: 不删除 queue，因为可能还有 broadcast task 在推送事件。
+        Queue 会在所有事件被消费后被遗弃（GC 会回收）。
         """
-        if session_id in self._queues:
-            del self._queues[session_id]
         self._running_sessions.discard(session_id)
 
     # ==================== Event Broadcasting ====================
@@ -93,8 +92,13 @@ class SSEManager:
             session_id: 会话 ID
             event: 流式事件
         """
+        logger.info(f"[SSEManager] push_event: session_id={session_id!r}, event_type={event.event_type}, queues={list(self._queues.keys())}")
+
+        # 如果 queue 不存在（可能被 SSE stream cleanup 删除了），重建它
+        # 这样 broadcast task 的事件不会丢失
         if session_id not in self._queues:
-            return
+            logger.warning(f"[SSEManager] push_event: queue missing for {session_id!r}, recreating. Available: {list(self._queues.keys())}")
+            self._queues[session_id] = asyncio.Queue(maxsize=100)
 
         try:
             self._queues[session_id].put_nowait(event)
@@ -269,6 +273,13 @@ class SSEManager:
 
         except asyncio.CancelledError:
             logger.info(f"[SSEManager] SSE stream cancelled for {session_id}")
+            # 发送取消标记，告知前端流已终止
+            try:
+                yield f"event: stream_cancelled\ndata: {json.dumps({'reason': 'connection_replaced'})}\n\n"
+            except Exception:
+                pass
+        except GeneratorExit:
+            logger.info(f"[SSEManager] SSE stream GeneratorExit for {session_id}")
         finally:
             self.unsubscribe(session_id)
             logger.info(f"[SSEManager] SSE stream ended for {session_id}")
