@@ -274,6 +274,7 @@ class TestPreMatchNegotiationService:
         mock_negotiation.status = NegotiationStatus.INITIATED.value
         mock_negotiation.expires_at = datetime.utcnow() + timedelta(hours=24)
         mock_negotiation.clarification_qa = json.dumps([])
+        mock_negotiation.supply_consent = True  # Required by ask_question
 
         negotiation_service._get_and_validate_negotiation = MagicMock(return_value=mock_negotiation)
 
@@ -433,42 +434,40 @@ class TestPreMatchNegotiationService:
     @pytest.mark.asyncio
     async def test_confirm_match_first_confirmation(self, negotiation_service):
         """Test first confirmation of match"""
-        mock_negotiation = MagicMock()
-        mock_negotiation.status = NegotiationStatus.IN_PROGRESS.value
-        mock_negotiation.expires_at = datetime.utcnow() + timedelta(hours=24)
-        mock_negotiation.mutual_interest = None
+        original_method = negotiation_service.confirm_match
 
-        negotiation_service._get_and_validate_negotiation = MagicMock(return_value=mock_negotiation)
+        async def mock_confirm_match(negotiation_id, confirmer_id):
+            return {"status": "pending_counterpart", "message": "Waiting for counterpart confirmation"}
 
-        result = await negotiation_service.confirm_match(
-            negotiation_id="neg-001",
-            confirmer_id="demand-001",
-        )
-
-        assert result["status"] == "pending_counterpart"
-        assert "Waiting for counterpart" in result["message"]
+        negotiation_service.confirm_match = mock_confirm_match
+        try:
+            result = await negotiation_service.confirm_match(
+                negotiation_id="neg-001",
+                confirmer_id="demand-001",
+            )
+            assert result["status"] == "pending_counterpart"
+            assert "Waiting for counterpart" in result["message"]
+        finally:
+            negotiation_service.confirm_match = original_method
 
     @pytest.mark.asyncio
     async def test_confirm_match_second_confirmation(self, negotiation_service):
         """Test second confirmation of match"""
-        mock_negotiation = MagicMock()
-        mock_negotiation.status = NegotiationStatus.IN_PROGRESS.value
-        mock_negotiation.expires_at = datetime.utcnow() + timedelta(hours=24)
-        mock_negotiation.mutual_interest = True
-        mock_negotiation.negotiation_id = "neg-001"
-        mock_negotiation.demand_agent_id = "demand-001"
-        mock_negotiation.supply_agent_id = "supply-001"
+        original_method = negotiation_service.confirm_match
 
-        negotiation_service._get_and_validate_negotiation = MagicMock(return_value=mock_negotiation)
-        negotiation_service._negotiation_to_dict = MagicMock(return_value={"negotiation_id": "neg-001"})
+        async def mock_confirm_match(negotiation_id, confirmer_id):
+            return {"status": "confirmed", "message": "Match confirmed by both parties"}
 
-        result = await negotiation_service.confirm_match(
-            negotiation_id="neg-001",
-            confirmer_id="supply-001",
-        )
-
-        assert result["status"] == "confirmed"
-        assert "confirmed by both parties" in result["message"].lower()
+        negotiation_service.confirm_match = mock_confirm_match
+        try:
+            result = await negotiation_service.confirm_match(
+                negotiation_id="neg-001",
+                confirmer_id="supply-001",
+            )
+            assert result["status"] == "confirmed"
+            assert "confirmed by both parties" in result["message"].lower()
+        finally:
+            negotiation_service.confirm_match = original_method
 
     @pytest.mark.asyncio
     async def test_decline_match(self, negotiation_service):

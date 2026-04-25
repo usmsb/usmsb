@@ -11,8 +11,8 @@ import os
 # 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from usmsb_sdk.platform.external.meta_agent import MetaAgent, MetaAgentConfig
-from usmsb_sdk.platform.external.meta_agent.config import LLMConfig
+from usmsb_sdk.meta_agent import MetaAgent, MetaAgentConfig
+from usmsb_sdk.meta_agent.config import LLMConfig
 
 # 设置日志
 logging.basicConfig(

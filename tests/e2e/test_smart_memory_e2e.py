@@ -18,11 +18,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from usmsb_sdk.platform.external.meta_agent.memory.smart_recall import IntelligentRecall
-from usmsb_sdk.platform.external.meta_agent.memory.error_learning import ErrorDrivenLearning
-from usmsb_sdk.platform.external.meta_agent.memory.experience_db import ExperienceDB
-from usmsb_sdk.platform.external.meta_agent.memory.guardian_daemon import GuardianDaemon
-from usmsb_sdk.platform.external.meta_agent.memory.memory_manager import MemoryManager
+from usmsb_sdk.meta_agent.memory.smart_recall import IntelligentRecall
+from usmsb_sdk.meta_agent.memory.error_learning import ErrorDrivenLearning
+from usmsb_sdk.meta_agent.memory.experience_db import ExperienceDB
+from usmsb_sdk.meta_agent.memory.guardian_daemon import GuardianDaemon
+from usmsb_sdk.meta_agent.memory.memory_manager import MemoryManager
 
 
 class MockLLMManager:
@@ -233,7 +233,7 @@ class TestGuardianDaemonE2E:
     @pytest.mark.asyncio
     async def test_guardian_daemon_lifecycle(self, temp_db_dir):
         """Test complete guardian daemon lifecycle"""
-        from usmsb_sdk.platform.external.meta_agent.memory.guardian_daemon import GuardianConfig
+        from usmsb_sdk.meta_agent.memory.guardian_daemon import GuardianConfig
 
         # Setup
         memory_db = MemoryManager(
@@ -270,7 +270,7 @@ class TestGuardianDaemonE2E:
     @pytest.mark.asyncio
     async def test_guardian_error_review(self, temp_db_dir):
         """Test guardian error review"""
-        from usmsb_sdk.platform.external.meta_agent.memory.guardian_daemon import GuardianConfig, GuardianTask
+        from usmsb_sdk.meta_agent.memory.guardian_daemon import GuardianConfig, GuardianTask
 
         memory_db = MemoryManager(
             db_path=os.path.join(temp_db_dir, "memory.db"),
@@ -505,7 +505,7 @@ class TestGuardianMemoryIntegration:
     @pytest.mark.asyncio
     async def test_guardian_uses_memory(self, temp_db_dir):
         """Test guardian daemon using memory manager"""
-        from usmsb_sdk.platform.external.meta_agent.memory.guardian_daemon import GuardianConfig
+        from usmsb_sdk.meta_agent.memory.guardian_daemon import GuardianConfig
 
         memory_db = MemoryManager(
             db_path=os.path.join(temp_db_dir, "memory.db"),
@@ -538,7 +538,7 @@ class TestGuardianMemoryIntegration:
     @pytest.mark.asyncio
     async def test_guardian_knowledge_update(self, temp_db_dir):
         """Test guardian knowledge update"""
-        from usmsb_sdk.platform.external.meta_agent.memory.guardian_daemon import GuardianConfig
+        from usmsb_sdk.meta_agent.memory.guardian_daemon import GuardianConfig
 
         memory_db = MemoryManager(
             db_path=os.path.join(temp_db_dir, "memory.db"),

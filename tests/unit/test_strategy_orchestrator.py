@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
-from src.usmsb_sdk.platform.external.meta_agent.memory.strategy_orchestrator import (
+from usmsb_sdk.meta_agent.memory.strategy_orchestrator import (
     RecallStrategy,
     StorageStrategy,
     GuardianStrategy,

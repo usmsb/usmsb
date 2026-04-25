@@ -35,8 +35,8 @@ def integration_config():
 @pytest.fixture
 async def meta_agent_instance(integration_config):
     """Create a real MetaAgent instance for integration testing"""
-    from usmsb_sdk.platform.external.meta_agent.agent import MetaAgent
-    from usmsb_sdk.platform.external.meta_agent.config import MetaAgentConfig
+    from usmsb_sdk.meta_agent.agent import MetaAgent
+    from usmsb_sdk.meta_agent.config import MetaAgentConfig
 
     config = MetaAgentConfig(
         database={"path": ":memory:"},

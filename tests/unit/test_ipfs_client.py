@@ -13,7 +13,7 @@ from typing import Any, Dict
 import pytest
 import aiohttp
 
-from usmsb_sdk.platform.external.meta_agent.ipfs import Encryption, IPFSClient
+from usmsb_sdk.meta_agent.ipfs import Encryption, IPFSClient
 
 
 # ============================================================================

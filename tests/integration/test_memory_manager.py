@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from usmsb_sdk.platform.external.meta_agent.memory.memory_manager import (
+from usmsb_sdk.meta_agent.memory.memory_manager import (
     MemoryManager,
     MemoryConfig,
     ConversationSummary,

@@ -13,12 +13,12 @@ from typing import AsyncGenerator
 import pytest
 
 # 导入被测试模块
-from usmsb_sdk.platform.external.meta_agent.session import (
+from usmsb_sdk.meta_agent.session import (
     SessionManager,
     SessionConfig,
     UserProfile,
 )
-from usmsb_sdk.platform.external.meta_agent.sandbox import CodeSandbox, SandboxResult
+from usmsb_sdk.meta_agent.sandbox import CodeSandbox, SandboxResult
 
 
 # ============================================================================

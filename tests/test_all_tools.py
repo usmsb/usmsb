@@ -13,18 +13,18 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from usmsb_sdk.platform.external.meta_agent.tools.execution import get_execution_tools
-from usmsb_sdk.platform.external.meta_agent.tools.system import get_system_tools
-from usmsb_sdk.platform.external.meta_agent.tools.web import get_web_tools
-from usmsb_sdk.platform.external.meta_agent.tools.platform import get_platform_tools
-from usmsb_sdk.platform.external.meta_agent.tools.monitor import get_monitor_tools
-from usmsb_sdk.platform.external.meta_agent.tools.blockchain import get_blockchain_tools
-from usmsb_sdk.platform.external.meta_agent.tools.ipfs import get_ipfs_tools
-from usmsb_sdk.platform.external.meta_agent.tools.database import get_database_tools
-from usmsb_sdk.platform.external.meta_agent.tools.ui import get_ui_tools
-from usmsb_sdk.platform.external.meta_agent.tools.governance import get_governance_tools
-from usmsb_sdk.platform.external.meta_agent.tools.system_agents import get_system_agents_tools
-from usmsb_sdk.platform.external.meta_agent.tools.precise_matching import get_precise_matching_tools
+from usmsb_sdk.meta_agent.tools.execution import get_execution_tools
+from usmsb_sdk.meta_agent.tools.system import get_system_tools
+from usmsb_sdk.meta_agent.tools.web import get_web_tools
+from usmsb_sdk.meta_agent.tools.platform import get_platform_tools
+from usmsb_sdk.meta_agent.tools.monitor import get_monitor_tools
+from usmsb_sdk.meta_agent.tools.blockchain import get_blockchain_tools
+from usmsb_sdk.meta_agent.tools.ipfs import get_ipfs_tools
+from usmsb_sdk.meta_agent.tools.database import get_database_tools
+from usmsb_sdk.meta_agent.tools.ui import get_ui_tools
+from usmsb_sdk.meta_agent.tools.governance import get_governance_tools
+from usmsb_sdk.meta_agent.tools.system_agents import get_system_agents_tools
+from usmsb_sdk.meta_agent.tools.precise_matching import get_precise_matching_tools
 import inspect
 
 

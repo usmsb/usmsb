@@ -22,13 +22,13 @@ class TestToolRegistry:
     @pytest.fixture
     def registry(self):
         """创建工具注册表"""
-        from usmsb_sdk.platform.external.meta_agent.tools.registry import ToolRegistry
+        from usmsb_sdk.meta_agent.tools.registry import ToolRegistry
         return ToolRegistry()
 
     @pytest.fixture
     def Tool(self):
         """导入 Tool 类"""
-        from usmsb_sdk.platform.external.meta_agent.tools.registry import Tool as ToolClass
+        from usmsb_sdk.meta_agent.tools.registry import Tool as ToolClass
         return ToolClass
 
     @pytest.fixture
@@ -170,7 +170,7 @@ class TestToolModules:
     @pytest.mark.asyncio
     async def test_platform_tools(self):
         """测试平台工具"""
-        from usmsb_sdk.platform.external.meta_agent.tools.platform import (
+        from usmsb_sdk.meta_agent.tools.platform import (
             get_platform_tools,
             start_node,
             get_node_status,
@@ -188,7 +188,7 @@ class TestToolModules:
     @pytest.mark.asyncio
     async def test_web_tools(self):
         """测试网页工具"""
-        from usmsb_sdk.platform.external.meta_agent.tools.web import (
+        from usmsb_sdk.meta_agent.tools.web import (
             get_web_tool_objects,
         )
 
@@ -204,7 +204,7 @@ class TestToolModules:
     @pytest.mark.asyncio
     async def test_system_tools_schema(self):
         """测试系统工具的 schema"""
-        from usmsb_sdk.platform.external.meta_agent.tools.system import (
+        from usmsb_sdk.meta_agent.tools.system import (
             get_system_tools,
         )
 
@@ -271,7 +271,7 @@ class TestToolExecutionIntegration:
     @pytest.mark.asyncio
     async def test_execute_tool_calls_with_wallet(self, mock_session_manager):
         """测试带 wallet_address 的工具调用"""
-        from usmsb_sdk.platform.external.meta_agent.tools.registry import ToolRegistry, Tool
+        from usmsb_sdk.meta_agent.tools.registry import ToolRegistry, Tool
 
         registry = ToolRegistry()
 

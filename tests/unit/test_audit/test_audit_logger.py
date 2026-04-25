@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 import shutil
 
-from usmsb_sdk.platform.external.meta_agent.audit import AuditLogger, AuditConfig
+from usmsb_sdk.meta_agent.audit import AuditLogger, AuditConfig
 
 
 @pytest.fixture

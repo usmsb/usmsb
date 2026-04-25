@@ -431,7 +431,7 @@ class L4SelfConsciousAgent:
 
     async def infer_mind(self, other_agent_id: str, history: list[dict]) -> TheoryOfMindResult:
         """IL4: 他人心智推断"""
-        predictions = self.theory_of_mind.predict_other_intention(other_agent_id)
+        predictions = self.theory_of_mind.predict_intention(other_agent_id)
         inferred = predictions[0] if predictions else '未知意图'
         return self.TheoryOfMindResult(
             other_agent_id=other_agent_id,

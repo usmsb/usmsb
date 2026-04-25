@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pytest
 
-from src.usmsb_sdk.platform.external.meta_agent.database import (
+from usmsb_sdk.meta_agent.database import (
     UserDatabase,
     Conversation,
     Message,

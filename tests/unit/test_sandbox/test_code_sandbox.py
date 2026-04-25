@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from usmsb_sdk.platform.external.meta_agent.sandbox import CodeSandbox, SandboxResult
+from usmsb_sdk.meta_agent.sandbox import CodeSandbox, SandboxResult
 
 
 class TestCodeSandbox:

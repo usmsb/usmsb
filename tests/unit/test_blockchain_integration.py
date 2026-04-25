@@ -61,9 +61,10 @@ class TestConfig:
         config = BlockchainConfig(network=NetworkType.TESTNET)
 
         # 验证测试网合约地址
-        assert config.get_contract_address("VIBEToken") == "0x91d8C3084b4fd21A04fA3584BFE357F378938dbc"
-        assert config.get_contract_address("VIBStaking") == "0xc3fbD1736a95f403A0569FcA8C84d7B85e2b4E53"
-        assert config.get_contract_address("AgentRegistry") == "0x54bEbDc40cc8B60b0922D8FA6463ab710B14dC69"
+        # TODO: 合约重新部署后需更新为正式地址
+        assert config.get_contract_address("VIBEToken") == "0x93C52dF000317e12F891474B46d8B05652430bDC"
+        assert config.get_contract_address("VIBStaking") == "0x1901Ab56eA38cBeFc7a3F0Ed188B7108d27f4c05"
+        assert config.get_contract_address("AgentRegistry") == "0xC5AbAE9f580C48D645bDE9904712891AE8FcDec6"
 
     def test_env_variable_override(self, monkeypatch):
         """环境变量覆盖测试"""

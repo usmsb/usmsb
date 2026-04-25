@@ -48,9 +48,10 @@ class MigrationProgress:
     @property
     def speed_mb_per_sec(self) -> float:
         """Get migration speed in MB/s."""
-        if self.elapsed_seconds == 0:
+        elapsed = self.elapsed_seconds
+        if elapsed < 0.001 or self.bytes_processed == 0:
             return 0.0
-        return (self.bytes_processed / (1024 * 1024)) / self.elapsed_seconds
+        return (self.bytes_processed / (1024 * 1024)) / elapsed
 
 
 @dataclass

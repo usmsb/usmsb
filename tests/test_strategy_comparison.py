@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.usmsb_sdk.platform.external.meta_agent.memory.strategy_orchestrator import (
+from usmsb_sdk.meta_agent.memory.strategy_orchestrator import (
     RecallStrategy,
     StorageStrategy,
     GuardianStrategy,

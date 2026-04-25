@@ -22,7 +22,7 @@ import pytest
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from usmsb_sdk.platform.external.meta_agent.migrate.data_migration import (
+from usmsb_sdk.meta_agent.migrate.data_migration import (
     DataMigration,
     MigrationProgress,
     MigrationResult,
@@ -89,7 +89,7 @@ def mock_user_database(sample_profile, sample_knowledge):
 @pytest.fixture
 def mock_ipfs_client():
     """创建模拟的IPFSClient"""
-    from usmsb_sdk.platform.external.meta_agent.ipfs.ipfs_client import IPFSUploadResult
+    from usmsb_sdk.meta_agent.ipfs.ipfs_client import IPFSUploadResult
 
     client = AsyncMock()
     client.upload_user_data = AsyncMock(return_value=IPFSUploadResult(
@@ -108,7 +108,7 @@ def mock_ipfs_client():
 @pytest.fixture
 def mock_ipfs_upload_result():
     """创建模拟的IPFS上传结果"""
-    from usmsb_sdk.platform.external.meta_agent.ipfs.ipfs_client import IPFSUploadResult
+    from usmsb_sdk.meta_agent.ipfs.ipfs_client import IPFSUploadResult
     return IPFSUploadResult(
         success=True,
         cid="QmTestCID123456789",
@@ -331,7 +331,7 @@ class TestDataMigration:
         data_migration.session.db = mock_user_database
         data_migration.session.ipfs_client = mock_ipfs_client
 
-        from usmsb_sdk.platform.external.meta_agent.ipfs.ipfs_client import IPFSUploadResult
+        from usmsb_sdk.meta_agent.ipfs.ipfs_client import IPFSUploadResult
         mock_ipfs_client.upload_user_data.return_value = IPFSUploadResult(
             success=False,
             error="Network error"
@@ -618,7 +618,7 @@ class TestEncryptionIntegration:
         data_migration.session.db = mock_user_database
         data_migration.session.ipfs_client = mock_ipfs_client
 
-        from usmsb_sdk.platform.external.meta_agent.ipfs.ipfs_client import IPFSUploadResult
+        from usmsb_sdk.meta_agent.ipfs.ipfs_client import IPFSUploadResult
         mock_ipfs_client.upload_user_data.return_value = IPFSUploadResult(
             success=True,
             cid="QmEncrypted",

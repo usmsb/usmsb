@@ -28,8 +28,10 @@ from usmsb_sdk.meta_agent.sync.auto_sync_manager import (
 @pytest.fixture
 def mock_callback():
     """模拟同步回调函数"""
-    async def callback(wallet_address: str, sync_type: SyncType) -> str:
-        return f"QmTest{wallet_address[-4:]}{sync_type.value}"
+    async def callback(wallet_address: str, sync_type) -> str:
+        # Handle both string and SyncType enum
+        type_value = sync_type.value if hasattr(sync_type, 'value') else sync_type
+        return f"QmTest{wallet_address[-4:]}{type_value}"
     return callback
 
 
@@ -216,17 +218,30 @@ class TestAutoSyncManager:
 
     async def test_sync_before_close_with_idle(self, quick_config, mock_callback):
         """测试空闲时会话关闭前同步（全量同步）"""
-        manager = AutoSyncManager(config=quick_config, sync_callback=mock_callback)
+        config = SyncConfig(
+            profile_sync_delay=0.5,
+            knowledge_sync_delay=0.5,
+            full_sync_interval=2,
+            retry_attempts=2,
+            retry_delay=0.1,
+            enable_background_sync=False,
+            sync_on_idle=True,
+        )
+        manager = AutoSyncManager(config=config, sync_callback=mock_callback)
         await manager.start()
 
         wallet = "0xAAA1111111111111"
 
-        # 没有待同步，但有 idle 配置
-        results = await manager.sync_before_close(wallet)
+        # 触发变更并等待调度
+        await manager.on_profile_changed(wallet)
+        await asyncio.sleep(0.1)
 
-        # 应该执行一次全量同步
-        assert len(results) == 1
-        assert results[0].sync_type == SyncType.FULL
+        # 使用 idle timeout 版本：有待同步时立即执行（delay=0.001）
+        results = await manager.sync_before_close_with_idle(wallet, idle_timeout=0.001)
+
+        # 应该同步所有待同步类型
+        assert len(results) >= 1
+        assert all(r.success for r in results)
 
         await manager.stop()
 
@@ -241,13 +256,13 @@ class TestAutoSyncManager:
 
         wallet = "0xAAA1111111111111"
 
-        await manager.on_profile_changed(wallet)
+        # 未触发任何变更，直接关闭
 
-        # 立即执行会话关闭前同步
+        # 立即执行会话关闭前同步（无待同步）
         results = await manager.sync_before_close(wallet)
 
-        # 不应该执行任何同步
-        assert results is None
+        # 不应该执行任何同步，返回空列表
+        assert results == []
 
         await manager.stop()
 

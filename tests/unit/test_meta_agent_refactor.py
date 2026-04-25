@@ -17,7 +17,7 @@ class TestSensitiveInfoRegistry:
 
     def test_import_registry(self):
         """测试导入注册表"""
-        from usmsb_sdk.platform.external.meta_agent.sensitive.registry import (
+        from usmsb_sdk.meta_agent.sensitive.registry import (
             SensitiveInfoRegistry,
             SensitiveInfoHandler,
             get_sensitive_info_registry,
@@ -28,7 +28,7 @@ class TestSensitiveInfoRegistry:
 
     def test_get_all_keywords(self):
         """测试获取所有关键词"""
-        from usmsb_sdk.platform.external.meta_agent.sensitive.registry import (
+        from usmsb_sdk.meta_agent.sensitive.registry import (
             get_sensitive_info_registry,
             clear_sensitive_info_registry,
         )
@@ -44,7 +44,7 @@ class TestSensitiveInfoRegistry:
 
     def test_get_all_patterns(self):
         """测试获取所有正则模式"""
-        from usmsb_sdk.platform.external.meta_agent.sensitive.registry import (
+        from usmsb_sdk.meta_agent.sensitive.registry import (
             get_sensitive_info_registry,
             clear_sensitive_info_registry,
         )
@@ -62,7 +62,7 @@ class TestIntentRecognizer:
 
     def test_import_recognizer(self):
         """测试导入意图识别器"""
-        from usmsb_sdk.platform.external.meta_agent.intent.recognizer import (
+        from usmsb_sdk.meta_agent.intent.recognizer import (
             IntentRecognizer,
             Intent,
             IntentType,
@@ -73,7 +73,7 @@ class TestIntentRecognizer:
 
     def test_intent_type_enum(self):
         """测试意图类型枚举"""
-        from usmsb_sdk.platform.external.meta_agent.intent.recognizer import IntentType
+        from usmsb_sdk.meta_agent.intent.recognizer import IntentType
 
         assert hasattr(IntentType, "SIMPLE_CHAT")
         assert hasattr(IntentType, "TOOL_CALL")
@@ -81,7 +81,7 @@ class TestIntentRecognizer:
 
     def test_intent_dataclass(self):
         """测试意图数据类"""
-        from usmsb_sdk.platform.external.meta_agent.intent.recognizer import Intent, IntentType
+        from usmsb_sdk.meta_agent.intent.recognizer import Intent, IntentType
 
         intent = Intent(
             type=IntentType.SIMPLE_CHAT,
@@ -97,7 +97,7 @@ class TestIntentRecognizer:
 
     def test_rule_based_recognition(self):
         """测试基于规则的意图识别（降级模式）"""
-        from usmsb_sdk.platform.external.meta_agent.intent.recognizer import (
+        from usmsb_sdk.meta_agent.intent.recognizer import (
             IntentRecognizer,
             IntentType,
         )
@@ -124,12 +124,12 @@ class TestChatConfig:
 
     def test_import_chat_config(self):
         """测试导入 ChatConfig"""
-        from usmsb_sdk.platform.external.meta_agent.config.chat_config import ChatConfig
+        from usmsb_sdk.meta_agent.config.chat_config import ChatConfig
         assert ChatConfig is not None
 
     def test_default_values(self):
         """测试默认值"""
-        from usmsb_sdk.platform.external.meta_agent.config.chat_config import ChatConfig
+        from usmsb_sdk.meta_agent.config.chat_config import ChatConfig
 
         config = ChatConfig()
         assert config.max_history_tokens == 2000
@@ -139,14 +139,14 @@ class TestChatConfig:
 
     def test_from_env(self):
         """测试从环境变量加载"""
-        from usmsb_sdk.platform.external.meta_agent.config.chat_config import ChatConfig
+        from usmsb_sdk.meta_agent.config.chat_config import ChatConfig
 
         config = ChatConfig.from_env()
         assert config.max_history_tokens == 2000
 
     def test_message_templates(self):
         """测试消息模板"""
-        from usmsb_sdk.platform.external.meta_agent.config.chat_config import ChatConfig
+        from usmsb_sdk.meta_agent.config.chat_config import ChatConfig
 
         config = ChatConfig()
         assert "后台任务" in config.background_task_start_message
@@ -155,7 +155,7 @@ class TestChatConfig:
 
     def test_to_dict(self):
         """测试转换为字典"""
-        from usmsb_sdk.platform.external.meta_agent.config.chat_config import ChatConfig
+        from usmsb_sdk.meta_agent.config.chat_config import ChatConfig
 
         config = ChatConfig()
         config_dict = config.to_dict()
@@ -170,17 +170,17 @@ class TestIntegration:
 
     def test_meta_agent_import(self):
         """测试导入 MetaAgent"""
-        from usmsb_sdk.platform.external.meta_agent import MetaAgent
+        from usmsb_sdk.meta_agent import MetaAgent
         assert MetaAgent is not None
 
     def test_meta_agent_config(self):
         """测试导入 MetaAgentConfig"""
-        from usmsb_sdk.platform.external.meta_agent import MetaAgentConfig
+        from usmsb_sdk.meta_agent import MetaAgentConfig
         assert MetaAgentConfig is not None
 
     def test_sensitive_registry_in_config(self):
         """测试敏感信息注册表在配置中的使用"""
-        from usmsb_sdk.platform.external.meta_agent.sensitive.registry import (
+        from usmsb_sdk.meta_agent.sensitive.registry import (
             get_sensitive_info_registry,
         )
 

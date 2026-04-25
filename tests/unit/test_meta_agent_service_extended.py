@@ -16,7 +16,7 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
 
-from usmsb_sdk.platform.external.meta_agent.services.meta_agent_service import (
+from usmsb_sdk.meta_agent.services.meta_agent_service import (
     MetaAgentService,
     MetaAgentConversation,
     AgentProfile,
