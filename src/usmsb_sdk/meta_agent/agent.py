@@ -456,6 +456,12 @@ class MetaAgent:
         self._superadmin: Any = None
         self._external_agents_connected: bool = False  # 动态更新，见 _perceive_environment
 
+        # ========== A2A 协议（协作场景激活）==========
+        self._a2a_adapter: Any = None
+
+        # ========== MCP Gateway（P5）==========
+        self._mcp_gateway: Any = None
+
         # L4/L5 决策上下文（意识影响决策的关键数据）
         self._l4_lessons: list = []      # L4 历史教训
         self._l4_recommendations: list = []  # L4 推荐行动
@@ -500,6 +506,9 @@ class MetaAgent:
 
         # ========== Platform + Gene Capsule 初始化 ==========
         await self._init_platform_client()
+
+        # ========== MCP Gateway 初始化（P5）==========
+        await self._init_mcp_gateway()
 
         # ========== A2A HTTP Server 注册 ==========
         await self._register_a2a_agent()
@@ -658,6 +667,36 @@ class MetaAgent:
             self.platform_client = None
             self.gene_capsule_adapter = None
 
+    # ─────────────────────────────────────────────────────────
+    # MCP Gateway 初始化（P5）
+    # ─────────────────────────────────────────────────────────
+
+    async def _init_mcp_gateway(self) -> None:
+        """初始化 MCP Gateway，统一管理工具注册/发现/调用。"""
+        try:
+            from usmsb_sdk.protocol.mcp_gateway import MCPGateway
+            from usmsb_sdk.protocol.mcp_registry import MCPRegistry
+
+            registry = MCPRegistry()
+            self._mcp_gateway = MCPGateway(registry=registry)
+
+            # 从 ToolRegistry 迁移已有工具到 MCP Gateway
+            if hasattr(self, 'tool_registry') and self.tool_registry:
+                try:
+                    existing_tools = self.tool_registry.list_tools()
+                    for tool in existing_tools:
+                        tool_name = getattr(tool, 'name', None) or getattr(tool, 'tool_id', None)
+                        if tool_name:
+                            self._mcp_gateway.register_tool(tool)
+                    logger.info("[MCP] Migrated %d tools to MCP Gateway", len(existing_tools))
+                except Exception as e:
+                    logger.warning("[MCP] Tool migration skipped: %s", e)
+
+            logger.info("[MCP] MCPGateway initialized")
+        except Exception as e:
+            logger.warning("[MCP] MCPGateway init failed (non-critical): %s", e)
+            self._mcp_gateway = None
+
     async def _register_a2a_agent(self) -> None:
         """Register this MetaAgent as an A2A agent with the platform HTTP server."""
         try:
@@ -693,6 +732,16 @@ class MetaAgent:
                         logger.warning("A2A registration returned HTTP %d (server may not be running)", r.status_code)
             except Exception as e:
                 logger.warning("A2A registration skipped (platform server not reachable): %s", e)
+
+            # Initialize A2A Adapter for collaboration messaging
+            try:
+                from usmsb_sdk.protocol.a2a_adapter import A2AAdapter, A2AMessageType
+                self._a2a_adapter = A2AAdapter(agent_id=self.agent_id)
+                self._a2a_message_type = A2AMessageType
+                logger.info("A2AAdapter initialized for collaboration scenarios")
+            except Exception as e:
+                logger.warning("A2AAdapter init failed (non-critical): %s", e)
+                self._a2a_adapter = None
         except Exception as e:
             logger.warning("A2A agent registration failed: %s", e)
 
@@ -1308,6 +1357,156 @@ class MetaAgent:
         except Exception as e:
             logger.debug("_update_l4_from_result error: %s", e)
 
+    # ─────────────────────────────────────────────────────────
+    # A2A 协作广播（P2 激活）
+    # ─────────────────────────────────────────────────────────
+
+    async def _broadcast_collaboration_request(
+        self,
+        task: str,
+        scenario_tag,
+    ) -> list[str]:
+        """
+        当检测到 COLLAB 场景时，通过 A2A 向已连接的 Agent 广播协作请求。
+
+        Returns:
+            list[str]: 已发送消息的 Agent ID 列表
+        """
+        sent_to: list[str] = []
+        if not self._a2a_adapter:
+            logger.debug("[A2A] No A2AAdapter available")
+            return sent_to
+
+        try:
+            # 从 P2P handler 获取在线 Agent ID 列表
+            peer_ids: list[str] = []
+            if hasattr(self, "_p2p_handler") and self._p2p_handler:
+                try:
+                    # 直接从 _peers 字典获取在线节点的 node_id
+                    peers_dict = getattr(self._p2p_handler, '_peers', {})
+                    peer_ids = [
+                        pid for pid, pinfo in peers_dict.items()
+                        if getattr(pinfo, 'status', '') == 'online'
+                    ]
+                except Exception as e:
+                    logger.debug("[A2A] Failed to get peer list: %s", e)
+
+            if not peer_ids:
+                logger.info("[A2A] COLLAB scenario '%s' detected but no peers available",
+                           getattr(scenario_tag, 'scenario', '?'))
+                return sent_to
+
+            msg_type = getattr(self, '_a2a_message_type', None)
+            if msg_type is None:
+                return sent_to
+
+            for peer_id in peer_ids:
+                try:
+                    msg = self._a2a_adapter.send_message(
+                        to_agent=peer_id,
+                        message_type=msg_type.SKILL_REQUEST,
+                        subject=f"COLLAB协作请求: {getattr(scenario_tag, 'scenario', 'unknown')}",
+                        payload={
+                            "task": task,
+                            "scenario": getattr(scenario_tag, 'scenario', ''),
+                            "complexity": getattr(scenario_tag, 'complexity', ''),
+                            "layer": getattr(scenario_tag, 'suggested_layer', ''),
+                            "source_agent": self.agent_id,
+                        }
+                    )
+                    sent_to.append(peer_id)
+                    logger.info("[A2A] Sent collaboration request to %s (msg_id=%s)",
+                               peer_id, msg.id[:12] if hasattr(msg, 'id') else '?')
+                except Exception as e:
+                    logger.warning("[A2A] Failed to send to %s: %s", peer_id, e)
+
+            if sent_to:
+                logger.info("[A2A] Broadcast collaboration request to %d agents", len(sent_to))
+
+        except Exception as e:
+            logger.warning("[A2A] Collaboration broadcast failed: %s", e)
+
+        return sent_to
+
+    # ─────────────────────────────────────────────────────────
+    # P2P 消息收发（P3 增强）
+    # ─────────────────────────────────────────────────────────
+
+    async def _send_p2p_message(
+        self,
+        peer_id: str,
+        message_type: str,
+        payload: dict[str, Any],
+    ) -> bool:
+        """
+        向指定 Peer 发送 P2P 消息。
+
+        Returns:
+            bool: 发送是否成功
+        """
+        if not hasattr(self, "_p2p_handler") or not self._p2p_handler:
+            return False
+        try:
+            await self._p2p_handler._send_to_peer(peer_id, message_type, payload)
+            logger.info("[P2P] Sent %s to %s", message_type, peer_id)
+            return True
+        except Exception as e:
+            logger.warning("[P2P] Send to %s failed: %s", peer_id, e)
+            return False
+
+    async def _receive_p2p_messages(self) -> list[dict[str, Any]]:
+        """
+        从 P2P handler 接收所有待处理消息。
+
+        Returns:
+            list[dict]: 消息列表，每条包含 sender_id, message_type, payload
+        """
+        messages: list[dict[str, Any]] = []
+        if not hasattr(self, "_p2p_handler") or not self._p2p_handler:
+            return messages
+        try:
+            peers_dict = getattr(self._p2p_handler, '_peers', {})
+            for peer_id, peer_info in peers_dict.items():
+                # 尝试从 peer 最近的入站消息中提取（handler 内部维护）
+                inbox = getattr(peer_info, 'inbox', [])
+                for msg in inbox[:]:
+                    messages.append({
+                        "sender_id": peer_id,
+                        "message_type": getattr(msg, 'message_type', 'unknown'),
+                        "payload": getattr(msg, 'payload', {}),
+                        "message_id": getattr(msg, 'message_id', ''),
+                    })
+                    inbox.remove(msg)
+        except Exception as e:
+            logger.debug("[P2P] Receive messages error: %s", e)
+        return messages
+
+    # ─────────────────────────────────────────────────────────
+    # P3 P2P 感知指标采集
+    # ─────────────────────────────────────────────────────────
+
+    def _get_p2p_metrics(self) -> dict[str, Any]:
+        """采集 P2P 网络指标，供给 _perceive_environment 使用。"""
+        metrics = {
+            "total_peers": 0,
+            "online_peers": 0,
+            "skills_available": 0,
+            "dht_entries": 0,
+        }
+        if not hasattr(self, "_p2p_handler") or not self._p2p_handler:
+            return metrics
+        try:
+            stats = self._p2p_handler.get_network_stats()
+            metrics.update({
+                "total_peers": stats.get("total_peers", 0),
+                "online_peers": stats.get("online_peers", 0),
+                "skills_available": stats.get("skills_available", 0),
+                "dht_entries": stats.get("dht_entries", 0),
+            })
+        except Exception:
+            pass
+        return metrics
+
     async def _main_loop(self):
         """主循环 - 永不停歇"""
         logger.info("Meta Agent main loop started")
@@ -1361,6 +1560,17 @@ class MetaAgent:
                     self._external_agents_connected = peer_count > 0
                     if peer_count > 0:
                         logger.info("[PERCEIVE] P2P peers online: %d", peer_count)
+                    # P3: 周期性主动发现 peers（每10次主循环 = ~1分钟）
+                    discover_counter = getattr(self, '_peer_discovery_counter', 0) + 1
+                    self._peer_discovery_counter = discover_counter
+                    if discover_counter >= 10:
+                        self._peer_discovery_counter = 0
+                        await self._p2p_handler._discover_peers()
+                        new_stats = self._p2p_handler.get_network_stats()
+                        new_count = new_stats.get("online_peers", 0)
+                        if new_count != peer_count:
+                            logger.info("[P2P] Peer discovery updated: %d → %d peers",
+                                       peer_count, new_count)
                 except Exception:
                     self._external_agents_connected = False
         except Exception as e:
@@ -1925,8 +2135,28 @@ class MetaAgent:
         if self.strategy_router:
             try:
                 scenario_tag = await self.strategy_router._classify_scenario(message)
+
+                # P4 守卫：scenario_tag 为 None 时跳过路由，直接走 LLM
+                if scenario_tag is None:
+                    logger.warning("[STRATEGY] _classify_scenario returned None, falling back to LLM")
+                    scenario_tag = getattr(self.strategy_router, '_last_scenario_tag', None)
+                    if scenario_tag is None:
+                        # 创建默认 tag 避免后续空指针
+                        from usmsb_sdk.meta_agent.strategy_router import ScenarioTag
+                        scenario_tag = ScenarioTag(
+                            scenario="INFO", complexity="MEDIUM",
+                            confidence=0.5, reasoning="fallback",
+                            suggested_layer="L1", strategy_preference="internal"
+                        )
+
                 logger.info("[STRATEGY] scenario=%s layer=%s preference=%s",
                             scenario_tag.scenario, scenario_tag.suggested_layer, scenario_tag.strategy_preference)
+
+                # P2: COLLAB 场景 → A2A 广播协作请求
+                if getattr(scenario_tag, 'scenario', None) == "COLLAB":
+                    sent_peers = await self._broadcast_collaboration_request(message, scenario_tag)
+                    if sent_peers:
+                        logger.info("[A2A] COLLAB broadcast sent to %d peers", len(sent_peers))
 
                 # 加载 L4/L5 决策上下文（意识影响决策）
                 l4_context = self._get_l4_decision_context()
@@ -1989,21 +2219,34 @@ class MetaAgent:
         # 核心 LLM 调用逻辑 (MEDIUM/HIGH 复杂度)
         # =====================================================================
         if chat_result is None:
-            try:
-                logger.info(f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value})")
+            # P4: 带指数退避的 LLM 重试（最多 3 次）
+            max_retries = 3
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value}, attempt={attempt + 1})")
 
-                # 调用 LLM 获取完整结果
-                chat_result = await self._chat_with_llm(
-                    messages,
-                    tools=tools_schema,
-                    skills=skills_schema,
-                    conversation_id=str(conversation.id),
-                    user_session=user_session,
-                )
+                    # 调用 LLM 获取完整结果
+                    chat_result = await self._chat_with_llm(
+                        messages,
+                        tools=tools_schema,
+                        skills=skills_schema,
+                        conversation_id=str(conversation.id),
+                        user_session=user_session,
+                    )
+                    # 成功，跳出重试循环
+                    break
 
-            except Exception as e:
-                logger.error("[CHAT] LLM call failed: %s", e)
-                chat_result = None
+                except Exception as e:
+                    last_error = e
+                    wait_time = 2 ** attempt  # 1s, 2s, 4s
+                    if attempt < max_retries - 1:
+                        logger.warning("[CHAT] LLM call failed (attempt %d/%d): %s. Retrying in %ds...",
+                                      attempt + 1, max_retries, e, wait_time)
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error("[CHAT] LLM call failed after %d attempts: %s", max_retries, e)
+                        chat_result = None
 
         logger.info(f"[CHAT][RESULT] is_complete=%s needs_tool_retry=%s",
                     chat_result.is_complete if chat_result else False,
