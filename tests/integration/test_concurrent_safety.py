@@ -47,7 +47,8 @@ class TestConcurrentOrderCreation:
             cursor = integration_db.execute(
                 "SELECT COUNT(*) FROM orders WHERE order_id LIKE 'concurrent_read_%'"
             )
-            return cursor.fetchone()[0]
+            result = cursor.fetchone()
+            return result[0] if result else 0
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(read_count) for _ in range(10)]
