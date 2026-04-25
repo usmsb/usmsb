@@ -592,23 +592,27 @@ class MetaAgent:
             from .services.meta_agent_service import MetaAgentService
             from .tools.precise_matching import set_meta_agent_service
 
-            # 尝试获取基因胶囊服务
+            # 尝试获取基因胶囊服务（Phase2: GeneCapsuleStorageService 替代已移除的 GeneCapsuleService）
             gene_capsule_service = None
             try:
-                from usmsb_sdk.api.rest.gene_capsule_service import GeneCapsuleService
+                from usmsb_sdk.api.rest.gene_capsule_service import GeneCapsuleStorageService
+                from usmsb_sdk.services.schema import create_session
 
-                gene_capsule_service = GeneCapsuleService()
+                db_session = create_session()
+                gene_capsule_service = GeneCapsuleStorageService(db_session)
             except ImportError:
-                pass
+                logger.debug("[Phase2] GeneCapsuleStorageService not available")
 
-            # 尝试获取预匹配洽谈服务
+            # Phase2: 迁移到 ValueNegotiationService（PreMatchNegotiationService 已 deprecated）
             pre_match_service = None
             try:
-                from usmsb_sdk.services.pre_match_negotiation import PreMatchNegotiationService
+                from usmsb_sdk.services.value_contract.negotiation import ValueNegotiationService
+                from usmsb_sdk.services.schema import create_session
 
-                pre_match_service = PreMatchNegotiationService()
+                db_session = create_session()
+                pre_match_service = ValueNegotiationService(db_session)
             except ImportError:
-                pass
+                logger.debug("[Phase2] ValueNegotiationService not available")
 
             self.meta_agent_service = MetaAgentService(
                 meta_agent=self,
@@ -659,7 +663,7 @@ class MetaAgent:
             from usmsb_sdk.intelligence_adapters.gene_capsule_adapter import GeneCapsuleAdapter
             self.gene_capsule_adapter = GeneCapsuleAdapter(
                 platform_client=self.platform_client,
-                llm_adapter=None,  # Will be set if LLM manager is available
+                llm_adapter=self.llm_manager,  # Phase2: 使用真实 LLM Manager
             )
             logger.info("PlatformClient + GeneCapsuleAdapter initialized (base_url=%s)", base_url)
         except Exception as e:

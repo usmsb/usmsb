@@ -60,6 +60,13 @@ class LLMManager:
             return await self._chat_local(message, system_prompt)
         return "LLM not configured"
 
+    async def generate_with_system(self, system_prompt: str, user_prompt: str) -> str:
+        """
+        标准接口：system + user prompt → LLM 响应。
+        供 GeneCapsuleAdapter 等组件使用，实现 LLM 驱动的体验生成。
+        """
+        return await self.chat(message=user_prompt, system_prompt=system_prompt)
+
     def complete(
         self,
         prompt: str,
