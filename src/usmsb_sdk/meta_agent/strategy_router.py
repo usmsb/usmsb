@@ -226,11 +226,22 @@ class StrategyRouter:
         else:
             strategies = ["internal", "sdk"]
 
-        # Step 4: 并行执行
+        # Step 4: 真·并行执行（asyncio.gather）
         results: dict[str, StrategyResult] = {}
-        if "internal" in strategies:
+        if len(strategies) == 2:
+            # 真正并行：同时执行 internal 和 sdk
+            internal_task = asyncio.create_task(
+                self._execute_with_timing("internal", internal_fn, task_text)
+            )
+            sdk_task = asyncio.create_task(
+                self._execute_with_timing("sdk", sdk_fn, task_text)
+            )
+            internal_res, sdk_res = await asyncio.gather(internal_task, sdk_task)
+            results["internal"] = internal_res
+            results["sdk"] = sdk_res
+        elif strategies == ["internal"]:
             results["internal"] = await self._execute_with_timing("internal", internal_fn, task_text)
-        if "sdk" in strategies:
+        elif strategies == ["sdk"]:
             results["sdk"] = await self._execute_with_timing("sdk", sdk_fn, task_text)
 
         if len(results) == 1:

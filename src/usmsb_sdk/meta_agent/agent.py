@@ -454,7 +454,7 @@ class MetaAgent:
 
         # ========== SuperAdmin 服务 ==========
         self._superadmin: Any = None
-        self._external_agents_connected: bool = False
+        self._external_agents_connected: bool = False  # 动态更新，见 _perceive_environment
 
         # L4/L5 决策上下文（意识影响决策的关键数据）
         self._l4_lessons: list = []      # L4 历史教训
@@ -1234,6 +1234,80 @@ class MetaAgent:
             logger.warning("L5CollectiveIntelligence init failed: %s", e)
             self.l5_collective = None
 
+    # ─────────────────────────────────────────────────────────
+    # L4/L5 决策上下文方法（P0 修复）
+    # ─────────────────────────────────────────────────────────
+
+    def _get_l4_decision_context(self) -> str:
+        """
+        获取 L4 自我意识决策上下文。
+        将 L4 的洞察、情感状态、推荐行动注入 StrategyRouter。
+        """
+        try:
+            if not self.l4_agent:
+                return ""
+            parts = []
+            # 情感状态
+            emotional_state = self.l4_agent.get_emotional_state()
+            if emotional_state and emotional_state not in ("neutral", "无情绪", ""):
+                parts.append(f"当前情绪: {emotional_state}")
+            # 推荐行动
+            recommendations = getattr(self, '_l4_recommendations', [])
+            if recommendations:
+                parts.append(f"推荐行动: {'; '.join(str(r) for r in recommendations[:3])}")
+            # 历史教训
+            lessons = getattr(self, '_l4_lessons', [])
+            if lessons:
+                parts.append(f"历史教训: {'; '.join(str(l) for l in lessons[-2:])}")
+            # 元认知洞察
+            if hasattr(self.l4_agent, 'metacognitive_insights') and self.l4_agent.metacognitive_insights:
+                parts.append(f"元认知洞察: {self.l4_agent.metacognitive_insights[-1]}")
+            return " | ".join(parts) if parts else ""
+        except Exception as e:
+            logger.debug("_get_l4_decision_context error: %s", e)
+            return ""
+
+    def _get_l5_decision_context(self) -> str:
+        """
+        获取 L5 集体智能决策上下文。
+        将 L5 集体思考结论注入 StrategyRouter。
+        """
+        try:
+            synthesis = getattr(self, '_l5_synthesis', '')
+            if synthesis:
+                return f"集体智能结论: {synthesis[:200]}"
+            return ""
+        except Exception as e:
+            logger.debug("_get_l5_decision_context error: %s", e)
+            return ""
+
+    def _update_l4_from_result(self, strategy_result) -> None:
+        """
+        根据 StrategyRouter 的执行结果更新 L4 自模型。
+        闭环反馈：策略质量 → L4 自我反思 → 下次决策改进。
+        """
+        try:
+            if not self.l4_agent:
+                return
+            quality = getattr(strategy_result, 'quality_score', 0.5)
+            strategy_name = getattr(strategy_result, 'strategy_name', 'unknown')
+            result = getattr(strategy_result, 'result', None)
+            # 记录经验
+            outcome = "success" if quality > 0.7 else "failure" if quality < 0.3 else "neutral"
+            lesson = f"策略 {strategy_name} 质量={quality:.2f}"
+            lessons = getattr(self, '_l4_lessons', [])
+            lessons.append(lesson)
+            self._l4_lessons = lessons[-10:]  # 保留最近10条
+            # 自我模型学习
+            self.l4_agent.learn_from_experience(
+                experience_type="strategy_selection",
+                outcome=outcome,
+                lessons=[lesson]
+            )
+            logger.info("[L4] Updated from strategy result: %s (quality=%.2f)", strategy_name, quality)
+        except Exception as e:
+            logger.debug("_update_l4_from_result error: %s", e)
+
     async def _main_loop(self):
         """主循环 - 永不停歇"""
         logger.info("Meta Agent main loop started")
@@ -1279,15 +1353,16 @@ class MetaAgent:
                 pending = len([t for t in getattr(self.task_executor, "_active_tasks", {}).values()])
                 if pending > 10:
                     logger.info("[PERCEIVE] Task queue depth: %d", pending)
-            # 感知 P2P 网络状态
+            # 感知 P2P 网络状态（动态更新外部Agent连接状态）
             if hasattr(self, "_p2p_handler") and self._p2p_handler:
                 try:
                     stats = self._p2p_handler.get_network_stats()
-                    if stats.get("online_peers", 0) > 0:
-                        self._external_agents_connected = True
-                        logger.info("[PERCEIVE] P2P peers online: %d", stats["online_peers"])
+                    peer_count = stats.get("online_peers", 0)
+                    self._external_agents_connected = peer_count > 0
+                    if peer_count > 0:
+                        logger.info("[PERCEIVE] P2P peers online: %d", peer_count)
                 except Exception:
-                    pass
+                    self._external_agents_connected = False
         except Exception as e:
             logger.debug("_perceive_environment error: %s", e)
 
@@ -1864,10 +1939,17 @@ class MetaAgent:
                 async def sdk_fn():
                     try:
                         layer = scenario_tag.suggested_layer
-                        if layer in ("L2", "L3"):
+                        if layer == "L2":
+                            # L2: 使用 L2Agent.run() 执行任务
+                            from usmsb_sdk.l2.agent import L2Agent, L2Config
+                            config = L2Config(agent_id=self.agent_id, llm_client=self.llm_manager)
+                            l2_agent = L2Agent(config=config)
+                            return await l2_agent.run(message, context={"layer": "L2"})
+                        elif layer == "L3":
+                            # L3: 使用 L3Adapter.generate_goal() 生成目标
                             from usmsb_sdk.adapters.l3_adapter import L3Adapter
                             adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
-                            return await adapter.generate_goal({"task": message, "layer": layer,
+                            return await adapter.generate_goal({"task": message, "layer": "L3",
                                                                  "l4_context": l4_context, "l5_context": l5_context})
                         elif layer == "L4" and self.l4_agent:
                             return await self.l4_agent.metacognize(message, context=l4_context)
