@@ -161,6 +161,8 @@ class AgentRecommendation:
     availability: str | None = None
     suggested_price_range: dict[str, float] | None = None
     confidence_level: str = "medium"  # low, medium, high
+    # P1-4: Pre-match Negotiation
+    pre_negotiation_session_id: str | None = None  # 如果已启动预协商
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -172,6 +174,7 @@ class AgentRecommendation:
             "availability": self.availability,
             "suggested_price_range": self.suggested_price_range,
             "confidence_level": self.confidence_level,
+            "pre_negotiation_session_id": self.pre_negotiation_session_id,
         }
 
 
@@ -629,12 +632,87 @@ Agent 画像：
         profile.updated_at = datetime.now()
         return profile
 
+    # ==================== Pre-match Negotiation（P1-4）====================
+
+    async def start_pre_negotiation(
+        self,
+        demand_agent_id: str,
+        supply_agent_id: str,
+        demand_description: str | None = None,
+        initial_terms: dict[str, Any] | None = None,
+    ) -> str | None:
+        """
+        为需求方和供应方启动预协商会话（P1-4 核心）
+
+        流程：
+        1. demand_agent（需求方，如 MetaAgent）发起
+        2. supply_agent（供应方，被推荐的 Agent）响应
+        3. 协商变量条款（价格/工期等）
+        4. 达成一致后 → 创建正式 Value Contract
+
+        Args:
+            demand_agent_id: 需求方 Agent ID
+            supply_agent_id: 供应方 Agent ID（被推荐的）
+            demand_description: 需求描述（用于确定协商模板）
+            initial_terms: 初始条款 {price_vibe: 5.0, deadline: 86400, ...}
+
+        Returns:
+            str: 协商会话 ID，或 None（服务不可用时）
+        """
+        if not self.pre_match_negotiation_service:
+            logger.debug("[P1-4] Pre-match negotiation service not available")
+            return None
+
+        try:
+            # 根据需求描述选择模板
+            template_id = "simple_task"
+            if demand_description:
+                desc_lower = demand_description.lower()
+                if any(k in desc_lower for k in ["复杂", "multi", "multi-step"]):
+                    template_id = "complex_task"
+                elif any(k in desc_lower for k in ["创意", "creative", "design"]):
+                    template_id = "creative_task"
+
+            session = await self.pre_match_negotiation_service.start_negotiation(
+                demand_agent_id=demand_agent_id,
+                supply_agent_id=supply_agent_id,
+                initial_terms=initial_terms,
+                template_id=template_id,
+                timeout_seconds=300,
+            )
+
+            logger.info(
+                f"[P1-4] Pre-negotiation started: {demand_agent_id} → {supply_agent_id}, "
+                f"session={session.session_id}"
+            )
+            return session.session_id
+
+        except Exception as e:
+            logger.warning(f"[P1-4] Failed to start pre-negotiation: {e}")
+            return None
+
+    async def get_negotiation_session(self, session_id: str) -> dict[str, Any] | None:
+        """获取协商会话状态"""
+        if not self.pre_match_negotiation_service:
+            return None
+
+        try:
+            session = await self.pre_match_negotiation_service.get_session(session_id)
+            if session:
+                return session.to_dict()
+            return None
+        except Exception as e:
+            logger.warning(f"[P1-4] Failed to get negotiation session: {e}")
+            return None
+
     # ==================== 推荐功能 ====================
 
     async def recommend_for_demand(
         self,
         demand: dict[str, Any],
         limit: int = 5,
+        demand_agent_id: str | None = None,
+        auto_pre_negotiate: bool = True,
     ) -> list[AgentRecommendation]:
         """
         为需求推荐最佳 Agent
@@ -642,6 +720,8 @@ Agent 画像：
         Args:
             demand: 需求信息
             limit: 返回数量限制
+            demand_agent_id: 需求方 Agent ID（用于启动预协商）
+            auto_pre_negotiate: 是否自动为 top 推荐启动预协商（P1-4）
 
         Returns:
             List[AgentRecommendation] 推荐列表
@@ -696,8 +776,30 @@ Agent 画像：
                     )
                     recommendations.append(recommendation)
 
-        # 4. 排序并返回
+        # 4. 排序
         recommendations.sort(key=lambda x: x.match_score, reverse=True)
+
+        # 5. P1-4: 为 top 推荐自动启动预协商
+        if auto_pre_negotiate and demand_agent_id and self.pre_match_negotiation_service:
+            top_k = min(3, len(recommendations))
+            for rec in recommendations[:top_k]:
+                if rec.match_score >= 0.5:  # 只对有信心推荐的启动预协商
+                    try:
+                        session_id = await self.start_pre_negotiation(
+                            demand_agent_id=demand_agent_id,
+                            supply_agent_id=rec.agent_id,
+                            demand_description=demand.get("description"),
+                            initial_terms=demand.get("initial_terms"),
+                        )
+                        if session_id:
+                            rec.pre_negotiation_session_id = session_id
+                            logger.info(
+                                f"[P1-4] Auto pre-negotiation for {rec.agent_id}: "
+                                f"session={session_id}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[P1-4] Auto pre-negotiation failed for {rec.agent_id}: {e}")
+
         return recommendations[:limit]
 
     async def _calculate_profile_match(
