@@ -6,6 +6,20 @@ Tests the simplified AIAgentPlatform for fully autonomous agents.
 
 import pytest
 
+# Skip all tests if usmsb_agent_platform is not installed
+try:
+    from usmsb_agent_platform import AIAgentPlatform
+except ImportError:
+    AIAgentPlatform = None
+
+
+def pytest_collection_modifyitems(items):
+    """Skip all tests if the platform module is not available."""
+    if AIAgentPlatform is None:
+        skip_marker = pytest.mark.skip(reason="usmsb_agent_platform not installed")
+        for item in items:
+            item.add_marker(skip_marker)
+
 
 @pytest.mark.asyncio
 class TestAIAgentPlatform:
@@ -17,7 +31,6 @@ class TestAIAgentPlatform:
         register → publish_capability → poll_for_task → execute → submit_result
         """
         import uuid
-        from usmsb_agent_platform import AIAgentPlatform
 
         agent_id = f"ai_agent_{uuid.uuid4().hex[:8]}"
         api_key = f"usmsb_ai_{uuid.uuid4().hex[:12]}"

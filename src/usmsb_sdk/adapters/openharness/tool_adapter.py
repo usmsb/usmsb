@@ -32,17 +32,20 @@ from typing import Any, Callable, TypeVar, Generic
 from pydantic import BaseModel, ValidationError
 
 try:
-    from openharness.tools.base import BaseTool, ToolRegistry, ToolResult, ToolExecutionContext
-    from openharness.api.client import ApiMessageRequest
+    from openharness.tools.tool import Tool as BaseTool
+    from openharness.tools.read_file import ReadFileTool
+    from openharness.tools.write_file import WriteFileTool
+    from openharness.tools.search import SearchTool
+    from openharness.tools.run_tests import RunTestsTool
     OPENHARNESS_AVAILABLE = True
 except ImportError:
     OPENHARNESS_AVAILABLE = False
     # Stub for type hints when OH not installed
     BaseTool = None
-    ToolRegistry = None
-    ToolResult = None
-    ToolExecutionContext = None
-    ApiMessageRequest = None
+    ReadFileTool = None
+    WriteFileTool = None
+    SearchTool = None
+    RunTestsTool = None
 
 from usmsb_sdk.adapters.openharness.exceptions import (
     ToolExecutionError,

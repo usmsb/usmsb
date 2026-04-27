@@ -532,7 +532,12 @@ class MetaAgent:
         await self.goal_engine.start()
 
         # ========== FastAPI REST Server ==========
-        await self._start_api_server()
+        # 默认不自动启动 REST API，避免与 main:app 的 lifespan 冲突
+        # 如需启动，设置环境变量 USMSB_AUTO_START_API=1
+        if os.environ.get("USMSB_AUTO_START_API") == "1":
+            await self._start_api_server()
+        else:
+            logger.info("[SERVER] Skipping auto-start of REST API (set USMSB_AUTO_START_API=1 to enable)")
 
         # 启动进化引擎
         self.evolution_engine = EvolutionEngine(
@@ -638,11 +643,9 @@ class MetaAgent:
         """Initialize OpenHarness integration and inject tools into registry."""
         try:
             from usmsb_sdk.adapters.openharness import OpenHarnessIntegration
-            from usmsb_sdk.adapters.openharness.meta_agent_adapter import MetaAgentAdapter
             self.oh_integration = OpenHarnessIntegration.from_env(cwd=self.config.data_dir or ".")
             await self.oh_integration.initialize()
-            self._meta_agent_adapter = MetaAgentAdapter(oh_integration=self.oh_integration)
-            logger.info("OpenHarness + MetaAgentAdapter initialized")
+            logger.info("OpenHarness initialized")
             
             # Inject OH tools into USMSB tool registry
             injected = self.oh_integration.inject_oh_tools_into_registry(

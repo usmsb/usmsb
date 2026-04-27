@@ -360,11 +360,17 @@ class FileStorage(StorageInterface[Union[dict, list, str, int, float, bool]]):
     def _get_data_path(self, key: str) -> Path:
         """Get path for data file."""
         safe_key = self._sanitize_key(key)
+        # Remove any existing .json extension to avoid .json.json
+        if safe_key.endswith(".json"):
+            safe_key = safe_key[:-5]
         return self.base_path / "data" / f"{safe_key}.json"
 
     def _get_metadata_path(self, key: str) -> Path:
         """Get path for metadata file."""
         safe_key = self._sanitize_key(key)
+        # Remove .json to avoid .meta.json.json
+        if safe_key.endswith(".json"):
+            safe_key = safe_key[:-5]
         return self.base_path / "metadata" / f"{safe_key}.meta.json"
 
     def _sanitize_key(self, key: str) -> str:
@@ -392,6 +398,10 @@ class FileStorage(StorageInterface[Union[dict, list, str, int, float, bool]]):
         try:
             data_path = self._get_data_path(key)
             meta_path = self._get_metadata_path(key)
+
+            # Ensure data directory exists (lazy initialization)
+            data_path.parent.mkdir(parents=True, exist_ok=True)
+            meta_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Check if exists
             if data_path.exists() and not overwrite:

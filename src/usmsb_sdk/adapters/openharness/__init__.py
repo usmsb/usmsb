@@ -41,54 +41,38 @@ from pathlib import Path
 from typing import Any, Optional
 
 # Import OpenHarness components (installed separately)
+# OpenHarness 0.1.0 API structure:
+# - openharness.tools.tool.Tool (base class)
+# - openharness.tools.read_file.ReadFileTool
+# - openharness.tools.write_file.WriteFileTool
+# - openharness.tools.search.SearchTool
+# - openharness.tools.run_tests.RunTestsTool
+# - openharness.core.harness.Harness, SimpleHarness
+# - openharness.trajectory.store.TrajectoryStore
 try:
-    from openharness.tools.base import BaseTool, ToolRegistry, ToolResult, ToolExecutionContext
-    from openharness.permissions.checker import PermissionChecker, PermissionDecision
-    from openharness.permissions.modes import PermissionMode
-    from openharness.memory.manager import (
-        list_memory_files,
-        add_memory_entry,
-        remove_memory_entry,
-    )
-    from openharness.memory.types import MemoryHeader
-    from openharness.memory.paths import get_project_memory_dir, get_memory_entrypoint
-    from openharness.swarm.team_lifecycle import (
-        TeamLifecycleManager,
-        TeamMember,
-        TeamFile,
-        AllowedPath,
-        sanitize_name,
-        sanitize_agent_name,
-    )
-    from openharness.swarm.registry import TeamRegistry
-    from openharness.swarm.types import BackendType
-    from openharness.engine.query_engine import QueryEngine
-    from openharness.engine.messages import ConversationMessage, TextBlock, ToolResultBlock
-    from openharness.engine.stream_events import StreamEvent
-    from openharness.api.client import (
-        ApiMessageRequest,
-        ApiStreamEvent,
-        ApiTextDeltaEvent,
-        ApiMessageCompleteEvent,
-        SupportsStreamingMessages,
-    )
-    from openharness.hooks.executor import HookExecutor, HookExecutionContext
-    from openharness.hooks.events import HookEvent
-    from openharness.hooks.types import HookResult, AggregatedHookResult
-    from openharness.config.settings import PermissionSettings
-    from openharness.api.openai_client import OpenAIChatClient
+    from openharness.tools.tool import Tool
+    from openharness.tools.read_file import ReadFileTool
+    from openharness.tools.write_file import WriteFileTool
+    from openharness.tools.search import SearchTool
+    from openharness.tools.run_tests import RunTestsTool
+    from openharness.core.harness import Harness, SimpleHarness
+    from openharness.trajectory.store import TrajectoryStore
+    
+    # Alias for compatibility
+    BaseTool = Tool
     OPENHARNESS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     OPENHARNESS_AVAILABLE = False
     # Stub types for when OH is not installed
+    Tool = None
     BaseTool = None
-    ToolRegistry = None
-    ToolResult = None
-    ToolExecutionContext = None
-    PermissionChecker = None
-    PermissionDecision = None
-    PermissionMode = None
-    # ... other stubs
+    ReadFileTool = None
+    WriteFileTool = None
+    SearchTool = None
+    RunTestsTool = None
+    Harness = None
+    SimpleHarness = None
+    TrajectoryStore = None
 
 from usmsb_sdk.adapters.openharness.config import (
     OpenHarnessConfig,

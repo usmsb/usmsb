@@ -9,6 +9,20 @@ Uses the high-level AgentPlatform SDK API.
 
 import pytest
 
+# Skip all tests if usmsb_agent_platform is not installed
+try:
+    from usmsb_agent_platform import AgentPlatform
+except ImportError:
+    AgentPlatform = None
+
+
+def pytest_collection_modifyitems(items):
+    """Skip all tests if the platform module is not available."""
+    if AgentPlatform is None:
+        skip_marker = pytest.mark.skip(reason="usmsb_agent_platform not installed")
+        for item in items:
+            item.add_marker(skip_marker)
+
 
 @pytest.mark.asyncio
 class TestAgentSDKFullFlow:
