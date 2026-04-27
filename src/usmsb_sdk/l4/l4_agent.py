@@ -11,6 +11,7 @@ L4 = L3 + 自模型 + 元认知 + 他人心智 + 情感架构
 4. 有情绪反应（EmotionalArchitecture）
 """
 
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -358,6 +359,24 @@ class L4SelfConsciousAgent:
             tags=tags or []
         )
     
+    # ========== 情绪行为引导 ==========
+    
+    def get_behavioral_guidance(self) -> dict:
+        """
+        获取当前情绪驱动的行为引导参数。
+        
+        供外部系统（L3目标生成、元认知策略等）调用：
+        - 目标难度系数（difficulty_multiplier）
+        - 推理策略（reasoning_strategy）
+        - 协作调整（collaboration_adjustment）
+        - 时间分配（time_allocation）
+        """
+        return self.emotions.get_behavioral_guidance()
+    
+    def get_emotional_state_summary(self) -> str:
+        """获取情绪状态摘要"""
+        return self.emotions.get_emotional_summary()
+    
     # ========== 状态报告 ==========
     
     def get_full_status(self) -> dict:
@@ -378,11 +397,8 @@ class L4SelfConsciousAgent:
                 "others_modeled": len(self.theory_of_mind.other_models),
                 "total_interactions": len(self.theory_of_mind.all_interactions),
             },
-            "emotions": {
-                "mood": self.emotions.mood.to_natural_language(),
-                "emotion_count": len(self.emotions.emotion_history),
-                "bonds": len(self.emotions.attachment_bonds),
-            },
+            "emotions": self.emotions.to_dict(),
+            "behavioral_guidance": self.emotions.get_behavioral_guidance(),
             "reflection_count": self.reflection_count,
             "uptime": datetime.now().timestamp() - self.created_at,
         }
@@ -408,9 +424,14 @@ class L4SelfConsciousAgent:
 
     @dataclass
     class EmotionResponse:
-        emotion: str
+        """IL4 情感响应（扩展版）"""
+        primary_emotion: str
         intensity: float
-        action_tendency: str
+        action_tendency: str          # 行为倾向名称
+        tendency_confidence: float    # 置信度
+        active_emotions: list[dict]  # 所有活跃情绪及其衰减强度
+        mood_state: str              # 心境自然语言描述
+        behavioral_guidance: dict    # 完整行为引导参数
 
     async def build_self_model(self, experience: list[dict]) -> SelfModel:
         """IL4: 根据经验构建/更新自模型"""
@@ -440,15 +461,48 @@ class L4SelfConsciousAgent:
         )
 
     async def feel(self, stimulus: dict) -> EmotionResponse:
-        """IL4: 情感反应"""
+        """
+        IL4: 情感反应
+        
+        对刺激产生情绪反应，并返回完整的行为引导信息。
+        情绪通过规则层立即映射为 ActionTendency（无递归）。
+        """
+        # 触发情绪反应（规则层）
         emotions = self._feel_sync(stimulus)
+        
+        # 获取当前行为倾向（规则层计算）
+        tendency, confidence = self.emotions.get_action_tendency()
+        
+        # 获取完整行为引导
+        guidance = self.emotions.get_behavioral_guidance()
+        
+        # 收集所有活跃情绪
+        active = self.emotions.active_emotions
+        active_emotions_data = []
+        for e in active:
+            eff = self.emotions._effective_intensity(e)
+            active_emotions_data.append({
+                "type": e.type.value,
+                "effective_intensity": round(eff, 3),
+                "original_intensity": e.intensity,
+                "trigger": e.trigger[:50] if e.trigger else "",
+                "elapsed_seconds": round(time.time() - e.timestamp, 1),
+            })
+        
         primary = emotions[0] if emotions else None
         if primary:
             emotion_type = getattr(primary.type, 'value', str(primary.type)) if hasattr(primary, 'type') else 'neutral'
             intensity = getattr(primary, 'intensity', 0.5)
-            action = getattr(primary.type, 'name', 'neutral') if hasattr(primary, 'type') else 'none'
+            action = tendency.value
         else:
-            emotion_type, intensity, action = 'neutral', 0.0, 'none'
+            emotion_type, intensity, action = 'neutral', 0.0, tendency.value
+        
         return self.EmotionResponse(
-            emotion=emotion_type, intensity=intensity, action_tendency=action
+            primary_emotion=emotion_type,
+            intensity=intensity,
+            action_tendency=action,
+            tendency_confidence=round(confidence, 3),
+            active_emotions=active_emotions_data,
+            mood_state=self.emotions.mood.to_natural_language(),
+            behavioral_guidance=guidance,
         )
