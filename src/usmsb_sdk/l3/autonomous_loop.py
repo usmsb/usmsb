@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from usmsb_sdk.l3.intrinsic_motivation import IntrinsicMotivationEngine
     from usmsb_sdk.l3.purpose_generator import PurposeGenerator
     from usmsb_sdk.l3.emotional_goal_selector import EmotionalGoalSelector
+    from usmsb_sdk.l3.llm_goal_prioritizer import LLMGoalPrioritizer
     from usmsb_sdk.l4.emotional_architecture import EmotionalArchitecture
 
 
@@ -81,6 +82,7 @@ class LoopConfig:
     motivation_decay_interval: float = 10.0  # 动机衰减检查间隔
     log_cycles: bool = True            # 是否记录循环日志
     emotion_feedback: bool = True      # 是否将结果反馈到情绪
+    num_goal_candidates: int = 3       # 每轮生成的候选目标数量（用于 LLM 优先级排序）
 
 
 class AutonomousLoop:
@@ -124,6 +126,7 @@ class AutonomousLoop:
         emotional_arch: EmotionalArchitecture | None = None,
         config: LoopConfig | None = None,
         executor: Callable[[Any], Any] | None = None,
+        llm_goal_prioritizer: LLMGoalPrioritizer | None = None,
     ):
         self.agent_id = agent_id
         self.config = config or LoopConfig()
@@ -133,7 +136,8 @@ class AutonomousLoop:
         self.purpose_generator = purpose_generator
         self.emotional_selector = emotional_selector
         self.emotions = emotional_arch
-        self.executor = executor  # 执行目标的函数 async (goal) -> result
+        self.executor = executor
+        self.llm_prioritizer = llm_goal_prioritizer
         
         # 状态
         self.state = LoopState.STOPPED
@@ -277,10 +281,31 @@ class AutonomousLoop:
             if self.motivation_engine:
                 needs = self.motivation_engine.generate_needs(state_before)
             
-            # Step 2: 生成目标（注入情绪引导）
-            goal = await self._generate_goal_with_emotion(state_before)
+            # Step 2: 生成候选目标（注入情绪引导）
+            candidates = await self._generate_candidates_with_emotion(state_before)
+            
+            # Step 2b: LLM 优先级排序（如果可用）
+            if candidates and len(candidates) > 1 and self.llm_prioritizer:
+                agent_state = self._build_agent_state(state_before)
+                rankings = await self.llm_prioritizer.prioritize(agent_state, candidates)
+                if rankings:
+                    # 选择排名第一的目标
+                    goal = self._goal_from_ranking(candidates, rankings[0])
+                    goal.metadata = goal.metadata or {}
+                    goal.metadata['llm_priority'] = rankings[0].to_dict()
+                    goal.metadata['all_rankings'] = [r.to_dict() for r in rankings]
+                    logger.info(f"[AutonomousLoop] LLM prioritized: {rankings[0].goal_name} "
+                               f"(score={rankings[0].priority_score:.2f}, "
+                               f"risk={rankings[0].risk_level}, "
+                               f"reason={rankings[0].reasoning[:60]})")
+            elif candidates:
+                # 无 LLM：用 EmotionalGoalSelector 选择
+                goal = self.emotional_selector.select_from_candidates(candidates) if self.emotional_selector else candidates[0]
+            else:
+                goal = None
+            
             if goal:
-                goals_generated = 1
+                goals_generated = len(candidates) if candidates else 1
                 goal_executed = goal
                 
                 # 触发事件
@@ -326,45 +351,46 @@ class AutonomousLoop:
         
         return result
     
-    async def _generate_goal_with_emotion(self, state: dict) -> Any | None:
+    async def _generate_candidates_with_emotion(self, state: dict) -> list[Any]:
         """
-        使用情绪引导生成目标
-        
-        优先级：
-        1. purpose_generator 存在 → 通过它生成目标
-        2. purpose_generator 不存在但有 emotional_selector → 直接从目标池生成
-        3. 都没有 → 返回 None
+        使用情绪引导生成多个候选目标（用于 LLM 优先级排序）
         """
-        # 获取情绪上下文
         emotional_ctx = None
         if self.emotional_selector:
             emotional_ctx = self.emotional_selector.get_emotional_context()
         
-        # 如果有 purpose_generator，通过它生成
-        if self.purpose_generator:
-            purpose = self.purpose_generator.generate_purpose()
-            if not purpose:
-                # 回退到目标池
-                return self._generate_from_pool(emotional_ctx)
-            
-            goal = self.purpose_generator.purpose_to_goal(purpose)
-            if emotional_ctx:
-                goal = self.emotional_selector.adjust_goal_difficulty(goal, base_difficulty=0.5)
-            return goal
+        num_candidates = getattr(self.config, 'num_goal_candidates', 3)
+        candidates = []
+        base_difficulties = [0.3, 0.5, 0.7]
         
-        # 无 purpose_generator → 直接从目标池生成
-        return self._generate_from_pool(emotional_ctx)
+        for i in range(min(num_candidates, 3)):
+            base_diff = base_difficulties[i % 3]
+            
+            if self.purpose_generator and i == 0:
+                purpose = self.purpose_generator.generate_purpose()
+                if purpose:
+                    goal = self.purpose_generator.purpose_to_goal(purpose)
+                    if emotional_ctx:
+                        goal = self.emotional_selector.adjust_goal_difficulty(goal, base_difficulty=base_diff)
+                    candidates.append(goal)
+                    continue
+            
+            goal = self._generate_from_pool(emotional_ctx, base_difficulty=base_diff)
+            if goal:
+                candidates.append(goal)
+        
+        return candidates
     
-    def _generate_from_pool(self, emotional_ctx) -> Any | None:
-        """从难度池生成目标（不需要 LLM）"""
+    def _generate_from_pool(self, emotional_ctx, base_difficulty: float = 0.5) -> Any | None:
+        """从难度池生成一个目标"""
         if not self.emotional_selector:
             return None
         
-        pool_result = self.emotional_selector.generate_goal_from_pool(base_difficulty=0.5)
+        pool_result = self.emotional_selector.generate_goal_from_pool(base_difficulty=base_difficulty)
         
-        # 构造一个简易 Goal 对象
         class PoolGoal:
             def __init__(self, data):
+                self.id = data.get("name", "")[:50]
                 self.name = data["name"]
                 self.description = data["description"]
                 self.metadata = {
@@ -379,6 +405,58 @@ class AutonomousLoop:
                 return f"PoolGoal({self.name})"
         
         return PoolGoal(pool_result)
+    
+    def _build_agent_state(self, state: dict) -> "AgentState":
+        """从内部状态构建 LLMGoalPrioritizer 的 AgentState"""
+        from usmsb_sdk.l3.llm_goal_prioritizer import AgentState as LLMAgentState
+        
+        recent_events = self.event_history[-20:]
+        goal_events = [e for _, evt, _ in recent_events if evt in (LoopEvent.GOAL_COMPLETED, LoopEvent.GOAL_FAILED)]
+        if goal_events:
+            completed = sum(1 for _, evt, _ in goal_events if evt == LoopEvent.GOAL_COMPLETED)
+            success_rate = completed / len(goal_events)
+        else:
+            success_rate = 0.5
+        
+        dominant_mot = "curiosity"
+        mot_intensity = 0.5
+        if self.motivation_engine:
+            dominant_mot = self.motivation_engine.get_dominant_motivation() or "curiosity"
+            mot_intensity = self.motivation_engine.get_motivation_state(dominant_mot)
+        
+        emot_tendency = "neutral"
+        diff_mult = 1.0
+        collab_adj = 0.0
+        ctx_val = None
+        if self.emotional_selector:
+            ctx_val = self.emotional_selector.get_emotional_context()
+            if ctx_val:
+                emot_tendency = ctx_val.tendency
+                diff_mult = ctx_val.difficulty_multiplier
+                collab_adj = ctx_val.collaboration_adjustment
+        
+        return LLMAgentState(
+            agent_id=self.agent_id,
+            capabilities={},
+            confidence=min(1.0, 0.5 * diff_mult),
+            motivation=dominant_mot,
+            motivation_intensity=mot_intensity,
+            resources={},
+            recent_success_rate=success_rate,
+            emotional_tendency=emot_tendency,
+            difficulty_multiplier=diff_mult,
+            collaboration_adjustment=collab_adj,
+            time_allocation=ctx_val.time_allocation if ctx_val else "maintain",
+            recent_goals=state.get("recent_goals", []),
+        )
+    
+    def _goal_from_ranking(self, candidates: list[Any], ranking: "PriorityResult") -> Any | None:
+        """从优先级结果中找到对应的候选目标"""
+        for c in candidates:
+            c_name = getattr(c, 'name', '') or getattr(c, 'id', '')
+            if c_name == ranking.goal_name or ranking.goal_name in c_name:
+                return c
+        return candidates[0] if candidates else None
     
     async def _execute_goal_with_timeout(self, goal: Any) -> Any | None:
         """带超时的目标执行"""
