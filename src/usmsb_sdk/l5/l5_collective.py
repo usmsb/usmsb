@@ -337,16 +337,19 @@ class L5CollectiveIntelligence:
     def __init__(
         self,
         collective_id: str = "collective_001",
-        max_attention: int = 7
+        max_attention: int = 7,
+        llm_adapter=None,  # P2-3: LLM驱动
     ):
         self.collective_id = collective_id
-        
+        self.llm_adapter = llm_adapter  # P2-3
+
         # ========== L5 核心组件 ==========
-        
-        # 1. 全局工作空间
+
+        # 1. 全局工作空间（LLM驱动的注意力竞价）
         self.workspace = GlobalWorkspace(
             collective_id=collective_id,
-            max_attention=max_attention
+            max_attention=max_attention,
+            llm_adapter=llm_adapter,
         )
         
         # 2. 集体记忆
@@ -472,14 +475,26 @@ class L5CollectiveIntelligence:
         return f"Thought from {agent.agent_id}: {problem[:50]}..."
     
     async def _synthesize_thoughts(self, thoughts: list[dict], problem: str) -> str:
-        """综合思考结果"""
+        """
+        综合思考结果（P2-3: LLM驱动合成）
+
+        有 LLM → LLM 深度综合
+        无 LLM → 简单拼接
+        """
         if not thoughts:
             return "No thoughts to synthesize"
-        
-        # 简化的综合
+
         all_thoughts = [t["thought"] for t in thoughts]
-        
-        synthesis = f"""
+
+        # P2-3: LLM 驱动的深度综合
+        if self.llm_adapter:
+            try:
+                return await self._llm_synthesize(thoughts, problem, all_thoughts)
+            except Exception:
+                pass
+
+        # 回退：简单拼接
+        return f"""
 多个 Agent 的思考综合：
 
 问题：{problem}
@@ -487,12 +502,89 @@ class L5CollectiveIntelligence:
 参与 Agent 数：{len(thoughts)}
 
 主要观点：
-{chr(10).join(f"- {t}" for t in all_thoughts[:3])}
+{chr(10).join(f'- {t}' for t in all_thoughts[:3])}
 
 综合结论：结合各方观点，形成以上解决方案。
         """.strip()
-        
-        return synthesis
+
+    async def _llm_synthesize(
+        self,
+        thoughts: list[dict],
+        problem: str,
+        all_thoughts: list[str],
+    ) -> str:
+        """
+        LLM 驱动的思考综合
+
+        识别：
+        1. 共识观点（多个Agent同意）
+        2. 分歧点（Agent之间观点冲突）
+        3. 独特洞察（某个Agent独有的见解）
+        4. 综合结论
+        """
+        import json
+        import re
+
+        system_prompt = """你是一个集体智慧综合专家，擅长从多个Agent的观点中提取共识、分歧和独特洞察。
+
+给定多个Agent对同一问题的思考，你需要综合成一个连贯的结论。
+
+输出格式（纯JSON）：
+{
+  "consensus": "多个Agent的共识观点（20字以内）",
+  "disagreements": ["分歧点1", "分歧点2"],
+  "unique_insights": [{"agent": "agent_id", "insight": "独特见解"}],
+  "synthesis": "综合结论（50字以内）",
+  "confidence": 0.85
+}
+"""
+
+        thought_text = "\n".join(
+            f"Agent {t['agent_id']}: {t['thought']}"
+            for t in thoughts
+        )
+
+        user_prompt = f"""问题：{problem}
+
+各方观点：
+{thought_text}
+
+请综合这些观点，输出JSON格式的综合结论。"""
+
+        response = await self.llm_adapter.generate_with_system(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        if not json_match:
+            return f"综合了{len(thoughts)}个Agent的观点。"
+
+        data = json.loads(json_match.group())
+
+        consensus = data.get("consensus", "")
+        disagreements = data.get("disagreements", [])
+        unique_insights = data.get("unique_insights", [])
+        synthesis = data.get("synthesis", "")
+        confidence = data.get("confidence", 0.5)
+
+        result = f"""【集体思考综合】
+
+问题：{problem}
+参与 Agent：{len(thoughts)}个
+置信度：{confidence:.0%}
+
+✅ 共识：{consensus}
+
+💡 独特洞察：
+{chr(10).join(f'  - [{ins.get("agent", "?")}]: {ins.get("insight", "")}' for ins in unique_insights) if unique_insights else '  （无）'}
+
+⚡ 综合结论：{synthesis}
+
+🔀 分歧点：
+{chr(10).join(f'  - {d}' for d in disagreements) if disagreements else '  （无）'}"""
+
+        return result
     
     async def decide(
         self,

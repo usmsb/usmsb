@@ -2,13 +2,13 @@
 """
 GlobalWorkspace - L5 全局工作空间
 
-全局工作空间理论：
+全局工作空间理论:
 多个 L4 Agent 共享的集体注意力系统。
 
-核心概念：
-- 注意力竞争：哪些信息进入全局空间
-- 广播机制：信息传播到所有 Agent
-- 意识整合：多个 Agent 共享同一个"意识"
+核心概念:
+- 注意力竞争:哪些信息进入全局空间
+- 广播机制:信息传播到所有 Agent
+- 意识整合:多个 Agent 共享同一个"意识"
 """
 
 import uuid
@@ -30,7 +30,7 @@ class AttentionLevel(Enum):
 class ConsciousnessObject:
     """
     意识对象
-    
+
     进入全局工作空间的信息片段。
     """
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -43,12 +43,12 @@ class ConsciousnessObject:
     last_accessed: float = field(default_factory=lambda: datetime.now().timestamp())
     related_objects: list[str] = field(default_factory=list)  # 相关对象
     tags: list[str] = field(default_factory=list)
-    
+
     def access(self) -> None:
         """被访问"""
         self.attention_count += 1
         self.last_accessed = datetime.now().timestamp()
-    
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -73,60 +73,156 @@ class CollectiveMood:
 
 class AttentionBiddingSystem:
     """
-    注意力竞价系统
-    
+    注意力竞价系统(P2-3)
+
     决定哪些信息进入全局工作空间。
+
+    v2: LLM驱动的注意力竞价(当 llm_adapter 可用时)
     """
-    
-    def __init__(self):
+
+    def __init__(self, llm_adapter=None):
+        self.llm_adapter = llm_adapter
         self.base_importance_weight = 0.3
         self.agent_need_weight = 0.3
         self.collective_relevance_weight = 0.25
         self.urgency_weight = 0.15
-    
+
     async def calculate_bid(
         self,
         agent_id: str,
         obj: ConsciousnessObject,
         agent_need: float,
         collective_relevance: float,
-        urgency: float
+        urgency: float,
+        workspace_context: dict | None = None,
     ) -> float:
         """
         计算注意力竞价
-        
+
         Args:
             agent_id: Agent ID
             obj: 意识对象
             agent_need: Agent 的需求程度
             collective_relevance: 对集体的相关性
             urgency: 紧急程度
-            
+            workspace_context: 全局工作空间上下文(当前注意力对象、专业领域等)
+
         Returns:
             float: 竞价分数 (0.0 - 1.0)
         """
+        # 有 LLM → LLM 驱动的注意力竞价
+        if self.llm_adapter:
+            try:
+                return await self._llm_calculate_bid(
+                    agent_id, obj, agent_need, collective_relevance, urgency,
+                    workspace_context or {}
+                )
+            except Exception:
+                pass
+
+        # 回退:固定权重计算
         bid = (
             obj.importance * self.base_importance_weight +
             agent_need * self.agent_need_weight +
             collective_relevance * self.collective_relevance_weight +
             urgency * self.urgency_weight
         )
-        
+
         return min(1.0, max(0.0, bid))
+
+    async def _llm_calculate_bid(
+        self,
+        agent_id: str,
+        obj: ConsciousnessObject,
+        agent_need: float,
+        collective_relevance: float,
+        urgency: float,
+        workspace_context: dict,
+    ) -> float:
+        """
+        LLM 驱动的注意力竞价分析
+
+        使用 LLM 综合判断:
+        1. 信息本身的重要性
+        2. Agent 的需求状态
+        3. 与当前集体注意力焦点的关联
+        4. 紧急程度
+        5. 信息的独特性(避免重复)
+        """
+        import json
+        import re
+
+        # 当前注意力内容(简要)
+        current_attention = []
+        if workspace_context.get("attended_objects"):
+            for o in workspace_context["attended_objects"][:5]:
+                current_attention.append(str(o.get("content", ""))[:80])
+
+        system_prompt = """你是一个注意力分配专家,擅长判断信息对集体的重要性。
+
+给定以下信息,你将输出一个 0.0-1.0 的注意力竞价分数:
+- 信息本身的重要性(0.0-1.0)
+- Agent 的需求程度(0.0-1.0)
+- 对集体的相关性(0.0-1.0)
+- 紧急程度(0.0-1.0)
+
+输出格式(纯JSON):
+{
+  "bid_score": 0.75,
+  "reasoning": "该信息涉及紧急安全事件,多个Agent需要关注",
+  "novelty": 0.8,
+  "collective_impact": 0.9
+}
+
+bid_score: 综合注意力分数(0.0-1.0)
+reasoning: 简短推理(30字以内)
+novelty: 信息新颖程度(0.0-1.0,避免重复已有注意力)
+collective_impact: 对集体的影响(0.0-1.0)
+"""
+
+        user_prompt = f"""注意力竞价分析:
+
+信息来源: Agent {agent_id}
+信息内容: {str(obj.content)[:200]}
+信息原始重要性: {obj.importance:.2f}
+Agent 需求程度: {agent_need:.2f}
+集体相关性: {collective_relevance:.2f}
+紧急程度: {urgency:.2f}
+
+当前全局工作空间注意力焦点:
+{chr(10).join(f'- {c}' for c in current_attention) if current_attention else '(空)'}
+
+请判断这条信息是否值得进入全局工作空间。"""
+
+        response = await self.llm_adapter.generate_with_system(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        if not json_match:
+            # 回退到简单计算
+            return min(1.0, max(0.0,
+                obj.importance * 0.4 + agent_need * 0.3 +
+                collective_relevance * 0.2 + urgency * 0.1
+            ))
+
+        data = json.loads(json_match.group())
+        return float(data.get("bid_score", 0.5))
 
 
 class GossipProtocol:
     """
     Gossip 协议
-    
+
     用于 Agent 之间传播信息。
     """
-    
+
     def __init__(self, gossip_probability: float = 0.3):
         self.gossip_probability = gossip_probability
         self.subscriptions: dict[str, list[str]] = {}  # topic -> [agent_ids]
         self.message_log: list[dict] = []
-    
+
     async def publish(
         self,
         topic: str,
@@ -143,23 +239,23 @@ class GossipProtocol:
             "timestamp": datetime.now().timestamp(),
             "ttl": ttl,
         }
-        
+
         self.message_log.append(message)
-        
+
         # 限制日志大小
         if len(self.message_log) > 10000:
             self.message_log = self.message_log[-5000:]
-        
+
         # 返回订阅者
         return self.subscriptions.get(topic, [])
-    
+
     def subscribe(self, topic: str, agent_id: str) -> None:
         """订阅主题"""
         if topic not in self.subscriptions:
             self.subscriptions[topic] = []
         if agent_id not in self.subscriptions[topic]:
             self.subscriptions[topic].append(agent_id)
-    
+
     def unsubscribe(self, topic: str, agent_id: str) -> None:
         """取消订阅"""
         if topic in self.subscriptions:
@@ -170,48 +266,52 @@ class GossipProtocol:
 class GlobalWorkspace:
     """
     全局工作空间
-    
+
     所有 L4 Agent 共享的集体注意力系统。
-    
-    原理：
+
+    原理:
     1. 每个 Agent 可以广播信息到工作空间
     2. 信息通过注意力竞价决定是否进入
     3. 进入的信息对所有 Agent 可见
     4. 高度重要的信息获得更多注意力
     """
-    
+
     def __init__(
         self,
         collective_id: str = "collective_001",
-        max_attention: int = 7
+        max_attention: int = 7,
+        llm_adapter=None,  # P2-3: LLM驱动的注意力竞价
     ):
         self.collective_id = collective_id
-        
+
         # 注意力空间
         self.max_attention = max_attention
         self.attended_objects: list[ConsciousnessObject] = []
-        
-        # 注意力竞价
-        self.bidding_system = AttentionBiddingSystem()
-        
+
+        # 注意力竞价(LLM驱动)
+        self.bidding_system = AttentionBiddingSystem(llm_adapter=llm_adapter)
+
         # Gossip 协议
         self.gossip = GossipProtocol()
-        
+
         # 成员 Agent
         self.member_agents: dict[str, dict] = {}  # agent_id -> info
-        
+
         # 集体情绪
         self.collective_mood = CollectiveMood()
-        
+
+        # P2-3: 广播历史(追踪哪些信息被拒绝)
+        self.broadcast_history: list[dict] = []
+
         # 统计
         self.stats = {
             "total_broadcasts": 0,
             "total_objects_entered": 0,
             "attention_switches": 0,
         }
-        
-        print(f"[GlobalWorkspace] Initialized with max_attention={max_attention}")
-    
+
+        print(f"[GlobalWorkspace] Initialized with max_attention={max_attention}, llm={'Yes' if llm_adapter else 'No'}")
+
     async def receive_broadcast(
         self,
         agent_id: str,
@@ -219,53 +319,80 @@ class GlobalWorkspace:
     ) -> bool:
         """
         接收广播并决定是否进入工作空间
-        
+
         Args:
             agent_id: 来源 Agent
             obj: 意识对象
-            
+
         Returns:
             bool: 是否进入工作空间
         """
         self.stats["total_broadcasts"] += 1
         obj.source_agent = agent_id
-        
-        # 计算竞价
+
+        # P2-3: 构建工作空间上下文(供 LLM 分析)
+        workspace_ctx = {
+            "attended_objects": [{"content": o.content, "importance": o.importance} for o in self.attended_objects],
+            "member_count": len(self.member_agents),
+            "collective_mood": {
+                "valence": self.collective_mood.valence,
+                "arousal": self.collective_mood.arousal,
+            },
+        }
+
+        # 计算竞价(带上下文)
         bid = await self.bidding_system.calculate_bid(
             agent_id=agent_id,
             obj=obj,
             agent_need=obj.importance,
             collective_relevance=obj.importance,
-            urgency=0.5
+            urgency=0.5,
+            workspace_context=workspace_ctx,
         )
-        
+
         obj.importance = bid
-        
+
+        # 记录广播历史
+        history_entry = {
+            "agent_id": agent_id,
+            "content_preview": str(obj.content)[:100],
+            "bid_score": bid,
+            "timestamp": datetime.now().timestamp(),
+            "admitted": False,
+        }
+
         # 检查是否应该进入
         if len(self.attended_objects) >= self.max_attention:
             # 找到最低重要性
             min_obj = min(self.attended_objects, key=lambda x: x.importance)
-            
+
             if obj.importance > min_obj.importance:
                 # 替换
                 self.attended_objects.remove(min_obj)
                 self.attended_objects.append(obj)
                 self.stats["attention_switches"] += 1
                 self.stats["total_objects_entered"] += 1
-                
+                history_entry["admitted"] = True
+                history_entry["replaced_id"] = min_obj.id
+
                 # 广播注意力变化
                 await self._broadcast_attention_change(obj, "replaced", min_obj)
+                self.broadcast_history.append(history_entry)
                 return True
-        
+
         else:
-            # 还有空间，直接进入
+            # 还有空间,直接进入
             self.attended_objects.append(obj)
             self.stats["total_objects_entered"] += 1
+            history_entry["admitted"] = True
             await self._broadcast_attention_change(obj, "added", None)
+            self.broadcast_history.append(history_entry)
             return True
-        
+
+        # 拒绝
+        self.broadcast_history.append(history_entry)
         return False
-    
+
     async def _broadcast_attention_change(
         self,
         obj: ConsciousnessObject,
@@ -283,7 +410,7 @@ class GlobalWorkspace:
             },
             source_agent="global_workspace"
         )
-    
+
     def access_object(self, object_id: str) -> ConsciousnessObject | None:
         """访问意识对象"""
         for obj in self.attended_objects:
@@ -291,7 +418,7 @@ class GlobalWorkspace:
                 obj.access()
                 return obj
         return None
-    
+
     def get_attended_objects(
         self,
         attention_level: AttentionLevel | None = None
@@ -300,7 +427,7 @@ class GlobalWorkspace:
         if attention_level is None:
             return self.attended_objects.copy()
         return [o for o in self.attended_objects if o.attention_level == attention_level]
-    
+
     def register_agent(self, agent_id: str, info: dict) -> None:
         """注册 Agent 到集体"""
         self.member_agents[agent_id] = {
@@ -310,50 +437,57 @@ class GlobalWorkspace:
             **info
         }
         print(f"[GlobalWorkspace] Agent {agent_id} joined the collective")
-    
+
     def unregister_agent(self, agent_id: str) -> None:
         """注销 Agent"""
         if agent_id in self.member_agents:
             del self.member_agents[agent_id]
             print(f"[GlobalWorkspace] Agent {agent_id} left the collective")
-    
+
     async def update_collective_mood(self, agent_moods: list[dict]) -> CollectiveMood:
         """
         更新集体情绪
-        
+
         从所有 Agent 的情绪中聚合。
         """
         if not agent_moods:
             return self.collective_mood
-        
+
         # 计算平均
         avg_valence = sum(m.get("valence", 0.5) for m in agent_moods) / len(agent_moods)
         avg_arousal = sum(m.get("arousal", 0.5) for m in agent_moods) / len(agent_moods)
-        
+
         # 计算一致性
         valences = [m.get("valence", 0.5) for m in agent_moods]
         agreement = 1.0 - (max(valences) - min(valences)) if valences else 0.5
-        
+
         # 更新
         self.collective_mood.valence = avg_valence
         self.collective_mood.arousal = avg_arousal
         self.collective_mood.agreement = agreement
-        
+
         if agreement > 0.8:
             self.collective_mood.mood_type = "unanimous"
         elif agreement > 0.5:
             self.collective_mood.mood_type = "majority"
         else:
             self.collective_mood.mood_type = "divided"
-        
+
         return self.collective_mood
-    
+
     def get_workspace_summary(self) -> dict:
         """获取工作空间摘要"""
+        # 广播历史统计
+        recent_history = self.broadcast_history[-20:]
+        admission_rate = (
+            sum(1 for h in self.broadcast_history if h["admitted"]) /
+            max(1, len(self.broadcast_history))
+        )
+
         return {
             "collective_id": self.collective_id,
             "member_count": len(self.member_agents),
-            "attended_objects": len(self.attended_objects),
+            "attended_objects_count": len(self.attended_objects),
             "max_attention": self.max_attention,
             "collective_mood": {
                 "valence": self.collective_mood.valence,
@@ -362,7 +496,22 @@ class GlobalWorkspace:
                 "type": self.collective_mood.mood_type,
             },
             "stats": self.stats,
+            "broadcast_stats": {
+                "total": len(self.broadcast_history),
+                "admission_rate": f"{admission_rate:.1%}",
+                "recent_rejections": sum(1 for h in recent_history if not h["admitted"]),
+            },
         }
-    
+
+    def get_attention_ranking(self) -> list[dict]:
+        """
+        P2-3: 获取注意力排名（供LLM分析哪些信息被关注）
+        """
+        return sorted(
+            [o.to_dict() for o in self.attended_objects],
+            key=lambda x: x["importance"],
+            reverse=True,
+        )
+
     def to_dict(self) -> dict:
         return self.get_workspace_summary()
