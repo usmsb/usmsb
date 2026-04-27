@@ -59,23 +59,41 @@
 
 ### 🔷 P2 - 更长期
 
-- [ ] **P2-1**: 他心智推断升级
-  - 从统计计数 → LLM 推断
+- [x] **P2-1**: 他心智推断升级（已完成 fcb7e3f）
+  - ✅ TheoryOfMind v2：LLMInferredMind 数据结构
+  - ✅ infer_intent_llm()：LLM推断真实意图 + 冷却机制
+  - ✅ detect_deception_llm()：6维度欺骗检测 + graceful degradation
+  - ✅ OtherAgentModel v2：llm_mind_state + update_llm_mind_state()
 
-- [ ] **P2-2**: 价值观动态演化
-  - `ValueSeedEngine.evolve()` 真正被调用
-  - 接入真实反馈信号
+- [x] **P2-2**: 价值观动态演化（已完成 f6246ca）
+  - ✅ ValueSeedEngine v2：evolve_with_feedback() 异步主方法
+  - ✅ _llm_value_evolution()：LLM分析价值观触发+调整方向
+  - ✅ _simple_value_evolution()：无LLM时的规则演化
+  - ✅ record_goal_outcome()：async，AutonomousLoop._evaluate_and_evolve()末尾调用
+  - ✅ _infer_values_from_goal()：目标描述→价值类型映射
+  - ✅ AutonomousLoop 新增 value_seed_engine 参数
 
-- [ ] **P2-3**: L5 GlobalWorkspace + AttentionBidding
-  - 多个 Agent 注意力竞价
+- [x] **P2-3**: L5 GlobalWorkspace + AttentionBidding（已完成 877396b）
+  - ✅ AttentionBiddingSystem v2：LLM驱动的5维度注意力竞价
+  - ✅ GlobalWorkspace v2：broadcast_history追踪，workspace_context供LLM分析
+  - ✅ L5CollectiveIntelligence v2：llm_adapter透传，_llm_synthesize()深度综合
+
+### 🔴 P3 - 架构升级（待开始）
+
+- [ ] **P3-1**: MetaAgent 初始化
+  - MetaAgentService 真正的初始化流程
+  - 与 Agent 平台的连接
+
+- [ ] **P3-2**: 真实 Ethereum 集成
+  - 真实 Web3 连接
+  - 钱包管理
 
 ---
 
 ## 执行顺序
 
 ```
-阶段1（P0）→ 阶段2（P1）→ 阶段3（P2）
+阶段1（P0）→ 阶段2（P1）→ 阶段3（P2）→ 阶段4（P3）
 ```
 
 每个阶段开始前讨论，结束后复盘。
-
