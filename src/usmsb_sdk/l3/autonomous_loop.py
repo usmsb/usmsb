@@ -127,10 +127,11 @@ class AutonomousLoop:
         config: LoopConfig | None = None,
         executor: Callable[[Any], Any] | None = None,
         llm_goal_prioritizer: LLMGoalPrioritizer | None = None,
+        gene_capsule_adapter=None,
     ):
         self.agent_id = agent_id
         self.config = config or LoopConfig()
-        
+
         # 组件注入
         self.motivation_engine = motivation_engine
         self.purpose_generator = purpose_generator
@@ -138,6 +139,11 @@ class AutonomousLoop:
         self.emotions = emotional_arch
         self.executor = executor
         self.llm_prioritizer = llm_goal_prioritizer
+        self.gene_capsule_adapter = gene_capsule_adapter  # P1-3: 经验RAG
+
+        # 如果 PurposeGenerator 没有注入 gene_capsule_adapter，自动注入
+        if self.purpose_generator and not getattr(self.purpose_generator, 'gene_capsule_adapter', None):
+            self.purpose_generator.gene_capsule_adapter = gene_capsule_adapter
         
         # 状态
         self.state = LoopState.STOPPED
@@ -367,7 +373,16 @@ class AutonomousLoop:
             base_diff = base_difficulties[i % 3]
             
             if self.purpose_generator and i == 0:
-                purpose = self.purpose_generator.generate_purpose()
+                # P1-3: 传入情绪上下文作为任务上下文，用于 Gene Capsule RAG 检索
+                task_context = None
+                if emotional_ctx:
+                    task_context = (
+                        f"当前情绪倾向：{emotional_ctx.tendency}，"
+                        f"主导情绪：{emotional_ctx.dominant_emotion or '无'}，"
+                        f"难度系数：{emotional_ctx.difficulty_multiplier}，"
+                        f"协作倾向：{emotional_ctx.collaboration_adjustment:+.0%}"
+                    )
+                purpose = self.purpose_generator.generate_purpose(task_context=task_context)
                 if purpose:
                     goal = self.purpose_generator.purpose_to_goal(purpose)
                     if emotional_ctx:

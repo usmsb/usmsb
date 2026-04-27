@@ -99,36 +99,136 @@ class PurposeGenerator:
         intrinsic_motivation=None,
         need_detector=None,
         llm_client: LLMClient | None = None,
+        gene_capsule_adapter=None,
     ):
         """
         初始化目的生成器
+
+        Args:
+            gene_capsule_adapter: GeneCapsuleAdapter 实例，
+                用于在目标生成时注入相关历史经验（RAG）
         """
         self.agent_id = agent_id
-        
+
         # LLM 客户端
         self.llm = llm_client or LLMClient()
-        
+
+        # Gene Capsule RAG 适配器（P1-3）
+        self.gene_capsule_adapter = gene_capsule_adapter
+
         # 其他组件（可选）
         self.goal_persistence = goal_persistence
         self.intrinsic_motivation = intrinsic_motivation
         self.need_detector = need_detector
-        
+
         # 统计
         self._goals_generated = 0
         self._llm_failures = 0
     
-    def generate_purpose(self) -> Purpose | None:
+    def generate_purpose(self, task_context: str | None = None) -> Purpose | None:
         """
-        生成目的（使用 LLM）
-        
+        生成目的（同步版本，使用 LLM 或回退）
+
+        Args:
+            task_context: 可选的当前任务描述，用于检索相关经验
+
         Returns:
             Purpose: 生成的目的
         """
         self._goals_generated += 1
-        
-        # 直接使用启发式回退（跳过 LLM 调用以避免异步问题）
-        # TODO: 修复 LLM 异步调用问题后重新启用
+
+        # 如果有 Gene Capsule 适配器，尝试使用 RAG 生成
+        if self.gene_capsule_adapter and task_context:
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 事件循环已在运行，创建任务
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        future = pool.submit(
+                            asyncio.run,
+                            self._generate_purpose_with_experiences(task_context)
+                        )
+                        purpose = future.result(timeout=30)
+                        if purpose:
+                            return purpose
+                else:
+                    # 无运行中的事件循环
+                    purpose = asyncio.run(self._generate_purpose_with_experiences(task_context))
+                    if purpose:
+                        return purpose
+            except Exception:
+                pass
+
+        # 回退到启发式
         return self._generate_fallback_purpose()
+
+    async def _generate_purpose_with_experiences(self, task_context: str) -> Purpose | None:
+        """
+        使用 Gene Capsule 经验增强的异步目标生成（P1-3 核心）
+
+        流程：
+        1. 用 task_context 查找相关历史经验
+        2. 将经验注入 LLM Prompt
+        3. LLM 生成更有针对性的目标
+        """
+        if not self.gene_capsule_adapter:
+            return None
+
+        try:
+            # 构建基础 prompt
+            state_summary = self._get_state_summary()
+            capabilities = self._get_capabilities_summary()
+
+            system_prompt = """你是一个专业的 AI 助手，擅长为目标生成有意义的内在目标。
+
+生成目标的原则：
+- 具体可执行
+- 与 Agent 当前状态匹配
+- 专注于成长或贡献
+- 如果有相关经验，优先参考经验中的成功模式
+
+输出格式：
+[自生成] <目标文本>
+或
+[内在] <目标文本>
+
+只输出目标文本，不要其他内容。"""
+
+            user_prompt = f"""Agent: {self.agent_id}
+当前状态：
+{state_summary}
+
+能力概览：
+{capabilities}
+
+当前任务：{task_context}
+
+请生成一个与当前任务和 Agent 状态匹配的内在目标。"""
+
+            # 使用 GeneCapsuleAdapter 的 RAG 上下文构建
+            rag_context = await self.gene_capsule_adapter.build_rag_context(
+                task_description=task_context,
+                max_experiences=3,
+            )
+
+            if rag_context:
+                user_prompt = f"{rag_context}\n\n---\n\n当前任务：{task_context}\n\nAgent 状态：\n{state_summary}\n能力：\n{capabilities}\n\n请基于以上相关经验，生成一个适合当前任务的内在目标。"
+
+            # 调用 LLM
+            response = await self.gene_capsule_adapter.llm_adapter.generate_with_system(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+
+            if response and len(response) > 5:
+                return self._parse_llm_response(response)
+
+        except Exception:
+            pass
+
+        return None
     
     def _build_prompt(self) -> str:
         """构建 LLM 提示"""
