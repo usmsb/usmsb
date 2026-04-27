@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-Metacognition - L4 元认知
+Metacognition - L4 元认知 v2
 
 元认知 = 思考自己在想什么。
 
-核心能力：
+v2 升级（闭环）：
 - 推理追踪：记录每一步思考
 - 质量评估：评估推理质量
-- 策略优化：调整学习策略
+- 策略优化：根据任务场景选择策略
 - 困惑检测：发现思维卡住
 - 自我纠正：发现错误后纠正
+- 场景闭环：记录"场景+策略→结果"，下次类似任务复用成功策略
 """
 
+from __future__ import annotations
+
+import time
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -28,6 +33,48 @@ class ReasoningQuality(Enum):
     FAILED = "failed"          # < 0.3
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 任务场景类型
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TaskScenario(Enum):
+    """任务场景类型（用于策略匹配）"""
+    COMPLEX_PROBLEM = "complex_problem"      # 复杂多步骤问题
+    NOVEL_PROBLEM = "novel_problem"          # 全新/未知问题
+    PATTERN_RECOGNITION = "pattern_recognition"  # 模式识别/类比
+    SOCIAL = "social"                        # 社交/协作类问题
+    KNOWLEDGE_GAP = "knowledge_gap"          # 知识缺口类
+    SEARCH = "search"                        # 搜索/查找类
+    TRIAL_AND_ERROR = "trial_and_error"      # 试错类
+    GENERALIZATION = "generalization"          # 泛化/抽象类
+    DECISION = "decision"                    # 决策类（有明确选项）
+    PLANNING = "planning"                    # 规划类（多阶段）
+
+
+# 场景描述（用于 LLM 判断）
+# 策略 applicable_scenarios 别名映射（模块级别，供 _matches_scenario 使用）
+SCENARIO_ALIASES = {
+    "social": ["social", "social_problem"],
+    "social_problem": ["social", "social_problem"],
+    "complex_problem": ["complex_problem", "multi_step"],
+    "novel_problem": ["novel_problem"],
+    "planning": ["planning", "complex_problem"],
+}
+
+SCENARIO_DESCRIPTIONS = {
+    TaskScenario.COMPLEX_PROBLEM: "复杂多步骤问题，需要分解为子问题",
+    TaskScenario.NOVEL_PROBLEM: "全新的、从未遇到过的问题",
+    TaskScenario.PATTERN_RECOGNITION: "识别模式、找相似问题的解法",
+    TaskScenario.SOCIAL: "涉及他人意图、协作或社交交互",
+    TaskScenario.KNOWLEDGE_GAP: "需要获取外部知识填补认知空白",
+    TaskScenario.SEARCH: "搜索、查找、探索未知空间",
+    TaskScenario.TRIAL_AND_ERROR: "通过尝试和错误逐步逼近解法",
+    TaskScenario.GENERALIZATION: "从具体实例提取普遍规律",
+    TaskScenario.DECISION: "在多个选项中选择最优",
+    TaskScenario.PLANNING: "制定多阶段行动计划",
+}
+
+
 @dataclass
 class ReasoningStep:
     """推理步骤"""
@@ -38,7 +85,7 @@ class ReasoningStep:
     revised: bool = False     # 是否被修订过
     revision_reason: str = "" # 修订原因
     alternatives_considered: list[str] = field(default_factory=list)  # 考虑过的替代方案
-    timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
+    timestamp: float = field(default_factory=lambda: time.time())
 
 
 @dataclass
@@ -46,17 +93,19 @@ class ReasoningTrace:
     """推理追踪"""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     goal: str = ""            # 推理目标
+    scenario: str = "general"  # 任务场景
     steps: list[ReasoningStep] = field(default_factory=list)
+    strategy_used: str = ""    # 使用的策略名称
     quality_score: float = 0.0
     quality_grade: ReasoningQuality = ReasoningQuality.ADEQUATE
     alternatives_considered: list[str] = field(default_factory=list)  # 全局替代方案
-    start_time: float = field(default_factory=lambda: datetime.now().timestamp())
+    start_time: float = field(default_factory=lambda: time.time())
     end_time: float | None = None
     conclusion: str = ""
     is_complete: bool = False
+    task_context: dict = field(default_factory=dict)  # 任务上下文（难度/类型等）
     
     def add_step(self, thought: str, evidence: list[str] | None = None) -> ReasoningStep:
-        """添加推理步骤"""
         step = ReasoningStep(
             step_number=len(self.steps) + 1,
             thought=thought,
@@ -66,7 +115,6 @@ class ReasoningTrace:
         return step
     
     def revise_step(self, step_number: int, new_thought: str, reason: str) -> None:
-        """修订之前的步骤"""
         if 0 <= step_number < len(self.steps):
             step = self.steps[step_number]
             step.thought = new_thought
@@ -74,7 +122,6 @@ class ReasoningTrace:
             step.revision_reason = reason
     
     def calculate_quality(self) -> float:
-        """计算推理质量"""
         if not self.steps:
             return 0.0
         
@@ -102,7 +149,6 @@ class ReasoningTrace:
         
         self.quality_score = min(1.0, score)
         
-        # 质量等级
         if self.quality_score >= 0.9:
             self.quality_grade = ReasoningQuality.EXCELLENT
         elif self.quality_score >= 0.7:
@@ -127,6 +173,24 @@ class LearningStrategy:
     success_rate: float = 0.5
     usage_count: int = 0
     avg_quality: float = 0.0
+    
+    # v2: 场景维度的成功率（scenario → (successes, total)）
+    # 这才是闭环的核心：同类任务+同类策略→效果
+    scenario_history: dict[str, dict[str, int]] = field(default_factory=lambda: defaultdict(lambda: {"success": 0, "total": 0}))
+    
+    def get_scenario_success_rate(self, scenario: str) -> float:
+        """获取某个场景下的成功率"""
+        history = self.scenario_history.get(scenario, {"success": 0, "total": 0})
+        total = history["total"]
+        if total == 0:
+            return self.success_rate  # 无历史，用全局
+        return history["success"] / total
+    
+    def record_scenario_outcome(self, scenario: str, success: bool) -> None:
+        """记录某个场景的结果"""
+        self.scenario_history[scenario]["total"] += 1
+        if success:
+            self.scenario_history[scenario]["success"] += 1
 
 
 class LearningStrategyRegistry:
@@ -137,12 +201,11 @@ class LearningStrategyRegistry:
         self._init_default_strategies()
     
     def _init_default_strategies(self) -> None:
-        """初始化默认策略"""
         defaults = [
             LearningStrategy(
                 name="divide_and_conquer",
                 description="分而治之：将大问题分解为小问题",
-                applicable_scenarios=["complex_problem", "multi_step"]
+                applicable_scenarios=["complex_problem", "multi_step", "planning"]
             ),
             LearningStrategy(
                 name="analogy",
@@ -164,45 +227,131 @@ class LearningStrategyRegistry:
                 description="协作求解：借助他人知识",
                 applicable_scenarios=["social_problem", "knowledge_gap"]
             ),
+            LearningStrategy(
+                name="decision_tree",
+                description="决策树：穷举选项后比较",
+                applicable_scenarios=["decision", "planning"]
+            ),
         ]
         
         for s in defaults:
             self.strategies[s.name] = s
     
+    def _matches_scenario(self, strategy: LearningStrategy, scenario: str) -> bool:
+        """判断策略是否适用于给定场景（含别名）"""
+        if scenario in strategy.applicable_scenarios:
+            return True
+        aliases = SCENARIO_ALIASES.get(scenario, [])
+        return any(a in strategy.applicable_scenarios for a in aliases)
+    
     def get_for_scenario(self, scenario: str) -> LearningStrategy | None:
-        """获取适合场景的策略"""
-        candidates = [s for s in self.strategies.values() if scenario in s.applicable_scenarios]
+        """获取适合场景的策略（基于历史成功率）"""
+        candidates = [
+            s for s in self.strategies.values()
+            if self._matches_scenario(s, scenario)
+        ]
         if not candidates:
             return None
-        return max(candidates, key=lambda s: s.success_rate)
+        return max(candidates, key=lambda s: s.get_scenario_success_rate(scenario))
     
-    def record_outcome(self, strategy_name: str, success: bool, quality: float) -> None:
-        """记录策略使用结果"""
+    def get_best_for_context(
+        self,
+        scenario: str,
+        task_metadata: dict | None = None,
+    ) -> tuple[LearningStrategy | None, str]:
+        """
+        根据完整上下文获取最佳策略
+        
+        Returns:
+            (最佳策略, 选择理由)
+        """
+        # 只选择适用该场景的策略
+        candidates = [
+            s for s in self.strategies.values()
+            if self._matches_scenario(s, scenario)
+        ]
+        if not candidates:
+            return None, "no_strategies"
+        
+        # 计算综合分数
+        scored = []
+        for s in candidates:
+            # 场景匹配权重（已过滤，只选匹配的）
+            scenario_match = 1.0
+            
+            # 场景历史成功率
+            scenario_history = s.scenario_history.get(scenario, {"success": 0, "total": 0})
+            scenario_total = scenario_history["total"]
+            scenario_rate = s.get_scenario_success_rate(scenario)
+            
+            # 全局成功率（兜底）
+            global_rate = s.success_rate
+            
+            # 置信度：样本数决定，越多样本越可靠
+            if scenario_total == 0:
+                # 无该场景历史 → 用全局，全局样本也少时降权
+                confidence = min(0.5, s.usage_count / 10)
+                rate = global_rate * (0.5 + confidence)
+            else:
+                # 有该场景历史 → 样本越多，场景权重越高
+                confidence = min(0.9, scenario_total / 5)
+                # 场景历史占主导，全局做平滑
+                rate = scenario_rate * confidence + global_rate * (1 - confidence)
+            
+            # 综合分 = 场景匹配加分 + 成功率加权
+            score = scenario_match * 0.2 + rate * 0.8
+            
+            scored.append((score, s))
+        
+        scored.sort(key=lambda x: x[0], reverse=True)
+        best = scored[0][1]
+        
+        reason = f"场景匹配{'✓' if self._matches_scenario(best, scenario) else '✗'}, "
+        reason += f"场景成功率 {best.get_scenario_success_rate(scenario):.0%}, "
+        reason += f"全局成功率 {best.success_rate:.0%}, "
+        reason += f"使用次数 {best.usage_count}"
+        
+        return best, reason
+    
+    def record_outcome(
+        self,
+        strategy_name: str,
+        success: bool,
+        quality: float,
+        scenario: str | None = None,
+    ) -> None:
+        """记录策略使用结果（含场景）"""
         if strategy_name not in self.strategies:
             return
         
         s = self.strategies[strategy_name]
         s.usage_count += 1
         
-        # 指数加权移动平均
+        # 指数加权移动平均更新全局质量
         s.avg_quality = s.avg_quality * 0.8 + quality * 0.2
+        
+        # 更新全局成功率
         if success:
             s.success_rate = s.success_rate * 0.95 + 0.05
         else:
             s.success_rate = s.success_rate * 0.95 - 0.02
-        
         s.success_rate = max(0.0, min(1.0, s.success_rate))
+        
+        # v2: 如果有场景，记录到场景历史
+        if scenario:
+            s.record_scenario_outcome(scenario, success)
 
 
 class Metacognition:
     """
-    元认知引擎
+    元认知引擎 v2
     
     核心能力：
     1. 追踪自己的思考过程
     2. 评估推理质量
     3. 检测困惑
-    4. 从学习中学习
+    4. 从学习中学习（v2: 场景闭环）
+    5. 基于历史的任务-策略匹配
     """
     
     def __init__(self, agent_id: str):
@@ -224,21 +373,45 @@ class Metacognition:
             "failed_count": 0,
             "confusion_detections": 0,
             "self_corrections": 0,
+            "scenario_history_hits": 0,
         }
     
-    def start_reasoning(self, goal: str) -> ReasoningTrace:
-        """开始新的推理追踪"""
-        trace = ReasoningTrace(goal=goal)
+    def start_reasoning(
+        self,
+        goal: str,
+        scenario: str | None = None,
+        task_metadata: dict | None = None,
+    ) -> tuple[ReasoningTrace, str]:
+        """
+        开始新的推理追踪
+        
+        Returns:
+            (推理追踪, 建议的策略名称)
+        """
+        # 获取推荐策略
+        scenario = scenario or "general"
+        best_strategy, strategy_reason = self.learning_strategies.get_best_for_context(
+            scenario, task_metadata
+        )
+        strategy_name = best_strategy.name if best_strategy else "none"
+        
+        trace = ReasoningTrace(
+            goal=goal,
+            scenario=scenario,
+            strategy_used=strategy_name,
+            task_context=task_metadata or {},
+        )
         self.current_trace = trace
         self.stats["total_reasonings"] += 1
-        return trace
-    
-    def think(self, thought: str, evidence: list[str] | None = None) -> ReasoningStep:
-        """
-        添加思考步骤
         
-        这是"我在想什么"的记录。
-        """
+        return trace, strategy_reason
+    
+    def think(
+        self,
+        thought: str,
+        evidence: list[str] | None = None,
+    ) -> ReasoningStep:
+        """添加思考步骤"""
         if not self.current_trace:
             self.start_reasoning("unknown")
         
@@ -257,21 +430,31 @@ class Metacognition:
         if not self.current_trace or not self.current_trace.steps:
             return
         
-        # 修正最后一步
         last_step = self.current_trace.steps[-1]
         self.current_trace.revise_step(last_step.step_number - 1, new_thought, reason)
         self.stats["self_corrections"] += 1
-        
-        print(f"[Metacognition] Self-corrected: {reason}")
     
-    def finish_reasoning(self, conclusion: str) -> ReasoningTrace:
-        """完成推理"""
+    def finish_reasoning(
+        self,
+        conclusion: str,
+        task_outcome: dict | None = None,
+    ) -> ReasoningTrace:
+        """
+        完成推理
+        
+        Args:
+            conclusion: 推理结论
+            task_outcome: 可选，任务执行结果 {
+                "success": bool,
+                "quality": float,
+            }
+        """
         if not self.current_trace:
             return ReasoningTrace()
         
         self.current_trace.conclusion = conclusion
         self.current_trace.is_complete = True
-        self.current_trace.end_time = datetime.now().timestamp()
+        self.current_trace.end_time = time.time()
         self.current_trace.calculate_quality()
         
         # 更新统计
@@ -280,18 +463,27 @@ class Metacognition:
         elif self.current_trace.quality_grade == ReasoningQuality.FAILED:
             self.stats["failed_count"] += 1
         
+        # 记录策略结果（含场景）
+        strategy = self.current_trace.strategy_used
+        scenario = self.current_trace.scenario
+        
+        # 任务结果优先，否则用推理质量
+        if task_outcome:
+            success = task_outcome.get("success", self.current_trace.quality_score > 0.5)
+            quality = task_outcome.get("quality", self.current_trace.quality_score)
+        else:
+            success = self.current_trace.quality_score > 0.5
+            quality = self.current_trace.quality_score
+        
+        self.learning_strategies.record_outcome(
+            strategy_name=strategy,
+            success=success,
+            quality=quality,
+            scenario=scenario,
+        )
+        
         # 存档
         self.reasoning_history.append(self.current_trace)
-        
-        # 保存策略结果
-        if self.current_trace.alternatives_considered:
-            strategy = self.learning_strategies.get_for_scenario("general")
-            if strategy:
-                self.learning_strategies.record_outcome(
-                    strategy.name,
-                    success=self.current_trace.quality_score > 0.5,
-                    quality=self.current_trace.quality_score
-                )
         
         result = self.current_trace
         self.current_trace = None
@@ -299,11 +491,7 @@ class Metacognition:
         return result
     
     def think_about_thinking(self) -> str:
-        """
-        元认知：思考自己在想什么
-        
-        这是"我知道我在想什么"的能力。
-        """
+        """元认知：思考自己在想什么"""
         if not self.current_trace or not self.current_trace.steps:
             return "我没有在思考任何事情。"
         
@@ -321,35 +509,25 @@ class Metacognition:
         return response
     
     def detect_confusion(self) -> bool:
-        """
-        检测困惑
-        
-        发现思维卡住的信号：
-        1. 置信度持续下降
-        2. 循环推理
-        3. 缺乏证据
-        """
+        """检测困惑"""
         if not self.current_trace or len(self.current_trace.steps) < 3:
             return False
         
         recent = self.current_trace.steps[-3:]
         
-        # 1. 置信度下降
         confidence_trend = [
-            recent[i].confidence - recent[i+1].confidence 
+            recent[i].confidence - recent[i+1].confidence
             for i in range(len(recent)-1)
         ]
         if sum(confidence_trend) > 0.2:
             self.stats["confusion_detections"] += 1
             return True
         
-        # 2. 循环推理（当前思考和之前相似）
         for i, step in enumerate(recent[:-1]):
             if step.thought[:50] == recent[-1].thought[:50]:
                 self.stats["confusion_detections"] += 1
                 return True
         
-        # 3. 缺乏证据
         if all(not s.evidence for s in recent):
             self.stats["confusion_detections"] += 1
             return True
@@ -366,9 +544,8 @@ class Metacognition:
         if len(recent) < 3:
             return "推理步骤不足"
         
-        # 检测原因
         confidence_trend = [
-            recent[i].confidence - recent[i+1].confidence 
+            recent[i].confidence - recent[i+1].confidence
             for i in range(len(recent)-1)
         ]
         if sum(confidence_trend) > 0.2:
@@ -383,22 +560,81 @@ class Metacognition:
         
         return "未知原因"
     
-    def suggest_strategy(self) -> LearningStrategy | None:
-        """建议学习策略"""
+    def suggest_strategy(self) -> tuple[LearningStrategy | None, str]:
+        """
+        建议学习策略（基于场景历史）
+        
+        Returns:
+            (策略, 选择理由)
+        """
         if self.detect_confusion():
-            return self.learning_strategies.get_for_scenario("backtracking")
+            return (
+                self.learning_strategies.strategies.get("backtracking"),
+                "检测到困惑，建议回溯"
+            )
         
-        if not self.current_trace or len(self.current_trace.steps) < 2:
-            return self.learning_strategies.get_for_scenario("divide_and_conquer")
+        if not self.current_trace:
+            return None, "无推理进行中"
         
-        # 根据历史选择最佳策略
-        best = max(
-            self.learning_strategies.strategies.values(),
-            key=lambda s: s.success_rate * s.usage_count
-        )
-        return best
+        scenario = self.current_trace.scenario
+        metadata = self.current_trace.task_context
+        
+        return self.learning_strategies.get_best_for_context(scenario, metadata)
     
-    def learn_from_outcome(self, outcome: dict) -> None:
+    def classify_scenario(
+        self,
+        goal_description: str,
+        task_metadata: dict | None = None,
+    ) -> str:
+        """
+        根据目标描述和上下文分类任务场景
+        
+        规则化分类（不用 LLM）：
+        - 包含"分解"/"多步"/"阶段" → complex_problem
+        - 包含"类似"/"相似"/"模式" → pattern_recognition
+        - 包含"协作"/"他人"/"社交" → social
+        - 包含"搜索"/"查找"/"探索" → search
+        - 包含"决策"/"选择"/"选项" → decision
+        - 包含"规划"/"计划"/"安排" → planning
+        - 包含"新"/"未知"/"从未" → novel_problem
+        - 否则 → general
+        """
+        desc = goal_description.lower()
+        
+        # 场景关键字（包含别名映射）
+        scenario_keywords = {
+            "complex_problem": ["分解", "多步", "阶段", "复杂", "多个", "逐步"],
+            "novel_problem": ["新", "未知", "从未", "创新", "突破"],
+            "pattern_recognition": ["类似", "相似", "模式", "类比", "规律"],
+            "social": ["协作", "合作", "他人", "社交", "团队", "沟通", "social"],
+            "search": ["搜索", "查找", "探索", "寻找", "发现"],
+            "decision": ["决策", "选择", "比较", "权衡", "最优"],
+            "planning": ["规划", "计划", "安排", "设计", "策划"],
+            "trial_and_error": ["尝试", "试错", "实验", "验证"],
+            "knowledge_gap": ["学习", "了解", "研究", "理解", "掌握"],
+            "generalization": ["抽象", "概括", "总结", "归纳", "泛化"],
+        }
+        
+        for scenario, keywords in scenario_keywords.items():
+            if any(kw in desc for kw in keywords):
+                return scenario
+        
+        # 从 metadata 推断
+        if task_metadata:
+            if task_metadata.get("is_collaborative"):
+                return "social"
+            if task_metadata.get("is_multi_step"):
+                return "complex_problem"
+            if task_metadata.get("is_novel"):
+                return "novel_problem"
+        
+        return "general"
+    
+    def learn_from_outcome(
+        self,
+        outcome: dict,
+        scenario: str | None = None,
+    ) -> None:
         """
         从结果中学习
         
@@ -412,41 +648,76 @@ class Metacognition:
             return
         
         trace = self.reasoning_history[-1]
+        scenario = scenario or trace.scenario
         
-        # 如果失败率高，更新策略
-        if outcome["success"]:
-            self.learning_strategies.record_outcome(
-                "general",
-                success=True,
-                quality=outcome["quality"]
-            )
-        else:
-            # 从失败中学习
-            strategy = self.suggest_strategy()
-            if strategy:
-                self.learning_strategies.record_outcome(
-                    strategy.name,
-                    success=False,
-                    quality=outcome["quality"]
-                )
+        self.learning_strategies.record_outcome(
+            strategy_name=trace.strategy_used,
+            success=outcome["success"],
+            quality=outcome["quality"],
+            scenario=scenario,
+        )
     
     def get_metacognitive_report(self) -> dict:
         """获取元认知报告"""
+        best = self.learning_strategies.strategies.get(
+            max(
+                self.learning_strategies.strategies.values(),
+                key=lambda s: s.success_rate
+            ).name
+        ) if self.learning_strategies.strategies else None
+        
         return {
             "agent_id": self.agent_id,
             "stats": self.stats,
             "current_reasoning": {
                 "active": self.current_trace is not None,
+                "scenario": self.current_trace.scenario if self.current_trace else None,
+                "strategy": self.current_trace.strategy_used if self.current_trace else None,
                 "steps": len(self.current_trace.steps) if self.current_trace else 0,
                 "quality": self.current_trace.quality_score if self.current_trace else 0.0,
             } if self.current_trace else None,
             "history_count": len(self.reasoning_history),
-            "best_strategy": (
-                max(self.learning_strategies.strategies.values(), 
-                    key=lambda s: s.success_rate).name
-                if self.learning_strategies.strategies else None
-            ),
+            "best_strategy": best.name if best else None,
+            "best_strategy_global_rate": best.success_rate if best else 0.0,
+            "strategy_scenario_rates": {
+                name: s.get_scenario_success_rate(self.current_trace.scenario if self.current_trace else "general")
+                for name, s in self.learning_strategies.strategies.items()
+            },
         }
+    
+    def get_scenario_summary(self, scenario: str) -> dict:
+        """获取某个场景的历史总结"""
+        result = {
+            "scenario": scenario,
+            "total_traces": 0,
+            "successful_traces": 0,
+            "strategies_used": {},
+            "avg_quality": 0.0,
+        }
+        
+        traces = [t for t in self.reasoning_history if t.scenario == scenario]
+        if not traces:
+            return result
+        
+        result["total_traces"] = len(traces)
+        result["successful_traces"] = sum(1 for t in traces if t.quality_score >= 0.5)
+        
+        strategy_counts = defaultdict(lambda: {"count": 0, "quality_sum": 0.0})
+        for t in traces:
+            strategy_counts[t.strategy_used]["count"] += 1
+            strategy_counts[t.strategy_used]["quality_sum"] += t.quality_score
+        
+        result["strategies_used"] = {
+            s: {
+                "count": d["count"],
+                "avg_quality": d["quality_sum"] / d["count"] if d["count"] > 0 else 0.0
+            }
+            for s, d in strategy_counts.items()
+        }
+        
+        result["avg_quality"] = sum(t.quality_score for t in traces) / len(traces)
+        
+        return result
     
     def to_dict(self) -> dict:
         return self.get_metacognitive_report()
