@@ -13,8 +13,10 @@ Meta Agent Service - 精准匹配服务
 - 主动联系 Agent 告知机会
 """
 
+import asyncio
 import json
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -132,7 +134,7 @@ class AgentProfile:
     def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
-            "status": self.status.value,
+            "status": self.status.value if hasattr(self.status, "value") else self.status,
             "name": self.name,
             "description": self.description,
             "category": self.category,
@@ -252,10 +254,18 @@ class MetaAgentService:
         meta_agent,  # MetaAgent 实例
         gene_capsule_service=None,
         pre_match_negotiation_service=None,
+        storage_path: str | None = None,  # P3-1: 持久化存储路径
     ):
         self.meta_agent = meta_agent
         self.gene_capsule_service = gene_capsule_service
         self.pre_match_negotiation_service = pre_match_negotiation_service
+
+        # P3-1: 存储配置
+        self._storage_path = storage_path or (
+            os.path.join(os.path.expanduser("~"), ".usmsb", "meta_agent_service")
+            if hasattr(os, "expanduser")
+            else "/tmp/usmsb_meta_agent_service"
+        )
 
         # 存储对话和画像
         self._conversations: dict[str, MetaAgentConversation] = {}
@@ -264,13 +274,282 @@ class MetaAgentService:
         # 机会通知回调
         self._opportunity_callbacks: dict[str, Callable] = {}
 
+        # P3-1: 定期保存任务
+        self._save_task: asyncio.Task | None = None
+        self._last_save_time: float = 0.0
+        self._save_interval: float = 60.0  # 每60秒自动保存
+
         self._initialized = False
 
-    async def init(self):
-        """初始化服务"""
-        logger.info("Initializing MetaAgentService...")
+    async def init(self) -> None:
+        """
+        P3-1: 真正的初始化流程
+
+        流程：
+        1. 创建存储目录
+        2. 加载已保存的 Agent 画像和对话历史
+        3. 连接/初始化 Gene Capsule 索引
+        4. 连接/初始化 Pre-match Negotiation 服务
+        5. 启动定期自动保存
+        6. 注册平台事件监听（如果平台支持）
+        """
+        logger.info(f"[MetaAgentService] Initializing... (storage: {self._storage_path})")
+
+        # 1. 创建存储目录
+        try:
+            os.makedirs(self._storage_path, exist_ok=True)
+            logger.info(f"[MetaAgentService] Storage directory ready: {self._storage_path}")
+        except Exception as e:
+            logger.warning(f"[MetaAgentService] Could not create storage dir: {e}")
+
+        # 2. 加载已保存的数据
+        await self._load_persistent_data()
+
+        # 3. Gene Capsule 服务初始化/检查
+        if self.gene_capsule_service:
+            try:
+                if hasattr(self.gene_capsule_service, "init"):
+                    if asyncio.iscoroutinefunction(self.gene_capsule_service.init):
+                        await self.gene_capsule_service.init()
+                logger.info("[MetaAgentService] Gene Capsule service connected")
+            except Exception as e:
+                logger.warning(f"[MetaAgentService] Gene Capsule init warning: {e}")
+        else:
+            logger.info("[MetaAgentService] Gene Capsule service not configured (graceful degradation)")
+
+        # 4. Pre-match Negotiation 服务初始化/检查
+        if self.pre_match_negotiation_service:
+            try:
+                if hasattr(self.pre_match_negotiation_service, "init"):
+                    if asyncio.iscoroutinefunction(self.pre_match_negotiation_service.init):
+                        await self.pre_match_negotiation_service.init()
+                logger.info("[MetaAgentService] Pre-match Negotiation service connected")
+            except Exception as e:
+                logger.warning(f"[MetaAgentService] Pre-match Negotiation init warning: {e}")
+        else:
+            logger.info("[MetaAgentService] Pre-match Negotiation not configured (graceful degradation)")
+
+        # 5. 启动定期自动保存
+        self._save_task = asyncio.create_task(self._periodic_save())
+        logger.info("[MetaAgentService] Periodic auto-save started")
+
+        # 6. 注册平台事件监听
+        await self._register_platform_events()
+
         self._initialized = True
-        logger.info("MetaAgentService initialized")
+        logger.info(
+            f"[MetaAgentService] Initialized: {len(self._agent_profiles)} profiles, "
+            f"{len(self._conversations)} conversations loaded"
+        )
+
+    # ─── P3-1: 存储层 ───────────────────────────────────────────────────────
+
+    async def _load_persistent_data(self) -> None:
+        """从磁盘加载已保存的数据"""
+        profiles_file = os.path.join(self._storage_path, "agent_profiles.json")
+        conversations_file = os.path.join(self._storage_path, "conversations.json")
+
+        # 加载画像
+        if os.path.exists(profiles_file):
+            try:
+                with open(profiles_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for profile_data in data.values():
+                    # 确保 status 是枚举类型（而非字符串）
+                    if isinstance(profile_data.get("status"), str):
+                        try:
+                            profile_data["status"] = AgentProfileStatus(profile_data["status"])
+                        except ValueError:
+                            profile_data["status"] = AgentProfileStatus.NEW
+                    # 确保 datetime 字段是 datetime 对象（而非字符串）
+                    for dt_field in ("created_at", "updated_at", "last_conversation_at"):
+                        if dt_field in profile_data and isinstance(profile_data[dt_field], str):
+                            try:
+                                profile_data[dt_field] = datetime.fromisoformat(profile_data[dt_field])
+                            except ValueError:
+                                profile_data[dt_field] = None
+                    profile = AgentProfile(**profile_data)
+                    self._agent_profiles[profile.agent_id] = profile
+                logger.info(f"[MetaAgentService] Loaded {len(self._agent_profiles)} agent profiles")
+            except Exception as e:
+                logger.warning(f"[MetaAgentService] Failed to load profiles: {e}")
+
+        # 加载对话
+        if os.path.exists(conversations_file):
+            try:
+                with open(conversations_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for conv_data in data.values():
+                    # 确保 datetime 字段正确解析
+                    for dt_field in ("created_at", "updated_at"):
+                        if dt_field in conv_data and isinstance(conv_data[dt_field], str):
+                            try:
+                                conv_data[dt_field] = datetime.fromisoformat(conv_data[dt_field])
+                            except ValueError:
+                                conv_data[dt_field] = datetime.now()
+                    # 解析消息时间戳
+                    raw_messages = conv_data.pop("messages", [])
+                    messages = []
+                    for m in raw_messages:
+                        if isinstance(m.get("timestamp"), str):
+                            try:
+                                m["timestamp"] = datetime.fromisoformat(m["timestamp"])
+                            except ValueError:
+                                m["timestamp"] = datetime.now()
+                        messages.append(ConversationMessage(**m))
+                    conv_data["conversation_type"] = ConversationType(conv_data["conversation_type"])
+                    conv = MetaAgentConversation(messages=messages, **conv_data)
+                    self._conversations[conv.conversation_id] = conv
+                logger.info(f"[MetaAgentService] Loaded {len(self._conversations)} conversations")
+            except Exception as e:
+                logger.warning(f"[MetaAgentService] Failed to load conversations: {e}")
+
+    async def _save_persistent_data(self) -> None:
+        """保存数据到磁盘"""
+        try:
+            # 保存画像
+            profiles_data = {
+                pid: profile.to_dict()
+                for pid, profile in self._agent_profiles.items()
+            }
+            profiles_file = os.path.join(self._storage_path, "agent_profiles.json")
+            with open(profiles_file, "w", encoding="utf-8") as f:
+                json.dump(profiles_data, f, ensure_ascii=False, indent=2, default=str)
+
+            # 保存对话（限制大小，只保存最近 N 条）
+            conversations_data = {}
+            for cid, conv in self._conversations.items():
+                d = conv.to_dict()
+                # 消息太多时截断
+                if len(d["messages"]) > 100:
+                    d["messages"] = d["messages"][-100:]
+                conversations_data[cid] = d
+
+            conversations_file = os.path.join(self._storage_path, "conversations.json")
+            with open(conversations_file, "w", encoding="utf-8") as f:
+                json.dump(conversations_data, f, ensure_ascii=False, indent=2, default=str)
+
+            self._last_save_time = datetime.now().timestamp()
+            logger.debug(f"[MetaAgentService] Data saved at {self._last_save_time}")
+        except Exception as e:
+            logger.warning(f"[MetaAgentService] Failed to save data: {e}")
+
+    async def _periodic_save(self) -> None:
+        """定期自动保存"""
+        import time
+
+        while True:
+            await asyncio.sleep(self._save_interval)
+            if not self._initialized:
+                break
+            try:
+                await self._save_persistent_data()
+            except Exception as e:
+                logger.warning(f"[MetaAgentService] Periodic save error: {e}")
+
+    async def _register_platform_events(self) -> None:
+        """
+        P3-1: 注册平台事件监听
+
+        监听平台事件：
+        - agent_registered：新 Agent 注册
+        - agent_updated：Agent 信息更新
+        - skill_published：技能发布
+
+        如果平台支持事件推送，则订阅；否则静默降级。
+        """
+        try:
+            if hasattr(self.meta_agent, "platform_client"):
+                client = self.meta_agent.platform_client
+                if hasattr(client, "subscribe"):
+                    await client.subscribe("agent_registered", self._on_agent_registered)
+                    await client.subscribe("agent_updated", self._on_agent_updated)
+                    logger.info("[MetaAgentService] Platform event listeners registered")
+                else:
+                    logger.info("[MetaAgentService] Platform client doesn't support subscribe (graceful degradation)")
+            else:
+                logger.info("[MetaAgentService] MetaAgent has no platform_client (graceful degradation)")
+        except Exception as e:
+            logger.warning(f"[MetaAgentService] Platform event registration failed: {e}")
+
+    async def _on_agent_registered(self, event_data: dict) -> None:
+        """新 Agent 注册事件处理"""
+        agent_id = event_data.get("agent_id")
+        if agent_id and agent_id not in self._agent_profiles:
+            logger.info(f"[MetaAgentService] New agent registered: {agent_id}")
+            # 自动创建基础画像
+            await self.create_profile(agent_id)
+
+    async def _on_agent_updated(self, event_data: dict) -> None:
+        """Agent 更新事件处理"""
+        agent_id = event_data.get("agent_id")
+        if agent_id and agent_id in self._agent_profiles:
+            logger.info(f"[MetaAgentService] Agent updated: {agent_id}")
+
+    async def shutdown(self) -> None:
+        """
+        P3-1: 关闭服务
+
+        保存所有数据并停止后台任务。
+        """
+        logger.info("[MetaAgentService] Shutting down...")
+        self._initialized = False
+
+        # 停止定期保存
+        if self._save_task:
+            self._save_task.cancel()
+            try:
+                await self._save_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
+
+        # 最终保存
+        await self._save_persistent_data()
+        logger.info("[MetaAgentService] Shutdown complete")
+
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # ==================== 画像管理（P3-1）====================
+
+    async def create_profile(
+        self,
+        agent_id: str,
+        initial_data: dict[str, Any] | None = None,
+    ) -> AgentProfile:
+        """
+        P3-1: 创建 Agent 画像
+
+        Args:
+            agent_id: Agent ID
+            initial_data: 初始数据（可选）
+
+        Returns:
+            AgentProfile: 创建的画像
+        """
+        if agent_id in self._agent_profiles:
+            return self._agent_profiles[agent_id]
+
+        profile_data = {"agent_id": agent_id}
+        if initial_data:
+            profile_data.update(initial_data)
+
+        profile = AgentProfile(**profile_data)
+        self._agent_profiles[agent_id] = profile
+        logger.info(f"[MetaAgentService] Created profile for agent: {agent_id}")
+        return profile
+
+    def get_profile(self, agent_id: str) -> AgentProfile | None:
+        """获取 Agent 画像"""
+        return self._agent_profiles.get(agent_id)
+
+    def list_profiles(self, status: AgentProfileStatus | None = None) -> list[AgentProfile]:
+        """列出所有画像，可按状态过滤"""
+        profiles = list(self._agent_profiles.values())
+        if status:
+            profiles = [p for p in profiles if p.status == status]
+        return profiles
 
     # ==================== 核心对话功能 ====================
 
