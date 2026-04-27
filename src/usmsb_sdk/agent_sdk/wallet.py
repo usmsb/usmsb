@@ -223,142 +223,284 @@ class StakeResult:
 
 class WalletManager:
     """
-    Manages agent wallet operations.
+    P3-2: 钱包管理器（真实 Web3 集成）
+
+    支持两种模式：
+    1. Real Mode: 使用 VIBEToken（Base Sepolia 真实链）
+    2. Mock Mode: 使用 PlatformClient（向后兼容）
 
     Features:
-    - Balance queries
-    - Staking/unstaking
-    - Transaction history
-    - Spending limits
+    - 余额查询（VIBEToken）
+    - 质押/解锁（VIBStaking 合约）
+    - 交易历史（Transfer 事件）
+    - 支出限制
     """
 
     def __init__(
         self,
-        platform_client: PlatformClient,
+        platform_client: PlatformClient | None = None,
+        vibe_token=None,  # P3-2: VIBEToken 实例
+        private_key: str | None = None,  # P3-2: 钱包私钥
         logger: logging.Logger | None = None,
     ):
         self._platform = platform_client
+        self._vibe_token = vibe_token  # P3-2: 真实 Web3
+        self._private_key = private_key
         self.logger = logger or logging.getLogger(__name__)
+        self._initialized = False
 
         # Local cache
         self._balance_cache: WalletBalance | None = None
         self._stake_cache: StakeInfo | None = None
 
-    # ==================== Balance ====================
+    async def init(self) -> None:
+        """
+        P3-2: 异步初始化
+
+        1. 检查 VIBEToken 连接状态
+        2. 如果有私钥，从私钥派生地址
+        3. 预热余额缓存
+        """
+        if self._vibe_token:
+            if not self._vibe_token.is_connected:
+                self.logger.warning("[WalletManager] VIBEToken not connected, will retry on demand")
+            else:
+                self.logger.info(
+                    f"[WalletManager] Connected to {self._vibe_token.rpc_url[:40]}..."
+                )
+                # 预热余额（如果有地址）
+                if self._private_key:
+                    try:
+                        account = self._vibe_token.w3.eth.account.from_key(self._private_key)
+                        balance = self._vibe_token.get_balance(account.address)
+                        self._balance_cache = WalletBalance(
+                            available_balance=balance.balance_vibe,
+                            staked_amount=0,
+                            locked_amount=0,
+                            pending_incoming=0,
+                            pending_outgoing=0,
+                        )
+                        self.logger.info(
+                            f"[WalletManager] Balance: {balance.balance_vibe:.4f} VIBE"
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"[WalletManager] Failed to fetch initial balance: {e}")
+
+        self._initialized = True
+
+    # ─── 余额 ────────────────────────────────────────────────────────────────
 
     async def get_balance(self, use_cache: bool = False) -> WalletBalance:
         """
-        Get wallet balance.
+        查询钱包余额
 
-        Args:
-            use_cache: Return cached value if available
-
-        Returns:
-            WalletBalance object
+        优先使用 VIBEToken（真实链），回退到 PlatformClient。
         """
         if use_cache and self._balance_cache:
             return self._balance_cache
 
-        # Query platform for balance
-        # Note: This would need a dedicated platform endpoint
-        # For now, use registration status which includes stake
-        response = await self._platform.get_registration_status()
+        # P3-2: 真实 Web3 查询
+        if self._vibe_token and self._private_key:
+            try:
+                account = self._vibe_token.w3.eth.account.from_key(self._private_key)
+                balance = self._vibe_token.get_balance(account.address)
+                self._balance_cache = WalletBalance(
+                    available_balance=balance.balance_vibe,
+                    staked_amount=0,  # 质押通过 VIBStaking 合约
+                    locked_amount=0,
+                    pending_incoming=0,
+                    pending_outgoing=0,
+                )
+                return self._balance_cache
+            except Exception as e:
+                self.logger.warning(f"[WalletManager] Failed to get balance from chain: {e}")
 
-        if response.success and response.data:
-            self._balance_cache = WalletBalance.from_dict(response.data)
-        else:
-            self._balance_cache = WalletBalance(
-                available_balance=0,
-                staked_amount=0,
-                locked_amount=0,
-                pending_incoming=0,
-                pending_outgoing=0,
-            )
+        # 回退到平台
+        if self._platform:
+            response = await self._platform.get_registration_status()
+            if response.success and response.data:
+                self._balance_cache = WalletBalance.from_dict(response.data)
+                return self._balance_cache
 
-        return self._balance_cache
+        return WalletBalance(0, 0, 0, 0, 0)
 
     async def refresh_balance(self) -> WalletBalance:
-        """Force refresh balance from platform"""
+        """强制刷新余额"""
+        self._balance_cache = None
         return await self.get_balance(use_cache=False)
 
-    # ==================== Staking ====================
+    # ─── 质押 ────────────────────────────────────────────────────────────────
 
     async def get_stake_info(self) -> StakeInfo:
-        """Get stake information"""
-        response = await self._platform.get_registration_status()
-
-        if response.success and response.data:
-            self._stake_cache = StakeInfo.from_dict(response.data)
-        else:
-            self._stake_cache = StakeInfo(
-                staked_amount=0,
-                stake_status="none",
-                locked_stake=0,
-                unlock_available_at=None,
-                reputation_boost=0.5,
-            )
-
-        return self._stake_cache
-
-    async def stake(self, amount: float) -> StakeResult:
         """
-        Stake tokens to increase reputation.
+        查询质押信息（P3-2: 通过 VIBStaking 合约）
+        """
+        if self._vibe_token and self._private_key:
+            try:
+                # 从环境变量获取质押合约地址
+                import os as _os
+                staking_address = _os.environ.get(
+                    "USMSB_VIBSTAKING_ADDRESS",
+                    "0x1901Ab564341F9VibStaking"  # 回退地址
+                )
+                account = self._vibe_token.w3.eth.account.from_key(self._private_key)
+                checksum_addr = self._vibe_token.address_to_checksum(account.address)
+
+                # 读取质押合约的 stakeOf
+                from usmsb_sdk.blockchain.contracts import VIBSTAKING_ABI
+                staking_contract = self._vibe_token.w3.eth.contract(
+                    address=self._vibe_token.address_to_checksum(staking_address),
+                    abi=VIBSTAKING_ABI
+                )
+                stake_wei = staking_contract.functions.stakeOf(checksum_addr).call()
+                stake_amount = self._vibe_token.from_wei(stake_wei)
+
+                self._stake_cache = StakeInfo(
+                    staked_amount=stake_amount,
+                    stake_status="staked" if stake_amount > 0 else "none",
+                    locked_stake=0,
+                    unlock_available_at=None,
+                    reputation_boost=min(0.5 + (stake_amount / 1000), 1.0),
+                )
+                return self._stake_cache
+            except Exception as e:
+                self.logger.warning(f"[WalletManager] Failed to get stake info: {e}")
+
+        # 回退到平台
+        if self._platform:
+            response = await self._platform.get_registration_status()
+            if response.success and response.data:
+                self._stake_cache = StakeInfo.from_dict(response.data)
+                return self._stake_cache
+
+        return StakeInfo(0, "none", 0, None, 0.5)
+
+    async def stake(self, amount: float, lock_period: int = 0) -> StakeResult:
+        """
+        质押 VIBE 代币（P3-2: 通过 VIBStaking 合约）
 
         Args:
-            amount: Amount to stake
+            amount: 质押数量（VIBE）
+            lock_period: 锁定期（0=无锁, 1=30天, 2=90天, 3=180天, 4=365天）
 
         Returns:
             StakeResult with operation status
         """
         if amount <= 0:
-            return StakeResult(
-                success=False,
-                amount=0,
-                total_staked=0,
-                new_reputation=0.5,
-                message="Amount must be positive",
+            return StakeResult(False, 0, 0, 0.5, "Amount must be positive")
+
+        if not self._vibe_token or not self._private_key:
+            # 回退到平台质押
+            if self._platform:
+                response = await self._platform.stake(amount)
+                if response.success and response.data:
+                    result = StakeResult.from_dict(response.data)
+                    result.amount = amount
+                    self._balance_cache = None
+                    self._stake_cache = None
+                    return result
+            return StakeResult(False, amount, 0, 0.5, "No Web3 connection")
+
+        try:
+            import os as _os
+            staking_address = _os.environ.get(
+                "USMSB_VIBSTAKING_ADDRESS",
+                "0x1901Ab564341F9VibStaking"
+            )
+            from usmsb_sdk.blockchain.contracts import VIBSTAKING_ABI
+
+            account = self._vibe_token.w3.eth.account.from_key(self._private_key)
+            staking_contract = self._vibe_token.w3.eth.contract(
+                address=self._vibe_token.address_to_checksum(staking_address),
+                abi=VIBSTAKING_ABI
             )
 
-        response = await self._platform.stake(amount)
+            amount_wei = self._vibe_token.to_wei(amount)
+            nonce = self._vibe_token.w3.eth.get_transaction_count(account.address)
 
-        if response.success and response.data:
-            result = StakeResult.from_dict(response.data)
-            result.amount = amount
-            self.logger.info(f"Staked {amount} tokens. Total: {result.total_staked}, Reputation: {result.new_reputation}")
+            tx = staking_contract.functions.stake(amount_wei, lock_period).build_transaction({
+                "from": account.address,
+                "nonce": nonce,
+                "gas": 150000,
+                "maxFeePerGas": self._vibe_token.w3.eth.gas_price * 2,
+                "maxPriorityFeePerGas": self._vibe_token.w3.eth.max_priority_fee,
+                "chainId": self._vibe_token.w3.eth.chain_id,
+            })
 
-            # Clear cache
+            signed = self._vibe_token.w3.eth.account.sign_transaction(tx, self._private_key)
+            tx_hash = self._vibe_token.w3.eth.send_raw_transaction(signed.raw_transaction)
+            receipt = self._vibe_token.w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            self.logger.info(f"[WalletManager] Staked {amount} VIBE: {tx_hash.hex()}")
             self._balance_cache = None
             self._stake_cache = None
 
-            return result
-
-        return StakeResult(
-            success=False,
-            amount=amount,
-            total_staked=0,
-            new_reputation=0.5,
-            message=response.error or "Staking failed",
-        )
+            return StakeResult(
+                success=receipt.status == 1,
+                amount=amount,
+                total_staked=amount,  # 精确值需重新查询
+                new_reputation=min(0.5 + (amount / 1000), 1.0),
+                message=f"Staked {amount} VIBE. Tx: {tx_hash.hex()[:16]}...",
+            )
+        except Exception as e:
+            self.logger.error(f"[WalletManager] Stake failed: {e}")
+            return StakeResult(False, amount, 0, 0.5, str(e))
 
     async def unstake(self, amount: float) -> StakeResult:
         """
-        Unstake tokens.
-
-        Args:
-            amount: Amount to unstake
-
-        Returns:
-            StakeResult with operation status
+        解除质押（P3-2: 通过 VIBStaking 合约）
         """
-        # TODO: Implement when platform API supports unstaking
-        self.logger.warning("Unstaking not yet implemented in platform API")
-        return StakeResult(
-            success=False,
-            amount=amount,
-            total_staked=0,
-            new_reputation=0.5,
-            message="Unstaking not yet supported",
-        )
+        if amount <= 0:
+            return StakeResult(False, amount, 0, 0.5, "Amount must be positive")
+
+        if not self._vibe_token or not self._private_key:
+            return StakeResult(False, amount, 0, 0.5, "No Web3 connection")
+
+        try:
+            import os as _os
+            staking_address = _os.environ.get(
+                "USMSB_VIBSTAKING_ADDRESS",
+                "0x1901Ab564341F9VibStaking"
+            )
+            from usmsb_sdk.blockchain.contracts import VIBSTAKING_ABI
+
+            account = self._vibe_token.w3.eth.account.from_key(self._private_key)
+            staking_contract = self._vibe_token.w3.eth.contract(
+                address=self._vibe_token.address_to_checksum(staking_address),
+                abi=VIBSTAKING_ABI
+            )
+
+            amount_wei = self._vibe_token.to_wei(amount)
+            nonce = self._vibe_token.w3.eth.get_transaction_count(account.address)
+
+            # unstake 功能
+            tx = staking_contract.functions.unstake(amount_wei).build_transaction({
+                "from": account.address,
+                "nonce": nonce,
+                "gas": 150000,
+                "maxFeePerGas": self._vibe_token.w3.eth.gas_price * 2,
+                "maxPriorityFeePerGas": self._vibe_token.w3.eth.max_priority_fee,
+                "chainId": self._vibe_token.w3.eth.chain_id,
+            })
+
+            signed = self._vibe_token.w3.eth.account.sign_transaction(tx, self._private_key)
+            tx_hash = self._vibe_token.w3.eth.send_raw_transaction(signed.raw_transaction)
+            receipt = self._vibe_token.w3.eth.wait_for_transaction_receipt(tx_hash)
+
+            self.logger.info(f"[WalletManager] Unstaked {amount} VIBE: {tx_hash.hex()}")
+            self._balance_cache = None
+            self._stake_cache = None
+
+            return StakeResult(
+                success=receipt.status == 1,
+                amount=amount,
+                total_staked=0,
+                new_reputation=0.5,
+                message=f"Unstaked {amount} VIBE. Tx: {tx_hash.hex()[:16]}...",
+            )
+        except Exception as e:
+            self.logger.error(f"[WalletManager] Unstake failed: {e}")
+            return StakeResult(False, amount, 0, 0.5, str(e))
 
     async def get_unstake_status(self) -> dict[str, Any]:
         """Get unstaking status and unlock time"""
@@ -377,19 +519,43 @@ class WalletManager:
         limit: int = 50,
     ) -> list[Transaction]:
         """
-        Get transaction history.
+        获取交易历史（P3-2: 通过 VIBEToken Transfer 事件）
 
         Args:
-            status: Filter by status
-            limit: Maximum results
+            status: 状态过滤（暂不支持，保留接口）
+            limit: 最大返回数量
 
         Returns:
-            List of Transaction objects
+            Transaction 对象列表
         """
-        # TODO: Implement when platform has transaction history endpoint
-        # For now, return empty list
-        self.logger.debug("Transaction history not yet available from platform")
-        return []
+        if not self._vibe_token or not self._private_key:
+            return []
+
+        try:
+            account = self._vibe_token.w3.eth.account.from_key(self._private_key)
+            history_raw = self._vibe_token.get_transfer_history(account.address)
+
+            txs = []
+            for h in history_raw[:limit]:
+                tx = Transaction(
+                    tx_id=h["tx_hash"],
+                    tx_type="transfer",
+                    amount=h["value_vibe"],
+                    counterparty_id=h["to"] if h["from"].lower() == account.address.lower() else h["from"],
+                    status="completed",
+                    title=None,
+                    description=None,
+                    platform_fee=0,
+                    created_at=None,
+                    completed_at=None,
+                    rating=None,
+                    review=None,
+                )
+                txs.append(tx)
+            return txs
+        except Exception as e:
+            self.logger.warning(f"[WalletManager] Failed to get transaction history: {e}")
+            return []
 
     async def get_pending_transactions(self) -> list[Transaction]:
         """Get pending (non-completed) transactions"""
@@ -398,9 +564,29 @@ class WalletManager:
         return [tx for tx in all_tx if tx.status in pending_statuses]
 
     async def get_transaction(self, tx_id: str) -> Transaction | None:
-        """Get a specific transaction"""
-        # TODO: Implement when platform has transaction endpoint
-        return None
+        """Get a specific transaction by hash"""
+        if not self._vibe_token:
+            return None
+        try:
+            receipt = self._vibe_token.w3.eth.get_transaction_receipt(tx_id)
+            if not receipt:
+                return None
+            return Transaction(
+                tx_id=tx_id,
+                tx_type="unknown",
+                amount=0,
+                counterparty_id="",
+                status="completed" if receipt.status == 1 else "failed",
+                title=None,
+                description=None,
+                platform_fee=0,
+                created_at=None,
+                completed_at=None,
+                rating=None,
+                review=None,
+            )
+        except Exception:
+            return None
 
     # ==================== Limits ====================
 
