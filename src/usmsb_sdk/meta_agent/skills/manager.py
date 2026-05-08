@@ -502,22 +502,6 @@ class SkillsManager:
         """按类别获取技能"""
         return [s for s in self.skills.values() if s.category == category]
 
-    def get_skills_schema(self, provider: str = "anthropic") -> list[dict[str, Any]]:
-        """
-        获取所有技能的 JSON Schema 格式（用于 Function Calling）
-
-        Args:
-            provider: LLM提供商 (anthropic/openai/ollama)
-
-        Returns:
-            技能列表的 Function Calling 格式
-        """
-        schemas = []
-        for skill in self.skills.values():
-            schema = skill.to_function_schema(provider)
-            schemas.append(schema)
-        return schemas
-
     def get_skills_description(self) -> str:
         """获取所有技能的描述文本"""
         lines = ["## 可用技能\n"]
