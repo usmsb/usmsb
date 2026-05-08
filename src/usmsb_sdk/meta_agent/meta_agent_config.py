@@ -45,7 +45,10 @@ class MetaAgentConfig:
 
     # 节点配置（多用户隔离）
     node_id: str = "node-001"
-    data_dir: str = "/data"
+    data_dir: str = "./data"  # 所有数据路径的基础目录
+
+    # Skills 目录（Agent Skills）
+    skills_dir: str | None = None  # None = 使用 data_dir/skills
 
     # LLM 配置
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -65,6 +68,9 @@ class MetaAgentConfig:
 
     # 知识库配置
     vector_db_url: str | None = None
+
+    # 项目知识加载（可选，默认关闭）
+    load_project_knowledge: bool = False  # 是否加载项目知识到向量知识库
 
     # IPFS 配置
     ipfs_gateway: str = "https://ipfs.io"
@@ -90,7 +96,8 @@ class MetaAgentConfig:
         """从环境变量加载配置"""
         return cls(
             node_id=os.getenv("NODE_ID", "node-001"),
-            data_dir=os.getenv("META_DATA_DIR", "/data"),
+            data_dir=os.getenv("META_DATA_DIR", "./data"),
+            skills_dir=os.getenv("META_SKILLS_DIR"),
             llm=LLMConfig(
                 provider=os.getenv("META_LLM_PROVIDER", "minimax"),
                 api_key=os.getenv("MINIMAX_API_KEY"),

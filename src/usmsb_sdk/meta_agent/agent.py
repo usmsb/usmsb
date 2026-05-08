@@ -509,8 +509,15 @@ class MetaAgent:
         # ========== SkillsManager 初始化（Agent Skills 标准）==========
         # 设置 ToolRegistry 引用（用于 Skills meta-skill）
         self.skills_manager.set_tool_registry(self.tool_registry)
-        # 加载 skills 目录（Agent Skills Discovery 阶段）
-        skills_dir = os.path.join(os.path.dirname(__file__), "skills", "skills")
+        # 加载 skills 目录（支持自定义路径）
+        # 优先级: config.skills_dir > data_dir/skills > 内置SDK skills
+        if self.config.skills_dir:
+            skills_dir = self.config.skills_dir
+        elif self.config.data_dir:
+            skills_dir = os.path.join(self.config.data_dir, "skills")
+        else:
+            # Fallback: 使用 SDK 内置 skills（不推荐，仅用于兼容）
+            skills_dir = os.path.join(os.path.dirname(__file__), "skills", "skills")
         self.skills_manager.load_skills_from_directory(skills_dir)
         logger.info(f"SkillsManager loaded skills from: {skills_dir}")
 
@@ -879,11 +886,12 @@ class MetaAgent:
             logger.warning(f"Permission manager initialization failed: {e}")
             logger.warning(f"Traceback: {traceback.format_exc()}")
 
-        # 加载项目知识（可选）
-        try:
-            await self._load_project_knowledge()
-        except Exception as e:
-            logger.warning(f"Failed to load project knowledge: {e}")
+        # 加载项目知识（可选，由 config.load_project_knowledge 控制）
+        if self.config.load_project_knowledge:
+            try:
+                await self._load_project_knowledge()
+            except Exception as e:
+                logger.warning(f"Failed to load project knowledge: {e}")
 
         # 预热向量知识库（可选）
         try:
@@ -1089,9 +1097,19 @@ class MetaAgent:
             logger.warning(f"Failed to register git skill: {e}")
 
     async def _load_project_knowledge(self):
-        """加载项目知识到向量知识库 - 扫描整个项目"""
+        """加载项目知识到向量知识库 - 扫描整个项目
+
+        使用 config.data_dir 作为项目根目录（可被子类覆盖）
+        """
         # 确定项目根目录
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        if self.config.data_dir:
+            project_root = self.config.data_dir
+        else:
+            project_root = os.getcwd()
+
+        if not os.path.exists(project_root):
+            logger.debug(f"Project root does not exist: {project_root}, skipping knowledge load")
+            return
 
         knowledge_items = []
 
