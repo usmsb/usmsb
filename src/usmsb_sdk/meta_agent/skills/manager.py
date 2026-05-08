@@ -667,6 +667,35 @@ class SkillsManager:
         except Exception as e:
             return {"error": str(e)}
 
+    def get_skills_catalog(self) -> str:
+        """生成 Skills 目录（用于 System Prompt 注入）
+
+        返回所有 file-based skills 的名称和描述，
+        让 LLM 知道有哪些 skill 可用，以及在什么情况下使用。
+
+        Returns:
+            格式化的 skills 目录字符串
+        """
+        if not self._skill_folders:
+            return ""
+
+        lines = ["\n\n## 可用 Skills (Agent Skills)\n"]
+        lines.append("你可以使用以下技能来完成特定任务。当用户请求涉及以下场景时，调用对应的 skill：\n")
+
+        for name, folder in sorted(self._skill_folders.items()):
+            lines.append(f"### {name}")
+            lines.append(f"- **描述**: {folder.description}")
+            if folder.triggers:
+                lines.append(f"- **触发条件**: {'; '.join(folder.triggers[:3])}")
+            if folder.category:
+                lines.append(f"- **类别**: {folder.category}")
+            lines.append("")
+
+        # 添加使用提示
+        lines.append("\n**使用方式**: 当需要使用某个 skill 时，调用 `activate_skill` 工具并指定 skill 名称。\n")
+
+        return "\n".join(lines)
+
     def get_skills_schema(self, provider: str = "anthropic") -> list[dict[str, Any]]:
         """
         获取所有技能的 JSON Schema 格式（用于 Function Calling）

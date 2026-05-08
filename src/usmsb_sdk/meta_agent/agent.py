@@ -911,13 +911,6 @@ class MetaAgent:
                 action=Action(ActionType.RESPOND, response="pong"),
                 priority=10,
             ),
-            # 状态查询
-            Rule(
-                name="status_query",
-                condition=Condition(ConditionType.KEYWORD, pattern="状态"),
-                action=Action(ActionType.RESPOND, response="MetaAgent 运行正常"),
-                priority=10,
-            ),
             # 帮助
             Rule(
                 name="help_request",
@@ -1025,6 +1018,66 @@ class MetaAgent:
         )
         self.tool_registry.register(search_knowledge_tool)
         logger.info("Registered search_knowledge tool")
+
+        # 注册 activate_skill 工具（用于 Agent Skills Activation）
+        async def activate_skill_handler(params: dict) -> dict:
+            """激活指定 skill，加载其完整 SKILL.md 指令"""
+            skill_name = params.get("skill_name", "")
+            if not skill_name:
+                return "错误: skill_name 参数必填"
+
+            try:
+                result = await self.skills_manager.activate_skill(skill_name)
+                if "error" in result:
+                    return f"错误: {result['error']}"
+
+                # 返回自然语言格式的指令，LLM 会自然地跟随执行
+                instructions = result.get("instructions", "")
+                triggers = result.get("triggers", [])
+                scripts = result.get("scripts", [])
+
+                response_parts = [
+                    f"## {skill_name} Skill 已激活",
+                    "",
+                    "请按照以下指令完成此任务：",
+                    "",
+                    instructions,
+                ]
+
+                if triggers:
+                    response_parts.append("")
+                    response_parts.append(f"**触发条件**: {'; '.join(triggers[:3])}")
+
+                if scripts:
+                    response_parts.append("")
+                    response_parts.append(f"**可用脚本**: {', '.join(scripts)}")
+
+                response_parts.append("")
+                response_parts.append("请按照上述指令执行任务。如果指令中有多个步骤，请按顺序执行。")
+
+                return "\n".join(response_parts)
+            except Exception as e:
+                logger.error(f"activate_skill failed: {e}")
+                return f"错误: {str(e)}"
+
+        activate_skill_tool = Tool(
+            name="activate_skill",
+            description="激活指定 skill，加载其完整指令。当需要使用某个 skill（如 assess_candidate、brainstorm 等）完成特定任务时调用此工具。调用后会返回该 skill 的完整 SKILL.md 内容，包括操作步骤、参数说明等。",
+            handler=activate_skill_handler,
+            requires_session=False,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "skill_name": {
+                        "type": "string",
+                        "description": "要激活的 skill 名称，如 'assess_candidate'、'brainstorm'、'decompose_goal' 等",
+                    },
+                },
+                "required": ["skill_name"],
+            },
+        )
+        self.tool_registry.register(activate_skill_tool)
+        logger.info("Registered activate_skill tool")
 
         logger.info(f"Registered {len(self.tool_registry.list_tools())} default tools")
 
@@ -2350,6 +2403,8 @@ class MetaAgent:
         logger.info(f"[CHAT][TOOLS] 权限过滤后: {len(tool_names)}/{len(all_tools)} 工具可用")
 
         # 更新消息列表中的可用工具
+        # 注入 Skills 目录到 system prompt
+        skills_catalog = self.skills_manager.get_skills_catalog()
         messages = await self.context_manager.build_messages(
             user_message=message,
             conversation_history=history_messages,
@@ -2357,6 +2412,7 @@ class MetaAgent:
             available_tools=tool_names,
             memory_context=memory_context,
             smart_recall_context=smart_recall_context,
+            skills_catalog=skills_catalog,
         )
 
         # 获取工具 schema

@@ -78,8 +78,15 @@ class ContextManager:
         self,
         user_info: UserInfo | None = None,
         available_tools: list[str] | None = None,
+        skills_catalog: str | None = None,
     ) -> str:
-        """构建系统提示词"""
+        """构建系统提示词
+
+        Args:
+            user_info: 用户信息
+            available_tools: 可用工具列表
+            skills_catalog: Skills 目录字符串（从 SkillsManager.get_skills_catalog() 获取）
+        """
         parts = [SYSTEM_PROMPT]
 
         if user_info and self.config.include_user_info:
@@ -87,6 +94,10 @@ class ContextManager:
 
         if available_tools and self.config.include_tools:
             parts.append(get_tool_prompt(available_tools))
+
+        # 注入 Skills 目录
+        if skills_catalog:
+            parts.append(skills_catalog)
 
         return "\n\n".join(parts)
 
@@ -129,6 +140,7 @@ class ContextManager:
         available_tools: list[str] | None = None,
         memory_context: dict[str, Any] | None = None,
         smart_recall_context: str = "",
+        skills_catalog: str | None = None,
     ) -> list[dict[str, str]]:
         """
         构建完整的消息列表
@@ -140,13 +152,14 @@ class ContextManager:
             available_tools: 可用工具列表
             memory_context: 分层记忆上下文（摘要、用户画像）
             smart_recall_context: 智能召回上下文
+            skills_catalog: Skills 目录字符串（从 SkillsManager.get_skills_catalog() 获取）
 
         Returns:
             完整的消息列表，用于 LLM API 调用
         """
         messages = []
 
-        system_prompt = self.build_system_prompt(user_info, available_tools)
+        system_prompt = self.build_system_prompt(user_info, available_tools, skills_catalog)
 
         # 添加知识库检索结果
         knowledge_context = await self._get_knowledge_context(user_message)
