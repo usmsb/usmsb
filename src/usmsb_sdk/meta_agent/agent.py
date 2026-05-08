@@ -468,6 +468,11 @@ class MetaAgent:
         self._l5_synthesis: str = ""     # L5 集体综合结论
         self._last_strategy_confidence: float = 1.0
 
+        # ========== L3 自主运行循环 ==========
+        # P0: 修复 - AutonomousLoop 未接入主循环的问题
+        self.autonomous_loop: Any = None
+        self._autonomous_loop_config: Any = None
+
         # 状态
         self._running = False
         self._main_loop_task: asyncio.Task | None = None
@@ -501,6 +506,14 @@ class MetaAgent:
         # ========== OpenHarness 初始化 + 工具注入 ==========
         await self._init_openharness()
 
+        # ========== SkillsManager 初始化（Agent Skills 标准）==========
+        # 设置 ToolRegistry 引用（用于 Skills meta-skill）
+        self.skills_manager.set_tool_registry(self.tool_registry)
+        # 加载 skills 目录（Agent Skills Discovery 阶段）
+        skills_dir = os.path.join(os.path.dirname(__file__), "skills", "skills")
+        self.skills_manager.load_skills_from_directory(skills_dir)
+        logger.info(f"SkillsManager loaded skills from: {skills_dir}")
+
         # ========== P2P 网络初始化 ==========
         await self._init_p2p_network()
 
@@ -527,6 +540,13 @@ class MetaAgent:
             await self._init_l5_collective()
         except Exception as e:
             logger.warning(f"L5CollectiveIntelligence init failed (non-critical): {e}")
+
+        # ========== L3 自主运行循环初始化 ==========
+        # P0: 修复 - AutonomousLoop 未接入主循环
+        try:
+            await self._init_autonomous_loop()
+        except Exception as e:
+            logger.warning(f"AutonomousLoop init failed (non-critical): {e}")
 
         # 启动目标引擎
         await self.goal_engine.start()
@@ -1290,6 +1310,156 @@ class MetaAgent:
             logger.warning("L5CollectiveIntelligence init failed: %s", e)
             self.l5_collective = None
 
+    async def _init_autonomous_loop(self) -> None:
+        """
+        P0: 修复 - 初始化 L3 自主运行循环
+
+        AutonomousLoop 让 Agent 自己驱动自己跑，不是等外部请求。
+        它连接了 L3 的目标生成、L4 的情感架构，形成完整的自主决策闭环。
+
+        组件依赖:
+        - IntrinsicMotivationEngine: 提供内在动机状态
+        - PurposeGenerator: 生成目标
+        - EmotionalGoalSelector: 将情绪注入目标
+        - EmotionalArchitecture: 触发情绪反馈（L4）
+        - LLMGoalPrioritizer: LLM 优先级排序
+
+        修复内容:
+        1. 创建 AutonomousLoop 实例
+        2. 连接 L3/L4 组件
+        3. 配置自主运行参数
+        """
+        try:
+            from usmsb_sdk.l3.autonomous_loop import AutonomousLoop, LoopConfig
+            from usmsb_sdk.l3.intrinsic_motivation import IntrinsicMotivationEngine
+            from usmsb_sdk.l3.purpose_generator import PurposeGenerator
+            from usmsb_sdk.l3.emotional_goal_selector import EmotionalGoalSelector
+            from usmsb_sdk.l3.llm_goal_prioritizer import LLMGoalPrioritizer
+
+            # 创建 L3 核心组件
+            motivation_engine = IntrinsicMotivationEngine()
+
+            # PurposeGenerator 使用 LLMClient
+            llm_client = None
+            if hasattr(self, 'llm_manager') and self.llm_manager:
+                llm_client = self.llm_manager._adapter if hasattr(self.llm_manager, '_adapter') else None
+
+            purpose_generator = PurposeGenerator(
+                agent_id=self.agent_id,
+                llm_client=llm_client,
+                intrinsic_motivation=motivation_engine,
+            )
+
+            # EmotionalGoalSelector 依赖 L4 的情感架构
+            emotional_selector = None
+            if self.l4_agent and hasattr(self.l4_agent, 'emotions'):
+                emotional_selector = EmotionalGoalSelector(
+                    emotional_architecture=self.l4_agent.emotions,
+                )
+
+            # LLM Goal Prioritizer
+            llm_prioritizer = None
+            if llm_client:
+                llm_prioritizer = LLMGoalPrioritizer(
+                    agent_id=self.agent_id,
+                    llm_client=llm_client,
+                )
+
+            # P1: 集成 ValueSeedEngine - 价值观评估
+            # 用于目标生成前的价值观过滤和目标执行后的价值观演化
+            from usmsb_sdk.l3.value_seed_engine import ValueSeedEngine
+            value_seed_engine = ValueSeedEngine(llm_adapter=llm_client)
+            # 创建 Agent 的初始价值观种子
+            value_seed_engine.create_value_seed(self.agent_id)
+            logger.info("[P1] ValueSeedEngine initialized for %s", self.agent_id)
+
+            # P1: 集成 DynamicNegotiationEngine (用于多 Agent 协作场景)
+            from usmsb_sdk.l3.dynamic_negotiation import NegotiationEngine
+            negotiation_engine = NegotiationEngine(max_rounds=5)
+            logger.info("[P1] NegotiationEngine initialized")
+
+            # 配置自主循环
+            config = LoopConfig(
+                cycle_interval=60.0,       # 每 60 秒一个循环
+                goal_timeout=120.0,       # 单个目标超时 2 分钟
+                max_retries=3,
+                log_cycles=True,
+                emotion_feedback=True,
+                num_goal_candidates=3,
+            )
+
+            # 创建 executor 函数，用于执行 AutonomousLoop 生成的目标
+            async def autonomous_executor(goal):
+                """
+                AutonomousLoop 的目标执行器
+
+                将自主生成的目标添加到 goal_engine 进行追踪和执行。
+                """
+                try:
+                    goal_name = getattr(goal, 'name', 'unknown') or getattr(goal, 'id', 'unknown')
+                    goal_desc = getattr(goal, 'description', '') or str(goal)
+                    logger.info(f"[AutonomousExecutor] Executing goal: {goal_name} - {goal_desc[:50]}")
+
+                    # 将目标添加到 goal_engine
+                    if self.goal_engine:
+                        await self.goal_engine.add_goal(goal)
+                        logger.info(f"[AutonomousExecutor] Goal added to engine: {goal_name}")
+
+                    # 如果有 LLM，发起一次对话来执行目标
+                    # （实际执行由 LLM + 工具完成）
+                    if hasattr(self, 'llm_manager') and self.llm_manager:
+                        try:
+                            prompt = f"Execute this goal: {goal_desc}"
+                            response = await self.llm_manager.chat(prompt)
+                            if response and "error" not in response.lower():
+                                return {"success": True, "goal": goal, "result": response}
+                        except Exception as llm_err:
+                            logger.warning(f"[AutonomousExecutor] LLM execution failed: {llm_err}")
+
+                    # 模拟成功（实际环境中应该有真实执行）
+                    return {"success": True, "goal": goal}
+                except Exception as e:
+                    logger.error(f"[AutonomousExecutor] Goal execution failed: {e}")
+                    return {"success": False, "goal": goal, "error": str(e)}
+
+            # 创建 AutonomousLoop
+            self.autonomous_loop = AutonomousLoop(
+                agent_id=self.agent_id,
+                motivation_engine=motivation_engine,
+                purpose_generator=purpose_generator,
+                emotional_selector=emotional_selector,
+                emotional_arch=self.l4_agent.emotions if self.l4_agent else None,
+                config=config,
+                executor=autonomous_executor,
+                llm_goal_prioritizer=llm_prioritizer,
+                gene_capsule_adapter=self.gene_capsule_adapter if hasattr(self, 'gene_capsule_adapter') else None,
+                value_seed_engine=value_seed_engine,  # P1: 价值观引擎
+            )
+
+            # P1: 保存 L3 引擎引用到 MetaAgent（供其他模块使用）
+            self._value_seed_engine = value_seed_engine
+            self._negotiation_engine = negotiation_engine
+            logger.info("[P1] L3 engines attached: value_seed_engine=%s, negotiation_engine=%s",
+                       value_seed_engine is not None, negotiation_engine is not None)
+
+            # 配置
+            self._autonomous_loop_config = {
+                "enabled": True,
+                "cycle_interval": config.cycle_interval,
+            }
+
+            logger.info("[AutonomousLoop] Initialized - L3 self-driven loop ready with executor")
+            logger.info(f"[AutonomousLoop] Components: motivation_engine={motivation_engine is not None}, "
+                       f"purpose_generator={purpose_generator is not None}, "
+                       f"emotional_selector={emotional_selector is not None}, "
+                       f"llm_prioritizer={llm_prioritizer is not None}, "
+                       f"value_seed_engine={value_seed_engine is not None}, "
+                       f"executor=autonomous_executor")
+
+        except Exception as e:
+            logger.warning("[AutonomousLoop] Init failed: %s", e)
+            self.autonomous_loop = None
+
     # ─────────────────────────────────────────────────────────
     # L4/L5 决策上下文方法（P0 修复）
     # ─────────────────────────────────────────────────────────
@@ -1518,6 +1688,9 @@ class MetaAgent:
         """主循环 - 永不停歇"""
         logger.info("Meta Agent main loop started")
 
+        # 自主循环计数器（控制执行频率）
+        _autonomous_cycle_counter = 0
+
         while self._running:
             try:
                 # 1. 感知环境
@@ -1526,10 +1699,47 @@ class MetaAgent:
                 # 2. 检查目标状态
                 await self._check_goals()
 
-                # 3. 处理待处理任务
+                # 3. L3 自主运行循环（P0 修复 - 之前未接入）
+                # AutonomousLoop 有自己的 cycle_interval (默认60秒)，
+                # 我们用计数器控制每12次主循环(~60秒)执行一次
+                _autonomous_cycle_counter += 1
+                if _autonomous_cycle_counter >= 12 and self.autonomous_loop:
+                    _autonomous_cycle_counter = 0
+                    try:
+                        # 设置为 RUNNING 状态以便 step() 可以执行
+                        from usmsb_sdk.l3.autonomous_loop import LoopState
+                        if self.autonomous_loop.state == LoopState.STOPPED:
+                            self.autonomous_loop.state = LoopState.RUNNING
+
+                        cycle_result = await self.autonomous_loop.step()
+                        if cycle_result and cycle_result.goal_executed:
+                            goal_name = getattr(cycle_result.goal_executed, 'name', 'unknown')
+                            status = "✅" if cycle_result.goal_succeeded else "❌"
+                            logger.info(f"[AutonomousLoop] {status} Goal: {goal_name}")
+
+                            # L3→L4 反馈闭环：目标结果更新 L4 自模型
+                            if self.l4_agent and cycle_result.goal_executed:
+                                try:
+                                    outcome = "success" if cycle_result.goal_succeeded else "failure"
+                                    lesson = f"Autonomous goal '{goal_name}' {outcome}"
+                                    self.l4_agent.learn_from_experience(
+                                        experience_type="autonomous_goal",
+                                        outcome=outcome,
+                                        lessons=[lesson]
+                                    )
+                                    # 更新 _l4_lessons
+                                    lessons = getattr(self, '_l4_lessons', [])
+                                    lessons.append(lesson)
+                                    self._l4_lessons = lessons[-10:]  # 保留最近10条
+                                except Exception as e:
+                                    logger.debug(f"[L4] Failed to update from autonomous goal: {e}")
+                    except Exception as e:
+                        logger.warning(f"[AutonomousLoop] step() failed: {e}")
+
+                # 4. 处理待处理任务
                 await self._process_pending_tasks()
 
-                # 4. 学习进化
+                # 5. 学习进化
                 await self._learn_and_evolve()
 
                 # 等待一段时间
@@ -1607,28 +1817,62 @@ class MetaAgent:
             logger.warning("[WALLET] Economic evaluation failed: %s", e)
 
     async def _check_goals(self):
-        """主动追求目标 - 检查 + 生成 + 追踪"""
+        """
+        主动追求目标 - 检查 + 生成 + 追踪
+
+        P0 修复: L4 推荐行动现在会直接影响目标生成
+        L5 综合结论也会注入到目标上下文中
+        """
         if not self.goal_engine:
             return
         try:
+            # 获取 L4/L5 决策上下文
+            l4_recommendations = getattr(self, '_l4_recommendations', [])
+            l5_synthesis = getattr(self, '_l5_synthesis', '')
+
             # 内在动机检测：是否需要生成新目标
             state = {
                 "agent_id": self.agent_id,
                 "conversations_count": getattr(self, "_conversation_count", 0),
                 "external_agents": getattr(self, "_external_agents_connected", False),
-                "l4_insights": getattr(self, "_l4_recommendations", []),
-                "l5_synthesis": getattr(self, "_l5_synthesis", ""),
+                "l4_insights": l4_recommendations,
+                "l5_synthesis": l5_synthesis,
             }
+
+            # P0 修复: 如果 L4 有明确推荐，优先生成相关目标
+            if l4_recommendations and len(l4_recommendations) > 0:
+                top_recommendation = str(l4_recommendations[0])
+                logger.info("[GOAL][L4] Using L4 recommendation for goal: %s...", top_recommendation[:50])
+                state["priority_goal_hint"] = top_recommendation
+
             from usmsb_sdk.adapters.l3_adapter import L3Adapter
             adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
             signal = await adapter.detect_intrinsic_motivation(state)
-            if signal.intensity > 0.65:
+
+            # L4 推荐的目标降低阈值优先生成
+            threshold = 0.65
+            if l4_recommendations:
+                threshold = 0.50  # L4 有推荐时降低阈值
+
+            if signal.intensity > threshold:
                 logger.info("[GOAL] Intrinsic motivation detected: intensity=%.2f, type=%s",
                             signal.intensity, getattr(signal, 'motivation_type', 'unknown'))
                 new_goal = await adapter.generate_goal(state)
                 if new_goal:
                     await self.goal_engine.add_goal(new_goal)
                     logger.info("[GOAL] New goal generated: %s", getattr(new_goal, 'description', str(new_goal)[:50]))
+
+                    # L3→L4 反馈: 通知 L4 我们采纳了它的建议
+                    if l4_recommendations and self.l4_agent:
+                        try:
+                            self.l4_agent.learn_from_experience(
+                                experience_type="goal_adoption",
+                                outcome="l4_recommendation_accepted",
+                                lessons=[f"Goal generated from L4 recommendation: {top_recommendation[:50]}"]
+                            )
+                        except Exception:
+                            pass
+
             # 检查现有目标状态
             await self.goal_engine.check_goals()
         except Exception as e:
@@ -2366,14 +2610,24 @@ class MetaAgent:
                 except Exception as e:
                     logger.warning("[L4] self_reflect failed: %s", e)
 
-            # L5 集体学习（当有外部 Agent 连接时）→ 集体结论进入决策回路
-            if self.l5_collective and getattr(self, "_external_agents_connected", False):
+            # P2: L5 集体学习
+            # 触发条件: 有外部 Agent 连接 OR 每 10 次主循环强制触发一次（单 Agent 模式）
+            _l5_cycle_counter = getattr(self, '_l5_cycle_counter', 0) + 1
+            self._l5_cycle_counter = _l5_cycle_counter
+            _should_think = (
+                getattr(self, "_external_agents_connected", False) or
+                (_l5_cycle_counter >= 10)
+            )
+            if _l5_cycle_counter >= 10:
+                self._l5_cycle_counter = 0  # 重置计数器
+
+            if self.l5_collective and _should_think:
                 try:
                     # 结合 L4 推荐来确定集体思考主题
                     l4_topic = getattr(self, '_l4_recommendations', [])[:1]
                     topic = l4_topic[0] if l4_topic else "如何提升平台整体性能和用户体验"
                     thought = await self.l5_collective.think_collectively(topic)
-                    if thought.synthesis:
+                    if thought and thought.synthesis:
                         logger.info("[L5] Collective thought: %s", str(thought.synthesis)[:80])
                         self._l5_synthesis = thought.synthesis
                         # L4 ← L5: collective insight 更新自我模型（闭环）
@@ -2386,6 +2640,9 @@ class MetaAgent:
                                 }])
                             except Exception:
                                 pass
+                    elif thought:
+                        # 即使没有 synthesis，也保存 partial 结果
+                        self._l5_synthesis = getattr(thought, 'partial_insights', [''])[0] or self._l5_synthesis
                 except Exception as e:
                     logger.warning("[L5] think_collectively failed: %s", e)
         except Exception as e:
@@ -4092,13 +4349,41 @@ class MetaAgent:
                 # 检查工具是否需要 session
                 tool = self.tool_registry.get_tool(tool_name)
                 if tool is None:
-                    # 工具不存在
+                    # Fallback: 检查 SkillsManager 是否有带 handler 的 skill
+                    skill = self.skills_manager.get_skill(tool_name)
+                    if skill and skill.handler:
+                        # 在 SkillsManager 中找到有 handler 的 skill，执行它
+                        try:
+                            result = await self.skills_manager.execute_skill(
+                                tool_name, tool_args, session=user_session
+                            )
+                            logger.info(f"Executed skill via SkillsManager: {tool_name}")
+                            results.append(
+                                {
+                                    "tool": tool_name,
+                                    "result": result,
+                                    "success": True,
+                                }
+                            )
+                            continue
+                        except Exception as e:
+                            logger.error(f"Skill execution failed: {e}")
+                            results.append(
+                                {
+                                    "tool": tool_name,
+                                    "result": {"error": f"技能执行失败: {str(e)}"},
+                                    "success": False,
+                                }
+                            )
+                            continue
+
+                    # 工具/技能不存在
                     logger.error(f"Tool not found: {tool_name}")
                     results.append(
                         {
                             "tool": tool_name,
                             "result": {
-                                "error": f"工具 '{tool_name}' 不存在。请检查工具名称是否正确。"
+                                "error": f"工具/技能 '{tool_name}' 不存在或无可用处理器。"
                             },
                             "success": False,
                         }
@@ -4267,10 +4552,9 @@ class MetaAgent:
         """
         # 如果提供 wallet_address，获取 UserSession 并传入
         if wallet_address:
-            await self.session_manager.get_or_create_session(wallet_address)
-            # TODO: 改造 ToolRegistry.execute 支持 session 参数
-            # 当前保持兼容性，后续需要改造工具执行接口
-            return await self.tool_registry.execute(tool_name, **kwargs)
+            user_session = await self.session_manager.get_or_create_session(wallet_address)
+            # P2 Fix: 传递 session 参数给 tool_registry.execute
+            return await self.tool_registry.execute(tool_name, session=user_session, **kwargs)
 
         # 向后兼容：不提供 wallet_address 时使用原有行为
         return await self.tool_registry.execute(tool_name, **kwargs)

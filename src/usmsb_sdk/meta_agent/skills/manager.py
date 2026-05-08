@@ -18,6 +18,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from .skill_loader import (
+    SkillFolder,
+    load_skill_folder,
+    load_all_skills_from_directory,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -115,9 +121,12 @@ class SkillsManager:
     5. 技能权限控制
     """
 
-    def __init__(self, db_path: str = "meta_agent.db"):
+    def __init__(self, db_path: str = "meta_agent.db", skills_dir: str = ""):
         self.db_path = db_path
+        self.skills_dir = skills_dir
         self.skills: dict[str, Skill] = {}
+        self._skill_folders: dict[str, SkillFolder] = {}  # file-based skills
+        self._tool_registry = None  # 引用 ToolRegistry 用于 Skills meta-skill
         self._initialized = False
 
     async def init(self):
@@ -127,6 +136,7 @@ class SkillsManager:
 
         await self._init_db()
         await self._load_builtin_skills()
+        await self._register_skills_meta_skill()
         self._initialized = True
         logger.info(f"Skills Manager initialized with {len(self.skills)} skills")
 
@@ -239,6 +249,78 @@ class SkillsManager:
 
         for skill in builtin_skills:
             self.skills[skill.name] = skill
+
+    async def _register_skills_meta_skill(self):
+        """注册 Skills meta-skill（列出所有可用技能和工具）"""
+
+        async def skills_meta_handler(params: dict = None, session: "UserSession" = None) -> dict:
+            """列出所有可用技能和工具（增强版）
+
+            Args:
+                params: 请求参数
+                session: 用户会话（可选）
+
+            Returns:
+                包含所有 skills 和 tools 的列表
+            """
+            # 1. 获取所有 file-based skills（从 _skill_folders）
+            file_skills = []
+            for name, folder in self._skill_folders.items():
+                file_skills.append({
+                    "name": folder.name,
+                    "description": folder.description,
+                    "category": folder.category,
+                    "version": folder.version,
+                    "source": "file",
+                })
+
+            # 2. 获取所有 runtime/builtin skills（从 self.skills，排除 meta-skills 自身）
+            runtime_skills = []
+            for skill in self.skills.values():
+                if skill.source in ("runtime", "builtin") and skill.name != "Skills":
+                    runtime_skills.append({
+                        "name": skill.name,
+                        "description": skill.description,
+                        "category": skill.category,
+                        "version": skill.version,
+                        "source": skill.source,
+                        "has_handler": skill.handler is not None,
+                    })
+
+            # 3. 获取所有 ToolRegistry tools（如果可用）
+            tools = []
+            if self._tool_registry:
+                try:
+                    for tool_info in self._tool_registry.list_tools():
+                        tools.append({
+                            "name": tool_info["name"],
+                            "description": tool_info.get("description", ""),
+                        })
+                except Exception as e:
+                    logger.warning(f"Failed to get tools from ToolRegistry: {e}")
+
+            return {
+                "skills_file": file_skills,
+                "skills_runtime": runtime_skills,
+                "tools": tools,
+                "summary": {
+                    "total_skills_file": len(file_skills),
+                    "total_skills_runtime": len(runtime_skills),
+                    "total_tools": len(tools),
+                },
+            }
+
+        self.skills["Skills"] = Skill(
+            name="Skills",
+            description="列出所有可用的 Agent Skills 和 Tools。当用户询问你能做什么，或者需要了解有哪些可用能力时使用此技能。这是 Agent Skills 标准的 Discovery 机制。",
+            category="meta",
+            version="1.0.0",
+            author="usmsb",
+            parameters={},  # 不需要参数
+            handler=skills_meta_handler,
+            source="builtin",
+        )
+        logger.debug("Registered Skills meta-skill")
 
     async def load_skills(self):
         """加载所有技能"""
@@ -455,6 +537,180 @@ class SkillsManager:
 
         return "\n".join(lines)
 
+    def set_tool_registry(self, tool_registry):
+        """设置 ToolRegistry 引用（用于 Skills meta-skill）"""
+        self._tool_registry = tool_registry
+
+    def load_skills_from_directory(self, skills_dir: str = ""):
+        """Discovery: 扫描并加载所有 skill 文件夹（Agent Skills 标准）
+
+        Args:
+            skills_dir: skills 目录路径，为空则使用 self.skills_dir
+        """
+        target_dir = skills_dir or self.skills_dir
+        if not target_dir or not os.path.isdir(target_dir):
+            logger.debug(f"Skills directory not found: {target_dir}")
+            return
+
+        self._skill_folders = load_all_skills_from_directory(target_dir)
+        logger.info(f"Loaded {len(self._skill_folders)} skill folders from {target_dir}")
+
+        # 将 file-based skills 转换为 Skill 对象（不带 handler）
+        for name, folder in self._skill_folders.items():
+            if name not in self.skills:
+                skill = Skill(
+                    name=folder.name,
+                    description=folder.description,
+                    version=folder.version,
+                    author=folder.author,
+                    category=folder.category,
+                    source="file",
+                    handler=None,  # file-based skills 通过 LLM 理解执行，不走 handler
+                )
+                self.skills[name] = skill
+
+    async def activate_skill(
+        self, skill_name: str, include_scripts: bool = True, include_references: bool = True
+    ) -> dict[str, Any]:
+        """Activation: 按需加载完整 SKILL.md 内容到 context（Agent Skills 标准）
+
+        当任务匹配 skill 的 description 或 triggers 时调用此方法。
+
+        Args:
+            skill_name: 技能名称
+            include_scripts: 是否包含脚本内容
+            include_references: 是否包含参考文档内容
+
+        Returns:
+            activation_result {
+                "skill_name": str,
+                "instructions": str,       # SKILL.md 完整内容
+                "scripts": list[str],      # 可执行脚本列表
+                "scripts_content": dict,   # 脚本名称 -> 内容（如果 include_scripts=True）
+                "references": dict,        # 参考文档名称 -> 内容（如果 include_references=True）
+                "triggers": list[str],     # 触发条件
+            }
+        """
+        folder = self._skill_folders.get(skill_name)
+        if not folder:
+            return {"error": f"Skill not found: {skill_name}"}
+
+        result = {
+            "skill_name": folder.name,
+            "description": folder.description,
+            "instructions": folder.skill_md_content or folder.instructions,
+            "scripts": folder.scripts,
+            "references": list(folder.references.keys()),
+            "triggers": folder.triggers,
+        }
+
+        if include_scripts:
+            result["scripts_content"] = folder.get_scripts_content()
+
+        if include_references:
+            result["references_content"] = folder.get_references_content()
+
+        return result
+
+    def get_skill_info(self, skill_name: str) -> dict[str, Any] | None:
+        """返回 skill 的基本信息（用于 Skills meta-skill）
+
+        Args:
+            skill_name: 技能名称
+
+        Returns:
+            {name, description, category, version, author, source} 或 None
+        """
+        # 先查 file-based skills
+        folder = self._skill_folders.get(skill_name)
+        if folder:
+            return {
+                "name": folder.name,
+                "description": folder.description,
+                "category": folder.category,
+                "version": folder.version,
+                "author": folder.author,
+                "source": "file",
+                "triggers": folder.triggers,
+            }
+
+        # 再查 runtime/builtin skills
+        skill = self.skills.get(skill_name)
+        if skill:
+            return {
+                "name": skill.name,
+                "description": skill.description,
+                "category": skill.category,
+                "version": skill.version,
+                "author": skill.author,
+                "source": skill.source,
+            }
+
+        return None
+
+    async def execute_skill_script(
+        self, skill_name: str, script_path: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Execution: 执行 skill 的 bundled script
+
+        Args:
+            skill_name: 技能名称
+            script_path: 脚本路径（相对于 skill/scripts/ 目录）
+            params: 脚本参数
+
+        Returns:
+            执行结果
+        """
+        folder = self._skill_folders.get(skill_name)
+        if not folder:
+            return {"error": f"Skill not found: {skill_name}"}
+
+        full_script_path = os.path.join(folder.scripts_dir, script_path)
+        if not os.path.exists(full_script_path):
+            return {"error": f"Script not found: {script_path}"}
+
+        # 简单脚本执行：读取内容返回（实际执行由调用方通过 ToolRegistry 执行）
+        try:
+            with open(full_script_path, encoding="utf-8") as f:
+                content = f.read()
+            return {
+                "status": "script_loaded",
+                "skill_name": skill_name,
+                "script_path": script_path,
+                "content": content,
+                "params": params,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_skills_schema(self, provider: str = "anthropic") -> list[dict[str, Any]]:
+        """
+        获取所有技能的 JSON Schema 格式（用于 Function Calling）
+
+        Agent Skills Discovery 阶段：只返回有 handler 的技能，
+        因为只有这些才能通过 execute_skill() 执行。
+
+        注意：file-based skills 不返回 schema（它们通过 activate_skill 加载指令，
+        由 LLM 理解后自行决定调用哪些工具，不走 execute_skill 路径）。
+
+        Args:
+            provider: LLM提供商 (anthropic/openai/ollama)
+
+        Returns:
+            技能列表的 Function Calling 格式
+        """
+        schemas = []
+        for skill in self.skills.values():
+            if not skill.enabled:
+                continue
+            # 只返回有 handler 的 skill（runtime/builtin）
+            # file-based skills 通过 activate_skill() 加载，不直接调用
+            if skill.handler is None:
+                continue
+            schema = skill.to_function_schema(provider)
+            schemas.append(schema)
+        return schemas
+
     async def register_skill(
         self,
         name: str,
@@ -483,8 +739,15 @@ class SkillsManager:
         self,
         name: str,
         params: dict[str, Any],
+        session: Any = None,
     ) -> Any:
-        """执行技能"""
+        """执行技能
+
+        Args:
+            name: 技能名称
+            params: 技能参数
+            session: 可选的 UserSession（用于需要会话上下文的技能）
+        """
         skill = self.skills.get(name)
         if not skill:
             raise ValueError(f"Skill not found: {name}")
@@ -493,9 +756,14 @@ class SkillsManager:
             raise ValueError(f"Skill is disabled: {name}")
 
         if skill.handler:
+            # 构建 handler 参数
+            handler_kwargs = params.copy() if params else {}
+            if session is not None:
+                handler_kwargs["session"] = session
+
             if asyncio.iscoroutinefunction(skill.handler):
-                return await skill.handler(**params)
+                return await skill.handler(**handler_kwargs)
             else:
-                return skill.handler(**params)
+                return skill.handler(**handler_kwargs)
 
         return {"status": "skill_executed", "name": name, "params": params}
