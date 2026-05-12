@@ -596,11 +596,36 @@ class MetaAgent:
         # ========== 初始化分步任务执行器 ==========
         # 复杂任务拆分为小步骤，逐步执行
         # 每步独立超时（60秒），支持断点续传
-        self.task_executor = TaskExecutor(self)
-        # P2: 初始化进度存储
-        task_db_path = self.config.database.path.replace(".db", "_tasks.db")
-        self.task_executor.init_progress_store(task_db_path)
-        logger.info("TaskExecutor initialized with progress store")
+        try:
+            import sys
+            import os
+            debug_file = f"/tmp/taskexecutor_debug_{os.getpid()}.log"
+            with open(debug_file, 'w') as f:
+                f.write(f">>> [STARTUP] PID {os.getpid()} - Creating TaskExecutor...\n")
+                f.flush()
+            print(f">>> [STARTUP] Creating TaskExecutor...", file=sys.stderr, flush=True)
+            self.task_executor = TaskExecutor(self)
+            with open(debug_file, 'a') as f:
+                f.write(f">>> [STARTUP] TaskExecutor object created: {type(self.task_executor)}\n")
+                f.flush()
+            print(f">>> [STARTUP] TaskExecutor created: {type(self.task_executor)}.", file=sys.stderr, flush=True)
+            # P2: 初始化进度存储
+            task_db_path = self.config.database.path.replace(".db", "_tasks.db")
+            self.task_executor.init_progress_store(task_db_path)
+            with open(debug_file, 'a') as f:
+                f.write(f">>> [STARTUP] Progress store initialized at {task_db_path}\n")
+                f.flush()
+            print(f">>> [STARTUP] TaskExecutor progress store initialized.", file=sys.stderr, flush=True)
+        except Exception as e:
+            import traceback
+            import os
+            debug_file = f"/tmp/taskexecutor_debug_{os.getpid()}.log"
+            with open(debug_file, 'a') as f:
+                f.write(f">>> [STARTUP] FATAL: TaskExecutor init failed: {e}\n{traceback.format_exc()}\n")
+                f.flush()
+            print(f">>> [STARTUP] FATAL: TaskExecutor init failed: {e}", file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+            self.task_executor = None
 
         # ========== 启动守护进程 ==========
         if self.config.guardian_enabled:
@@ -898,6 +923,20 @@ class MetaAgent:
             await self._warmup_knowledge_base()
         except Exception as e:
             logger.warning(f"Failed to warmup knowledge base: {e}")
+
+        # ========== 初始化分步任务执行器 ==========
+        # 复杂任务拆分为小步骤，逐步执行
+        # 每步独立超时（60秒），支持断点续传
+        try:
+            self.task_executor = TaskExecutor(self)
+            task_db_path = self.config.database.path.replace(".db", "_tasks.db")
+            self.task_executor.init_progress_store(task_db_path)
+            logger.info("TaskExecutor initialized with progress store")
+        except Exception as e:
+            import traceback
+            logger.error(f"TaskExecutor initialization failed: {e}")
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+            self.task_executor = None
 
     def _register_l1_rules(self):
         """注册 L1 规则（MetaAgent 专用快速匹配规则）"""

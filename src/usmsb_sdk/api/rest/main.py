@@ -510,6 +510,37 @@ async def debug_pid():
         "_chat_mgr_from_state": str(type(_chat_mgr_from_state.get()).__name__) if _chat_mgr_from_state.get() else None,
     }
 
+
+@app.get("/api/meta-agent/debug/task_executor")
+async def debug_task_executor():
+    """Debug endpoint to check TaskExecutor status."""
+    import traceback
+    import os
+    from usmsb_sdk.api.rest.meta_agent import _meta_agent
+    
+    result = {
+        "pid": os.getpid(),
+    }
+    
+    if _meta_agent is None:
+        result["error"] = "MetaAgent not initialized"
+        return result
+    
+    te = getattr(_meta_agent, 'task_executor', None)
+    result["task_executor_type"] = str(type(te).__name__) if te else None
+    result["initialized"] = te is not None
+    result["meta_agent_id"] = _meta_agent.agent_id if hasattr(_meta_agent, 'agent_id') else None
+    
+    # Check init debug file content
+    init_debug_file = f"/tmp/init_debug_{os.getpid()}.log"
+    try:
+        with open(init_debug_file, 'r') as f:
+            result["init_debug_content"] = f.read()
+    except:
+        result["init_debug_content"] = "file not found or unreadable"
+    
+    return result
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,

@@ -239,6 +239,10 @@ COMPLEXITY_INDICATORS = {
         "写一个完整", "实现一个完整",
         "帮我设计", "帮我规划", "帮我构建",
         "分步骤", "多文件", "项目结构",
+        "写一个算法", "实现一个算法", "帮我写",
+        "命令行程序", "命令行工具", "CLI工具",
+        "Flask", "Django", "FastAPI", "REST API", "GraphQL",
+        "CRUD", "增删改查", "数据库设计", "创建API", "生成API",
     ],
     TaskComplexity.MEDIUM: [
         "创建文件", "读取并分析", "搜索并整理",

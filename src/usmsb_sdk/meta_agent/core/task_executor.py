@@ -36,6 +36,7 @@ from ..models.task_plan import (
     should_use_step_by_step,
 )
 from ..services.task_progress_store import TaskProgressRecord, TaskProgressStore
+from .goal_outcome_verifier import GoalOutcomeVerifier, VERIFICATION_CONFIG
 
 if TYPE_CHECKING:
     from ..agent import MetaAgent
@@ -52,12 +53,17 @@ class TaskExecutor:
     2. Generate execution steps via LLM
     3. Execute steps sequentially
     4. Manage task state and persistence
+    5. Verify goal outcomes (self-driven)
+    6. Self-correction when goals not met
     """
 
     def __init__(self, agent: "MetaAgent"):
         self.agent = agent
         self._active_tasks: dict[str, TaskPlan] = {}
         self._progress_store: TaskProgressStore | None = None
+        # 初始化目标达成验证器
+        self._verifier = GoalOutcomeVerifier(agent)
+        self._verification_config = VERIFICATION_CONFIG.copy()
 
     def init_progress_store(self, db_path: str):
         """Initialize progress store"""
@@ -373,13 +379,26 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
             progress_callback: Progress callback
 
         Returns:
-            Updated task plan
+            Updated task plan with verification result
         """
         plan.status = TaskStatus.EXECUTING
         plan.updated_at = datetime.now()
 
         logger.info(f"[TaskExecutor] Executing plan {plan.task_id}, steps count: {len(plan.steps)}")
 
+        # 如果是复杂任务，先生成验证标准
+        verification_criteria = None
+        if plan.complexity in [TaskComplexity.HIGH, TaskComplexity.VERY_HIGH]:
+            try:
+                verification_criteria = await self._verifier.generate_criteria(
+                    goal=plan.user_request,
+                    context={"wallet_address": plan.wallet_address}
+                )
+                logger.info(f"[TaskExecutor] Generated {len(verification_criteria)} verification criteria")
+            except Exception as e:
+                logger.warning(f"[TaskExecutor] Failed to generate verification criteria: {e}")
+
+        # 执行步骤
         for i, step in enumerate(plan.steps):
             logger.info(f"[TaskExecutor] Step {i+1}: {step.name}, action: {step.action}")
             if step.status == StepStatus.COMPLETED:
@@ -421,17 +440,129 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Start with {{ and end with }}""
             # Save progress
             await self._save_progress(plan)
 
-        # Update plan status
-        completed = len(plan.get_completed_steps())
-        if completed == len(plan.steps):
-            plan.status = TaskStatus.COMPLETED
+        # ========== 自驱动目标达成验证 ==========
+        if verification_criteria and self._verification_config.get("enabled"):
+            logger.info("[TaskExecutor] Starting goal outcome verification...")
+            
+            # 收集执行结果
+            execution_result = self._collect_execution_result(plan)
+            
+            # 验证目标达成
+            verification = await self._verifier.verify_outcome(
+                goal=plan.user_request,
+                criteria=verification_criteria,
+                execution_result=execution_result,
+                context={"wallet_address": plan.wallet_address}
+            )
+            
+            # 记录验证结果
+            plan.metadata = plan.metadata or {}
+            plan.metadata["verification"] = verification.to_dict()
+            plan.metadata["goal_score"] = verification.score
+            
+            logger.info(
+                f"[TaskExecutor] Goal verification: score={verification.score:.1%}, "
+                f"passed={verification.passed}, status={verification.status}"
+            )
+            
+            # 处理验证结果 - 自驱动修正
+            if verification.status == "needs_correction" and verification.correction_plan:
+                logger.info(
+                    f"[TaskExecutor] Goal not fully achieved, applying self-correction... "
+                    f"Strategy: {verification.correction_plan.strategy.value}"
+                )
+                
+                # 检查是否还有重试机会
+                retry_count = plan.metadata.get("correction_retry_count", 0)
+                max_retries = self._verification_config.get("max_retries", 3)
+                
+                if retry_count < max_retries:
+                    plan.metadata["correction_retry_count"] = retry_count + 1
+                    plan.metadata["correction_plan"] = verification.correction_plan.to_dict()
+                    
+                    # 执行修正
+                    await self._apply_correction(plan, verification)
+                    
+                    # 重新执行（递归）
+                    logger.info(
+                        f"[TaskExecutor] Re-executing plan after correction "
+                        f"(attempt {retry_count + 1}/{max_retries})..."
+                    )
+                    return await self.execute_plan(plan, progress_callback)
+                else:
+                    logger.warning(
+                        f"[TaskExecutor] Max correction retries ({max_retries}) reached, "
+                        f"accepting current result"
+                    )
+            
+            # 更新最终状态
+            if verification.passed:
+                plan.status = TaskStatus.COMPLETED
+                logger.info("[TaskExecutor] ✅ Goal fully achieved!")
+            elif verification.status == "needs_correction":
+                plan.status = TaskStatus.FAILED  # 无法修正，标记失败
+                logger.warning("[TaskExecutor] ⚠️ Goal partially achieved, could not fully correct")
+            else:
+                plan.status = TaskStatus.FAILED
         else:
-            plan.status = TaskStatus.FAILED
+            # 无验证的情况（简单任务）
+            completed = len(plan.get_completed_steps())
+            if completed == len(plan.steps):
+                plan.status = TaskStatus.COMPLETED
+            else:
+                plan.status = TaskStatus.FAILED
 
         # Save final status
         await self._save_progress(plan)
 
         return plan
+
+    async def _collect_execution_result(self, plan: TaskPlan) -> dict:
+        """收集执行结果用于验证"""
+        results = {
+            "goal": plan.user_request,
+            "steps_completed": [],
+            "steps_failed": [],
+            "total_steps": len(plan.steps),
+        }
+        
+        for step in plan.steps:
+            step_info = {
+                "name": step.name,
+                "status": step.status.value,
+                "result": step.result,
+                "error": step.error,
+            }
+            
+            if step.status == StepStatus.COMPLETED:
+                results["steps_completed"].append(step_info)
+            elif step.status == StepStatus.FAILED:
+                results["steps_failed"].append(step_info)
+        
+        return results
+
+    async def _apply_correction(self, plan: TaskPlan, verification) -> None:
+        """应用修正计划"""
+        correction_plan = verification.correction_plan
+        
+        if not correction_plan:
+            return
+        
+        logger.info(f"[TaskExecutor] Applying correction: {correction_plan.reason}")
+        
+        # 添加新的修正步骤
+        for step_data in correction_plan.new_steps:
+            new_step = TaskStep(
+                step_id=f"{plan.task_id}_correction_{len(plan.steps) + 1}",
+                name=step_data.get("name", "Correction Step"),
+                description=step_data.get("description", ""),
+                action=step_data.get("action", "direct_execute"),
+                params=step_data.get("params", {}),
+                dependencies=[],
+                estimated_time=step_data.get("estimated_time", 30),
+            )
+            plan.steps.append(new_step)
+            logger.info(f"[TaskExecutor] Added correction step: {new_step.name}")
 
     async def _execute_step(
         self,
