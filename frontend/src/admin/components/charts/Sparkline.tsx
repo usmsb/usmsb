@@ -1,88 +1,40 @@
-/**
- * Sparkline - 迷你趋势线
- */
+// Sparkline.tsx - 小型迷你趋势线图
+import { LineChart, Line, ResponsiveContainer } from 'recharts'
+
 interface SparklineProps {
   data: number[]
-  color?: 'primary' | 'success' | 'danger' | 'warning' | 'info'
+  color?: string
+  width?: number
   height?: number
   className?: string
 }
 
-const colorMap = {
-  primary: '#6366f1',
-  success: '#10b981',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  info: '#3b82f6',
-}
-
-export function Sparkline({
+export default function Sparkline({
   data,
-  color = 'primary',
+  color = '#8b5cf6',
+  width = 80,
   height = 32,
   className = '',
 }: SparklineProps) {
-  if (!data || data.length < 2) return null
+  const chartData = data.map((v, i) => ({ i, v }))
 
-  const stroke = colorMap[color]
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-
-  const width = 120
-  const padding = 2
-
-  const points = data.map((v, i) => {
-    const x = padding + (i / (data.length - 1)) * (width - padding * 2)
-    const y = height - padding - ((v - min) / range) * (height - padding * 2)
-    return `${x},${y}`
-  }).join(' ')
-
-  // 填充区域
-  const fillPoints = [
-    `${padding},${height - padding}`,
-    ...points.split(' '),
-    `${width - padding},${height - padding}`,
-  ].join(' ')
+  if (!data || data.length < 2) {
+    return <div className={`w-[${width}px] h-[${height}px] bg-bg-tertiary rounded ${className}`} />
+  }
 
   return (
-    <svg
-      width="100%"
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className={className}
-      preserveAspectRatio="none"
-    >
-      <defs>
-        <linearGradient id={`spark-${color}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity={0.3} />
-          <stop offset="100%" stopColor={stroke} stopOpacity={0} />
-        </linearGradient>
-      </defs>
-
-      {/* 填充区域 */}
-      <polygon
-        points={fillPoints}
-        fill={`url(#spark-${color})`}
-      />
-
-      {/* 线条 */}
-      <polyline
-        points={points}
-        fill="none"
-        stroke={stroke}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-
-      {/* 最后一个点 */}
-      <circle
-        cx={points.split(' ').pop()?.split(',')[0]}
-        cy={points.split(' ').pop()?.split(',')[1]}
-        r={2}
-        fill={stroke}
-      />
-    </svg>
+    <div className={className} style={{ width, height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData}>
+          <Line
+            type="monotone"
+            dataKey="v"
+            stroke={color}
+            strokeWidth={1.5}
+            dot={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

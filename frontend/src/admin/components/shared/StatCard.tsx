@@ -4,7 +4,7 @@
  */
 import { TrendingUp, TrendingDown, type LucideIcon } from 'lucide-react'
 import clsx from 'clsx'
-import { Sparkline } from '../charts/Sparkline'
+import Sparkline from '../charts/Sparkline'
 
 interface StatCardProps {
   title: string

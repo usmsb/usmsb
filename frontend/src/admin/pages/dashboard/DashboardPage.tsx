@@ -27,6 +27,7 @@ import {
   fetchMatching,
 } from '../../api/adminApi'
 import StatCard from '../../components/shared/StatCard'
+import WebSocketStatus from '../../components/shared/WebSocketStatus'
 import StatusBadge from '../../components/shared/StatusBadge'
 import AgentTrendChart from './components/AgentTrendChart'
 import TransactionChart from './components/TransactionChart'
@@ -155,6 +156,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           <RefreshButton onClick={handleRefresh} />
+          <WebSocketStatus />
         </div>
       </div>
 
