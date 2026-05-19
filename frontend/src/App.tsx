@@ -28,6 +28,9 @@ import Contracts from './pages/Contracts'
 import { useAuthStore } from './stores/authStore'
 import { StakeGuideModal } from './components/StakeGuideModal'
 
+// Admin Panel
+import AdminApp from './admin/AdminApp'
+
 // Protected Route Component that requires staking
 function StakeProtectedRoute({
   children,
@@ -71,6 +74,10 @@ function App() {
       <Routes>
         {/* Landing Page - root path */}
         <Route path="/" element={<LandingPage />} />
+
+        {/* Admin Panel - 管理员专用路由 */}
+        <Route path="/admin" element={<AdminApp />} />
+        <Route path="/admin/command-center" element={<AdminApp />} />
 
         {/* Docs Page - full page without layout */}
         <Route path="/docs" element={<DocsPage />} />
