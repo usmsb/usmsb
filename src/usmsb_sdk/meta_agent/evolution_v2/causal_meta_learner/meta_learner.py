@@ -12,6 +12,10 @@ CausalMetaLearner
 from dataclasses import dataclass, field
 from typing import Any
 
+import random
+from dataclasses import dataclass, field
+from typing import Any
+
 import numpy as np
 
 from .ewc_penalty import EWCPenalty, OnlineEWC
@@ -231,19 +235,18 @@ class CausalMetaLearner:
         """
         外循环：元更新
 
-        使用一阶梯度更新元权重
+        基于 meta_loss 方向调整权重
 
         Args:
             meta_loss: 元损失
         """
-        # 简化的梯度更新
-        # 实际应该用更高阶的优化方法
         learning_rate = self.config.outer_lr
+        # 基于损失方向调整：损失为正则反向，为负则保持
+        direction = -1 if meta_loss > 0 else 1
 
         for param_name, param in self._causal_model_weights.items():
-            # 随机估计梯度方向
-            # 实际应该用反传
-            self._causal_model_weights[param_name] = param - learning_rate * 0.001 * param
+            update_scale = learning_rate * direction * max(0.1, abs(meta_loss))
+            self._causal_model_weights[param_name] = param + update_scale * 0.001 * param
 
     def _compute_causal_gradients(
         self,
@@ -284,16 +287,11 @@ class CausalMetaLearner:
         if not query_set:
             return 0.0
 
-        # 简化的损失计算
-        # 实际应该评估因果发现的准确性
         loss = 0.0
-
         for record in query_set:
-            # 模拟损失
-            # 实际应该比较预测和真实因果
-            pred_quality = 0.5  # 简化的预测质量
             actual_quality = record.outcome.quality if hasattr(record, "outcome") else 0.5
-
+            # 用权重的 L2 范数作为预测质量估计
+            pred_quality = min(1.0, sum(np.linalg.norm(w) for w in weights.values()) * 0.1)
             loss += (pred_quality - actual_quality) ** 2
 
         return loss / len(query_set)
@@ -376,6 +374,3 @@ class CausalMetaLearner:
             return self._fisher_information
 
         return self._fisher_information.get(domain, {})
-
-
-import random  # 添加导入

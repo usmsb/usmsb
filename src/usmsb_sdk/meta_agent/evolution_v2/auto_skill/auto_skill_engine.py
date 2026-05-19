@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from .skill_creator import SkillCreator, LLMAssistedSkillCreator
+from .skill_creator import SkillCreator, LLMAssistedSkillCreator, SkillCreationResult
 from .skill_discovery import SkillDiscovery, PrioritizedSkillDiscovery, SkillGap
 from .skill_validator import SkillValidator, ValidationResult
 from .skill_curator import SkillCurator
@@ -248,12 +248,17 @@ class AutoSkillEngine:
         gap: SkillGap,
         creation_result,
     ) -> None:
-        """更新因果图"""
+        """更新因果图 - 标记边已被 skill 覆盖"""
         if not self.graph:
             return
 
-        # 标记该因果边已被 skill 覆盖
-        # 实际实现可能需要更复杂的逻辑
+        # 找到对应的因果边并标记为已被 skill 覆盖
+        for edge in self.graph.edges:
+            if edge.source == gap.source_node and edge.target == gap.target_node:
+                # 将 skill_id 添加到 evidence 中
+                if creation_result.skill_id not in edge.evidence:
+                    edge.evidence.append(creation_result.skill_id)
+                break
 
     def start(self) -> None:
         """启动引擎"""

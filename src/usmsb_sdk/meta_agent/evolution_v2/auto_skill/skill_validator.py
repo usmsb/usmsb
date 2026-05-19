@@ -6,7 +6,9 @@ AutoSkillEngine 的组件
 验证 Skill 的功能正确性、质量和冲突
 """
 
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -44,6 +46,7 @@ class SkillValidator:
         self,
         causal_graph=None,
         llm_manager=None,
+        skill_registry=None,
     ):
         """
         初始化
@@ -51,9 +54,11 @@ class SkillValidator:
         Args:
             causal_graph: 因果图
             llm_manager: LLM 管理器
+            skill_registry: Skill 注册表（用于冲突检测）
         """
         self.graph = causal_graph
         self.llm = llm_manager
+        self.registry = skill_registry or {}
 
     async def validate(
         self,
@@ -159,17 +164,28 @@ class SkillValidator:
 
     async def _execute_skill(self, skill: Any, input_data: Any) -> Any:
         """执行 Skill"""
-        # 简化的执行
         skill_type = getattr(skill, "skill_type", "prompt")
+        skill_path = getattr(skill, "path", None)
 
-        if skill_type == "code":
-            # 执行代码
-            return "executed"
-        else:
-            # Prompt skill
-            if self.llm:
-                return await self.llm.generate(str(input_data))
-            return str(input_data)
+        if skill_type == "code" and skill_path:
+            # 真实执行 code skill
+            test_file = Path(skill_path) / "test_skill.py"
+            if test_file.exists():
+                try:
+                    result = subprocess.run(
+                        ["python", str(test_file)],
+                        capture_output=True, text=True, timeout=30,
+                        input=str(input_data)
+                    )
+                    return result.stdout if result.returncode == 0 else f"Error: {result.stderr}"
+                except subprocess.TimeoutExpired:
+                    return "Error: Execution timeout"
+                except Exception as e:
+                    return f"Error: {e}"
+        # Prompt skill 或无路径的 code skill
+        if self.llm:
+            return await self.llm.generate(str(input_data))
+        return str(input_data)
 
     def _outputs_match(self, actual: Any, expected: Any) -> bool:
         """检查输出是否匹配"""
@@ -217,9 +233,45 @@ class SkillValidator:
         )
 
     async def _check_conflicts(self, skill: Any) -> CheckResult:
-        """冲突检查"""
-        # 简化的冲突检查
-        return CheckResult(passed=True, score=1.0)
+        """冲突检查 - 检测 skill 之间是否冲突"""
+        conflicts = []
+        skill_triggers = set(getattr(skill, "trigger_conditions", []) or [])
+        skill_desc = getattr(skill, "description", "").lower()
+        skill_id = getattr(skill, "skill_id", None)
+
+        # 与注册表中的 skill 检测冲突
+        for existing_id, existing_info in self.registry.items():
+            if existing_id == skill_id:
+                continue
+
+            existing_triggers = set(existing_info.get("trigger_conditions", []) or [])
+            existing_desc = existing_info.get("description", "").lower()
+
+            # 检查触发条件重叠
+            overlap = skill_triggers & existing_triggers
+            if overlap:
+                conflicts.append(f"触发条件重叠: {overlap}")
+
+            # 检查描述语义冲突
+            if self._has_semantic_conflict(skill_desc, existing_desc):
+                conflicts.append(f"与 {existing_id} 描述语义冲突")
+
+        return CheckResult(
+            passed=len(conflicts) == 0,
+            score=1.0 - len(conflicts) * 0.2,
+            issues=conflicts,
+        )
+
+    def _has_semantic_conflict(self, desc1: str, desc2: str) -> bool:
+        """检测描述是否存在语义冲突"""
+        conflict_pairs = [
+            ("always", "never"), ("require", "skip"), ("must", "must_not"),
+            ("enable", "disable"), ("allow", "forbid"),
+        ]
+        for pos, neg in conflict_pairs:
+            if (pos in desc1 and neg in desc2) or (neg in desc1 and pos in desc2):
+                return True
+        return False
 
     async def _check_causal_effect(self, skill: Any) -> CheckResult:
         """因果效应检查"""
