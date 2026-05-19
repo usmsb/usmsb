@@ -276,16 +276,20 @@ class ReflectiveCorrector:
                 continue
 
             # 检查是否是键
+            key_found = False
             for key, attr in key_map.items():
                 if key in line and ":" in line:
                     current_key = attr
                     content = line.split(":", 1)[1].strip()
                     if content:
                         result[attr].append(content)
+                    key_found = True
                     break
-            elif current_key and line.startswith("-"):
-                result[current_key].append(line[1:].strip())
-            elif current_key and line.startswith("*"):
-                result[current_key].append(line[1:].strip())
+
+            if not key_found:
+                if current_key and line.startswith("-"):
+                    result[current_key].append(line[1:].strip())
+                elif current_key and line.startswith("*"):
+                    result[current_key].append(line[1:].strip())
 
         return result

@@ -104,6 +104,10 @@ class CausalMetaLearner:
         self._best_loss = float("inf")
         self._patience_counter = 0
 
+    async def initialize(self) -> None:
+        """异步初始化（兼容 engine 调用）"""
+        pass
+
     def _initialize_weights(self) -> None:
         """
         初始化模型权重

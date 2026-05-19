@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from .skill_creator import SkillCreator, LLM assistedSkillCreator
+from .skill_creator import SkillCreator, LLMAssistedSkillCreator
 from .skill_discovery import SkillDiscovery, PrioritizedSkillDiscovery, SkillGap
 from .skill_validator import SkillValidator, ValidationResult
 from .skill_curator import SkillCurator
@@ -67,7 +67,7 @@ class AutoSkillEngine:
         self.registry = skill_registry or {}
 
         # 组件
-        self.skill_creator = LLM assistedSkillCreator(llm_manager) if llm_manager else SkillCreator(llm_manager)
+        self.skill_creator = LLMAssistedSkillCreator(llm_manager) if llm_manager else SkillCreator(llm_manager)
         self.skill_discovery = PrioritizedSkillDiscovery(
             causal_graph, curiosity_engine, task_executor, self.registry
         )

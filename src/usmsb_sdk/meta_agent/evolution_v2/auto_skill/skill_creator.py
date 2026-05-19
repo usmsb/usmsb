@@ -276,7 +276,7 @@ class SkillCreator:
         return min(score, 1.0)
 
 
-class LLM assistedSkillCreator(SkillCreator):
+class LLMAssistedSkillCreator(SkillCreator):
     """
     LLM 辅助的 Skill 创建器
 

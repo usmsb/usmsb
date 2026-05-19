@@ -12,7 +12,7 @@ Skill 自创建系统 - 完整闭环
 """
 
 from .auto_skill_engine import AutoSkillEngine, AutoSkillEngineConfig
-from .skill_creator import SkillCreator, LLM assistedSkillCreator, SkillCreationResult
+from .skill_creator import SkillCreator, LLMAssistedSkillCreator, SkillCreationResult
 from .skill_discovery import SkillDiscovery, PrioritizedSkillDiscovery, SkillGap
 from .skill_validator import SkillValidator, ValidationResult, CheckResult
 from .skill_curator import SkillCurator
