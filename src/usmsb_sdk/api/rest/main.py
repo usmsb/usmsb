@@ -58,6 +58,7 @@ from usmsb_sdk.api.rest.quotes import router as quotes_router
 # Import new modular routers
 from usmsb_sdk.api.rest.routers import (
     agents_router,
+    admin_router,
     blockchain_router,
     collaborations_router,
     contracts_router,
@@ -611,6 +612,7 @@ app.include_router(registration_router, prefix="/api")
 app.include_router(services_router, prefix="/api")
 app.include_router(system_router, prefix="/api")
 app.include_router(gene_capsule_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 app.include_router(joint_order_router, prefix="/api")
 app.include_router(pre_match_negotiation_router, prefix="/api")
 app.include_router(meta_agent_router, prefix="/api")

@@ -31,11 +31,9 @@ adminApi.interceptors.response.use(
     const originalRequest = error.config
     const status = error.response?.status
 
-    // Token 过期，重新获取 token
     if (status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
       try {
-        // 从 localStorage 获取最新 token
         const authData = localStorage.getItem('usmsb-auth')
         if (authData) {
           const { state } = JSON.parse(authData)
@@ -45,14 +43,12 @@ adminApi.interceptors.response.use(
           }
         }
       } catch {
-        // 失败，登出
         useAuthStore.getState().logout()
         window.location.href = '/login'
         return Promise.reject(error)
       }
     }
 
-    // 403：无权限
     if (status === 403) {
       console.warn('[AdminAPI] 无权限访问:', originalRequest.url)
     }
@@ -63,350 +59,281 @@ adminApi.interceptors.response.use(
 
 // ==================== Dashboard ====================
 
-export interface DashboardStats {
-  // Agent 统计
-  totalAgents: number
-  onlineAgents: number
-  busyAgents: number
-  offlineAgents: number
-  newAgentsToday: number
-  agentTrend: { time: string; online: number; busy: number; offline: number }[]
-
-  // 用户统计
-  totalUsers: number
-  newUsersToday: number
-
-  // 质押统计
-  totalStake: string
-  totalStakeUsd: number
-
-  // 业务统计
-  activeDemands: number
-  activeServices: number
-  activeOrders: number
-  pendingOrders: number
-  totalTransactions: number
-  todayTransactionCount: number
-  todayTransactionVolume: string
-  platformRevenue: string
-
-  // 实时
-  lastBlockNumber: number
-  lastBlockTimestamp: number
-  vibePriceUsd: number
-  stakeDistribution: {
-    none: number
-    bronze: number
-    silver: number
-    gold: number
-    platinum: number
-  }
+export interface DashboardData {
+  total_agents: number
+  online_agents: number
+  total_users: number
+  total_transactions: number
+  total_transaction_volume: number
+  total_orders: number
+  pending_orders: number
+  completed_orders: number
+  total_volume_24h: number
+  tx_count_24h: number
+  active_negotiations: number
+  active_proposals: number
+  agent_growth: number[]
+  tx_volume_growth: number[]
+  top_agents: Array<{
+    agent_id: string
+    name: string
+    stake: number
+    status: string
+    reputation: number
+  }>
+  recent_transactions: Array<{
+    tx_id: string
+    type: string
+    amount: number
+    status: string
+    from_address: string
+    to_address: string
+    created_at: number
+  }>
 }
 
-export async function fetchDashboardStats(): Promise<DashboardStats> {
-  const { data } = await adminApi.get<DashboardStats>('/dashboard/stats')
-  return data
-}
+export const fetchDashboard = (): Promise<DashboardData> =>
+  adminApi.get<DashboardData>('/dashboard').then(r => r.data)
+
+// Legacy alias
+export const fetchDashboardStats = fetchDashboard
 
 // ==================== Agents ====================
 
-export interface Agent {
-  agentId: string
-  name: string
-  agentType: 'ai' | 'human' | 'system'
-  status: 'online' | 'busy' | 'offline'
-  stake: string
-  reputation: number
-  capabilities: string[]
-  lastHeartbeat: number
-  createdAt: number
-  ownerWallet: string
-  bindingStatus: 'wallet' | 'manual' | 'agent'
-}
-
-export interface AgentsResponse {
-  agents: Agent[]
+export interface AgentListData {
+  agents: Array<{
+    agent_id: string
+    name: string
+    agent_type: string
+    status: string
+    stake: number
+    balance: number
+    reputation: number
+    capabilities: string[]
+    endpoint: string
+    protocol: string
+    created_at: number
+    last_heartbeat: number
+  }>
   total: number
+  page: number
+  page_size: number
+  total_pages: number
 }
 
-export async function fetchAgents(params?: {
+export const fetchAgents = (params?: {
   page?: number
-  pageSize?: number
+  page_size?: number
   status?: string
-  type?: string
-  tier?: string
+  agent_type?: string
   search?: string
-}): Promise<AgentsResponse> {
-  const { data } = await adminApi.get<AgentsResponse>('/agents', { params })
-  return data
-}
+}): Promise<AgentListData> =>
+  adminApi.get<AgentListData>('/agents', { params }).then(r => r.data)
 
-export async function freezeAgent(agentId: string, reason: string): Promise<void> {
-  await adminApi.post(`/agents/${agentId}/freeze`, { reason })
-}
-
-export async function unfreezeAgent(agentId: string): Promise<void> {
-  await adminApi.post(`/agents/${agentId}/unfreeze`)
-}
+export const fetchAgentDetail = (agentId: string) =>
+  adminApi.get(`/agents/${agentId}`).then(r => r.data)
 
 // ==================== Users ====================
 
-export interface User {
-  walletAddress: string
-  did?: string
-  role: string
-  stake: string
-  reputation: number
-  vibeBalance: string
-  stakeStatus: 'none' | 'staked' | 'unstaking' | 'unlocked'
-  agentId?: string
-  createdAt: number
-}
-
-export interface UsersResponse {
-  users: User[]
+export interface UserListData {
+  users: Array<{
+    user_id: string
+    address: string
+    did: string
+    user_role: string
+    stake_amount: number
+    balance: number
+    status: string
+    created_at: number
+    last_active: number
+  }>
   total: number
+  page: number
+  page_size: number
+  total_pages: number
 }
 
-export async function fetchUsers(params?: {
+export const fetchUsers = (params?: {
   page?: number
-  pageSize?: number
+  page_size?: number
   role?: string
-  stakeStatus?: string
   search?: string
-}): Promise<UsersResponse> {
-  const { data } = await adminApi.get<UsersResponse>('/users', { params })
-  return data
-}
+}): Promise<UserListData> =>
+  adminApi.get<UserListData>('/users', { params }).then(r => r.data)
 
-export async function changeUserRole(
-  wallet: string,
-  role: string,
-  reason: string
-): Promise<void> {
-  await adminApi.put(`/users/${wallet}/role`, { role, reason })
-}
+export const updateUserRole = (userId: string, newRole: string) =>
+  adminApi.patch(`/users/${userId}/role`, null, { params: { new_role: newRole } }).then(r => r.data)
 
 // ==================== Transactions ====================
 
-export interface Transaction {
-  id: string
-  buyerId: string
-  sellerId: string
-  amount: string
-  status: 'pending' | 'completed' | 'failed' | 'refunded'
-  transactionType: 'payment' | 'stake' | 'reward' | 'refund' | 'governance'
-  escrowTxHash?: string
-  rating?: number
-  createdAt: number
-  completedAt?: number
-}
-
-export interface TransactionsResponse {
-  transactions: Transaction[]
+export interface TransactionListData {
+  transactions: Array<{
+    tx_id: string
+    type: string
+    amount: number
+    fee: number
+    status: string
+    from_address: string
+    to_address: string
+    tx_hash: string
+    created_at: number
+  }>
   total: number
-  summary?: {
-    todayVolume: string
-    todayCount: number
-    avgAmount: string
-    successRate: number
-  }
+  page: number
+  page_size: number
+  total_pages: number
 }
 
-export async function fetchTransactions(params?: {
+export const fetchTransactions = (params?: {
   page?: number
-  pageSize?: number
-  type?: string
+  page_size?: number
   status?: string
-  startTime?: number
-  endTime?: number
-  minAmount?: number
-  maxAmount?: number
-  search?: string
-}): Promise<TransactionsResponse> {
-  const { data } = await adminApi.get<TransactionsResponse>('/transactions', { params })
-  return data
-}
+  tx_type?: string
+  address?: string
+}): Promise<TransactionListData> =>
+  adminApi.get<TransactionListData>('/transactions', { params }).then(r => r.data)
 
 // ==================== Orders ====================
 
-export interface Order {
-  orderId: string
-  demandAgentId: string
-  supplyAgentId?: string
-  status: 'pending' | 'in_progress' | 'delivered' | 'completed' | 'cancelled' | 'disputed'
-  priority: 'low' | 'medium' | 'high'
-  vibeLocked: string
-  chainOrderId?: string
-  createdAt: number
-  completedAt?: number
-}
-
-export interface OrdersResponse {
-  orders: Order[]
+export interface OrderListData {
+  orders: Array<{
+    order_id: string
+    creator: string
+    service_type: string
+    total_budget: number
+    spent: number
+    status: string
+    matched_agents: string
+    created_at: number
+    updated_at: number
+  }>
   total: number
-  stats?: {
-    total: number
-    inProgress: number
-    completed: number
-    disputed: number
-  }
+  page: number
+  page_size: number
+  total_pages: number
 }
 
-export async function fetchOrders(params?: {
+export const fetchOrders = (params?: {
   page?: number
-  pageSize?: number
+  page_size?: number
   status?: string
-  priority?: string
-}): Promise<OrdersResponse> {
-  const { data } = await adminApi.get<OrdersResponse>('/orders', { params })
-  return data
-}
+  service_type?: string
+}): Promise<OrderListData> =>
+  adminApi.get<OrderListData>('/orders', { params }).then(r => r.data)
 
 // ==================== Nodes ====================
 
-export interface NodeHealth {
-  nodeId: string
-  name: string
-  ip: string
-  status: 'online' | 'warning' | 'critical' | 'maintenance'
-  agentCount: number
-  onlineCount: number
-  cpuPercent: number
-  memoryPercent: number
-  diskPercent: number
-  networkIn: number
-  networkOut: number
-  latency: number
-  lastHeartbeat: number
-  uptime: number
-  version: string
-  createdAt: number
-}
-
-export interface NodesResponse {
-  nodes: NodeHealth[]
+export interface NodeListData {
+  nodes: Array<{
+    node_id: string
+    name: string
+    status: string
+    agent_count: number
+    cpu_percent: number
+    memory_percent: number
+    region: string
+    version: string
+    last_heartbeat: number
+  }>
   total: number
+  online: number
+  offline: number
 }
 
-export async function fetchNodes(params?: {
-  page?: number
-  pageSize?: number
-  status?: string
-  search?: string
-}): Promise<NodesResponse> {
-  const { data } = await adminApi.get<NodesResponse>('/nodes', { params })
-  return data
-}
-
-// ==================== Contracts ====================
-
-export interface ContractOverview {
-  name: string
-  address: string
-  category: 'staking' | 'rewards' | 'governance' | 'market' | 'orders'
-  balance: string
-  status: 'ok' | 'warning' | 'error'
-}
-
-export async function fetchContractsOverview(): Promise<ContractOverview[]> {
-  const { data } = await adminApi.get<ContractOverview[]>('/contracts/overview')
-  return data
-}
-
-export interface StakingData {
-  totalStaked: string
-  currentAPY: number
-  stakerCount: number
-  totalRewardsDistributed: string
-  dividendBalance: string
-  vibePrice: number
-  stakeDistribution: { bronze: number; silver: number; gold: number; platinum: number }
-}
-
-export async function fetchStakingData(): Promise<StakingData> {
-  const { data } = await adminApi.get<StakingData>('/contracts/staking')
-  return data
-}
-
-export interface StakeUserInfo {
-  stakedAmount: string
-  lockPeriod: number
-  startTime: number
-  tier: string
-  timeMultiplier: number
-  votingPower: string
-  pendingReward: string
-}
-
-export async function fetchStakeUserInfo(address: string): Promise<StakeUserInfo> {
-  const { data } = await adminApi.get<StakeUserInfo>(`/contracts/staking/user/${address}`)
-  return data
-}
-
-// ==================== System ====================
-
-export interface ServiceHealth {
-  name: string
-  status: 'ok' | 'degraded' | 'down'
-  latencyMs: number
-  message?: string
-}
-
-export interface HealthResponse {
-  services: ServiceHealth[]
-  lastCheck: number
-}
-
-export async function fetchHealth(): Promise<HealthResponse> {
-  const { data } = await adminApi.get<HealthResponse>('/system/health')
-  return data
-}
+export const fetchNodes = (): Promise<NodeListData> =>
+  adminApi.get<NodeListData>('/nodes').then(r => r.data)
 
 // ==================== Matching ====================
 
-export interface MatchingFunnel {
-  demands: number
-  aiMatch: number
-  negotiations: number
-  agreements: number
-  deliveries: number
-  avgMatchTime: string
-  avgNegotiationRounds: number
-  agreementRate: number
-  deliveryRate: number
+export interface MatchingData {
+  funnel: {
+    published: number
+    negotiating: number
+    matched: number
+    completed: number
+  }
+  avg_match_time: number
+  success_rate: number
+  top_services: Array<{ service_type: string; count: number }>
+  recent_matches: Record<string, unknown>[]
 }
 
-export async function fetchMatchingFunnel(timeRange: '7d' | '30d' | '90d' = '7d'): Promise<MatchingFunnel> {
-  const { data } = await adminApi.get<MatchingFunnel>('/matching/funnel', { params: { timeRange } })
-  return data
-}
+export const fetchMatching = (): Promise<MatchingData> =>
+  adminApi.get<MatchingData>('/matching').then(r => r.data)
 
-// ==================== Governance ====================
+// ==================== Gene Capsules ====================
 
-export interface Proposal {
-  id: number
-  title: string
-  proposalType: 'general' | 'incentive' | 'parameter' | 'emergency'
-  status: 'active' | 'passed' | 'rejected' | 'expired'
-  votesFor: string
-  votesAgainst: string
-  deadline: number
-  proposerId: string
-  description?: string
-}
-
-export interface ProposalsResponse {
-  proposals: Proposal[]
+export interface GeneCapsuleListData {
+  capsules: Record<string, unknown>[]
   total: number
 }
 
-export async function fetchProposals(params?: {
-  page?: number
-  pageSize?: number
-  status?: string
-  type?: string
-}): Promise<ProposalsResponse> {
-  const { data } = await adminApi.get<ProposalsResponse>('/governance/proposals', { params })
-  return data
+export const fetchGeneCapsules = (params?: { page?: number; page_size?: number }): Promise<GeneCapsuleListData> =>
+  adminApi.get<GeneCapsuleListData>('/gene-capsules', { params }).then(r => r.data)
+
+// ==================== Intelligence ====================
+
+export interface IntelligenceData {
+  llm_calls_total: number
+  token_usage: Record<string, number>
+  active_sessions: number
+  avg_response_time: number
+  top_capabilities: Array<{ capability: string; count: number }>
 }
+
+export const fetchIntelligence = (): Promise<IntelligenceData> =>
+  adminApi.get<IntelligenceData>('/intelligence').then(r => r.data)
+
+// ==================== Governance ====================
+
+export interface GovernanceData {
+  proposals: Record<string, unknown>[]
+  active_proposals: number
+  total_votes: number
+  participation_rate: number
+}
+
+export const fetchGovernance = (): Promise<GovernanceData> =>
+  adminApi.get<GovernanceData>('/governance').then(r => r.data)
+
+// ==================== System ====================
+
+export interface SystemHealthData {
+  status: string
+  uptime_seconds: number
+  cpu_percent: number
+  memory_percent: number
+  disk_percent: number
+  db_size_mb: number
+  api_response_time_ms: number
+  components: Record<string, string>
+}
+
+export const fetchSystemHealth = (): Promise<SystemHealthData> =>
+  adminApi.get<SystemHealthData>('/system/health').then(r => r.data)
+
+export const fetchSystemConfig = (): Promise<Record<string, string>> =>
+  adminApi.get<Record<string, string>>('/system/config').then(r => r.data)
+
+export interface SystemLogsData {
+  logs: Array<Record<string, unknown>>
+  total: number
+}
+
+export const fetchSystemLogs = (params?: {
+  page?: number
+  page_size?: number
+  level?: string
+  search?: string
+}): Promise<SystemLogsData> =>
+  adminApi.get<SystemLogsData>('/system/logs', { params }).then(r => r.data)
+
+// ==================== Permissions ====================
+
+export interface PermissionMatrixData {
+  matrix: Array<Record<string, unknown>>
+  roles: string[]
+}
+
+export const fetchPermissions = (): Promise<PermissionMatrixData> =>
+  adminApi.get<PermissionMatrixData>('/permissions').then(r => r.data)

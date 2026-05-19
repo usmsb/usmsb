@@ -1,137 +1,64 @@
 /**
- * AgentTrendChart - Agent 活跃趋势图
- * 堆叠面积图（在线/忙碌/离线）
+ * AgentTrendChart - Agent 增长趋势图
+ * 纯 CSS 条形图，无需 chart library
  */
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from 'recharts'
-import clsx from 'clsx'
+import { useState } from 'react'
 
-interface DataPoint {
-  time: string
-  online: number
-  busy: number
-  offline: number
-  total?: number
+interface Props {
+  data: number[]
 }
 
-interface AgentTrendChartProps {
-  data: DataPoint[]
-  timeRange: '7d' | '30d' | '90d'
-  className?: string
-}
+export default function AgentTrendChart({ data }: Props) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
-function CustomTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  const total = payload.reduce((sum: number, p: any) => sum + (p.value || 0), 0)
-  return (
-    <div className="bg-bg-elevated border border-border-primary rounded-lg p-3 shadow-lg">
-      <p className="text-text-primary text-sm font-medium mb-2">{label}</p>
-      {payload.map((p: any) => (
-        <div key={p.dataKey} className="flex items-center gap-2 text-xs">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-          <span className="text-text-secondary">{p.name}:</span>
-          <span className="text-text-primary font-mono">{p.value.toLocaleString()}</span>
-        </div>
-      ))}
-      <div className="border-t border-border-primary mt-2 pt-2 flex justify-between text-xs">
-        <span className="text-text-secondary">总计</span>
-        <span className="text-text-primary font-mono font-medium">{total.toLocaleString()}</span>
-      </div>
-    </div>
-  )
-}
-
-export default function AgentTrendChart({ data, timeRange, className }: AgentTrendChartProps) {
   if (!data || data.length === 0) {
     return (
-      <div className={clsx('flex items-center justify-center h-64 bg-bg-tertiary rounded-lg', className)}>
-        <p className="text-text-muted text-sm">暂无数据</p>
+      <div className="h-40 flex items-center justify-center text-text-muted text-sm">
+        暂无趋势数据
       </div>
     )
   }
 
+  const maxVal = Math.max(...data, 1)
+  const labels = ['6天前', '5天前', '4天前', '3天前', '2天前', '昨天', '今天']
+
   return (
-    <div className={className}>
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorOnline" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#22c55e" stopOpacity={0.02} />
-            </linearGradient>
-            <linearGradient id="colorBusy" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.02} />
-            </linearGradient>
-            <linearGradient id="colorOffline" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#ef4444" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-
-          <CartesianGrid strokeDasharray="3 3" stroke="#2d2d4a" vertical={false} />
-          <XAxis
-            dataKey="time"
-            stroke="#64748b"
-            fontSize={11}
-            tickLine={false}
-            axisLine={false}
-            interval="preserveStartEnd"
-          />
-          <YAxis
-            stroke="#64748b"
-            fontSize={11}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend
-            formatter={(value) => (
-              <span className="text-text-secondary text-xs">
-                {value === 'online' ? '🟢 在线' :
-                 value === 'busy' ? '🟡 忙碌' : '🔴 离线'}
-              </span>
-            )}
-          />
-
-          <Area
-            type="monotone"
-            dataKey="online"
-            name="online"
-            stackId="1"
-            stroke="#22c55e"
-            strokeWidth={2}
-            fill="url(#colorOnline)"
-          />
-          <Area
-            type="monotone"
-            dataKey="busy"
-            name="busy"
-            stackId="1"
-            stroke="#f59e0b"
-            strokeWidth={2}
-            fill="url(#colorBusy)"
-          />
-          <Area
-            type="monotone"
-            dataKey="offline"
-            name="offline"
-            stackId="1"
-            stroke="#ef4444"
-            strokeWidth={2}
-            fill="url(#colorOffline)"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div className="h-40 flex flex-col">
+      {/* Bar chart */}
+      <div className="flex-1 flex items-end gap-1">
+        {data.map((val, i) => {
+          const heightPct = (val / maxVal) * 100
+          return (
+            <div
+              key={i}
+              className="flex-1 flex flex-col items-center group cursor-pointer"
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {/* Tooltip */}
+              {hoveredIndex === i && (
+                <div className="mb-1 px-2 py-1 bg-bg-elevated border border-border-primary rounded text-xs text-text-primary whitespace-nowrap z-10">
+                  {val} agents
+                </div>
+              )}
+              {/* Bar */}
+              <div className="w-full bg-primary/30 hover:bg-primary/60 rounded-t transition-all relative"
+                style={{ height: `${Math.max(heightPct, 4)}%` }}>
+                <div className="absolute inset-0 bg-primary rounded-t opacity-80"
+                  style={{ height: `${(val / maxVal) * 100}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {/* X-axis labels */}
+      <div className="flex gap-1 mt-2">
+        {labels.map((label, i) => (
+          <div key={i} className="flex-1 text-center">
+            <span className="text-text-muted text-xs">{i === data.length - 1 ? '今' : labels[data.length - 1 - i]?.slice(0, 1) || ''}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

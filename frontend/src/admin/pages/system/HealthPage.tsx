@@ -1,73 +1,80 @@
-/** HealthPage - 服务健康状态 */
+/** HealthPage - 系统健康状态 */
 import { useQuery } from '@tanstack/react-query'
-import { fetchHealth } from '../../api/adminApi'
-import { Settings } from 'lucide-react'
+import { fetchSystemHealth } from '../../api/adminApi'
+import { Activity, Server, Database, Zap } from 'lucide-react'
+import StatCard from '../../components/shared/StatCard'
 import StatusBadge from '../../components/shared/StatusBadge'
+import { ProgressBar } from '../../components/shared/ProgressBar'
 
 export default function HealthPage() {
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['admin', 'system', 'health'],
-    queryFn: fetchHealth,
+    queryFn: fetchSystemHealth,
     refetchInterval: 30000,
   })
 
-  const services = data?.services ?? []
+  const components = data?.components ?? {}
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-primary font-rajdhani">服务健康状态</h1>
-        <button onClick={() => refetch()}
-          className="flex items-center gap-2 px-4 py-2 bg-bg-tertiary rounded-lg text-text-secondary hover:text-text-primary text-sm transition-colors">
-          <Settings className="w-4 h-4" />
-          重新检查
-        </button>
+      <h1 className="text-2xl font-bold text-text-primary font-rajdhani">系统健康状态</h1>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="系统状态"
+          value={data?.status === 'healthy' ? '健康' : data?.status ?? '未知'}
+          icon={Activity}
+          color={data?.status === 'healthy' ? 'success' : 'danger'}
+          loading={isLoading}
+        />
+        <StatCard title="CPU 使用率" value={`${(data?.cpu_percent ?? 0).toFixed(1)}%`} icon={Zap} color="info" loading={isLoading} />
+        <StatCard title="内存使用率" value={`${(data?.memory_percent ?? 0).toFixed(1)}%`} icon={Server} color="info" loading={isLoading} />
+        <StatCard title="数据库大小" value={`${(data?.db_size_mb ?? 0).toFixed(2)} MB`} icon={Database} color="primary" loading={isLoading} />
       </div>
 
-      <div className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-bg-tertiary border-b border-border-primary">
-            <tr>
-              <th className="text-left text-text-muted text-xs font-medium py-3 px-4">服务</th>
-              <th className="text-left text-text-muted text-xs font-medium py-3 px-4">状态</th>
-              <th className="text-left text-text-muted text-xs font-medium py-3 px-4">延迟</th>
-              <th className="text-left text-text-muted text-xs font-medium py-3 px-4">详情</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-primary">
-            {isLoading ? (
-              <tr><td colSpan={4} className="py-8 text-center text-text-muted">加载中...</td></tr>
-            ) : services.length === 0 ? (
-              <tr><td colSpan={4} className="py-8 text-center text-text-muted text-sm">暂无服务数据</td></tr>
-            ) : (
-              services.map(svc => (
-                <tr key={svc.name} className="hover:bg-bg-tertiary/50">
-                  <td className="py-3 px-4">
-                    <span className="text-text-primary text-sm font-medium">{svc.name}</span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <StatusBadge
-                      status={svc.status === 'ok' ? 'ok' : svc.status === 'degraded' ? 'degraded' : 'down'}
-                      size="sm"
-                      pulse={svc.status === 'down'}
-                    />
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`text-sm font-mono ${
-                      svc.latencyMs < 100 ? 'text-success' :
-                      svc.latencyMs < 1000 ? 'text-warning' : 'text-danger'
-                    }`}>
-                      {svc.latencyMs}ms
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-text-muted text-xs">
-                    {svc.message || '-'}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* 资源使用 */}
+      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
+        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">资源使用情况</h3>
+        <div className="space-y-4 max-w-xl">
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-text-secondary">CPU</span>
+              <span className="text-text-primary font-mono">{(data?.cpu_percent ?? 0).toFixed(1)}%</span>
+            </div>
+            <ProgressBar percent={data?.cpu_percent ?? 0} />
+          </div>
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-text-secondary">内存</span>
+              <span className="text-text-primary font-mono">{(data?.memory_percent ?? 0).toFixed(1)}%</span>
+            </div>
+            <ProgressBar percent={data?.memory_percent ?? 0} />
+          </div>
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-text-secondary">磁盘</span>
+              <span className="text-text-primary font-mono">{((data?.disk_percent ?? 0)).toFixed(2)} MB</span>
+            </div>
+            <ProgressBar percent={Math.min((data?.disk_percent ?? 0), 100)} />
+          </div>
+        </div>
+      </div>
+
+      {/* 服务组件状态 */}
+      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
+        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">服务组件</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {Object.entries(components).map(([name, status]) => (
+            <div key={name} className="flex items-center gap-3 p-3 bg-bg-tertiary rounded-lg">
+              <div className={`w-2 h-2 rounded-full ${status === 'healthy' || status === 'ok' ? 'bg-success animate-pulse' : status === 'degraded' ? 'bg-warning' : 'bg-danger'}`} />
+              <span className="text-text-primary text-sm">{name}</span>
+              <span className="ml-auto text-text-muted text-xs capitalize">{status as string}</span>
+            </div>
+          ))}
+          {Object.keys(components).length === 0 && (
+            <p className="text-text-muted text-sm col-span-3">暂无组件数据</p>
+          )}
+        </div>
       </div>
     </div>
   )

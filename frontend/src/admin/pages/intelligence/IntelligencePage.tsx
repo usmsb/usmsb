@@ -1,19 +1,57 @@
 /** IntelligencePage - AI 能力分析 */
-import { Brain } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchIntelligence } from '../../api/adminApi'
+import { Brain, Cpu, Zap } from 'lucide-react'
 import StatCard from '../../components/shared/StatCard'
 
 export default function IntelligencePage() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'intelligence'],
+    queryFn: fetchIntelligence,
+    refetchInterval: 60000,
+  })
+
+  const topCaps = data?.top_capabilities ?? []
+  const llmCalls = data?.llm_calls_total ?? 0
+  const activeSessions = data?.active_sessions ?? 0
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-text-primary font-rajdhani">AI 能力分析</h1>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="LLM 总调用" value="-" icon={Brain} color="primary" />
-        <StatCard title="成功率" value="-" icon={Brain} color="success" />
-        <StatCard title="平均延迟" value="-" icon={Brain} color="warning" />
-        <StatCard title="Token 消耗" value="-" icon={Brain} color="info" />
+        <StatCard title="LLM 调用总数" value={llmCalls} icon={Cpu} color="primary" loading={isLoading} />
+        <StatCard title="活跃会话" value={activeSessions} icon={Zap} color="warning" loading={isLoading} />
+        <StatCard title="平均响应时间" value={`${(data?.avg_response_time ?? 0).toFixed(0)}ms`} icon={Brain} color="info" loading={isLoading} />
+        <StatCard title="Token 使用" value={(data?.token_usage?.total ?? 0).toLocaleString()} icon={Zap} color="success" loading={isLoading} />
       </div>
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-8 text-center">
-        <p className="text-text-muted">AI 能力分析功能开发中...</p>
+
+      {/* 能力分布 */}
+      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
+        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">Agent 能力分布 Top 10</h3>
+        {topCaps.length === 0 ? (
+          <p className="text-text-muted text-sm">暂无能力数据</p>
+        ) : (
+          <div className="space-y-3">
+            {topCaps.map((cap, i) => (
+              <div key={cap.capability} className="flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs text-primary font-bold shrink-0">
+                  {i + 1}
+                </span>
+                <span className="text-text-primary flex-1">{cap.capability}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-32 h-2 bg-bg-tertiary rounded overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded"
+                      style={{ width: `${Math.min(100, (cap.count / Math.max(...topCaps.map(c => c.count), 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-text-muted text-xs font-mono w-12 text-right">{cap.count}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,59 +1,70 @@
 /** GovernancePage - 治理投票 */
 import { useQuery } from '@tanstack/react-query'
-import { fetchProposals } from '../../api/adminApi'
-import { Vote } from 'lucide-react'
+import { fetchGovernance } from '../../api/adminApi'
+import { Target, ThumbsUp, ThumbsDown } from 'lucide-react'
 import StatCard from '../../components/shared/StatCard'
 import StatusBadge from '../../components/shared/StatusBadge'
 
 export default function GovernancePage() {
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'governance', 'proposals'],
-    queryFn: () => fetchProposals({ pageSize: 50 }),
-    refetchInterval: 300000,
+    queryKey: ['admin', 'governance'],
+    queryFn: fetchGovernance,
+    refetchInterval: 60000,
   })
 
   const proposals = data?.proposals ?? []
-  const activeCount = proposals.filter(p => p.status === 'active').length
+  const activeProposals = data?.active_proposals ?? 0
+  const totalVotes = data?.total_votes ?? 0
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-text-primary font-rajdhani">治理投票</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="提案总数" value={data?.total ?? 0} icon={Vote} color="primary" loading={isLoading} />
-        <StatCard title="进行中" value={activeCount} icon={Vote} color="success" loading={isLoading} />
-        <StatCard title="已通过" value={proposals.filter(p => p.status === 'passed').length} icon={Vote} color="info" loading={isLoading} />
-        <StatCard title="已否决" value={proposals.filter(p => p.status === 'rejected').length} icon={Vote} color="danger" loading={isLoading} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatCard title="活跃提案" value={activeProposals} icon={Target} color="warning" loading={isLoading} />
+        <StatCard title="总提案" value={proposals.length} icon={Target} color="primary" loading={isLoading} />
+        <StatCard title="总投票数" value={totalVotes} icon={ThumbsUp} color="info" loading={isLoading} />
       </div>
 
       <div className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-bg-tertiary border-b border-border-primary">
-              <tr>
-                <th className="text-left text-text-muted text-xs font-medium py-3 px-4">ID</th>
-                <th className="text-left text-text-muted text-xs font-medium py-3 px-4">标题</th>
-                <th className="text-left text-text-muted text-xs font-medium py-3 px-4">类型</th>
-                <th className="text-left text-text-muted text-xs font-medium py-3 px-4">状态</th>
-                <th className="text-left text-text-muted text-xs font-medium py-3 px-4">赞成/反对</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-primary bg-bg-tertiary">
+                <th className="text-left px-4 py-3 text-text-muted font-normal">提案ID</th>
+                <th className="text-left px-4 py-3 text-text-muted font-normal">状态</th>
+                <th className="text-left px-4 py-3 text-text-muted font-normal">赞成</th>
+                <th className="text-left px-4 py-3 text-text-muted font-normal">反对</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-primary">
+            <tbody>
               {isLoading ? (
-                <tr><td colSpan={5} className="py-8 text-center text-text-muted">加载中...</td></tr>
+                [...Array(3)].map((_, i) => (
+                  <tr key={i} className="border-b border-border-primary/50">
+                    <td className="px-4 py-3"><div className="h-4 w-24 bg-bg-tertiary rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-20 bg-bg-tertiary rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-16 bg-bg-tertiary rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-16 bg-bg-tertiary rounded animate-pulse" /></td>
+                  </tr>
+                ))
               ) : proposals.length === 0 ? (
-                <tr><td colSpan={5} className="py-8 text-center text-text-muted text-sm">暂无提案数据</td></tr>
+                <tr>
+                  <td colSpan={4} className="text-center text-text-muted py-12">暂无提案数据</td>
+                </tr>
               ) : (
-                proposals.map(p => (
-                  <tr key={p.id} className="hover:bg-bg-tertiary/50">
-                    <td className="py-3 px-4 text-text-muted text-sm font-mono">#{p.id}</td>
-                    <td className="py-3 px-4 text-text-primary text-sm font-medium">{p.title}</td>
-                    <td className="py-3 px-4 text-text-secondary text-xs">{p.proposalType}</td>
-                    <td className="py-3 px-4"><StatusBadge status={p.status} size="sm" /></td>
-                    <td className="py-3 px-4">
-                      <span className="text-success text-xs">{Number(p.votesFor).toLocaleString()}</span>
-                      {' / '}
-                      <span className="text-danger text-xs">{Number(p.votesAgainst).toLocaleString()}</span>
+                proposals.map((p: Record<string, unknown>) => (
+                  <tr key={p.proposal_id as string || p.id as string} className="border-b border-border-primary/50 hover:bg-bg-tertiary/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-text-secondary">
+                      {(p.proposal_id as string || p.id as string || '').slice(0, 8)}...
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={(p.status as string) || 'active'} size="sm" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-success font-mono">{(p.votes_for as number || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-danger font-mono">{(p.votes_against as number || 0).toLocaleString()}</span>
                     </td>
                   </tr>
                 ))

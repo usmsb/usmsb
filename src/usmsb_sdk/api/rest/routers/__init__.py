@@ -4,6 +4,7 @@ USMSB SDK REST API Routers
 Modular routers for different API domains.
 """
 
+from usmsb_sdk.api.rest.routers.admin import router as admin_router
 from usmsb_sdk.api.rest.routers.agents import router as agents_router
 from usmsb_sdk.api.rest.routers.blockchain import router as blockchain_router
 from usmsb_sdk.api.rest.routers.collaborations import router as collaborations_router
@@ -36,6 +37,7 @@ from usmsb_sdk.api.rest.routers.wallet import router as wallet_router
 from usmsb_sdk.api.rest.routers.workflows import router as workflows_router
 
 __all__ = [
+    "admin_router",
     "agents_router",
     "contracts_router",
     "environments_router",
@@ -66,4 +68,5 @@ __all__ = [
     "governance_router",
     "identity_router",
     "dispute_router",
+    "admin_router",
 ]
