@@ -26,7 +26,7 @@ from .core.perception import PerceptionService
 # 设计初衷：见 models/task_plan.py 和 core/task_executor.py
 # 复杂任务拆分为小步骤，逐步执行，每步独立超时（60秒）
 from .core.task_executor import TaskExecutor
-from .evolution.engine import EvolutionEngine
+from .evolution_v2.engine import SelfEvolutionEngine  # v2.1 因果学习引擎
 from .goals.engine import GoalEngine
 
 # 新增：信息提取器
@@ -385,8 +385,8 @@ class MetaAgent:
         self.interaction = InteractionService(self.llm_manager)
         self.learning = LearningService(self.knowledge_base, self.context_manager)
 
-        # 进化引擎
-        self.evolution_engine: EvolutionEngine | None = None
+        # v2.1 因果进化引擎
+        self.evolution_engine: SelfEvolutionEngine | None = None
 
         # ========== 智能召回系统 ==========
         self.smart_recall: IntelligentRecall | None = None
@@ -696,14 +696,14 @@ class MetaAgent:
         # 目标引擎启动
         await self.goal_engine.start()
 
-        # 进化引擎
-        self.evolution_engine = EvolutionEngine(
-            self.llm_manager,
-            self.knowledge_base,
-            self.conversation_manager,
+        # v2.1 因果进化引擎
+        self.evolution_engine = SelfEvolutionEngine(
+            llm_manager=self.llm_manager,
+            knowledge_base=self.knowledge_base,
         )
+        await self.evolution_engine.initialize()
         await self.evolution_engine.start()
-        logger.info("EvolutionEngine started")
+        logger.info("SelfEvolutionEngine (v2.1) started")
 
         # 智能召回
         if self.config.smart_recall_enabled:

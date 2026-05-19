@@ -2,6 +2,14 @@
 自主进化引擎 - Self Evolution Engine
 
 整合所有进化组件，实现AGI系统的自主进化
+
+v2.1 新增组件：
+- CausalDiscoveryEngine: 因果发现
+- CausalMetaLearner: 因果元学习
+- CausalPlanner: 因果规划
+- CausalVerifier: 因果验证
+- ReasoningEnhancer: 推理增强
+- AutoSkillEngine: Skill 自创建
 """
 
 import asyncio
@@ -23,6 +31,14 @@ from .models import (
 )
 from .self_optimizer import SelfOptimizer
 
+# v2.1 因果学习组件
+from .causal_discovery import CausalDiscoveryEngine
+from .causal_meta_learner import CausalMetaLearner, CausalMetaLearnerConfig
+from .causal_planner import CausalPlanner, CausalPlannerConfig
+from .causal_verifier import CausalVerifier
+from .reasoning_enhancer import ReasoningEnhancer
+from .auto_skill import AutoSkillEngine, AutoSkillEngineConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,12 +49,21 @@ class SelfEvolutionEngine:
     整合元学习、能力评估、知识固化、好奇心驱动、自我优化等组件，
     实现AGI系统的全面自主进化能力。
 
+    v2.1 新增：因果学习系统
+    - 因果发现：PC Algorithm 完整实现
+    - 因果元学习：MAML + EWC
+    - 因果规划：跨任务策略迁移
+    - 因果验证：do-calculus 反事实推断
+    - 推理增强：CoT + 多路径一致性
+    - Skill 自创建：自动发现缺口并创建 Skill
+
     核心特性：
     1. 自主学习 - 无监督的知识获取
     2. 能力进化 - 技能提升、新能力涌现
     3. 自我评估 - 性能监控、弱点识别
     4. 自我优化 - 策略调整、参数优化
     5. 知识固化 - 将临时知识转化为永久能力
+    6. 因果学习 - 深度因果发现和泛化
     """
 
     def __init__(
@@ -53,6 +78,7 @@ class SelfEvolutionEngine:
 
         self._state = EvolutionState()
 
+        # v2.0 组件
         self._meta_learner = MetaLearner(llm_manager, knowledge_base)
         self._capability_assessor = CapabilityAssessor(llm_manager, knowledge_base)
         self._knowledge_solidifier = KnowledgeSolidifier(
@@ -68,6 +94,25 @@ class SelfEvolutionEngine:
             llm_manager, self._capability_assessor, self._curiosity_engine
         )
 
+        # v2.1 因果学习组件
+        self._causal_discovery = CausalDiscoveryEngine()
+        self._causal_meta_learner = CausalMetaLearner(
+            llm_manager, knowledge_base, CausalMetaLearnerConfig()
+        )
+        self._causal_verifier = CausalVerifier(causal_graph=None)
+        self._reasoning_enhancer = ReasoningEnhancer(llm_manager)
+        self._auto_skill_engine = AutoSkillEngine(
+            causal_graph=None,
+            llm_manager=llm_manager,
+            skill_registry={},
+            curiosity_engine=self._curiosity_engine,
+            task_executor=None,
+            config=AutoSkillEngineConfig(),
+        )
+
+        # 因果规划器（在获取因果图后初始化）
+        self._causal_planner: CausalPlanner | None = None
+
         self._running = False
         self._evolution_task: asyncio.Task | None = None
         self._evolution_interval = self.config.get("evolution_interval", 300)
@@ -82,6 +127,7 @@ class SelfEvolutionEngine:
         if self._initialized:
             return
 
+        # v2.0 组件初始化
         await self._meta_learner.initialize()
         await self._capability_assessor.initialize()
         await self._knowledge_solidifier.initialize()
@@ -89,8 +135,12 @@ class SelfEvolutionEngine:
         await self._self_optimizer.initialize()
         await self._goal_generator.initialize()
 
+        # v2.1 因果组件初始化
+        await self._causal_discovery.initialize()
+        await self._causal_meta_learner.initialize()
+
         self._initialized = True
-        logger.info("SelfEvolutionEngine initialized")
+        logger.info("SelfEvolutionEngine (v2.1) initialized")
 
     async def start(self):
         """启动进化引擎"""
@@ -141,6 +191,13 @@ class SelfEvolutionEngine:
         consolidation_result = await self.consolidate_knowledge()
 
         optimization_result = await self.optimize_self()
+
+        # v2.1: 因果学习循环
+        await self._causal_learning_loop()
+
+        # v2.1: AutoSkillEngine 清理
+        if self._auto_skill_engine:
+            await self._auto_skill_engine.skill_curator.run_curation()
 
         self._state.generation += 1
         self._state.last_evolution = datetime.now().timestamp()
@@ -310,6 +367,135 @@ class SelfEvolutionEngine:
 
         return result
 
+    # ==================== v2.1 因果学习系统 ====================
+
+    async def _causal_learning_loop(self) -> dict[str, Any]:
+        """
+        因果学习主循环
+
+        v2.1 新增
+
+        1. 收集新经验（从执行记录中）
+        2. 增量更新因果图
+        3. 定期全量重构因果图
+        4. 运行元学习更新
+        """
+        result = {
+            "causal_graph_updated": False,
+            "full_rebuild_triggered": False,
+            "meta_learning_performed": False,
+        }
+
+        try:
+            # 1. 收集新经验
+            new_records = await self._collect_new_experiences()
+
+            if new_records:
+                # 2. 检查是否应该增量更新
+                if self._causal_discovery.updater.should_incremental_update():
+                    updated_graph, triggered = self._causal_discovery.discover_incremental(
+                        new_records
+                    )
+
+                    if updated_graph:
+                        # 更新因果规划器
+                        self._update_causal_planner(updated_graph)
+
+                        result["causal_graph_updated"] = True
+
+                        # 检查是否触发了全量重构
+                        if triggered:
+                            result["full_rebuild_triggered"] = True
+                            logger.info("Causal graph full rebuild triggered")
+
+                # 3. 记录用于元学习
+                for record in new_records:
+                    # 简单记录，实际应该更新元学习状态
+                    pass
+
+            # 4. 检查是否应该全量重构
+            if self._causal_discovery.updater.should_full_rebuild():
+                all_records = await self._get_all_task_records()
+                if all_records:
+                    graph = self._causal_discovery.full_rebuild(all_records)
+                    if graph:
+                        self._update_causal_planner(graph)
+                        result["full_rebuild_triggered"] = True
+
+            logger.debug(f"Causal learning loop completed: {result}")
+
+        except Exception as e:
+            logger.error(f"Causal learning loop error: {e}")
+
+        return result
+
+    def _update_causal_planner(self, causal_graph) -> None:
+        """更新因果规划器"""
+        if causal_graph and self._causal_discovery:
+            self._causal_verifier = CausalVerifier(causal_graph=causal_graph)
+            self._auto_skill_engine.graph = causal_graph
+
+            if self.llm:
+                self._causal_planner = CausalPlanner(
+                    causal_graph=causal_graph,
+                    llm_manager=self.llm,
+                    config=CausalPlannerConfig(),
+                )
+
+    async def _collect_new_experiences(self) -> list:
+        """收集新经验"""
+        # 简化实现，实际应该从数据库或任务执行器获取
+        return []
+
+    async def _get_all_task_records(self) -> list:
+        """获取所有任务记录"""
+        # 简化实现，实际应该从数据库获取
+        return []
+
+    async def enhance_reasoning(
+        self,
+        task: Any,
+        context: Any,
+    ) -> "ReasoningResult":
+        """
+        增强推理
+
+        v2.1 新增
+        使用 ReasoningEnhancer 增强推理过程
+        """
+        return await self._reasoning_enhancer.reason(
+            task=task,
+            context=context,
+        )
+
+    async def verify_strategy(
+        self,
+        strategy_a: Any,
+        strategy_b: Any,
+        task: Any,
+    ) -> "VerificationResult":
+        """
+        验证策略
+
+        v2.1 新增
+        使用 CausalVerifier 验证策略
+        """
+        from .causal_verifier import VerificationContext
+
+        context = VerificationContext(
+            task_id=getattr(task, "task_id", "unknown"),
+            strategy_a=strategy_a,
+            strategy_b=strategy_b,
+            outcome_a=None,
+            task_features=getattr(task, "features", {}),
+            historical_records=[],
+            verification_cost=1.0,
+        )
+
+        return await self._causal_verifier.verify_counterfactual(context)
+
+    # ==================== 能力迁移 ====================
+
     async def transfer_capability(
         self,
         source_capability_id: str,
@@ -465,6 +651,53 @@ class SelfEvolutionEngine:
                 "parameters": {
                     name: p.current_value for name, p in self._self_optimizer._parameters.items()
                 },
+            },
+        }
+
+    # ==================== v2.0 兼容接口 ====================
+
+    async def evolve(self) -> dict[str, Any]:
+        """
+        执行一次进化迭代（兼容 v2.0 EvolutionEngine）
+
+        Returns:
+            dict with keys: knowledge_added, patterns_identified
+        """
+        try:
+            # v2.1 的进化逻辑在 _execute_evolution_cycle 中
+            # 这里只触发一次学习
+            result = await self.learn_from_interaction({
+                "messages": [],
+                "success": True,
+                "task_type": "general",
+            })
+            return {
+                "knowledge_added": result.get("knowledge_added", 0),
+                "patterns_identified": 0,
+            }
+        except Exception as e:
+            logger.error(f"evolve() failed: {e}")
+            return {"knowledge_added": 0, "patterns_identified": 0}
+
+    def get_evolution_stats(self) -> dict[str, Any]:
+        """
+        获取进化统计（兼容 v2.0 EvolutionEngine）
+        """
+        report = self.get_comprehensive_report()
+        return {
+            "total_evolutions": report.get("evolution_state", {}).get("generation", 0),
+            "by_type": {
+                "knowledge_gain": report.get("knowledge", {}).get("total", 0),
+                "skill_improvement": 0,
+                "pattern_learning": 0,
+            },
+            "by_status": {
+                "applied": report.get("knowledge", {}).get("total", 0),
+                "pending": 0,
+            },
+            "capabilities": {
+                k: {"score": v.get("score", 0.5)}
+                for k, v in report.get("capabilities", {}).items()
             },
         }
 
