@@ -36,7 +36,7 @@ class LLMManager:
             api_key=self.config.api_key,
             model=self.model or "MiniMax-M2.5",
             extra_params={
-                "base_url": self.config.base_url or "https://api.minimaxi.com/anthropic",
+                "base_url": self.config.base_url or "https://api.minimaxi.com/v1",
                 "temperature": self.config.temperature,
                 "max_tokens": self.config.max_tokens,
             },

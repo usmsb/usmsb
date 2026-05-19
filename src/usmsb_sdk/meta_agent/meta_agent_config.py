@@ -102,7 +102,7 @@ class MetaAgentConfig:
                 provider=os.getenv("META_LLM_PROVIDER", "minimax"),
                 api_key=os.getenv("MINIMAX_API_KEY"),
                 api_url=os.getenv("META_LLM_API_URL"),
-                base_url=os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/anthropic"),
+                base_url=os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1"),
                 model=os.getenv("META_LLM_MODEL", "MiniMax-M2.5"),
             ),
             wallet=WalletConfig(

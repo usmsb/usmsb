@@ -598,7 +598,6 @@ class MetaAgent:
         # 每步独立超时（60秒），支持断点续传
         try:
             import sys
-            import os
             debug_file = f"/tmp/taskexecutor_debug_{os.getpid()}.log"
             with open(debug_file, 'w') as f:
                 f.write(f">>> [STARTUP] PID {os.getpid()} - Creating TaskExecutor...\n")
@@ -618,7 +617,6 @@ class MetaAgent:
             print(f">>> [STARTUP] TaskExecutor progress store initialized.", file=sys.stderr, flush=True)
         except Exception as e:
             import traceback
-            import os
             debug_file = f"/tmp/taskexecutor_debug_{os.getpid()}.log"
             with open(debug_file, 'a') as f:
                 f.write(f">>> [STARTUP] FATAL: TaskExecutor init failed: {e}\n{traceback.format_exc()}\n")
