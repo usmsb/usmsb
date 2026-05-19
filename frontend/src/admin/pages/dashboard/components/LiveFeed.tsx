@@ -3,7 +3,7 @@
  * 包含：最新 Agent 上线、最新交易、待处理订单
  */
 import { useState } from 'react'
-import StatusBadge from '../../components/shared/StatusBadge'
+import StatusBadge from '../../../components/shared/StatusBadge'
 import type { Agent, Transaction } from '../../../api/adminApi'
 
 interface LiveFeedProps {

@@ -1,8 +1,8 @@
 /**
  * NodeHealthTable - 节点健康表格
  */
-import StatusBadge from '../../components/shared/StatusBadge'
-import { ProgressBar } from '../../components/shared/ProgressBar'
+import StatusBadge from '../../../components/shared/StatusBadge'
+import { ProgressBar } from '../../../components/shared/ProgressBar'
 import type { NodeHealth } from '../../../api/adminApi'
 
 interface NodeHealthTableProps {

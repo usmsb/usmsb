@@ -1,7 +1,7 @@
 /**
  * RecentTransactionsTable - 最新交易表格
  */
-import StatusBadge from '../../components/shared/StatusBadge'
+import StatusBadge from '../../../components/shared/StatusBadge'
 import type { Transaction } from '../../../api/adminApi'
 
 interface RecentTransactionsTableProps {

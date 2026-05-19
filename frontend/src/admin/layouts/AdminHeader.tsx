@@ -60,7 +60,7 @@ function NotificationBell() {
 
 function UserMenu() {
   const logout = useAuthStore(s => s.logout)
-  const walletAddress = useAuthStore(s => s.walletAddress)
+  const address = useAuthStore(s => s.address)
   const userRole = useAuthStore(s => s.userRole)
   const isConnected = useAuthStore(s => s.isConnected)
   const [open, setOpen] = useState(false)
@@ -76,7 +76,7 @@ function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  if (!isConnected || !walletAddress) return null
+  if (!isConnected || !address) return null
 
   const displayRole = userRole === 'node_admin' ? '节点管理员' : userRole === 'superadmin' ? '超级管理员' : userRole || ''
 
@@ -88,7 +88,7 @@ function UserMenu() {
       >
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
           <span className="text-white text-sm font-medium">
-            {walletAddress?.slice(2, 4).toUpperCase() || 'AD'}
+            {address?.slice(2, 4).toUpperCase() || 'AD'}
           </span>
         </div>
         <div className="text-left hidden sm:block">
@@ -96,7 +96,7 @@ function UserMenu() {
             {displayRole}
           </p>
           <p className="text-text-muted text-xs font-mono">
-            {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+            {address?.slice(0, 6)}...{address?.slice(-4)}
           </p>
         </div>
         <ChevronDown className="w-4 h-4 text-text-muted" />
@@ -106,7 +106,7 @@ function UserMenu() {
         <div className="absolute right-0 top-full mt-2 w-56 bg-bg-secondary border border-border-primary rounded-xl shadow-lg z-50">
           <div className="p-3 border-b border-border-primary">
             <p className="text-text-primary text-sm font-medium">{userRole}</p>
-            <p className="text-text-muted text-xs font-mono mt-0.5">{walletAddress}</p>
+            <p className="text-text-muted text-xs font-mono mt-0.5">{address}</p>
           </div>
           <div className="p-2">
             <button

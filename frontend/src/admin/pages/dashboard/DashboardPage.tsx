@@ -103,7 +103,6 @@ export default function DashboardPage() {
 
   const { data: ordersData, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['admin', 'orders'],
-    fn: fetchOrders,
     queryFn: () => fetchOrders({ pageSize: 100 }),
     refetchInterval: 30000,
   })

@@ -35,7 +35,7 @@ function formatValue(value: string | number, decimals: number): string {
   if (typeof value === 'number') {
     if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1) + 'B'
     if (value >= 1_000_000) return (value / 1_000_000).toFixed(1) + 'M'
-    if (value >= 1_000) return value.toLocaleString(decimals > 0 ? decimals : 0)
+    if (value >= 1_000) return value.toLocaleString(undefined, { minimumFractionDigits: decimals > 0 ? decimals : 0 })
     return value.toFixed(decimals)
   }
   return String(value)
