@@ -477,155 +477,60 @@ class MetaAgent:
         self._running = False
         self._main_loop_task: asyncio.Task | None = None
 
-    async def start(self):
-        """启动 Meta Agent"""
-        logger.info(f"Starting Meta Agent {self.agent_id}...")
+    async def start(
+        self,
+        enable_advanced: bool = True,
+        enable_learning: bool = True,
+        start_runtime: bool = False,
+    ):
+        """
+        启动 Meta Agent（分阶段初始化）。
 
-        # ========== 新增：启动会话管理器 ==========
-        try:
-            await self.session_manager.start()
-            logger.info("SessionManager started")
-        except Exception as e:
-            logger.error(f"Failed to start SessionManager: {e}")
+        调用顺序：Phase 1 → Phase 2 → Phase 3 → Phase 4（可选）
 
-        # 初始化组件
-        await self._init_components()
+        Args:
+            enable_advanced: 是否启用高级 AI 能力（L4/L5/StrategyRouter/AutonomousLoop 等）
+            enable_learning: 是否启用学习与进化系统
+            start_runtime: 是否启动后台运行时（主循环 + 守护进程）。
+                            设为 True 时会在后台启动，永远不返回。
+                            设为 False 时仅初始化，适合嵌入 FastAPI 等外部管理生命周期的场景。
+        """
+        # Phase 1: 基础组件（必须）
+        await self._init_core()
 
-        # 注册默认工具
-        await self._register_default_tools()
+        # Phase 2: 高级 AI 能力（可选）
+        if enable_advanced:
+            await self._init_advanced()
 
-        # 加载 skills
-        await self.skills_manager.load_skills()
+        # Phase 3: 学习与进化系统（可选）
+        if enable_learning:
+            await self._init_learning()
 
-        # 注册 npm 命令执行技能
-        await self._register_npm_skill()
-
-        # 注册 git 命令执行技能
-        await self._register_git_skill()
-
-        # ========== OpenHarness 初始化 + 工具注入 ==========
-        await self._init_openharness()
-
-        # ========== SkillsManager 初始化（Agent Skills 标准）==========
-        # 设置 ToolRegistry 引用（用于 Skills meta-skill）
-        self.skills_manager.set_tool_registry(self.tool_registry)
-        # 加载 skills 目录（支持自定义路径）
-        # 优先级: config.skills_dir > data_dir/skills > 内置SDK skills
-        if self.config.skills_dir:
-            skills_dir = self.config.skills_dir
-        elif self.config.data_dir:
-            skills_dir = os.path.join(self.config.data_dir, "skills")
-        else:
-            # Fallback: 使用 SDK 内置 skills（不推荐，仅用于兼容）
-            skills_dir = os.path.join(os.path.dirname(__file__), "skills", "skills")
-        self.skills_manager.load_skills_from_directory(skills_dir)
-        logger.info(f"SkillsManager loaded skills from: {skills_dir}")
-
-        # ========== P2P 网络初始化 ==========
-        await self._init_p2p_network()
-
-        # ========== Platform + Gene Capsule 初始化 ==========
-        await self._init_platform_client()
-
-        # ========== MCP Gateway 初始化（P5）==========
-        await self._init_mcp_gateway()
-
-        # ========== A2A HTTP Server 注册 ==========
-        await self._register_a2a_agent()
-
-        # ========== StrategyRouter 初始化 ==========
-        await self._init_strategy_router()
-
-        # ========== L4 自我意识 Agent 初始化 ==========
-        try:
-            await self._init_l4_agent()
-        except Exception as e:
-            logger.warning(f"L4Agent init failed (non-critical): {e}")
-
-        # ========== L5 集体智能初始化 ==========
-        try:
-            await self._init_l5_collective()
-        except Exception as e:
-            logger.warning(f"L5CollectiveIntelligence init failed (non-critical): {e}")
-
-        # ========== L3 自主运行循环初始化 ==========
-        # P0: 修复 - AutonomousLoop 未接入主循环
-        try:
-            await self._init_autonomous_loop()
-        except Exception as e:
-            logger.warning(f"AutonomousLoop init failed (non-critical): {e}")
-
-        # 启动目标引擎
-        await self.goal_engine.start()
-
-        # ========== FastAPI REST Server ==========
-        # 默认不自动启动 REST API，避免与 main:app 的 lifespan 冲突
-        # 如需启动，设置环境变量 USMSB_AUTO_START_API=1
-        if os.environ.get("USMSB_AUTO_START_API") == "1":
-            await self._start_api_server()
-        else:
-            logger.info("[SERVER] Skipping auto-start of REST API (set USMSB_AUTO_START_API=1 to enable)")
-
-        # 启动进化引擎
-        self.evolution_engine = EvolutionEngine(
-            self.llm_manager,
-            self.knowledge_base,
-            self.conversation_manager,
+        logger.info(
+            f"Meta Agent {self.agent_id} initialized "
+            f"(advanced={enable_advanced}, learning={enable_learning})"
         )
-        await self.evolution_engine.start()
 
-        # ========== 初始化智能召回系统 ==========
-        if self.config.smart_recall_enabled:
-            self.smart_recall = IntelligentRecall(
-                llm_manager=self.llm_manager,
-                memory_db=self.memory_manager,
-                vector_store=self.vector_kb,
-            )
-            logger.info("Smart Recall initialized")
+        # Phase 4: 启动后台运行时（可选）
+        # start_runtime=True: 永远阻塞（standalone 模式）
+        # start_runtime=False: FastAPI 等外部管理生命周期，由 main.py lifespan 调用 _start_runtime()
+        if start_runtime:
+            await self._start_runtime(block_forever=True)
+            # 永远不返回
 
-        # ========== 初始化错误驱动学习系统 ==========
-        experience_db = ExperienceDB(
-            db_path=self.config.database.path.replace(".db", "_experience.db")
-        )
-        self.error_learning = ErrorDrivenLearning(
-            llm_manager=self.llm_manager,
-            experience_db=experience_db,
-        )
-        logger.info("Error-driven Learning initialized")
+    # ─────────────────────────────────────────────────────────────────
+    # Phase 4: 后台运行时（启动后永不返回）
+    # ─────────────────────────────────────────────────────────────────
 
-        # ========== 初始化分步任务执行器 ==========
-        # 复杂任务拆分为小步骤，逐步执行
-        # 每步独立超时（60秒），支持断点续传
-        try:
-            import sys
-            debug_file = f"/tmp/taskexecutor_debug_{os.getpid()}.log"
-            with open(debug_file, 'w') as f:
-                f.write(f">>> [STARTUP] PID {os.getpid()} - Creating TaskExecutor...\n")
-                f.flush()
-            print(f">>> [STARTUP] Creating TaskExecutor...", file=sys.stderr, flush=True)
-            self.task_executor = TaskExecutor(self)
-            with open(debug_file, 'a') as f:
-                f.write(f">>> [STARTUP] TaskExecutor object created: {type(self.task_executor)}\n")
-                f.flush()
-            print(f">>> [STARTUP] TaskExecutor created: {type(self.task_executor)}.", file=sys.stderr, flush=True)
-            # P2: 初始化进度存储
-            task_db_path = self.config.database.path.replace(".db", "_tasks.db")
-            self.task_executor.init_progress_store(task_db_path)
-            with open(debug_file, 'a') as f:
-                f.write(f">>> [STARTUP] Progress store initialized at {task_db_path}\n")
-                f.flush()
-            print(f">>> [STARTUP] TaskExecutor progress store initialized.", file=sys.stderr, flush=True)
-        except Exception as e:
-            import traceback
-            debug_file = f"/tmp/taskexecutor_debug_{os.getpid()}.log"
-            with open(debug_file, 'a') as f:
-                f.write(f">>> [STARTUP] FATAL: TaskExecutor init failed: {e}\n{traceback.format_exc()}\n")
-                f.flush()
-            print(f">>> [STARTUP] FATAL: TaskExecutor init failed: {e}", file=sys.stderr, flush=True)
-            traceback.print_exc(file=sys.stderr)
-            self.task_executor = None
+    async def _start_runtime(self, block_forever: bool = False):
+        """
+        Phase 4: 启动后台守护任务。
 
-        # ========== 启动守护进程 ==========
+        Args:
+            block_forever: 为 True 时永远阻塞（standalone 模式）。
+                           为 False 时启动后立即返回（FastAPI background_task 模式）。
+        """
+        # 守护进程
         if self.config.guardian_enabled:
             guardian_config = GuardianConfig(
                 idle_timeout_minutes=self.config.guardian_idle_minutes,
@@ -642,28 +547,24 @@ class MetaAgent:
             await self.guardian_daemon.start()
             logger.info("Guardian Daemon started")
 
-        # ========== 初始化精准匹配服务 ==========
+        # 精准匹配服务（必须在所有组件就绪后）
         try:
             from .services.meta_agent_service import MetaAgentService
             from .tools.precise_matching import set_meta_agent_service
 
-            # 尝试获取基因胶囊服务（Phase2: GeneCapsuleStorageService 替代已移除的 GeneCapsuleService）
             gene_capsule_service = None
             try:
                 from usmsb_sdk.api.rest.gene_capsule_service import GeneCapsuleStorageService
                 from usmsb_sdk.services.schema import create_session
-
                 db_session = create_session()
                 gene_capsule_service = GeneCapsuleStorageService(db_session)
             except ImportError:
                 logger.debug("[Phase2] GeneCapsuleStorageService not available")
 
-            # Phase2: 迁移到 ValueNegotiationService（PreMatchNegotiationService 已 deprecated）
             pre_match_service = None
             try:
                 from usmsb_sdk.services.value_contract.negotiation import ValueNegotiationService
                 from usmsb_sdk.services.schema import create_session
-
                 db_session = create_session()
                 pre_match_service = ValueNegotiationService(db_session)
             except ImportError:
@@ -675,10 +576,7 @@ class MetaAgent:
                 pre_match_negotiation_service=pre_match_service,
             )
             await self.meta_agent_service.init()
-
-            # 设置全局服务实例供工具使用
             set_meta_agent_service(self.meta_agent_service)
-
             logger.info("MetaAgentService initialized")
         except Exception as e:
             logger.warning(f"Failed to initialize MetaAgentService: {e}")
@@ -686,8 +584,157 @@ class MetaAgent:
         # 启动主循环
         self._running = True
         self._main_loop_task = asyncio.create_task(self._main_loop())
+        logger.info(f"Meta Agent {self.agent_id} runtime started (main loop task={id(self._main_loop_task)})")
 
-        logger.info(f"Meta Agent {self.agent_id} started successfully")
+        # 阻塞直到被 stop() 取消（standalone 模式）
+        # FastAPI 等外部管理生命周期的场景：block_forever=False，不阻塞
+        if block_forever:
+            await asyncio.Future()
+
+    # ─────────────────────────────────────────────────────────────────
+    # Phase 1: 基础组件（必须）
+    # ─────────────────────────────────────────────────────────────────
+
+    async def _init_core(self):
+        """
+        Phase 1: 初始化核心基础组件。
+
+        必须调用，核心聊天功能依赖于此。
+        无外部依赖，任何场景下都可以安全调用。
+        """
+        # 启动会话管理器
+        try:
+            await self.session_manager.start()
+            logger.info("SessionManager started")
+        except Exception as e:
+            logger.error(f"Failed to start SessionManager: {e}")
+
+        # 底层组件初始化（LLM、向量 KB、Context、Memory、Permission 等）
+        await self._init_components()
+
+        # 工具注册（100+ 工具）
+        await self._register_default_tools()
+
+        # Skills 加载
+        await self.skills_manager.load_skills()
+        await self._register_npm_skill()
+        await self._register_git_skill()
+
+        # OpenHarness 集成
+        await self._init_openharness()
+
+        # SkillsManager 标准初始化
+        self.skills_manager.set_tool_registry(self.tool_registry)
+        if self.config.skills_dir:
+            skills_dir = self.config.skills_dir
+        elif self.config.data_dir:
+            skills_dir = os.path.join(self.config.data_dir, "skills")
+        else:
+            skills_dir = os.path.join(os.path.dirname(__file__), "skills", "skills")
+        self.skills_manager.load_skills_from_directory(skills_dir)
+        logger.info(f"SkillsManager loaded skills from: {skills_dir}")
+
+        logger.info("[Phase 1] _init_core() completed")
+
+    # ─────────────────────────────────────────────────────────────────
+    # Phase 2: 高级 AI 能力（可选）
+    # ─────────────────────────────────────────────────────────────────
+
+    async def _init_advanced(self):
+        """
+        Phase 2: 初始化高级 AI 能力。
+
+        需要 LLM 已初始化。失败时打印 warning 并继续（non-critical）。
+        包括：P2P 网络、StrategyRouter、L4/L5、AutonomousLoop、MCP、A2A、Platform Client。
+        """
+        # P2P 网络（Agent 发现）
+        await self._init_p2p_network()
+
+        # StrategyRouter（LLM 双轨策略路由）
+        await self._init_strategy_router()
+
+        # L4 自我意识 Agent
+        try:
+            await self._init_l4_agent()
+        except Exception as e:
+            logger.warning(f"L4Agent init failed (non-critical): {e}")
+
+        # L5 集体智能
+        try:
+            await self._init_l5_collective()
+        except Exception as e:
+            logger.warning(f"L5CollectiveIntelligence init failed (non-critical): {e}")
+
+        # L3 自主运行循环（依赖 L4）
+        try:
+            await self._init_autonomous_loop()
+        except Exception as e:
+            logger.warning(f"AutonomousLoop init failed (non-critical): {e}")
+
+        # MCP Gateway
+        await self._init_mcp_gateway()
+
+        # A2A Agent 注册
+        await self._register_a2a_agent()
+
+        # Platform Client + GeneCapsule
+        await self._init_platform_client()
+
+        logger.info("[Phase 2] _init_advanced() completed")
+
+    # ─────────────────────────────────────────────────────────────────
+    # Phase 3: 学习与进化系统（可选）
+    # ─────────────────────────────────────────────────────────────────
+
+    async def _init_learning(self):
+        """
+        Phase 3: 初始化学习与进化系统。
+
+        依赖 _init_core()。需要 LLM 和数据库可用。
+        包括：GoalEngine、EvolutionEngine、SmartRecall、ErrorDrivenLearning、TaskExecutor 进度存储。
+        """
+        # 目标引擎启动
+        await self.goal_engine.start()
+
+        # 进化引擎
+        self.evolution_engine = EvolutionEngine(
+            self.llm_manager,
+            self.knowledge_base,
+            self.conversation_manager,
+        )
+        await self.evolution_engine.start()
+        logger.info("EvolutionEngine started")
+
+        # 智能召回
+        if self.config.smart_recall_enabled:
+            self.smart_recall = IntelligentRecall(
+                llm_manager=self.llm_manager,
+                memory_db=self.memory_manager,
+                vector_store=self.vector_kb,
+            )
+            logger.info("Smart Recall initialized")
+
+        # 错误驱动学习
+        experience_db = ExperienceDB(
+            db_path=self.config.database.path.replace(".db", "_experience.db")
+        )
+        self.error_learning = ErrorDrivenLearning(
+            llm_manager=self.llm_manager,
+            experience_db=experience_db,
+        )
+        logger.info("Error-driven Learning initialized")
+
+        # TaskExecutor 进度持久化
+        if self.task_executor:
+            task_db_path = self.config.database.path.replace(".db", "_tasks.db")
+            self.task_executor.init_progress_store(task_db_path)
+            logger.info("TaskExecutor progress store initialized")
+
+        logger.info("[Phase 3] _init_learning() completed")
+
+    # ─────────────────────────────────────────────────────────────────
+    # Phase 4 后台运行时结束（_start_runtime 定义见上方 start() 旁）
+    # ─────────────────────────────────────────────────────────────────
 
     async def _init_openharness(self) -> None:
         """Initialize OpenHarness integration and inject tools into registry."""

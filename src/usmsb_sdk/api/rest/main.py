@@ -175,13 +175,15 @@ async def lifespan(app: FastAPI):
         prediction_service, \
         workflow_service, \
         matching_engine, \
-        heartbeat_monitor_task
+        heartbeat_monitor_task, \
+        meta_agent_runtime_task
 
     # Startup
     logger.info("Starting USMSB SDK API...")
 
     # Module-level service singletons (for use in startup event)
     _order_service_singleton = None
+    meta_agent_runtime_task = None
     _pre_match_service_singleton = None
 
     # Initialize database
@@ -400,21 +402,27 @@ async def lifespan(app: FastAPI):
     if permission_manager:
         meta_agent.permission_manager = permission_manager
 
-    await meta_agent._init_components()
-    await meta_agent._register_default_tools()
+    # Phase 1-3: 初始化所有组件（不启动主循环，FastAPI 生命周期由 uvicorn 管理）
+    # enable_advanced=True: 启用 L4/L5/StrategyRouter/AutonomousLoop 等高级能力
+    # enable_learning=True: 启用 Evolution/SmartRecall/ErrorLearning 等学习系统
+    # start_runtime=False: 不启动主循环（由 FastAPI lifespan 管理）
+    await meta_agent.start(
+        enable_advanced=True,
+        enable_learning=True,
+        start_runtime=False,
+    )
+    logger.info("Meta Agent initialized (core+advanced+learning)")
 
-    # NOTE: Do NOT call meta_agent.start() here!
-    # When using uvicorn to run the REST API (uvicorn usmsb_sdk.api.rest.main:app),
-    # the MetaAgent API server is already provided by this FastAPI app.
-    # Calling meta_agent.start() would start a SECOND uvicorn instance on the same port,
-    # causing Errno 48 address already in use.
-    # The MetaAgent's internal API endpoints (chat_websocket, chat_sse, etc.) are
-    # served by the FastAPI app via meta_agent_router.
+    # Phase 4: 启动后台运行时（非阻塞）
+    # _start_runtime() 是 fire-and-forget：创建主循环 Task 后立即返回
+    # 使用 asyncio.create_task() 与 heartbeat_monitor_task 等保持一致
+    # 注意：这里不是 background_tasks.add_task（那样会等待任务完成导致 shutdown 卡住）
+    meta_agent_runtime_task = asyncio.create_task(meta_agent._start_runtime())
+    logger.info("Meta Agent runtime started (main loop as background task)")
 
     # Set the global meta_agent reference
     set_meta_agent(meta_agent)
     set_permission_manager(permission_manager)
-    logger.info("Meta Agent initialized with shared Permission Manager")
 
     # Now set global references including meta_agent
     set_global_references(
@@ -424,13 +432,11 @@ async def lifespan(app: FastAPI):
         meta_agent=meta_agent,
     )
 
-    # Initialize MetaAgentService for precise matching
-    from usmsb_sdk.meta_agent.services.meta_agent_service import MetaAgentService
+    # MetaAgentService 已在 agent.start(phase=3) 中初始化，无需重复创建
     from usmsb_sdk.meta_agent.tools.precise_matching import set_meta_agent_service
-
-    meta_agent_service = MetaAgentService(meta_agent=meta_agent)
-    set_meta_agent_service(meta_agent_service)
-    logger.info("MetaAgentService initialized")
+    if meta_agent.meta_agent_service:
+        set_meta_agent_service(meta_agent.meta_agent_service)
+        logger.info("MetaAgentService wired to global")
 
     # ========== Initialize Chat Session Manager (OpenHarness StreamEvent Pattern) ==========
     from usmsb_sdk.meta_agent.communication.session_manager import ChatSessionManager
@@ -484,6 +490,22 @@ async def lifespan(app: FastAPI):
     # Shutdown ChatSessionManager
     if 'chat_session_manager' in dir():
         await chat_session_manager.stop()
+
+    # Stop Meta Agent runtime task + graceful shutdown
+    if meta_agent_runtime_task and not meta_agent_runtime_task.done():
+        meta_agent_runtime_task.cancel()
+        try:
+            await meta_agent_runtime_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Meta Agent runtime task cancelled")
+
+    # Stop Meta Agent (cancels main loop, shuts down services)
+    try:
+        await meta_agent.stop()
+        logger.info("Meta Agent stopped")
+    except Exception as e:
+        logger.warning(f"Meta Agent stop error: {e}")
 
     logger.info("USMSB SDK API shutdown complete")
 
