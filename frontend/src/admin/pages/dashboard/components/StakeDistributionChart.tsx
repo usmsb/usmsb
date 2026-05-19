@@ -1,109 +1,69 @@
-/**
- * StakeDistributionChart - Stake 等级分布图
- * 饼图 + 数值
- */
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts'
-import clsx from 'clsx'
+// StakeDistributionChart.tsx - 质押分布图 (recharts)
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { useQuery } from '@tanstack/react-query'
+import { fetchDashboard } from '../../../api/adminApi'
 
-interface StakeDistributionChartProps {
-  data?: {
-    none: number
-    bronze: number
-    silver: number
-    gold: number
-    platinum: number
-  }
-  loading?: boolean
-  className?: string
+const MOCK_STAKE = [
+  { name: 'Tier 1', value: 15000, color: '#6b7280' },
+  { name: 'Tier 2', value: 28000, color: '#22c55e' },
+  { name: 'Tier 3', value: 42000, color: '#3b82f6' },
+  { name: 'Tier 4', value: 35000, color: '#f59e0b' },
+  { name: 'Tier 5', value: 20000, color: '#ef4444' },
+]
+
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; value: number; color: string } }> }) => {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div className="bg-bg-tertiary border border-border-primary rounded-lg px-3 py-2 text-sm">
+      <p className="font-mono" style={{ color: d.color }}>{d.name}</p>
+      <p className="text-text-primary font-mono">{d.value.toLocaleString()} VIBE</p>
+    </div>
+  )
 }
 
-const COLORS = ['#64748b', '#cd7c2d', '#a8a8a8', '#ffd700', '#6366f1']
+export default function StakeDistributionChart() {
+  const { data: dashboard } = useQuery({
+    queryKey: ['admin', 'dashboard'],
+    queryFn: fetchDashboard,
+    refetchInterval: 60000,
+  })
 
-export default function StakeDistributionChart({
-  data,
-  loading = false,
-  className,
-}: StakeDistributionChartProps) {
-  if (loading) {
-    return (
-      <div className={clsx('flex items-center justify-center h-56 bg-bg-tertiary rounded-lg animate-pulse', className)}>
-        <p className="text-text-muted text-sm">加载中...</p>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className={clsx('flex items-center justify-center h-56 bg-bg-tertiary rounded-lg', className)}>
-        <p className="text-text-muted text-sm">暂无数据</p>
-      </div>
-    )
-  }
-
-  const chartData = [
-    { name: '无 Stake', value: data.none, color: COLORS[0] },
-    { name: 'Bronze', value: data.bronze, color: COLORS[1] },
-    { name: 'Silver', value: data.silver, color: COLORS[2] },
-    { name: 'Gold', value: data.gold, color: COLORS[3] },
-    { name: 'Platinum', value: data.platinum, color: COLORS[4] },
-  ].filter(d => d.value > 0)
-
-  const total = chartData.reduce((sum, d) => sum + d.value, 0)
-
-  function CustomTooltip({ active, payload }: any) {
-    if (!active || !payload?.length) return null
-    const d = payload[0].payload
-    return (
-      <div className="bg-bg-elevated border border-border-primary rounded-lg p-3 shadow-lg">
-        <p className="text-text-primary text-sm font-medium">{d.name}</p>
-        <p className="text-text-secondary text-xs mt-1">
-          {d.value.toLocaleString()} 人 ({((d.value / total) * 100).toFixed(1)}%)
-        </p>
-      </div>
-    )
-  }
-
-  function CustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) {
-    if (percent < 0.05) return null
-    const RADIAN = Math.PI / 180
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-    const x = cx + radius * Math.cos(-midAngle * RADIAN)
-    const y = cy + radius * Math.sin(-midAngle * RADIAN)
-    return (
-      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"
-        fontSize={11} fontFamily="Rajdhani">
-        {`${(percent * 100).toFixed(0)}%`}
-      </text>
-    )
-  }
+  const total = MOCK_STAKE.reduce((s, d) => s + d.value, 0)
 
   return (
-    <div className={className}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="bg-bg-secondary rounded-xl border border-border-primary p-4">
+      <h3 className="text-text-primary font-rajdhani font-semibold mb-3">质押分布</h3>
+      <ResponsiveContainer width="100%" height={160}>
         <PieChart>
           <Pie
-            data={chartData}
+            data={MOCK_STAKE}
             cx="50%"
             cy="50%"
-            innerRadius={50}
-            outerRadius={80}
-            paddingAngle={2}
+            innerRadius={40}
+            outerRadius={70}
+            paddingAngle={3}
             dataKey="value"
-            labelLine={false}
-            label={<CustomLabel />}
           >
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
+            {MOCK_STAKE.map((entry, i) => (
+              <Cell key={i} fill={entry.color} />
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
-          <Legend
-            formatter={(value) => <span className="text-text-secondary text-xs">{value}</span>}
-            verticalAlign="bottom"
-            height={36}
-          />
         </PieChart>
       </ResponsiveContainer>
+      <div className="space-y-1.5">
+        {MOCK_STAKE.map((entry, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: entry.color }} />
+            <span className="text-text-muted text-xs flex-1">{entry.name}</span>
+            <span className="text-text-secondary text-xs font-mono">{entry.value.toLocaleString()}</span>
+            <span className="text-text-muted text-xs w-10 text-right">
+              {((entry.value / total) * 100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

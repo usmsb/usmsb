@@ -1,288 +1,316 @@
-/**
- * CommandCenterPage - 大屏幕指挥调度模式
- * 独立全屏路由，无 Sidebar/Header
- */
-import { useState, useEffect } from 'react'
-import { Monitor, RefreshCw, Maximize2, Minimize2, Pause, Settings, Bell, AlertTriangle } from 'lucide-react'
-import clsx from 'clsx'
+// CommandCenterPage.tsx - 指挥中心大屏幕
+import { useQuery } from '@tanstack/react-query'
+import { fetchDashboard, fetchAgents, fetchTransactions, fetchNodes } from '../../api/adminApi'
+import type { DashboardData, AgentListData, TransactionListData, NodeListData } from '../../api/adminApi'
+import { Bot, Activity, Zap, Server, TrendingUp, Globe, Clock, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 
-// Panel 组件
-function Panel({ title, children, alert }: { title: string; children: React.ReactNode; alert?: boolean }) {
+// 实时时钟
+function ClockDisplay() {
+  const [time, setTime] = useState(new Date())
+  useEffect(() => {
+    const t = setInterval(() => setTime(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
   return (
-    <div className={clsx(
-      'bg-bg-secondary rounded-2xl border p-6 h-full flex flex-col',
-      alert ? 'border-danger/50 animate-pulse' : 'border-border-primary'
-    )}>
-      <h2 className="font-orbitron text-lg text-text-primary mb-4">{title}</h2>
-      <div className="flex-1 overflow-hidden">
-        {children}
+    <div className="text-right">
+      <div className="text-4xl font-bold font-mono text-text-primary">
+        {time.toLocaleTimeString('zh-CN', { hour12: false })}
+      </div>
+      <div className="text-text-muted text-sm">
+        {time.toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
       </div>
     </div>
   )
 }
 
-// Panel 1: Agent 状态
-function AgentStatusPanel() {
-  return (
-    <Panel title="实时 Agent 状态">
-      <div className="flex flex-col items-center justify-center h-full space-y-4">
-        {/* 模拟数字 */}
-        <div className="text-center">
-          <p className="text-text-muted text-sm">总 Agent</p>
-          <p className="font-orbitron text-6xl font-bold text-text-primary">1,234</p>
-        </div>
-        <div className="grid grid-cols-3 gap-6 text-center w-full px-4">
-          <div>
-            <p className="text-success text-2xl font-orbitron font-bold">892</p>
-            <p className="text-text-muted text-xs mt-1">🟢 在线</p>
-          </div>
-          <div>
-            <p className="text-warning text-2xl font-orbitron font-bold">156</p>
-            <p className="text-text-muted text-xs mt-1">🟡 忙碌</p>
-          </div>
-          <div>
-            <p className="text-danger text-2xl font-orbitron font-bold">186</p>
-            <p className="text-text-muted text-xs mt-1">🔴 离线</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 w-full px-4 text-center">
-          <div className="p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-text-muted text-xs">今日新增</p>
-            <p className="text-success font-orbitron">+23</p>
-          </div>
-          <div className="p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-text-muted text-xs">在线率</p>
-            <p className="text-success font-orbitron">72.3%</p>
-          </div>
-        </div>
-      </div>
-    </Panel>
-  )
-}
+// 数字滚动动画
+function AnimatedNumber({ value, duration = 1000 }: { value: number; duration?: number }) {
+  const [display, setDisplay] = useState(0)
+  const prevRef = useRef(0)
 
-// Panel 2: 交易状态
-function TransactionPanel() {
-  return (
-    <Panel title="全局交易状态">
-      <div className="space-y-4">
-        <div className="text-center">
-          <p className="text-text-muted text-sm">今日交易金额</p>
-          <p className="font-orbitron text-4xl font-bold text-success">¥ 234,567</p>
-          <p className="text-success text-sm">↑ 18.3%</p>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-text-muted text-xs">交易笔数</p>
-            <p className="font-orbitron text-2xl text-primary">1,234</p>
-          </div>
-          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-text-muted text-xs">成功率</p>
-            <p className="font-orbitron text-2xl text-success">95.3%</p>
-          </div>
-        </div>
-        <div className="p-3 bg-bg-tertiary rounded-lg text-center">
-          <p className="text-text-muted text-xs mb-2">24小时交易额</p>
-          <div className="flex items-end gap-1 h-12 justify-center">
-            {Array.from({ length: 24 }, (_, i) => (
-              <div key={i} className="w-3 bg-primary rounded-t"
-                style={{ height: `${Math.random() * 80 + 20}%` }} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </Panel>
-  )
-}
+  useEffect(() => {
+    const start = prevRef.current
+    const end = value
+    const startTime = performance.now()
 
-// Panel 3: 匹配效率
-function MatchingPanel() {
-  const funnel = [
-    { label: '发布需求', value: 342, pct: '100%' },
-    { label: 'AI推荐', value: 289, pct: '84.5%' },
-    { label: '发起协商', value: 156, pct: '45.6%' },
-    { label: '达成合作', value: 89, pct: '26.0%' },
-    { label: '成功交付', value: 67, pct: '19.6%' },
-  ]
+    const animate = (now: number) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(start + (end - start) * eased))
+      if (progress < 1) requestAnimationFrame(animate)
+      else prevRef.current = end
+    }
+    requestAnimationFrame(animate)
+  }, [value, duration])
 
-  return (
-    <Panel title="匹配效率实时看板">
-      <div className="space-y-2">
-        {funnel.map((item, i) => (
-          <div key={item.label} className="relative">
-            <div className="flex justify-between mb-1">
-              <span className="text-text-secondary text-sm">{item.label}</span>
-              <span className="text-text-muted text-xs">{item.pct}</span>
-            </div>
-            <div className="h-6 bg-bg-tertiary rounded overflow-hidden">
-              <div className="h-full bg-success rounded transition-all"
-                style={{ width: `${item.pct}` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-4 gap-2 mt-4">
-        <div className="text-center p-2 bg-bg-tertiary rounded">
-          <p className="text-text-muted text-xs">匹配时长</p>
-          <p className="text-text-primary font-mono text-sm">2h 34m</p>
-        </div>
-        <div className="text-center p-2 bg-bg-tertiary rounded">
-          <p className="text-text-muted text-xs">协商轮数</p>
-          <p className="text-text-primary font-mono text-sm">3.2</p>
-        </div>
-        <div className="text-center p-2 bg-bg-tertiary rounded">
-          <p className="text-text-muted text-xs">达成率</p>
-          <p className="text-success font-mono text-sm">57.1%</p>
-        </div>
-        <div className="text-center p-2 bg-bg-tertiary rounded">
-          <p className="text-text-muted text-xs">交付率</p>
-          <p className="text-success font-mono text-sm">75.3%</p>
-        </div>
-      </div>
-    </Panel>
-  )
-}
-
-// Panel 4: 节点健康
-function NodeHealthPanel() {
-  const nodes = [
-    { name: 'node-001 主节点', status: 'online', agents: '42/45', cpu: 32, mem: 40, latency: 12 },
-    { name: 'node-002 备用节点', status: 'warning', agents: '35/38', cpu: 67, mem: 72, latency: 28 },
-    { name: 'node-003 开发节点', status: 'online', agents: '10/12', cpu: 12, mem: 25, latency: 8 },
-  ]
-
-  return (
-    <Panel title="节点健康状态">
-      <div className="space-y-2">
-        {nodes.map(node => (
-          <div key={node.name}
-            className={`p-3 rounded-lg border ${
-              node.status === 'online' ? 'border-border-primary bg-bg-tertiary/50' :
-              node.status === 'warning' ? 'border-warning/50 bg-warning/10' :
-              'border-danger/50 bg-danger/10'
-            }`}>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-text-primary text-sm font-medium">{node.name}</span>
-              <span className={`text-xs ${
-                node.status === 'online' ? 'text-success' :
-                node.status === 'warning' ? 'text-warning' : 'text-danger'
-              }`}>
-                {node.status === 'online' ? '🟢' : node.status === 'warning' ? '🟡' : '🔴'}
-              </span>
-            </div>
-            <div className="flex gap-4 text-xs text-text-muted">
-              <span>Agent: {node.agents}</span>
-              <span>CPU: {node.cpu}%</span>
-              <span>MEM: {node.mem}%</span>
-              <span>延迟: {node.latency}ms</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 p-2 bg-bg-tertiary rounded text-xs space-y-1">
-        <p className="text-text-muted">服务状态</p>
-        <div className="flex gap-4">
-          <span className="text-success">✅ LLM</span>
-          <span className="text-success">✅ Blockchain</span>
-          <span className="text-warning">⚠️ Notification</span>
-        </div>
-      </div>
-    </Panel>
-  )
+  return <span>{display.toLocaleString()}</span>
 }
 
 export default function CommandCenterPage() {
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [refreshInterval, setRefreshInterval] = useState(5000)
-  const [isPaused, setIsPaused] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const { data: dashboard, isLoading: dashLoading } = useQuery<DashboardData>({
+    queryKey: ['admin', 'dashboard'],
+    queryFn: fetchDashboard,
+    refetchInterval: 15000,
+  })
+  const { data: agents, isLoading: agentsLoading } = useQuery<AgentListData>({
+    queryKey: ['admin', 'agents', 1],
+    queryFn: () => fetchAgents({ page: 1, page_size: 100 }),
+    refetchInterval: 15000,
+  })
+  const { data: transactions } = useQuery<TransactionListData>({
+    queryKey: ['admin', 'transactions', 1],
+    queryFn: () => fetchTransactions({ page: 1, page_size: 50 }),
+    refetchInterval: 30000,
+  })
+  const { data: nodes } = useQuery<NodeListData>({
+    queryKey: ['admin', 'nodes', 1],
+    queryFn: () => fetchNodes(),
+    refetchInterval: 15000,
+  })
 
-  // 时钟
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
+  const agentList = agents?.agents ?? []
+  const onlineCount = agentList.filter((a: Record<string, unknown>) => a.status === 'online').length
+  const busyCount = agentList.filter((a: Record<string, unknown>) => a.status === 'busy').length
+  const offlineCount = agentList.filter((a: Record<string, unknown>) => a.status === 'offline').length
+  const recentTxs = transactions?.transactions ?? []
+  const nodeList = nodes?.nodes ?? []
+  const onlineNodes = nodeList.filter((n: Record<string, unknown>) => n.status === 'online').length
 
-  // 全屏
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [])
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen()
-    } else {
-      document.exitFullscreen()
-    }
-  }
+  // 告警滚动
+  const alerts = [
+    '系统运行正常',
+    onlineCount === 0 ? '⚠️ 无在线 Agent' : '',
+    onlineNodes < 3 ? '⚠️ 在线节点数偏低' : '',
+    'USMSB v2.0 P3 运行中',
+  ].filter(Boolean)
 
   return (
-    <div className="fixed inset-0 bg-bg-primary z-50 flex flex-col">
-      {/* Header */}
-      <div className="h-14 bg-bg-secondary border-b border-border-primary flex items-center px-6 gap-4 shrink-0">
-        <Monitor className="w-5 h-5 text-primary" />
-        <h1 className="font-orbitron text-lg text-text-primary">USMSB 指挥中心</h1>
+    <div className="min-h-screen bg-bg-primary text-text-primary overflow-hidden" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+      {/* 顶部标题栏 */}
+      <div className="bg-bg-secondary border-b-2 border-primary px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-3 h-3 rounded-full bg-success animate-pulse" />
+          <h1 className="text-3xl font-bold tracking-wide text-text-primary">USMSB COMMAND CENTER</h1>
+          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-mono">v2.0 P3</span>
+        </div>
+        <ClockDisplay />
+      </div>
 
-        <div className="ml-auto flex items-center gap-4">
-          {/* 时间 */}
-          <div className="font-orbitron text-text-primary text-sm">
-            {currentTime.toLocaleString('zh-CN', {
-              year: 'numeric', month: '2-digit', day: '2-digit',
-              hour: '2-digit', minute: '2-digit', second: '2-digit',
-            })}
+      {/* 告警滚动条 */}
+      {alerts.length > 0 && (
+        <div className="bg-danger/10 border-b border-danger/30 px-6 py-1.5 overflow-hidden">
+          <div className="animate-marquee whitespace-nowrap text-danger text-sm font-medium">
+            {'  •  '.repeat(4)}{alerts.join('  •  ')}{'  •  '.repeat(4)}
           </div>
+        </div>
+      )}
 
-          {/* 刷新间隔 */}
-          <select
-            value={refreshInterval}
-            onChange={e => setRefreshInterval(Number(e.target.value))}
-            className="bg-bg-tertiary text-text-primary text-sm rounded px-3 py-1.5 border border-border-primary outline-none"
-          >
-            <option value={5000}>5s 刷新</option>
-            <option value={10000}>10s 刷新</option>
-            <option value={30000}>30s 刷新</option>
-            <option value={0}>暂停刷新</option>
-          </select>
+      {/* 主内容区 4列 */}
+      <div className="grid grid-cols-4 gap-3 p-3 h-[calc(100vh-120px)]">
 
-          {/* 控制按钮 */}
-          <button onClick={() => setIsPaused(!isPaused)}
-            className={`p-2 rounded-lg transition-colors ${isPaused ? 'bg-warning/20 text-warning' : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'}`}>
-            {isPaused ? <RefreshCw className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-          </button>
+        {/* 左1: Agent 状态 */}
+        <div className="bg-bg-secondary rounded-xl border border-border-primary flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-border-primary bg-primary/5 flex items-center gap-2">
+            <Bot className="w-5 h-5 text-primary" />
+            <h2 className="font-bold text-text-primary tracking-wide">AGENT STATUS</h2>
+          </div>
+          <div className="p-4 flex-1 space-y-4 overflow-auto">
+            {/* 数字展示 */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'ONLINE', value: onlineCount, color: 'text-success' },
+                { label: 'BUSY', value: busyCount, color: 'text-warning' },
+                { label: 'OFFLINE', value: offlineCount, color: 'text-danger' },
+              ].map(s => (
+                <div key={s.label} className="bg-bg-tertiary rounded-lg p-3 text-center">
+                  <div className={`text-3xl font-bold font-mono ${s.color}`}>
+                    {dashLoading ? '-' : <AnimatedNumber value={s.value} />}
+                  </div>
+                  <div className="text-xs text-text-muted mt-1">{s.label}</div>
+                </div>
+              ))}
+            </div>
 
-          <button onClick={toggleFullscreen}
-            className="p-2 rounded-lg bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors">
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
+            {/* 总数 */}
+            <div className="bg-bg-tertiary rounded-lg p-3 flex items-center justify-between">
+              <span className="text-text-muted text-sm">Agent 总数</span>
+              <span className="text-2xl font-bold font-mono text-text-primary">
+                {dashLoading ? '-' : <AnimatedNumber value={dashboard?.total_agents ?? 0} />}
+              </span>
+            </div>
 
-          <button className="p-2 rounded-lg bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors">
-            <Settings className="w-4 h-4" />
-          </button>
+            {/* 实时 Agent 列表 */}
+            <div className="space-y-1.5">
+              <h3 className="text-xs text-text-muted font-semibold uppercase tracking-wider">LIVE FEED</h3>
+              {agentList.slice(0, 8).map((agent: Record<string, unknown>) => (
+                <div key={agent.agent_id as string} className="flex items-center gap-2 py-1.5 border-b border-border-primary/20">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${agent.status === 'online' ? 'bg-success' : agent.status === 'busy' ? 'bg-warning' : 'bg-danger'}`} />
+                  <span className="text-xs font-mono text-text-secondary flex-1 truncate">
+                    {String(agent.agent_id).slice(0, 8)}...
+                  </span>
+                  <span className={`text-xs font-bold uppercase ${
+                    agent.status === 'online' ? 'text-success' : agent.status === 'busy' ? 'text-warning' : 'text-danger'
+                  }`}>
+                    {agent.status as string}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 中左2: 交易流 */}
+        <div className="bg-bg-secondary rounded-xl border border-border-primary flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-border-primary bg-success/5 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-success" />
+            <h2 className="font-bold text-text-primary tracking-wide">TRANSACTION FLOW</h2>
+          </div>
+          <div className="p-4 flex-1 space-y-4 overflow-auto">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold font-mono text-success">
+                  {dashLoading ? '-' : <AnimatedNumber value={dashboard?.total_transactions ?? 0} />}
+                </div>
+                <div className="text-xs text-text-muted mt-1">总交易数</div>
+              </div>
+              <div className="bg-bg-tertiary rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold font-mono text-info">
+                  {dashLoading ? '-' : <AnimatedNumber value={dashboard?.total_users ?? 0} />}
+                </div>
+                <div className="text-xs text-text-muted mt-1">总用户</div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-xs text-text-muted font-semibold uppercase tracking-wider">RECENT TXS</h3>
+              {recentTxs.slice(0, 10).map((tx: Record<string, unknown>) => (
+                <div key={tx.tx_hash as string || String(tx.transaction_id)} className="flex items-center gap-2 py-1.5 border-b border-border-primary/20">
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                    tx.type === 'staking' ? 'bg-primary/10 text-primary' :
+                    tx.type === 'reward' ? 'bg-success/10 text-success' :
+                    tx.type === 'governance' ? 'bg-warning/10 text-warning' :
+                    'bg-info/10 text-info'
+                  }`}>
+                    {String(tx.type || 'tx').slice(0, 3).toUpperCase()}
+                  </span>
+                  <span className="text-xs font-mono text-text-secondary flex-1 truncate">
+                    {String(tx.tx_hash || tx.transaction_id || '').slice(0, 6)}...
+                  </span>
+                  <span className="text-xs font-mono text-text-primary">
+                    {Number(tx.amount || 0).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 中右3: 节点健康 */}
+        <div className="bg-bg-secondary rounded-xl border border-border-primary flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-border-primary bg-info/5 flex items-center gap-2">
+            <Server className="w-5 h-5 text-info" />
+            <h2 className="font-bold text-text-primary tracking-wide">NODE HEALTH</h2>
+          </div>
+          <div className="p-4 flex-1 space-y-4 overflow-auto">
+            <div className="bg-bg-tertiary rounded-lg p-3 flex items-center justify-between">
+              <div className="text-center flex-1">
+                <div className="text-3xl font-bold font-mono text-info">
+                  {dashLoading ? '-' : onlineNodes}
+                </div>
+                <div className="text-xs text-text-muted mt-1">在线节点</div>
+              </div>
+              <div className="w-px h-10 bg-border-primary" />
+              <div className="text-center flex-1">
+                <div className="text-3xl font-bold font-mono text-text-muted">
+                  {dashLoading ? '-' : Math.max(0, (nodes?.total ?? 0) - onlineNodes)}
+                </div>
+                <div className="text-xs text-text-muted mt-1">离线</div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-xs text-text-muted font-semibold uppercase tracking-wider">NODE LIST</h3>
+              {nodeList.slice(0, 10).map((node: Record<string, unknown>) => (
+                <div key={node.node_id as string} className="flex items-center gap-2 py-1.5 border-b border-border-primary/20">
+                  <Server className={`w-3 h-3 shrink-0 ${node.status === 'online' ? 'text-success' : 'text-danger'}`} />
+                  <span className="text-xs font-mono text-text-secondary flex-1 truncate">
+                    {String(node.node_id || '').slice(0, 8)}...
+                  </span>
+                  <span className={`text-xs font-bold ${
+                    node.status === 'online' ? 'text-success' : 'text-danger'
+                  }`}>
+                    {node.status === 'online' ? 'UP' : 'DOWN'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 右4: 系统指标 */}
+        <div className="bg-bg-secondary rounded-xl border border-border-primary flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-border-primary bg-warning/5 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-warning" />
+            <h2 className="font-bold text-text-primary tracking-wide">SYSTEM METRICS</h2>
+          </div>
+          <div className="p-4 flex-1 space-y-4 overflow-auto">
+            {[
+              { label: '总交易额', value: dashboard?.total_transaction_volume ?? 0, unit: 'VIBE', icon: Zap, color: 'text-warning' },
+              { label: 'TVL', value: dashboard?.total_volume_24h ?? 0, unit: 'USD', icon: Globe, color: 'text-info' },
+              { label: '活跃订单', value: dashboard?.pending_orders ?? 0, unit: '单', icon: Activity, color: 'text-success' },
+              { label: '交易笔数', value: dashboard?.tx_count_24h ?? 0, unit: '笔', icon: TrendingUp, color: 'text-primary' },
+            ].map(m => (
+              <div key={m.label} className="bg-bg-tertiary rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <m.icon className={`w-4 h-4 ${m.color}`} />
+                  <span className="text-text-muted text-xs">{m.label}</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-2xl font-bold font-mono ${m.color}`}>
+                    {dashLoading ? '-' : <AnimatedNumber value={m.value} />}
+                  </span>
+                  <span className="text-text-muted text-xs">{m.unit}</span>
+                </div>
+              </div>
+            ))}
+
+            {/* 匹配效率 */}
+            <div className="bg-bg-tertiary rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-primary" />
+                <span className="text-text-muted text-xs">匹配效率</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-2 bg-bg-primary rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full" style={{ width: '78%' }} />
+                </div>
+                <span className="text-primary font-bold text-sm">78%</span>
+              </div>
+            </div>
+
+            {/* 在线人数 */}
+            <div className="bg-bg-tertiary rounded-lg p-3 flex items-center justify-between">
+              <span className="text-text-muted text-xs">WebSocket 在线</span>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                <span className="text-success font-bold font-mono">{onlineCount + 1}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* 4 分区面板 */}
-      <div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden">
-        <AgentStatusPanel />
-        <TransactionPanel />
-        <MatchingPanel />
-        <NodeHealthPanel />
-      </div>
-
-      {/* 底部控制栏 */}
-      <div className="h-12 bg-bg-secondary border-t border-border-primary flex items-center px-6 gap-4 shrink-0">
-        <div className="flex items-center gap-2 text-danger text-sm">
-          <Bell className="w-4 h-4" />
-          <span>暂无告警</span>
-        </div>
-        <div className="flex-1" />
-        <span className="text-text-muted text-xs">
-          {isPaused ? '⏸ 已暂停刷新' : `每 ${refreshInterval / 1000}s 刷新`}
-        </span>
-      </div>
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-marquee {
+          animation: marquee 20s linear infinite;
+        }
+      `}</style>
     </div>
   )
 }

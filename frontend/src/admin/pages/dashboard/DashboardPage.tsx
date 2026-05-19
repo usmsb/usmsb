@@ -290,11 +290,11 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
               <h3 className="text-text-primary font-rajdhani font-semibold mb-4">Agent 增长趋势</h3>
-              <AgentTrendChart data={stats?.agent_growth ?? []} />
+              <AgentTrendChart />
             </div>
             <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
               <h3 className="text-text-primary font-rajdhani font-semibold mb-4">交易额趋势</h3>
-              <TransactionChart data={stats?.tx_volume_growth ?? []} />
+              <TransactionChart />
             </div>
           </div>
 
