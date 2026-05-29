@@ -4145,6 +4145,9 @@ class MetaAgent:
         executed_tools: list[str] = []
         all_tool_results: list[dict[str, Any]] = []
 
+        # Strict Mode 重试计数
+        self._strict_mode_retries = 0
+
         while iteration < max_iterations:
             iteration += 1
             logger.info(f"DEBUG agent loop iteration {iteration}")
@@ -4161,6 +4164,29 @@ class MetaAgent:
             if not tool_calls:
                 # === 没有工具调用，LLM 已生成最终回复 ===
                 content = llm_response.get("content", "")
+
+                # === Strict Mode：强制工具调用 ===
+                # 如果是第一次迭代且启用了 strict_mode，要求 LLM 必须调用工具
+                if (
+                    self.config.strict_mode
+                    and iteration == 1
+                    and all_tools
+                    and self._strict_mode_retries < self.config.strict_mode_max_retries
+                ):
+                    # 重试计数加1，然后注入警告并继续循环
+                    self._strict_mode_retries += 1
+                    warning = (
+                        "\n\n[STRICT MODE WARNING] 你必须使用工具来完成任务。\n"
+                        "根据技能指引，当前任务需要调用相应的工具来执行实际操作（创建/查询/修改/删除数据等），"
+                        "而不是仅回复文本。\n"
+                        "请立即调用相关工具来完成用户的请求，不要仅仅返回文本描述。\n"
+                    )
+                    logger.info(
+                        f"[STRICT_MODE] Injecting warning, retry {self._strict_mode_retries}/"
+                        f"{self.config.strict_mode_max_retries}"
+                    )
+                    current_messages.append({"role": "user", "content": warning})
+                    continue  # 继续循环，让 LLM 重试
 
                 # 检查是否是第一次尝试失败，降级处理
                 if iteration == 1 and content and "失败" in content:

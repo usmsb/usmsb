@@ -91,6 +91,12 @@ class MetaAgentConfig:
     guardian_tasks_threshold: int = 10  # 任务完成触发阈值
     guardian_errors_threshold: int = 3  # 错误累积触发阈值
 
+    # ========== Strict Mode 配置 ==========
+    # 强制模式：当技能被激活时，要求 LLM 必须调用工具，不能仅回复文本
+    # 适用于需要通过工具执行实际操作的场景（如 OPC 的目标/任务管理）
+    strict_mode: bool = False  # 是否启用严格模式
+    strict_mode_max_retries: int = 3  # 严格模式最大重试次数
+
     @classmethod
     def from_env(cls) -> "MetaAgentConfig":
         """从环境变量加载配置"""
