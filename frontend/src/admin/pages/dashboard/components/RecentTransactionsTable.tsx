@@ -24,7 +24,7 @@ interface Props {
 export default function RecentTransactionsTable({ transactions }: Props) {
   if (!transactions || transactions.length === 0) {
     return (
-      <div className="text-center text-text-muted text-sm py-8">
+      <div className="text-center text-gray-500 text-sm py-8">
         暂无交易记录
       </div>
     )
@@ -34,28 +34,28 @@ export default function RecentTransactionsTable({ transactions }: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border-primary">
-            <th className="text-left text-text-muted font-normal pb-2">类型</th>
-            <th className="text-left text-text-muted font-normal pb-2">金额</th>
-            <th className="text-left text-text-muted font-normal pb-2">状态</th>
-            <th className="text-left text-text-muted font-normal pb-2">时间</th>
+          <tr className="border-b border-neon-blue/20">
+            <th className="text-left text-gray-500 font-cyber font-normal pb-2">类型</th>
+            <th className="text-left text-gray-500 font-cyber font-normal pb-2">金额</th>
+            <th className="text-left text-gray-500 font-cyber font-normal pb-2">状态</th>
+            <th className="text-left text-gray-500 font-cyber font-normal pb-2">时间</th>
           </tr>
         </thead>
         <tbody>
           {transactions.slice(0, 5).map(tx => (
-            <tr key={tx.tx_id} className="border-b border-border-primary/50 hover:bg-bg-tertiary/50">
-              <td className="py-2 text-text-secondary font-mono text-xs">
+            <tr key={tx.tx_id} className="border-b border-neon-blue/10 hover:bg-cyber-dark/50 transition-colors">
+              <td className="py-2 text-gray-400 font-mono text-xs">
                 {shortAddr(tx.from_address)}
               </td>
               <td className="py-2">
-                <span className={`font-mono ${tx.amount >= 0 ? 'text-success' : 'text-danger'}`}>
+                <span className={`font-mono ${tx.amount >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
                   {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)}
                 </span>
               </td>
               <td className="py-2">
                 <StatusBadge status={tx.status} size="sm" />
               </td>
-              <td className="py-2 text-text-muted text-xs">
+              <td className="py-2 text-gray-500 text-xs">
                 {tx.created_at ? timeAgo(tx.created_at) : '-'}
               </td>
             </tr>

@@ -2,24 +2,29 @@
 """
 Google A2A Protocol Handler
 
-实现 Google A2A (Agent-to-Agent) 协议规范：
-https://github.com/google/a2a-python
+已废弃，请使用：
+- 类型：usmsb_sdk.protocol.types.google_a2a
+- Handler：usmsb_sdk.protocol.google_a2a.handler（Phase 2 实现）
 
-A2A 协议要点：
-1. AgentCard at /.well-known/agent.json
-2. Task State Machine: submitted → working → completed/failed/input-required
-3. JSON-RPC 2.0 消息格式
-4. SSE (Server-Sent Events) for push updates
+此模块保留用于向后兼容。新类型请从 protocol/types/google_a2a 导入。
 """
 
 import uuid
 import json
 import asyncio
 import logging
+import warnings
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable
 from dataclasses import dataclass, field
+
+warnings.warn(
+    "usmsb_sdk.protocol.google_a2a is deprecated, "
+    "use usmsb_sdk.protocol.types.google_a2a for types",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +36,7 @@ class TaskStatus(Enum):
     COMPLETED = "completed"          # 任务已完成
     FAILED = "failed"                # 任务失败
     INPUT_REQUIRED = "input-required" # 需要更多输入
-    CANCELLED = "cancelled"          # 任务已取消
+    CANCELLED = "canceled"          # 任务已取消
 
 
 class MessageType(Enum):
@@ -55,7 +60,7 @@ class A2ATask:
     output_data: Any = None
     error: str | None = None
     metadata: dict = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -73,7 +78,7 @@ class A2ATask:
 class GoogleAgentCard:
     """
     Google A2A Agent Card
-    
+
     遵循 Google A2A 协议规范：
     {
         "name": "Agent Name",
@@ -94,7 +99,7 @@ class GoogleAgentCard:
     url: str = ""
     endpoint: str = ""
     metadata: dict = field(default_factory=dict)
-    
+
     def to_dict(self) -> dict:
         return {
             "name": self.name,
@@ -108,7 +113,7 @@ class GoogleAgentCard:
             "endpoint": self.endpoint,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "GoogleAgentCard":
         return cls(
@@ -128,15 +133,15 @@ class GoogleAgentCard:
 class GoogleA2AHandler:
     """
     Google A2A Protocol Handler
-    
+
     遵循 Google A2A 协议规范：
     - AgentCard 发现
     - Task State Machine
     - JSON-RPC 2.0
     """
-    
+
     WELL_KNOWN_PATH = "/.well-known/agent.json"
-    
+
     def __init__(
         self,
         agent_id: str,
@@ -144,16 +149,10 @@ class GoogleA2AHandler:
     ):
         self.agent_id = agent_id
         self.agent_card = agent_card or self._create_default_agent_card()
-        
-        # 任务存储
         self._tasks: dict[str, A2ATask] = {}
-        
-        # 任务回调
         self._task_handlers: dict[str, Callable] = {}
-        
-        # SSE 订阅者
         self._sse_subscribers: dict[str, asyncio.Queue] = {}
-    
+
     def _create_default_agent_card(self) -> GoogleAgentCard:
         """创建默认 AgentCard"""
         return GoogleAgentCard(
@@ -173,11 +172,11 @@ class GoogleA2AHandler:
             ],
             authentication={"type": "none"},
         )
-    
+
     def get_agent_card_json(self) -> str:
         """获取 AgentCard JSON (用于 /.well-known/agent.json)"""
         return json.dumps(self.agent_card.to_dict(), indent=2)
-    
+
     def register_task_handler(
         self,
         skill_name: str,
@@ -186,125 +185,88 @@ class GoogleA2AHandler:
         """注册任务处理器"""
         self._task_handlers[skill_name] = handler
         logger.info(f"Registered task handler for skill: {skill_name}")
-    
+
     async def submit_task(
         self,
         skill_name: str,
         input_data: dict,
         metadata: dict | None = None
     ) -> str:
-        """
-        提交任务 (遵循 Google A2A Task State Machine)
-        
-        Args:
-            skill_name: 技能名称
-            input_data: 输入数据
-            metadata: 元数据
-            
-        Returns:
-            str: 任务 ID
-        """
+        """提交任务"""
         task_id = str(uuid.uuid4())
-        
         task = A2ATask(
             id=task_id,
             status=TaskStatus.SUBMITTED,
             input_data={"skill": skill_name, **input_data},
             metadata=metadata or {},
         )
-        
         self._tasks[task_id] = task
-        
-        # 异步执行任务
         asyncio.create_task(self._execute_task(task_id))
-        
         return task_id
-    
+
     async def _execute_task(self, task_id: str) -> None:
         """执行任务"""
         task = self._tasks.get(task_id)
         if not task:
             return
-        
         try:
-            # 更新状态为 working
             task.status = TaskStatus.WORKING
             task.updated_at = datetime.now().timestamp()
             await self._notify_status_update(task)
-            
-            # 获取技能名称
             skill_name = task.input_data.get("skill")
             handler = self._task_handlers.get(skill_name)
-            
             if not handler:
-                # 尝试通用处理器
                 handler = self._task_handlers.get("*")
-            
             if handler:
-                # 执行处理器
                 if asyncio.iscoroutinefunction(handler):
                     result = await handler(task.input_data)
                 else:
                     result = handler(task.input_data)
-                
                 task.output_data = result
                 task.status = TaskStatus.COMPLETED
             else:
                 task.error = f"No handler for skill: {skill_name}"
                 task.status = TaskStatus.FAILED
-            
         except Exception as e:
             logger.error(f"Task execution error: {e}")
             task.error = str(e)
             task.status = TaskStatus.FAILED
-        
         task.updated_at = datetime.now().timestamp()
         await self._notify_status_update(task)
-    
+
     async def _notify_status_update(self, task: A2ATask) -> None:
-        """通知任务状态更新 (SSE)"""
+        """通知任务状态更新"""
         for queue in self._sse_subscribers.values():
             await queue.put(task.to_dict())
-    
+
     async def get_task_status(self, task_id: str) -> dict | None:
         """获取任务状态"""
         task = self._tasks.get(task_id)
         return task.to_dict() if task else None
-    
+
     async def cancel_task(self, task_id: str) -> bool:
         """取消任务"""
         task = self._tasks.get(task_id)
         if not task:
             return False
-        
         task.status = TaskStatus.CANCELLED
         task.updated_at = datetime.now().timestamp()
         await self._notify_status_update(task)
         return True
-    
+
     async def subscribe_updates(self, subscription_id: str) -> asyncio.Queue:
-        """订阅任务更新 (SSE)"""
+        """订阅任务更新"""
         queue = asyncio.Queue()
         self._sse_subscribers[subscription_id] = queue
         return queue
-    
+
     async def unsubscribe_updates(self, subscription_id: str) -> None:
         """取消订阅"""
         if subscription_id in self._sse_subscribers:
             del self._sse_subscribers[subscription_id]
-    
+
     def handle_json_rpc_request(self, request: dict) -> dict:
-        """
-        处理 JSON-RPC 2.0 请求
-        
-        Google A2A 使用 JSON-RPC 2.0 格式：
-        {
-            "jsonrpc": "2.0",
-            "id": "...",
-            "method": "tasks/submit|tasks/get|cancel",
-            "params": {...}
-        }
-        """
+        """处理 JSON-RPC 2.0 请求"""
         jsonrpc = request.get("jsonrpc")
         if jsonrpc != "2.0":
             return {
@@ -312,11 +274,9 @@ class GoogleA2AHandler:
                 "error": {"code": -32600, "message": "Invalid JSON-RPC"},
                 "id": request.get("id"),
             }
-        
         method = request.get("method", "")
         params = request.get("params", {})
         req_id = request.get("id")
-        
         try:
             if method == "tasks/submit":
                 task_id = asyncio.run(self.submit_task(
@@ -329,7 +289,6 @@ class GoogleA2AHandler:
                     "id": req_id,
                     "result": {"taskId": task_id},
                 }
-            
             elif method == "tasks/get":
                 task = asyncio.run(self.get_task_status(params.get("taskId", "")))
                 return {
@@ -337,7 +296,6 @@ class GoogleA2AHandler:
                     "id": req_id,
                     "result": task,
                 }
-            
             elif method == "tasks/cancel":
                 cancelled = asyncio.run(self.cancel_task(params.get("taskId", "")))
                 return {
@@ -345,27 +303,24 @@ class GoogleA2AHandler:
                     "id": req_id,
                     "result": {"cancelled": cancelled},
                 }
-            
             elif method == "agents/card":
                 return {
                     "jsonrpc": "2.0",
                     "id": req_id,
                     "result": self.agent_card.to_dict(),
                 }
-            
             else:
                 return {
                     "jsonrpc": "2.0",
                     "error": {"code": -32601, "message": f"Method not found: {method}"},
                     "id": req_id,
                 }
-        
         except Exception as e:
             return {
                 "jsonrpc": "2.0",
                 "error": {"code": -32603, "message": f"Internal error: {e}"},
                 "id": req_id,
             }
-    
+
     def __repr__(self) -> str:
         return f"GoogleA2AHandler(agent={self.agent_id}, tasks={len(self._tasks)})"

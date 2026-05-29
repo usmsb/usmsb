@@ -124,15 +124,9 @@ export default function WalletBindingModal({ isOpen, onClose, defaultRole = 'hum
       setSession(authResponse.sessionId, authResponse.accessToken)
       setWallet(wagmiAddress, chain?.id || 1)
 
-      // Step 3: Get user info
-      try {
-        const info = await getUserInfo(wagmiAddress)
-        setUserRole(info.role as UserRole)
-        setPermissions(info.permissions, info.voting_power)
-      } catch {
-        // If getUserInfo fails, set default role
-        setUserRole('human')
-        setPermissions([], 0)
+      // Step 3: Use userRole from auth response (from users table, not permission manager)
+      if (authResponse.userRole) {
+        setUserRole(authResponse.userRole as UserRole)
       }
 
       setSuccess(true)

@@ -17,7 +17,9 @@ export default function HealthPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-text-primary font-rajdhani">系统健康状态</h1>
+      <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">
+        系统健康状态
+      </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -33,27 +35,27 @@ export default function HealthPage() {
       </div>
 
       {/* 资源使用 */}
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">资源使用情况</h3>
+      <div className="card hologram p-6">
+        <h3 className="text-neon-blue font-cyber font-semibold mb-4">资源使用情况</h3>
         <div className="space-y-4 max-w-xl">
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-text-secondary">CPU</span>
-              <span className="text-text-primary font-mono">{(data?.cpu_percent ?? 0).toFixed(1)}%</span>
+              <span className="text-gray-400">CPU</span>
+              <span className="text-gray-200 font-mono">{(data?.cpu_percent ?? 0).toFixed(1)}%</span>
             </div>
             <ProgressBar percent={data?.cpu_percent ?? 0} />
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-text-secondary">内存</span>
-              <span className="text-text-primary font-mono">{(data?.memory_percent ?? 0).toFixed(1)}%</span>
+              <span className="text-gray-400">内存</span>
+              <span className="text-gray-200 font-mono">{(data?.memory_percent ?? 0).toFixed(1)}%</span>
             </div>
             <ProgressBar percent={data?.memory_percent ?? 0} />
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-text-secondary">磁盘</span>
-              <span className="text-text-primary font-mono">{((data?.disk_percent ?? 0)).toFixed(2)} MB</span>
+              <span className="text-gray-400">磁盘</span>
+              <span className="text-gray-200 font-mono">{((data?.disk_percent ?? 0)).toFixed(2)} MB</span>
             </div>
             <ProgressBar percent={Math.min((data?.disk_percent ?? 0), 100)} />
           </div>
@@ -61,18 +63,20 @@ export default function HealthPage() {
       </div>
 
       {/* 服务组件状态 */}
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">服务组件</h3>
+      <div className="card hologram p-6">
+        <h3 className="text-neon-purple font-cyber font-semibold mb-4">服务组件</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {Object.entries(components).map(([name, status]) => (
-            <div key={name} className="flex items-center gap-3 p-3 bg-bg-tertiary rounded-lg">
-              <div className={`w-2 h-2 rounded-full ${status === 'healthy' || status === 'ok' ? 'bg-success animate-pulse' : status === 'degraded' ? 'bg-warning' : 'bg-danger'}`} />
-              <span className="text-text-primary text-sm">{name}</span>
-              <span className="ml-auto text-text-muted text-xs capitalize">{status as string}</span>
+            <div key={name} className="flex items-center gap-3 p-3 bg-cyber-dark/50 rounded-lg border border-neon-blue/10">
+              <div className={`w-2 h-2 rounded-full ${status === 'healthy' || status === 'ok' ? 'bg-neon-green animate-pulse' : status === 'degraded' ? 'bg-neon-yellow' : 'bg-neon-red'}`}
+                style={{ boxShadow: status === 'healthy' || status === 'ok' ? '0 0 10px #00ff88' : status === 'degraded' ? '0 0 10px #ffff00' : '0 0 10px #ff0040' }}
+              />
+              <span className="text-gray-200 text-sm">{name}</span>
+              <span className="ml-auto text-gray-500 text-xs capitalize">{status as string}</span>
             </div>
           ))}
           {Object.keys(components).length === 0 && (
-            <p className="text-text-muted text-sm col-span-3">暂无组件数据</p>
+            <p className="text-gray-500 text-sm col-span-3">暂无组件数据</p>
           )}
         </div>
       </div>

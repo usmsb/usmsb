@@ -204,11 +204,11 @@ class IncrementalUpdater:
 
         # 移除不再显著的边
         for source, target in changes["removed_edges"]:
-            # 找到边并移除
-            for i, edge in enumerate(updated_graph.edges):
-                if edge.source == source and edge.target == target:
-                    updated_graph.edges.pop(i)
-                    break
+            # 找到边并移除（使用列表推导式避免迭代中修改问题）
+            updated_graph.edges = [
+                edge for edge in updated_graph.edges
+                if not (edge.source == source and edge.target == target)
+            ]
 
         # 更新强度变化的边
         for (source, target), delta in changes["strength_changes"].items():

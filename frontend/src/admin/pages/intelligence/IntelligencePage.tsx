@@ -17,7 +17,9 @@ export default function IntelligencePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-text-primary font-rajdhani">AI 能力分析</h1>
+      <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">
+        AI 能力分析
+      </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="LLM 调用总数" value={llmCalls} icon={Cpu} color="primary" loading={isLoading} />
@@ -27,26 +29,26 @@ export default function IntelligencePage() {
       </div>
 
       {/* 能力分布 */}
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">Agent 能力分布 Top 10</h3>
+      <div className="card hologram p-6">
+        <h3 className="text-neon-blue font-cyber font-semibold mb-4">Agent 能力分布 Top 10</h3>
         {topCaps.length === 0 ? (
-          <p className="text-text-muted text-sm">暂无能力数据</p>
+          <p className="text-gray-500 text-sm">暂无能力数据</p>
         ) : (
           <div className="space-y-3">
             {topCaps.map((cap, i) => (
               <div key={cap.capability} className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs text-primary font-bold shrink-0">
+                <span className="w-6 h-6 rounded-full bg-neon-blue/10 border border-neon-blue/30 flex items-center justify-center text-xs text-neon-blue font-bold shrink-0">
                   {i + 1}
                 </span>
-                <span className="text-text-primary flex-1">{cap.capability}</span>
+                <span className="text-gray-200 flex-1">{cap.capability}</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-32 h-2 bg-bg-tertiary rounded overflow-hidden">
+                  <div className="w-32 h-2 bg-cyber-dark rounded overflow-hidden border border-neon-blue/20">
                     <div
-                      className="h-full bg-primary rounded"
-                      style={{ width: `${Math.min(100, (cap.count / Math.max(...topCaps.map(c => c.count), 1)) * 100)}%` }}
+                      className="h-full bg-neon-blue rounded"
+                      style={{ width: `${Math.min(100, (cap.count / Math.max(...topCaps.map(c => c.count), 1)) * 100)}%`, boxShadow: '0 0 10px #00f5ff' }}
                     />
                   </div>
-                  <span className="text-text-muted text-xs font-mono w-12 text-right">{cap.count}</span>
+                  <span className="text-gray-500 text-xs font-mono w-12 text-right">{cap.count}</span>
                 </div>
               </div>
             ))}

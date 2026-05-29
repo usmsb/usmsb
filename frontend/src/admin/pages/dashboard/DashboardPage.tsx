@@ -45,15 +45,15 @@ function TimeRangeSelector({
   onChange: (v: '7d' | '30d' | '90d') => void
 }) {
   return (
-    <div className="flex gap-1 bg-bg-tertiary rounded-lg p-1">
+    <div className="flex gap-1 bg-cyber-card border border-neon-blue/20 rounded-lg p-1">
       {(['7d', '30d', '90d'] as const).map(range => (
         <button
           key={range}
           onClick={() => onChange(range)}
           className={`px-3 py-1 rounded-md text-sm font-rajdhani font-medium transition-all ${
             value === range
-              ? 'bg-primary text-white'
-              : 'text-text-secondary hover:text-text-primary'
+              ? 'bg-neon-blue/20 text-neon-blue border border-neon-blue/30'
+              : 'text-gray-400 hover:text-neon-blue'
           }`}
         >
           {range === '7d' ? '7天' : range === '30d' ? '30天' : '90天'}
@@ -67,7 +67,7 @@ function RefreshButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated text-text-secondary hover:text-text-primary transition-colors text-sm"
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyber-card border border-neon-blue/20 hover:border-neon-blue/40 text-gray-400 hover:text-neon-blue transition-all text-sm"
     >
       <RefreshCw className="w-4 h-4" />
       刷新
@@ -148,8 +148,10 @@ export default function DashboardPage() {
       {/* 页面标题栏 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary font-rajdhani">运营总览</h1>
-          <p className="text-text-muted text-sm mt-1">
+          <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">
+            运营总览
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
             实时监控 USMSB 平台全局运营状态
           </p>
         </div>
@@ -290,37 +292,37 @@ export default function DashboardPage() {
 
           {/* 趋势图表 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-              <h3 className="text-text-primary font-rajdhani font-semibold mb-4">Agent 增长趋势</h3>
+            <div className="card hologram">
+              <h3 className="text-neon-blue font-cyber font-semibold mb-4">Agent 增长趋势</h3>
               <AgentTrendChart />
             </div>
-            <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-              <h3 className="text-text-primary font-rajdhani font-semibold mb-4">交易额趋势</h3>
+            <div className="card hologram">
+              <h3 className="text-neon-purple font-cyber font-semibold mb-4">交易额趋势</h3>
               <TransactionChart />
             </div>
           </div>
 
           {/* 质押分布 + 最近交易 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-              <h3 className="text-text-primary font-rajdhani font-semibold mb-4">匹配漏斗</h3>
+            <div className="card hologram">
+              <h3 className="text-neon-green font-cyber font-semibold mb-4">匹配漏斗</h3>
               {matchingData ? (
                 <div className="space-y-3">
                   {[
-                    { label: '发布需求', value: matchingData.funnel.published, color: 'bg-primary' },
-                    { label: 'AI 推荐', value: matchingData.funnel.matched, color: 'bg-info' },
-                    { label: '协商中', value: matchingData.funnel.negotiating, color: 'bg-warning' },
-                    { label: '已完成', value: matchingData.funnel.completed, color: 'bg-success' },
+                    { label: '发布需求', value: matchingData.funnel.published, color: 'bg-neon-blue', glow: '#00f5ff' },
+                    { label: 'AI 推荐', value: matchingData.funnel.matched, color: 'bg-neon-purple', glow: '#bf00ff' },
+                    { label: '协商中', value: matchingData.funnel.negotiating, color: 'bg-neon-yellow', glow: '#ffff00' },
+                    { label: '已完成', value: matchingData.funnel.completed, color: 'bg-neon-green', glow: '#00ff88' },
                   ].map(item => (
                     <div key={item.label}>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="text-text-secondary">{item.label}</span>
-                        <span className="text-text-primary font-mono">{item.value}</span>
+                        <span className="text-gray-500 font-cyber">{item.label}</span>
+                        <span className="text-gray-200 font-mono">{item.value}</span>
                       </div>
-                      <div className="h-2 bg-bg-tertiary rounded overflow-hidden">
+                      <div className="h-2 bg-cyber-dark rounded overflow-hidden">
                         <div
                           className={`h-full ${item.color} rounded transition-all`}
-                          style={{ width: `${Math.min(100, (item.value / Math.max(matchingData.funnel.published, 1)) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (item.value / Math.max(matchingData.funnel.published, 1)) * 100)}%`, boxShadow: `0 0 10px ${item.glow}` }}
                         />
                       </div>
                     </div>
@@ -332,8 +334,8 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-            <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-              <h3 className="text-text-primary font-rajdhani font-semibold mb-4">最近交易</h3>
+            <div className="card hologram">
+              <h3 className="text-neon-blue font-cyber font-semibold mb-4">最近交易</h3>
               <RecentTransactionsTable transactions={txData?.transactions ?? []} />
             </div>
           </div>
@@ -342,8 +344,8 @@ export default function DashboardPage() {
         {/* 右侧：实时动态 + 排行榜 */}
         <div className="space-y-6">
           {/* 实时动态 */}
-          <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-            <h3 className="text-text-primary font-rajdhani font-semibold mb-4">实时动态</h3>
+          <div className="card hologram">
+            <h3 className="text-neon-purple font-cyber font-semibold mb-4">实时动态</h3>
             <LiveFeed
               agents={agentsData?.agents ?? []}
               transactions={txData?.transactions ?? []}
@@ -351,22 +353,22 @@ export default function DashboardPage() {
           </div>
 
           {/* Top Agents */}
-          <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-            <h3 className="text-text-primary font-rajdhani font-semibold mb-4">Top Agents（按质押）</h3>
+          <div className="card hologram">
+            <h3 className="text-neon-yellow font-cyber font-semibold mb-4">Top Agents（按质押）</h3>
             <div className="space-y-3">
               {stats?.top_agents?.slice(0, 5).map((agent, i) => (
                 <div key={agent.agent_id} className="flex items-center gap-3">
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i === 0 ? 'bg-warning/20 text-warning' :
+                    i === 0 ? 'bg-neon-yellow/20 text-neon-yellow' :
                     i === 1 ? 'bg-gray-400/20 text-gray-400' :
                     i === 2 ? 'bg-amber-700/20 text-amber-700' :
-                    'bg-bg-tertiary text-text-muted'
+                    'bg-gray-600/20 text-gray-500'
                   }`}>
                     {i + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-text-primary text-sm truncate">{agent.name}</p>
-                    <p className="text-text-muted text-xs font-mono">
+                    <p className="text-gray-200 text-sm truncate">{agent.name}</p>
+                    <p className="text-gray-500 text-xs font-mono">
                       {agent.stake.toLocaleString()} VIBE
                     </p>
                   </div>
@@ -374,14 +376,14 @@ export default function DashboardPage() {
                 </div>
               ))}
               {(!stats?.top_agents || stats.top_agents.length === 0) && (
-                <p className="text-text-muted text-sm text-center py-4">暂无数据</p>
+                <p className="text-gray-500 text-sm text-center py-4">暂无数据</p>
               )}
             </div>
           </div>
 
           {/* 节点健康 */}
-          <div className="bg-bg-secondary rounded-2xl border border-border-primary p-6">
-            <h3 className="text-text-primary font-rajdhani font-semibold mb-4">节点状态</h3>
+          <div className="card hologram">
+            <h3 className="text-neon-blue font-cyber font-semibold mb-4">节点状态</h3>
             <NodeHealthTable nodes={nodesData?.nodes ?? []} />
           </div>
         </div>

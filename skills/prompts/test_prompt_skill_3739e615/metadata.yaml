@@ -1,0 +1,7 @@
+created_at: '2026-05-19T20:19:42.889652'
+description: A test prompt skill
+name: Test Prompt Skill
+skill_id: test_prompt_skill_3739e615
+source: auto_generated
+type: prompt
+version: 1.0.0

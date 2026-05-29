@@ -30,7 +30,7 @@ export default function LiveFeed({ agents, transactions }: LiveFeedProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex border-b border-border-primary">
+      <div className="flex border-b border-neon-blue/20">
         {[
           { key: 'agents', label: 'Agent' },
           { key: 'transactions', label: '交易' },
@@ -38,37 +38,38 @@ export default function LiveFeed({ agents, transactions }: LiveFeedProps) {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as Tab)}
-            className={`flex-1 py-3 text-sm font-rajdhani font-medium transition-colors
+            className={`flex-1 py-3 text-sm font-cyber font-medium transition-colors
               ${activeTab === tab.key
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-text-muted hover:text-text-secondary'}`}
+                ? 'text-neon-blue border-b-2 border-neon-blue'
+                : 'text-gray-500 hover:text-gray-300'}`}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      <div className="px-4 py-2 border-b border-border-primary flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-        <span className="text-text-muted text-xs">实时更新中</span>
+      <div className="px-4 py-2 border-b border-neon-blue/20 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse"
+          style={{ boxShadow: '0 0 10px #00ff88' }} />
+        <span className="text-gray-500 text-xs">实时更新中</span>
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-2">
         {activeTab === 'agents' ? (
           agents.length === 0 ? (
-            <p className="text-center text-text-muted text-sm py-8">暂无 Agent 数据</p>
+            <p className="text-center text-gray-500 text-sm py-8">暂无 Agent 数据</p>
           ) : (
             agents.map(agent => (
               <div key={agent.agent_id}
-                className="flex items-center gap-3 p-2.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
-                  <span className="text-primary text-xs font-bold">🤖</span>
+                className="flex items-center gap-3 p-2.5 rounded-lg bg-cyber-dark/50 hover:bg-cyber-card transition-colors">
+                <div className="w-8 h-8 rounded-lg bg-neon-blue/10 border border-neon-blue/30 flex items-center justify-center shrink-0">
+                  <span className="text-neon-blue text-xs font-bold">🤖</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-text-primary text-sm font-medium truncate">
+                  <p className="text-gray-200 text-sm font-medium truncate">
                     {agent.name || agent.agent_id.slice(0, 12)}
                   </p>
-                  <p className="text-text-muted text-xs">
+                  <p className="text-gray-500 text-xs">
                     {agent.last_heartbeat ? timeAgo(agent.last_heartbeat) : '-'}
                   </p>
                 </div>
@@ -78,25 +79,25 @@ export default function LiveFeed({ agents, transactions }: LiveFeedProps) {
           )
         ) : (
           transactions.length === 0 ? (
-            <p className="text-center text-text-muted text-sm py-8">暂无交易数据</p>
+            <p className="text-center text-gray-500 text-sm py-8">暂无交易数据</p>
           ) : (
             transactions.map(tx => (
               <div key={tx.tx_id}
-                className="flex items-center gap-3 p-2.5 rounded-lg bg-bg-tertiary hover:bg-bg-elevated transition-colors">
+                className="flex items-center gap-3 p-2.5 rounded-lg bg-cyber-dark/50 hover:bg-cyber-card transition-colors">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                  ${tx.status === 'completed' ? 'bg-success/20' : 'bg-warning/20'}`}>
-                  <span className={tx.status === 'completed' ? 'text-success' : 'text-warning'}>💰</span>
+                  ${tx.status === 'completed' ? 'bg-neon-green/10 border border-neon-green/30' : 'bg-neon-yellow/10 border border-neon-yellow/30'}`}>
+                  <span className={tx.status === 'completed' ? 'text-neon-green' : 'text-neon-yellow'}>💰</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-text-primary text-sm truncate">
+                  <p className="text-gray-200 text-sm truncate">
                     {shortAddr(tx.from_address || tx.tx_id)}
                   </p>
-                  <p className="text-text-muted text-xs">
+                  <p className="text-gray-500 text-xs">
                     {tx.created_at ? timeAgo(tx.created_at) : '-'}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-sm font-mono ${tx.from_address ? 'text-danger' : 'text-success'}`}>
+                  <p className={`text-sm font-mono ${tx.from_address ? 'text-neon-red' : 'text-neon-green'}`}>
                     {tx.amount.toFixed(2)}
                   </p>
                   <StatusBadge status={tx.status} size="sm" />
@@ -107,9 +108,9 @@ export default function LiveFeed({ agents, transactions }: LiveFeedProps) {
         )}
       </div>
 
-      <div className="p-3 border-t border-border-primary">
+      <div className="p-3 border-t border-neon-blue/20">
         <a href={activeTab === 'agents' ? '/admin/agents' : '/admin/transactions'}
-          className="block text-center text-primary text-sm hover:underline">
+          className="block text-center text-neon-blue text-sm hover:underline">
           查看全部 →
         </a>
       </div>

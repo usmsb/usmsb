@@ -20,7 +20,7 @@ function timeAgo(timestamp: number): string {
 export default function NodeHealthTable({ nodes }: Props) {
   if (!nodes || nodes.length === 0) {
     return (
-      <div className="text-center text-text-muted text-sm py-8">
+      <div className="text-center text-gray-500 text-sm py-8">
         暂无节点数据
       </div>
     )
@@ -29,25 +29,25 @@ export default function NodeHealthTable({ nodes }: Props) {
   return (
     <div className="space-y-2">
       {nodes.slice(0, 4).map(node => (
-        <div key={node.node_id} className="p-3 bg-bg-tertiary rounded-lg">
+        <div key={node.node_id} className="p-3 bg-cyber-dark/50 rounded-lg border border-neon-blue/10">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-text-primary text-sm font-medium">{node.name}</span>
+            <span className="text-gray-200 text-sm font-cyber font-medium">{node.name}</span>
             <StatusBadge status={node.status} size="sm" />
           </div>
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div>
-              <span className="text-text-muted">Agent: </span>
-              <span className="text-text-secondary">{node.agent_count}</span>
+              <span className="text-gray-500">Agent: </span>
+              <span className="text-neon-blue">{node.agent_count}</span>
             </div>
             <div>
-              <span className="text-text-muted">CPU: </span>
-              <span className={node.cpu_percent > 80 ? 'text-danger' : 'text-text-secondary'}>
+              <span className="text-gray-500">CPU: </span>
+              <span className={node.cpu_percent > 80 ? 'text-neon-red' : 'text-neon-green'}>
                 {node.cpu_percent.toFixed(0)}%
               </span>
             </div>
             <div>
-              <span className="text-text-muted">MEM: </span>
-              <span className={node.memory_percent > 80 ? 'text-danger' : 'text-text-secondary'}>
+              <span className="text-gray-500">MEM: </span>
+              <span className={node.memory_percent > 80 ? 'text-neon-red' : 'text-neon-green'}>
                 {node.memory_percent.toFixed(0)}%
               </span>
             </div>
@@ -55,7 +55,7 @@ export default function NodeHealthTable({ nodes }: Props) {
           <div className="mt-2">
             <ProgressBar percent={node.cpu_percent} />
           </div>
-          <p className="text-text-muted text-xs mt-1">
+          <p className="text-gray-500 text-xs mt-1">
             最后活跃: {node.last_heartbeat ? timeAgo(node.last_heartbeat) : '-'}
           </p>
         </div>

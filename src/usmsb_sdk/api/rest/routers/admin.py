@@ -11,7 +11,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from usmsb_sdk.api.database import (
@@ -25,9 +25,6 @@ from usmsb_sdk.api.database import (
     get_transactions_by_user,
     get_user_by_address,
     get_profile,
-    get_all_agents,
-    get_all_agents,
-    get_all_agents,
 )
 from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 
@@ -184,9 +181,8 @@ def _paginate(items: list, page: int, page_size: int) -> tuple[list, int, int, i
 # ============================================================================
 
 @router.get("/dashboard", response_model=DashboardResponse)
-async def get_admin_dashboard(request: Request):
+async def get_admin_dashboard(user: dict = Depends(get_current_user_unified)):
     """Platform overview for admin dashboard."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -273,7 +269,7 @@ async def get_admin_dashboard(request: Request):
 
 @router.get("/agents", response_model=AgentListResponse)
 async def list_agents(
-    request: Request,
+    user: dict = Depends(get_current_user_unified),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
@@ -281,7 +277,6 @@ async def list_agents(
     search: Optional[str] = None,
 ):
     """List all agents with pagination and filters."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     agents = get_all_agents(limit=10000) or []
@@ -328,9 +323,8 @@ async def list_agents(
 
 
 @router.get("/agents/{agent_id}")
-async def get_agent_detail(agent_id: str, request: Request):
+async def get_agent_detail(agent_id: str, user: dict = Depends(get_current_user_unified)):
     """Get detailed agent information."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     agent = get_agent(agent_id)
@@ -355,14 +349,13 @@ async def get_agent_detail(agent_id: str, request: Request):
 
 @router.get("/users", response_model=UserListResponse)
 async def list_users(
-    request: Request,
+    user: dict = Depends(get_current_user_unified),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     role: Optional[str] = None,
     search: Optional[str] = None,
 ):
     """List all users with pagination and filters."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -403,9 +396,8 @@ async def list_users(
 
 
 @router.patch("/users/{user_id}/role")
-async def update_user_role(user_id: str, request: Request, new_role: str = Query(...)):
+async def update_user_role(user_id: str, new_role: str = Query(...), user: dict = Depends(get_current_user_unified)):
     """Update user role (superadmin only for sensitive roles)."""
-    user = await get_current_user_unified(request)
     if user.get('user_role') != 'superadmin':
         raise HTTPException(status_code=403, detail="Only superadmin can change roles")
     if new_role not in ('human', 'ai_owner', 'ai_agent', 'node_operator', 'developer'):
@@ -423,7 +415,7 @@ async def update_user_role(user_id: str, request: Request, new_role: str = Query
 
 @router.get("/transactions", response_model=TransactionListResponse)
 async def list_transactions(
-    request: Request,
+    user: dict = Depends(get_current_user_unified),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
@@ -431,7 +423,6 @@ async def list_transactions(
     address: Optional[str] = None,
 ):
     """List all transactions with filters."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     all_txs = get_all_transactions(limit=10000) or []
@@ -481,14 +472,13 @@ async def list_transactions(
 
 @router.get("/orders", response_model=OrderListResponse)
 async def list_orders(
-    request: Request,
+    user: dict = Depends(get_current_user_unified),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
     service_type: Optional[str] = None,
 ):
     """List all orders with filters."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -537,9 +527,8 @@ async def list_orders(
 # ============================================================================
 
 @router.get("/nodes", response_model=NodeStatusResponse)
-async def list_nodes(request: Request):
+async def list_nodes(user: dict = Depends(get_current_user_unified)):
     """Get node status overview."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -573,9 +562,8 @@ async def list_nodes(request: Request):
 # ============================================================================
 
 @router.get("/matching", response_model=MatchingAnalyticsResponse)
-async def get_matching_analytics(request: Request):
+async def get_matching_analytics(user: dict = Depends(get_current_user_unified)):
     """Get matching funnel analytics."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -637,12 +625,11 @@ async def get_matching_analytics(request: Request):
 
 @router.get("/gene-capsules", response_model=GeneCapsuleResponse)
 async def list_gene_capsules(
-    request: Request,
+    user: dict = Depends(get_current_user_unified),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     """List gene capsules."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -664,9 +651,8 @@ async def list_gene_capsules(
 # ============================================================================
 
 @router.get("/intelligence", response_model=IntelligenceMetricsResponse)
-async def get_intelligence_metrics(request: Request):
+async def get_intelligence_metrics(user: dict = Depends(get_current_user_unified)):
     """Get AI capability and usage metrics."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -710,9 +696,8 @@ async def get_intelligence_metrics(request: Request):
 # ============================================================================
 
 @router.get("/governance", response_model=GovernanceResponse)
-async def get_governance(request: Request):
+async def get_governance(user: dict = Depends(get_current_user_unified)):
     """Get governance overview."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -738,9 +723,8 @@ async def get_governance(request: Request):
 # ============================================================================
 
 @router.get("/system/health", response_model=SystemHealthResponse)
-async def get_system_health(request: Request):
+async def get_system_health(user: dict = Depends(get_current_user_unified)):
     """Get system health metrics."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -774,10 +758,10 @@ async def get_system_health(request: Request):
 
     return SystemHealthResponse(
         status='healthy',
-        uptime_seconds=time.time(),
+        uptime_seconds=0,  # TODO: Track actual server start time
         cpu_percent=0,
         memory_percent=0,
-        disk_percent=db_size_mb,
+        disk_percent=0,  # TODO: Implement actual disk usage calculation
         db_size_mb=round(db_size_mb, 2),
         api_response_time_ms=0,
         components=components,
@@ -789,9 +773,8 @@ async def get_system_health(request: Request):
 # ============================================================================
 
 @router.get("/system/config")
-async def get_system_config(request: Request):
+async def get_system_config(user: dict = Depends(get_current_user_unified)):
     """Get runtime configuration."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -818,14 +801,13 @@ async def get_system_config(request: Request):
 
 @router.get("/system/logs", response_model=SystemLogsResponse)
 async def get_system_logs(
-    request: Request,
+    user: dict = Depends(get_current_user_unified),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     level: Optional[str] = None,
     search: Optional[str] = None,
 ):
     """Get system log entries."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     db = get_db()
@@ -867,9 +849,8 @@ async def get_system_logs(
 # ============================================================================
 
 @router.get("/permissions", response_model=PermissionMatrixResponse)
-async def get_permission_matrix(request: Request):
+async def get_permission_matrix(user: dict = Depends(get_current_user_unified)):
     """Get permission matrix for all roles."""
-    user = await get_current_user_unified(request)
     _check_admin(user)
 
     # Define permission matrix

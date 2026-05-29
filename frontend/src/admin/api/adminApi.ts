@@ -42,10 +42,11 @@ adminApi.interceptors.response.use(
             return adminApi(originalRequest)
           }
         }
+        useAuthStore.getState().logout()
+        window.location.href = '/login'
       } catch {
         useAuthStore.getState().logout()
         window.location.href = '/login'
-        return Promise.reject(error)
       }
     }
 

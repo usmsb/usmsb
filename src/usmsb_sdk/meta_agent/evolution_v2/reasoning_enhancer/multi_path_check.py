@@ -92,6 +92,15 @@ class MultiPathConsistencyChecker:
         conclusion_counts = Counter(conclusions)
 
         # 统计结论分布
+        if not conclusion_counts:
+            return MultiPathResult(
+                consistent=False,
+                score=0.0,
+                dominant_conclusion="",
+                path_count=len(paths),
+                divergent_steps=[],
+            )
+
         most_common = conclusion_counts.most_common(1)[0]
         consistency_score = most_common[1] / len(paths)
 
@@ -183,6 +192,9 @@ class MultiPathConsistencyChecker:
             path_scores.append((avg_confidence, path))
 
         # 选择置信度最高的
+        if not path_scores:
+            return None
+
         path_scores.sort(key=lambda x: x[0], reverse=True)
         return path_scores[0][1]
 

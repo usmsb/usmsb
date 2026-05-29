@@ -16,18 +16,20 @@ export default function MatchingPage() {
   const topServices = data?.top_services ?? []
 
   const funnelSteps = [
-    { label: '发布需求', value: funnel.published, color: 'bg-primary' },
-    { label: 'AI 推荐匹配', value: funnel.matched, color: 'bg-info' },
-    { label: '发起协商', value: funnel.negotiating, color: 'bg-warning' },
-    { label: '达成合作', value: funnel.matched, color: 'bg-success' },
-    { label: '成功交付', value: funnel.completed, color: 'bg-success' },
+    { label: '发布需求', value: funnel.published, color: 'bg-neon-blue' },
+    { label: 'AI 推荐匹配', value: funnel.matched, color: 'bg-neon-purple' },
+    { label: '发起协商', value: funnel.negotiating, color: 'bg-neon-yellow' },
+    { label: '达成合作', value: funnel.matched, color: 'bg-neon-green' },
+    { label: '成功交付', value: funnel.completed, color: 'bg-neon-green' },
   ]
 
   const maxFunnel = Math.max(...funnelSteps.map(s => s.value), 1)
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-text-primary font-rajdhani">匹配分析</h1>
+      <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">
+        匹配分析
+      </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="发布需求" value={funnel.published} icon={Target} color="primary" loading={isLoading} />
@@ -37,23 +39,23 @@ export default function MatchingPage() {
       </div>
 
       {/* 漏斗图 */}
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-        <h3 className="text-text-primary font-rajdhani font-semibold mb-6">匹配漏斗</h3>
+      <div className="card hologram p-6">
+        <h3 className="text-neon-blue font-cyber font-semibold mb-6">匹配漏斗</h3>
         <div className="space-y-4 max-w-xl">
           {funnelSteps.map((step, i) => (
             <div key={step.label}>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-secondary">{step.label}</span>
-                <span className="text-text-primary font-mono">
-                  {step.value} <span className="text-text-muted text-xs">
+                <span className="text-gray-400">{step.label}</span>
+                <span className="text-gray-200 font-mono">
+                  {step.value} <span className="text-gray-500 text-xs">
                     ({maxFunnel > 0 ? ((step.value / maxFunnel) * 100).toFixed(1) : 0}%)
                   </span>
                 </span>
               </div>
-              <div className="h-6 bg-bg-tertiary rounded overflow-hidden">
+              <div className="h-6 bg-cyber-dark rounded overflow-hidden border border-neon-blue/20">
                 <div
                   className={`h-full ${step.color} rounded transition-all`}
-                  style={{ width: `${maxFunnel > 0 ? (step.value / maxFunnel) * 100 : 0}%` }}
+                  style={{ width: `${maxFunnel > 0 ? (step.value / maxFunnel) * 100 : 0}%`, boxShadow: `0 0 10px currentColor` }}
                 />
               </div>
             </div>
@@ -62,19 +64,19 @@ export default function MatchingPage() {
       </div>
 
       {/* Top Services */}
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-        <h3 className="text-text-primary font-rajdhani font-semibold mb-4">热门服务类型</h3>
+      <div className="card hologram p-6">
+        <h3 className="text-neon-purple font-cyber font-semibold mb-4">热门服务类型</h3>
         {topServices.length === 0 ? (
-          <p className="text-text-muted text-sm">暂无数据</p>
+          <p className="text-gray-500 text-sm">暂无数据</p>
         ) : (
           <div className="space-y-2">
             {topServices.map((svc, i) => (
               <div key={svc.service_type} className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs text-primary font-bold">
+                <span className="w-6 h-6 rounded-full bg-neon-blue/10 border border-neon-blue/30 flex items-center justify-center text-xs text-neon-blue font-bold">
                   {i + 1}
                 </span>
-                <span className="text-text-primary flex-1">{svc.service_type}</span>
-                <span className="text-text-muted font-mono text-sm">{svc.count} 次</span>
+                <span className="text-gray-200 flex-1">{svc.service_type}</span>
+                <span className="text-gray-500 font-mono text-sm">{svc.count} 次</span>
               </div>
             ))}
           </div>

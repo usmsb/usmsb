@@ -5,6 +5,7 @@
 """
 
 import logging
+import random
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -537,6 +538,3 @@ class SelfOptimizer:
         """确保已初始化"""
         if not self._initialized:
             await self.initialize()
-
-
-import random

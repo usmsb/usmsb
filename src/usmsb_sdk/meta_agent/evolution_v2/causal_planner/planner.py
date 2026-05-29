@@ -9,10 +9,11 @@ CausalPlanner
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from ...models.causal_graph import CausalGraph
 from ...models.task_record import TaskRecord
-from .task_abstraction import TaskAbstractionEngine, TaskFeatureExtractor
+from .task_abstraction import TaskAbstractionEngine, TaskAbstraction, TaskFeatureExtractor
 from .backward_search import BackwardSearch, CostAwareBackwardSearch
 from .strategy_selector import StrategySelector, StrategySelectionResult, StrategyProfile, PlanningConstraints
 from .plan_instantiator import PlanInstantiator, ExecutionPlan

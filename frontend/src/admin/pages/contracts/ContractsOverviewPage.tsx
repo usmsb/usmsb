@@ -43,46 +43,49 @@ export default function ContractsOverviewPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-primary font-rajdhani">合约总览</h1>
-        <span className="text-text-muted text-sm">{ALL_CONTRACTS.reduce((s, c) => s + c.items.length, 0)} 个合约</span>
+        <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">
+          合约总览
+        </h1>
+        <span className="text-gray-500 text-sm font-cyber">{ALL_CONTRACTS.reduce((s, c) => s + c.items.length, 0)} 个合约</span>
       </div>
 
-      <div className="bg-bg-secondary rounded-xl border border-border-primary p-4 flex items-center gap-4">
+      <div className="card p-4 flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          <span className="text-text-secondary text-sm">Base Sepolia</span>
+          <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse"
+            style={{ boxShadow: '0 0 10px #00ff88' }} />
+          <span className="text-gray-300 text-sm font-cyber">Base Sepolia</span>
         </div>
-        <span className="text-text-muted text-xs">Chain ID: 84532</span>
+        <span className="text-gray-600 text-xs">Chain ID: 84532</span>
         <a
           href="https://sepolia.basescan.org"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary hover:underline text-xs ml-auto"
+          className="text-neon-blue hover:underline text-xs ml-auto font-cyber"
         >
           Basescan ↗
         </a>
       </div>
 
       {ALL_CONTRACTS.map(group => (
-        <div key={group.category} className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-primary bg-bg-tertiary">
-            <h3 className="text-text-primary font-rajdhani font-semibold">{group.category}</h3>
+        <div key={group.category} className="card hologram overflow-hidden">
+          <div className="px-4 py-3 border-b border-neon-blue/20 bg-cyber-dark/50">
+            <h3 className="text-neon-blue font-cyber font-semibold">{group.category}</h3>
           </div>
           <table className="w-full text-sm">
             <tbody>
               {group.items.map((item, i) => (
-                <tr key={item.label} className={`border-b border-border-primary/50 last:border-0 hover:bg-bg-tertiary/30 ${i % 2 === 0 ? 'bg-bg-secondary' : 'bg-bg-tertiary/10'}`}>
+                <tr key={item.label} className={`border-b border-neon-blue/10 last:border-0 hover:bg-cyber-dark/30 ${i % 2 === 0 ? '' : 'bg-cyber-dark/20'}`}>
                   <td className="px-4 py-3">
-                    <span className="text-text-primary font-medium">{item.label}</span>
-                    <span className="text-text-muted text-xs ml-2">({item.note})</span>
+                    <span className="text-gray-200 font-medium">{item.label}</span>
+                    <span className="text-gray-500 text-xs ml-2">({item.note})</span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-text-muted">{item.addr}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.addr}</td>
                   <td className="px-4 py-3 text-right">
                     <a
                       href={`https://sepolia.basescan.org/address/${item.addr}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
+                      className="inline-flex items-center gap-1 text-neon-blue hover:underline text-xs"
                     >
                       <ExternalLink className="w-3 h-3" />
                     </a>

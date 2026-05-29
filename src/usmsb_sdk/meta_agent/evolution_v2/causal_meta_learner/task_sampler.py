@@ -8,6 +8,7 @@ CausalMetaLearner 的组件
 """
 
 import random
+import numpy as np
 from dataclasses import dataclass
 from typing import Any
 
@@ -178,9 +179,6 @@ class CausalTaskSampler:
         """
         domain_records = [r for r in records if getattr(r, "domain", "general") == domain]
         return self._sample_single_task(domain, domain_records)
-
-
-import numpy as np  # 添加导入
 
 
 class MetaBatchSampler:

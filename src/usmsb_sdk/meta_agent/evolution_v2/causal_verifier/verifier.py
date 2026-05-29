@@ -149,6 +149,9 @@ class CausalVerifier:
         effects = []
 
         # 在因果图中查找与策略相关的边
+        if not self.graph:
+            return effects
+
         for edge in self.graph.edges:
             # 简化的匹配逻辑
             if self._strategy_matches_edge(strategy_name, edge):

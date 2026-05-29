@@ -10,6 +10,39 @@ from typing import Any
 
 import numpy as np
 
+# scipy import with fallback for compatibility issues
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except Exception:
+    SCIPY_AVAILABLE = False
+    stats = None
+
+
+def _t_cdf_fallback(t: float, df: int) -> float:
+    """Fallback t-distribution CDF using normal approximation"""
+    import math
+    # For large df, t-distribution approaches normal distribution
+    if df > 30:
+        # Standard normal CDF approximation
+        x = t / math.sqrt(1 + t**2 / (2 * df))
+        return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+    # For small df, use a rough approximation
+    # Using the relationship: t^2 ~ chi2 / df
+    from .conditional_independence import _chi2_cdf_fallback
+    t2 = t**2
+    chi2_cdf = _chi2_cdf_fallback(t2, df)
+    # Two-tailed p-value approximation
+    return 0.5 + (0.5 - chi2_cdf / 2) if t >= 0 else chi2_cdf / 2
+
+
+if not SCIPY_AVAILABLE:
+    class _TDist:
+        @staticmethod
+        def cdf(t, df):
+            return _t_cdf_fallback(t, df)
+    stats = type('stats', (), {'t': _TDist()})()
+
 
 class StrengthEstimator:
     """
@@ -169,7 +202,6 @@ class StrengthEstimator:
 
         # 计算 p-value（使用 t-test）
         t_stat = correlation * np.sqrt(n - 2) / np.sqrt(1 - correlation**2)
-        from scipy import stats
         p_value = 2 * (1 - stats.t.cdf(abs(t_stat), n - 2))
 
         return {
@@ -194,8 +226,6 @@ class StrengthEstimator:
 
         其中 β 是因果效应
         """
-        from scipy import stats
-
         n = len(x_data)
 
         # 构建回归矩阵

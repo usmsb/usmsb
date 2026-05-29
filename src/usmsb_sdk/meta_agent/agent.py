@@ -457,7 +457,8 @@ class MetaAgent:
         self._external_agents_connected: bool = False  # 动态更新，见 _perceive_environment
 
         # ========== A2A 协议（协作场景激活）==========
-        self._a2a_adapter: Any = None
+        self._a2a_adapter: Any = None  # Legacy A2AAdapter (deprecated)
+        self._custom_a2a_handler: Any = None  # CustomA2AHandler (new)
 
         # ========== MCP Gateway（P5）==========
         self._mcp_gateway: Any = None
@@ -837,14 +838,45 @@ class MetaAgent:
             except Exception as e:
                 logger.warning("A2A registration skipped (platform server not reachable): %s", e)
 
-            # Initialize A2A Adapter for collaboration messaging
+            # Initialize Custom A2A Handler for collaboration messaging
+            try:
+                from usmsb_sdk.protocol.custom_a2a import CustomA2AHandler
+                from usmsb_sdk.protocol.types.custom_a2a import CustomAgentCard, CustomSkill
+
+                # Create Custom AgentCard
+                custom_card = CustomAgentCard(
+                    id=self.agent_id,
+                    name=f"MetaAgent-{self.agent_id}",
+                    description="USMSB MetaAgent with goal layer",
+                    capabilities=["goal_directed", "multi_protocol", "collective_intelligence"],
+                    skills=[
+                        CustomSkill(
+                            id="collaboration",
+                            name="collaboration",
+                            description="A2A collaboration skill",
+                        )
+                    ],
+                    owner_wallet="",
+                    reputation=0.8,
+                )
+
+                self._custom_a2a_handler = CustomA2AHandler(
+                    agent_id=self.agent_id,
+                    agent_card=custom_card,
+                )
+                logger.info("CustomA2AHandler initialized for collaboration scenarios")
+            except Exception as e:
+                logger.warning("CustomA2AHandler init failed (non-critical): %s", e)
+                self._custom_a2a_handler = None
+
+            # Keep legacy A2AAdapter for backward compatibility
             try:
                 from usmsb_sdk.protocol.a2a_adapter import A2AAdapter, A2AMessageType
                 self._a2a_adapter = A2AAdapter(agent_id=self.agent_id)
                 self._a2a_message_type = A2AMessageType
-                logger.info("A2AAdapter initialized for collaboration scenarios")
+                logger.info("Legacy A2AAdapter initialized (for backward compatibility)")
             except Exception as e:
-                logger.warning("A2AAdapter init failed (non-critical): %s", e)
+                logger.warning("A2AAdapter init failed: %s", e)
                 self._a2a_adapter = None
         except Exception as e:
             logger.warning("A2A agent registration failed: %s", e)
@@ -1705,16 +1737,85 @@ class MetaAgent:
             list[str]: 已发送消息的 Agent ID 列表
         """
         sent_to: list[str] = []
-        if not self._a2a_adapter:
-            logger.debug("[A2A] No A2AAdapter available")
-            return sent_to
+
+        # Try CustomA2AHandler first (new implementation)
+        if self._custom_a2a_handler:
+            return await self._broadcast_via_custom_a2a(task, scenario_tag)
+
+        # Fallback to legacy A2AAdapter
+        if self._a2a_adapter:
+            return await self._broadcast_via_legacy_adapter(task, scenario_tag)
+
+        logger.debug("[A2A] No A2A handler available")
+        return sent_to
+
+    async def _broadcast_via_custom_a2a(
+        self,
+        task: str,
+        scenario_tag,
+    ) -> list[str]:
+        """通过 CustomA2AHandler 广播协作请求"""
+        sent_to: list[str] = []
 
         try:
             # 从 P2P handler 获取在线 Agent ID 列表
             peer_ids: list[str] = []
             if hasattr(self, "_p2p_handler") and self._p2p_handler:
                 try:
-                    # 直接从 _peers 字典获取在线节点的 node_id
+                    peers_dict = getattr(self._p2p_handler, '_peers', {})
+                    peer_ids = [
+                        pid for pid, pinfo in peers_dict.items()
+                        if getattr(pinfo, 'status', '') == 'online'
+                    ]
+                except Exception as e:
+                    logger.debug("[A2A] Failed to get peer list: %s", e)
+
+            if not peer_ids:
+                logger.info("[A2A] COLLAB scenario '%s' detected but no peers available",
+                           getattr(scenario_tag, 'scenario', '?'))
+                return sent_to
+
+            for peer_id in peer_ids:
+                try:
+                    task_id = await self._custom_a2a_handler.send_task_request(
+                        to_agent=peer_id,
+                        description=f"COLLAB协作请求: {getattr(scenario_tag, 'scenario', 'unknown')}",
+                        input_data={
+                            "task": task,
+                            "scenario": getattr(scenario_tag, 'scenario', ''),
+                            "complexity": getattr(scenario_tag, 'complexity', ''),
+                            "layer": getattr(scenario_tag, 'suggested_layer', ''),
+                            "source_agent": self.agent_id,
+                        },
+                        skill_id="collaboration",
+                    )
+                    sent_to.append(peer_id)
+                    logger.info("[A2A] Sent collaboration request to %s (task_id=%s)",
+                               peer_id, task_id[:12] if task_id else '?')
+                except Exception as e:
+                    logger.warning("[A2A] Failed to send to %s: %s", peer_id, e)
+
+            if sent_to:
+                logger.info("[A2A] CustomA2A broadcast to %d agents", len(sent_to))
+
+        except Exception as e:
+            logger.warning("[A2A] CustomA2A broadcast failed: %s", e)
+
+        return sent_to
+
+    async def _broadcast_via_legacy_adapter(
+        self,
+        task: str,
+        scenario_tag,
+    ) -> list[str]:
+        """通过 legacy A2AAdapter 广播协作请求（向后兼容）"""
+        sent_to: list[str] = []
+
+        try:
+            # 从 P2P handler 获取在线 Agent ID 列表
+            peer_ids: list[str] = []
+            if hasattr(self, "_p2p_handler") and self._p2p_handler:
+                try:
                     peers_dict = getattr(self._p2p_handler, '_peers', {})
                     peer_ids = [
                         pid for pid, pinfo in peers_dict.items()
@@ -1753,10 +1854,10 @@ class MetaAgent:
                     logger.warning("[A2A] Failed to send to %s: %s", peer_id, e)
 
             if sent_to:
-                logger.info("[A2A] Broadcast collaboration request to %d agents", len(sent_to))
+                logger.info("[A2A] Legacy A2A broadcast to %d agents", len(sent_to))
 
         except Exception as e:
-            logger.warning("[A2A] Collaboration broadcast failed: %s", e)
+            logger.warning("[A2A] Legacy broadcast failed: %s", e)
 
         return sent_to
 
@@ -4381,11 +4482,26 @@ class MetaAgent:
             "tool_calls": tool_calls,
         })
 
-        for tool_result in tool_results:
+        for idx, tool_result in enumerate(tool_results):
+            # 匹配工具调用的 ID：优先按索引匹配，其次按工具名匹配
+            tool_call_id = None
+            if idx < len(tool_calls):
+                tool_call_id = tool_calls[idx].get("id")
+
+            if tool_call_id is None:
+                tool_name = tool_result.get("tool", "")
+                for tc in tool_calls:
+                    if tc.get("function", {}).get("name") == tool_name:
+                        tool_call_id = tc.get("id")
+                        break
+
+            if tool_call_id is None and tool_calls:
+                tool_call_id = tool_calls[0].get("id")
+
             current_messages.append({
                 "role": "tool",
                 "content": json.dumps(_serialize_for_json(tool_result), ensure_ascii=False),
-                "tool_call_id": tool_calls[0].get("id") if tool_calls else None,
+                "tool_call_id": tool_call_id,
             })
 
     async def _check_needs_tools(
@@ -4654,9 +4770,13 @@ class MetaAgent:
                 import traceback
 
                 traceback.print_exc()
+                # 安全获取 tool_name：优先使用局部变量，否则尝试从 tool_call 获取
+                tool_name_in_error = locals().get("tool_name")
+                if tool_name_in_error is None:
+                    tool_name_in_error = tool_call.get("function", {}).get("name", "unknown") if 'tool_call' in locals() else "unknown"
                 results.append(
                     {
-                        "tool": tool_name if "tool_name" in dir() else "unknown",
+                        "tool": tool_name_in_error,
                         "result": {"error": f"工具执行失败: {str(e)}"},
                         "success": False,
                     }

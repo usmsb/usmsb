@@ -23,12 +23,12 @@ export default function StakingPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-primary font-rajdhani">质押合约</h1>
+        <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">质押合约</h1>
         <a
           href={`https://sepolia.basescan.org/address/${'0x1901Ab56eA38cBeFc7a3F0Ed188B7108d27f4c05'}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-neon-blue hover:underline font-cyber"
         >
           Basescan ↗
         </a>
@@ -67,15 +67,15 @@ export default function StakingPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border-primary">
+      <div className="flex gap-1 border-b border-neon-blue/20">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors font-cyber ${
               activeTab === tab.id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-text-muted hover:text-text-primary'
+                ? 'border-neon-blue text-neon-blue'
+                : 'border-transparent text-gray-500 hover:text-neon-blue'
             }`}
           >
             {tab.label}
@@ -86,8 +86,8 @@ export default function StakingPage() {
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-            <h3 className="text-text-primary font-rajdhani font-semibold mb-4">合约参数</h3>
+          <div className="card hologram p-6">
+            <h3 className="text-neon-blue font-cyber font-semibold mb-4">合约参数</h3>
             <div className="space-y-3">
               {[
                 ['合约地址', '0x1901Ab56eA38cBeFc7a3F0Ed188B7108d27f4c05', 'mono'],
@@ -95,38 +95,38 @@ export default function StakingPage() {
                 ['总质押量', stats ? `${Number(stats.total_staked).toLocaleString()} VIBE` : '-', 'num'],
                 ['奖励池余额', stats ? `${Number(stats.reward_pool).toLocaleString()} VIBE` : '-', 'num'],
               ].map(([label, value, type]) => (
-                <div key={label as string} className="flex justify-between items-center py-2 border-b border-border-primary/30 last:border-0">
-                  <span className="text-text-muted text-sm">{label}</span>
-                  <span className={`text-text-primary text-sm font-mono ${type === 'mono' ? 'text-xs' : ''}`}>{value as string}</span>
+                <div key={label as string} className="flex justify-between items-center py-2 border-b border-neon-blue/10 last:border-0">
+                  <span className="text-gray-500 text-sm font-cyber">{label}</span>
+                  <span className={`text-gray-200 text-sm font-mono ${type === 'mono' ? 'text-xs text-neon-blue' : ''}`}>{value as string}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-            <h3 className="text-text-primary font-rajdhani font-semibold mb-4">质押分布</h3>
+          <div className="card hologram p-6">
+            <h3 className="text-neon-blue font-cyber font-semibold mb-4">质押分布</h3>
             {isLoading ? (
-              <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-8 bg-bg-tertiary rounded animate-pulse" />)}</div>
+              <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-8 bg-cyber-dark rounded animate-pulse" />)}</div>
             ) : (
               <div className="space-y-3">
                 {(tiers ?? []).map((tier, i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <span className={`w-8 text-center text-lg font-bold ${TIER_COLORS[i] || 'text-text-muted'}`}>
+                    <span className={`w-8 text-center text-lg font-bold ${TIER_COLORS[i] || 'text-gray-500'}`}>
                       {i + 1}
                     </span>
                     <div className="flex-1">
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="text-text-primary">{String(tier?.label || `Tier ${i}`)}</span>
-                        <span className="text-text-muted font-mono">{tier?.min_stake} VIBE</span>
+                        <span className="text-gray-200">{String(tier?.label || `Tier ${i}`)}</span>
+                        <span className="text-gray-500 font-mono">{tier?.min_stake} VIBE</span>
                       </div>
-                      <div className="h-2 bg-bg-tertiary rounded-full overflow-hidden">
+                      <div className="h-2 bg-cyber-dark rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${['bg-success', 'bg-info', 'bg-warning', 'bg-danger', 'bg-primary'][i] || 'bg-primary'}`}
-                          style={{ width: `${Math.min(100, (1 / (tiers?.length || 1)) * 100 * (Number(tier?.multiplier || 1)))}%` }}
+                          className={`h-full rounded-full ${['bg-neon-green', 'bg-neon-blue', 'bg-neon-yellow', 'bg-neon-red', 'bg-neon-purple'][i] || 'bg-neon-blue'}`}
+                          style={{ width: `${Math.min(100, (1 / (tiers?.length || 1)) * 100 * (Number(tier?.multiplier || 1)))}%`, boxShadow: '0 0 10px currentColor' }}
                         />
                       </div>
                     </div>
-                    <span className="text-xs text-text-muted font-mono w-16 text-right">
+                    <span className="text-xs text-gray-500 font-mono w-16 text-right">
                       ×{tier?.multiplier ?? 1}
                     </span>
                   </div>
@@ -139,34 +139,34 @@ export default function StakingPage() {
 
       {/* Tiers Tab */}
       {activeTab === 'tiers' && (
-        <div className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
+        <div className="card hologram overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border-primary bg-bg-tertiary">
-                <th className="text-left px-4 py-3 text-text-muted font-normal">等级</th>
-                <th className="text-left px-4 py-3 text-text-muted font-normal">名称</th>
-                <th className="text-left px-4 py-3 text-text-muted font-normal">最低质押</th>
-                <th className="text-left px-4 py-3 text-text-muted font-normal">乘数</th>
+              <tr className="border-b border-neon-blue/20 bg-cyber-dark/50">
+                <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">等级</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">名称</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">最低质押</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">乘数</th>
               </tr>
             </thead>
             <tbody>
               {tiersLoading ? (
                 [...Array(5)].map((_, i) => (
-                  <tr key={i} className="border-b border-border-primary/50">
-                    {[...Array(4)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 w-20 bg-bg-tertiary rounded animate-pulse" /></td>)}
+                  <tr key={i} className="border-b border-neon-blue/10">
+                    {[...Array(4)].map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 w-20 bg-cyber-dark rounded animate-pulse" /></td>)}
                   </tr>
                 ))
               ) : (
                 tiers?.map((tier, i) => tier && (
-                  <tr key={i} className="border-b border-border-primary/50 hover:bg-bg-tertiary/30">
+                  <tr key={i} className="border-b border-neon-blue/10 hover:bg-cyber-dark/30 transition-colors">
                     <td className="px-4 py-3">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${TIER_COLORS[i]?.replace('text-', 'bg-').replace('text-', 'text-')}`}>
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-neon-blue/10 text-neon-blue border border-neon-blue/30`}>
                         {i + 1}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-text-primary">{tier.label}</td>
-                    <td className="px-4 py-3 font-mono text-text-secondary">{Number(tier.min_stake).toLocaleString()} VIBE</td>
-                    <td className="px-4 py-3"><span className="text-success font-bold">×{tier.multiplier}</span></td>
+                    <td className="px-4 py-3 text-gray-200">{tier.label}</td>
+                    <td className="px-4 py-3 font-mono text-gray-400">{Number(tier.min_stake).toLocaleString()} VIBE</td>
+                    <td className="px-4 py-3"><span className="text-neon-green font-bold font-cyber">×{tier.multiplier}</span></td>
                   </tr>
                 ))
               )}
@@ -179,27 +179,27 @@ export default function StakingPage() {
       {activeTab === 'my' && (
         <div className="space-y-6">
           {!address ? (
-            <div className="bg-bg-secondary rounded-xl border border-border-primary p-12 text-center">
-              <Shield className="w-12 h-12 mx-auto text-text-muted mb-3" />
-              <p className="text-text-muted">连接钱包查看我的质押信息</p>
+            <div className="card hologram p-12 text-center">
+              <Shield className="w-12 h-12 mx-auto text-gray-500 mb-3" />
+              <p className="text-gray-500 font-cyber">连接钱包查看我的质押信息</p>
             </div>
           ) : myStake ? (
             <div className="grid md:grid-cols-2 gap-6">
               {[
-                ['当前质押量', `${Number(myStake.stake).toFixed(2)} VIBE`, 'primary'],
-                ['当前等级', `Tier ${myStake.tier}`, 'info'],
-                ['待领取奖励', `${Number(myStake.pending_rewards).toFixed(2)} VIBE`, 'warning'],
-                ['已领取奖励', `${Number(myStake.rewards_claimed).toFixed(2)} VIBE`, 'success'],
+                ['当前质押量', `${Number(myStake.stake).toFixed(2)} VIBE`, 'neon-blue'],
+                ['当前等级', `Tier ${myStake.tier}`, 'neon-purple'],
+                ['待领取奖励', `${Number(myStake.pending_rewards).toFixed(2)} VIBE`, 'neon-yellow'],
+                ['已领取奖励', `${Number(myStake.rewards_claimed).toFixed(2)} VIBE`, 'neon-green'],
               ].map(([label, value, color]) => (
-                <div key={label as string} className="bg-bg-secondary rounded-xl border border-border-primary p-6">
-                  <p className="text-text-muted text-sm mb-1">{label}</p>
-                  <p className={`text-2xl font-bold font-mono text-${color}`}>{value as string}</p>
+                <div key={label as string} className="card hologram p-6">
+                  <p className="text-gray-500 text-sm mb-1 font-cyber">{label}</p>
+                  <p className={`text-2xl font-bold font-mono ${color}`} style={{ textShadow: `0 0 10px currentColor` }}>{value as string}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-bg-secondary rounded-xl border border-border-primary p-12 text-center">
-              <p className="text-text-muted">暂无质押记录</p>
+            <div className="card hologram p-12 text-center">
+              <p className="text-gray-500 font-cyber">暂无质押记录</p>
             </div>
           )}
         </div>

@@ -16,6 +16,7 @@ export function useWalletAuth() {
     setDid,
     setSession,
     setAgent,
+    setUserRole,
     setRole,
     setProfile,
     logout: clearAuth,
@@ -87,6 +88,9 @@ export function useWalletAuth() {
         setWallet(address, chainId)
         setDid(verifyResponse.did)
         setSession(verifyResponse.sessionId, verifyResponse.accessToken)
+        if (verifyResponse.userRole) {
+          setUserRole(verifyResponse.userRole as any)
+        }
 
         setIsAuthenticating(false)
         return true
@@ -101,7 +105,7 @@ export function useWalletAuth() {
       setIsAuthenticating(false)
       return false
     }
-  }, [address, chainId, signMessageAsync, setWallet, setDid, setSession])
+  }, [address, chainId, signMessageAsync, setWallet, setDid, setSession, setUserRole])
 
   // Check existing session
   const checkSession = useCallback(async () => {
@@ -113,6 +117,9 @@ export function useWalletAuth() {
       const session = await getSession()
       if (session.valid && session.agentId) {
         setAgent(session.agentId, session.stake || 0, session.reputation || 0)
+        if (session.userRole) {
+          setUserRole(session.userRole as any)
+        }
         return true
       }
       return false
@@ -120,7 +127,7 @@ export function useWalletAuth() {
       clearAuth()
       return false
     }
-  }, [sessionId, accessToken, setAgent, clearAuth])
+  }, [sessionId, accessToken, setAgent, setUserRole, clearAuth])
 
   // Logout
   const logout = useCallback(async () => {
@@ -157,6 +164,7 @@ export function useWalletAuth() {
 
     // Store actions
     setAgent,
+    setUserRole,
     setRole,
     setProfile,
   }

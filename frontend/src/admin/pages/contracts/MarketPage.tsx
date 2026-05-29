@@ -21,7 +21,7 @@ export default function MarketPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-text-primary font-rajdhani">市场数据</h1>
+      <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">市场数据</h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -43,13 +43,13 @@ export default function MarketPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border-primary">
+      <div className="flex gap-1 border-b border-neon-blue/20">
         {(['overview', 'vesting'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-primary'
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors font-cyber ${
+              activeTab === tab ? 'border-neon-blue text-neon-blue' : 'border-transparent text-gray-500 hover:text-neon-blue'
             }`}
           >
             {tab === 'overview' ? '合约列表' : 'Vesting 详情'}
@@ -58,26 +58,26 @@ export default function MarketPage() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
+        <div className="card hologram overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border-primary bg-bg-tertiary">
-                <th className="text-left px-4 py-3 text-text-muted font-normal">名称</th>
-                <th className="text-left px-4 py-3 text-text-muted font-normal">合约地址</th>
-                <th className="text-right px-4 py-3 text-text-muted font-normal">操作</th>
+              <tr className="border-b border-neon-blue/20 bg-cyber-dark/50">
+                <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">名称</th>
+                <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">合约地址</th>
+                <th className="text-right px-4 py-3 text-gray-500 font-cyber font-normal">操作</th>
               </tr>
             </thead>
             <tbody>
               {MARKET_CONTRACTS.map(c => (
-                <tr key={c.name} className="border-b border-border-primary/50 hover:bg-bg-tertiary/30">
-                  <td className="px-4 py-3 text-text-primary font-medium">{c.label}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-text-muted">{c.addr}</td>
+                <tr key={c.name} className="border-b border-neon-blue/10 hover:bg-cyber-dark/30 transition-colors">
+                  <td className="px-4 py-3 text-gray-200 font-medium">{c.label}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{c.addr}</td>
                   <td className="px-4 py-3 text-right">
                     <a
                       href={`https://sepolia.basescan.org/address/${c.addr}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
+                      className="inline-flex items-center gap-1 text-neon-blue hover:underline text-xs font-cyber"
                     >
                       <ExternalLink className="w-3 h-3" /> 查看
                     </a>
@@ -90,14 +90,14 @@ export default function MarketPage() {
       )}
 
       {activeTab === 'vesting' && (
-        <div className="bg-bg-secondary rounded-xl border border-border-primary p-6">
+        <div className="card hologram p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-text-primary font-rajdhani font-semibold">Vesting 合约</h3>
+            <h3 className="text-neon-blue font-cyber font-semibold">Vesting 合约</h3>
             <a
               href="https://sepolia.basescan.org/address/0x4d3008550fc164ccf0e1C0C4f666E77FC14dE924"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-neon-blue hover:underline font-cyber"
             >
               Basescan ↗
             </a>
@@ -109,13 +109,13 @@ export default function MarketPage() {
               ['锁仓类型', 'TGE + 12个月线性释放'],
               ['受益人数', '待查询'],
             ].map(([label, value]) => (
-              <div key={label} className="flex justify-between py-2 border-b border-border-primary/30 last:border-0">
-                <span className="text-text-muted text-sm">{label}</span>
-                <span className="text-text-primary text-sm">{value}</span>
+              <div key={label} className="flex justify-between py-2 border-b border-neon-blue/10 last:border-0">
+                <span className="text-gray-500 text-sm font-cyber">{label}</span>
+                <span className="text-gray-200 text-sm font-mono">{value}</span>
               </div>
             ))}
           </div>
-          <p className="text-text-muted text-xs mt-4">
+          <p className="text-gray-500 text-xs mt-4 font-cyber">
             Vesting 数据需要连接钱包后通过合约读取。部署时间基于项目早期区块估算。
           </p>
         </div>

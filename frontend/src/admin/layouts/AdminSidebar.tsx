@@ -92,10 +92,12 @@ export default function AdminSidebar({
 
   return (
     <aside className={clsx(
-      'fixed top-16 left-0 h-[calc(100vh-64px)] bg-bg-secondary border-r border-border-primary',
+      'fixed top-16 left-0 h-[calc(100vh-64px)] bg-cyber-card border-r border-neon-blue/20',
       'transition-all duration-300 z-30 flex flex-col',
       collapsed ? 'w-16' : 'w-64',
-    )}>
+    )}
+      style={{ boxShadow: 'inset -1px 0 0 rgba(0, 245, 255, 0.1)' }}
+    >
       {/* 导航列表 */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems
@@ -113,17 +115,17 @@ export default function AdminSidebar({
       </nav>
 
       {/* 折叠按钮 */}
-      <div className="p-3 border-t border-border-primary">
+      <div className="p-3 border-t border-neon-blue/20">
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:text-neon-blue hover:bg-cyber-card border border-transparent hover:border-neon-blue/30 transition-all"
         >
           {collapsed ? (
             <ChevronRight className="w-5 h-5" />
           ) : (
             <>
               <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm">收起</span>
+              <span className="text-sm font-cyber">收起</span>
             </>
           )}
         </button>
@@ -151,14 +153,16 @@ function NavItem({
         <button
           onClick={() => setExpanded(!expanded)}
           className={clsx(
-            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-            isActive ? 'bg-primary-muted text-primary border border-primary/30' : 'text-text-secondary hover:bg-bg-tertiary',
+            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all',
+            isActive
+              ? 'bg-neon-blue/10 text-neon-blue border border-neon-blue/30'
+              : 'text-gray-400 hover:bg-cyber-card hover:text-neon-blue border border-transparent',
           )}
         >
           <item.icon className="w-5 h-5 shrink-0" />
           {!collapsed && (
             <>
-              <span className="flex-1 text-left font-rajdhani font-medium text-sm">{item.label}</span>
+              <span className="flex-1 text-left font-cyber font-medium text-sm">{item.label}</span>
               <ChevronDown className={clsx('w-4 h-4 transition-transform', expanded && 'rotate-180')} />
             </>
           )}
@@ -175,10 +179,10 @@ function NavItem({
                   end={child.path === '/admin/contracts'}
                   className={clsx(
                     'flex items-center px-3 py-2 rounded-lg text-sm transition-colors',
-                    'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary',
+                    'text-gray-400 hover:bg-cyber-card hover:text-neon-blue',
                   )}
                 >
-                  <span>{child.label}</span>
+                  <span className="font-rajdhani">{child.label}</span>
                 </NavLink>
               ))
             }
@@ -192,18 +196,18 @@ function NavItem({
     <NavLink
       to={item.path}
       className={clsx(
-        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
+        'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all',
         isActive
-          ? 'bg-primary-muted text-primary border border-primary/30'
-          : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary',
+          ? 'bg-neon-blue/10 text-neon-blue border border-neon-blue/30'
+          : 'text-gray-400 hover:bg-cyber-card hover:text-neon-blue border border-transparent',
       )}
     >
       <item.icon className="w-5 h-5 shrink-0" />
       {!collapsed && (
-        <span className="font-rajdhani font-medium text-sm">{item.label}</span>
+        <span className="font-cyber font-medium text-sm">{item.label}</span>
       )}
       {!collapsed && item.badge && (
-        <span className="ml-auto px-2 py-0.5 rounded-full bg-danger text-white text-xs">
+        <span className="ml-auto px-2 py-0.5 rounded-full bg-neon-red text-white text-xs">
           {item.badge}
         </span>
       )}

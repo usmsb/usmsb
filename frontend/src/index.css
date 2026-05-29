@@ -401,13 +401,27 @@ body {
   }
 
   select.input option {
-    @apply bg-white text-secondary-900;
+    background-color: #ffffff;
+    color: #1f2937;
     padding: 0.5rem;
   }
 
   .dark select.input option {
-    background: #0d0d14;
-    color: #e5e7eb;
+    background-color: #0a0a10 !important;
+    color: #e5e7eb !important;
+    padding: 0.5rem;
+  }
+
+  .dark select.input option:hover,
+  .dark select.input option:focus {
+    background-color: rgba(0, 245, 255, 0.15) !important;
+    color: #00f5ff !important;
+  }
+
+  .dark select.input option:checked {
+    background-color: rgba(0, 245, 255, 0.2) !important;
+    color: #00f5ff !important;
+    font-weight: 600;
   }
 
   /* Button - Light Mode (Default) - AI 蓝紫渐变风格 */

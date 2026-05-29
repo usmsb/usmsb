@@ -31,6 +31,38 @@ from usmsb_sdk.protocol.a2a.client import (
     A2ASkillRequest,
     A2ASkillResponse,
 )
+# New types from unified type system
+from usmsb_sdk.protocol.types import (
+    A2AEnvelope,
+    # Google A2A types
+    TaskState,
+    Role,
+    MessageType,
+    Part,
+    Message,
+    Artifact,
+    Task,
+    SendMessageConfiguration,
+    TaskPushNotificationConfig,
+    AuthenticationInfo,
+    AgentCapabilities,
+    AgentExtension,
+    AgentProvider,
+    AgentInterface,
+    AgentSkill,
+    AgentCard,
+    SendMessageRequest,
+    GetTaskRequest,
+    CancelTaskRequest,
+    ListTasksRequest,
+    SubscribeToTaskRequest,
+    # Custom A2A types
+    CustomTaskStatus,
+    CustomMessageType,
+    CustomPart,
+    CustomMessage,
+    CustomTask,
+)
 from usmsb_sdk.protocol.a2a.client import (
     A2AClient as A2AProtocolHandler,
 )

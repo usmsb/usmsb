@@ -169,7 +169,7 @@ class CandidateSearch:
                 return candidates[:limit]
 
             ranked_indices = data.get("ranked_indices", [])[:limit]
-            return [candidates[i] for i in ranked_indices if i < len(candidates)]
+            return [candidates[i] for i in ranked_indices if 0 <= i < len(candidates)]
 
         except Exception as e:
             logger.warning(f"Ranking failed: {e}")

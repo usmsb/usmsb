@@ -12,11 +12,8 @@ CausalMetaLearner
 from dataclasses import dataclass, field
 from typing import Any
 
-import random
-from dataclasses import dataclass, field
-from typing import Any
-
 import numpy as np
+import random
 
 from .ewc_penalty import EWCPenalty, OnlineEWC
 from .task_sampler import CausalTaskSampler, CausalTask

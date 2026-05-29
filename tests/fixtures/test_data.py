@@ -569,3 +569,480 @@ def governance_flow():
 def transaction_flow():
     """交易流程"""
     return BusinessFlowTestData.create_transaction_flow()
+
+
+# ============================================================================
+# V2.1 因果学习系统测试数据
+# ============================================================================
+
+import numpy as np
+from enum import Enum
+from dataclasses import dataclass, field
+from typing import Optional
+
+
+class InputSize(Enum):
+    """输入大小枚举"""
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+
+class InputType(Enum):
+    """输入类型枚举"""
+    TEXT = "text"
+    CODE = "code"
+    DATA = "data"
+    MIXED = "mixed"
+    IMAGE = "image"
+
+
+class DomainArea(Enum):
+    """领域区域枚举"""
+    GENERAL = "general"
+    DATA_ANALYSIS = "data_analysis"
+    WEB_DEVELOPMENT = "web_development"
+    API_INTEGRATION = "api_integration"
+    TEXT_PROCESSING = "text_processing"
+
+
+@dataclass
+class TaskFeatures:
+    """任务特征"""
+    input_size: InputSize = InputSize.MEDIUM
+    input_type: InputType = InputType.MIXED
+    input_complexity: float = 0.5
+    has_api: bool = False
+    has_database: bool = False
+    is_real_time: bool = False
+    domain_area: DomainArea = DomainArea.GENERAL
+    time_limit: Optional[float] = None
+    memory_limit: Optional[float] = None
+    cost_budget: Optional[float] = None
+    accuracy_required: float = 0.7
+    creativity_required: float = 0.3
+    safety_required: float = 0.5
+
+    def to_dict(self) -> dict:
+        return {
+            "input_size": self.input_size.value,
+            "input_type": self.input_type.value,
+            "input_complexity": self.input_complexity,
+            "has_api": self.has_api,
+            "has_database": self.has_database,
+            "is_real_time": self.is_real_time,
+            "domain_area": self.domain_area.value,
+            "time_limit": self.time_limit,
+            "memory_limit": self.memory_limit,
+            "cost_budget": self.cost_budget,
+            "accuracy_required": self.accuracy_required,
+            "creativity_required": self.creativity_required,
+            "safety_required": self.safety_required,
+        }
+
+
+@dataclass
+class StrategyFeatures:
+    """策略特征"""
+    decomposition_depth: int = 1
+    parallel_threshold: float = 0.5
+    tool_count: int = 1
+    llm_call_budget: int = 5
+    retry_enabled: bool = True
+    verify_always: bool = False
+    verify_on_failure: bool = True
+    verify_sample_rate: float = 0.1
+
+    def to_dict(self) -> dict:
+        return {
+            "decomposition_depth": self.decomposition_depth,
+            "parallel_threshold": self.parallel_threshold,
+            "tool_count": self.tool_count,
+            "llm_call_budget": self.llm_call_budget,
+            "retry_enabled": self.retry_enabled,
+            "verify_always": self.verify_always,
+            "verify_on_failure": self.verify_on_failure,
+            "verify_sample_rate": self.verify_sample_rate,
+        }
+
+
+@dataclass
+class Strategy:
+    """策略"""
+    name: str
+    features: StrategyFeatures = field(default_factory=StrategyFeatures)
+    applicable_conditions: list = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "features": self.features.to_dict(),
+            "applicable_conditions": self.applicable_conditions,
+        }
+
+
+@dataclass
+class Outcome:
+    """执行结果"""
+    success: bool = True
+    quality: float = 0.0
+    duration: float = 0.0
+    resource_cost: float = 0.0
+    error_type: Optional[str] = None
+    partial_success: float = 0.0
+    llm_calls: int = 0
+    tool_calls: int = 0
+    retry_count: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "success": self.success,
+            "quality": self.quality,
+            "duration": self.duration,
+            "resource_cost": self.resource_cost,
+            "error_type": self.error_type,
+            "partial_success": self.partial_success,
+            "llm_calls": self.llm_calls,
+            "tool_calls": self.tool_calls,
+            "retry_count": self.retry_count,
+        }
+
+
+@dataclass
+class TaskRecord:
+    """任务记录"""
+    task_id: str
+    task_type: str
+    features: TaskFeatures
+    strategy: Strategy
+    parameters: dict
+    outcome: Outcome
+    timestamp: float
+    domain: str = "general"
+    conversation_id: Optional[str] = None
+    user_id: Optional[str] = None
+    metadata: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "task_id": self.task_id,
+            "task_type": self.task_type,
+            "features": self.features.to_dict(),
+            "strategy": self.strategy.to_dict(),
+            "parameters": self.parameters,
+            "outcome": self.outcome.to_dict(),
+            "timestamp": self.timestamp,
+            "domain": self.domain,
+            "conversation_id": self.conversation_id,
+            "user_id": self.user_id,
+            "metadata": self.metadata,
+        }
+
+
+def create_causal_discovery_test_data(n_samples: int = 100, seed: int = 42) -> list[TaskRecord]:
+    """
+    创建用于因果发现的测试数据
+
+    因果结构:
+    input_complexity -> quality (直接因果)
+    input_complexity -> duration (直接因果)
+    tool_count -> quality (直接因果)
+    accuracy_required -> quality (直接因果)
+    """
+    np.random.seed(seed)
+    records = []
+
+    for i in range(n_samples):
+        # 任务特征
+        complexity = np.random.beta(2, 5)  # 偏向低复杂度
+        accuracy_req = np.random.uniform(0.5, 1.0)
+        has_api = np.random.random() > 0.7
+        tool_count = np.random.poisson(2) + 1
+
+        features = TaskFeatures(
+            input_size=InputSize.MEDIUM if complexity < 0.6 else InputSize.LARGE,
+            input_type=InputType.MIXED,
+            input_complexity=complexity,
+            has_api=has_api,
+            has_database=np.random.random() > 0.8,
+            is_real_time=np.random.random() > 0.9,
+            domain_area=DomainArea.GENERAL,
+            accuracy_required=accuracy_req,
+            creativity_required=np.random.uniform(0.2, 0.8),
+            safety_required=np.random.uniform(0.3, 0.9),
+        )
+
+        # 策略
+        strategy = Strategy(
+            name=f"strategy_{i % 3}",
+            features=StrategyFeatures(
+                decomposition_depth=np.random.poisson(2) + 1,
+                tool_count=tool_count,
+                llm_call_budget=np.random.poisson(5) + 1,
+                retry_enabled=np.random.random() > 0.3,
+                verify_always=np.random.random() > 0.8,
+            ),
+        )
+
+        # 结果质量 - 与特征有因果关系
+        # quality = f(complexity, accuracy_req, tool_count) + noise
+        base_quality = 0.3
+        complexity_effect = (1 - complexity) * 0.3  # 低复杂度更容易高质量
+        accuracy_effect = accuracy_req * 0.2
+        tool_effect = min(tool_count / 10, 0.2)  # 工具数量有帮助但边际递减
+        noise = np.random.randn() * 0.1
+        quality = base_quality + complexity_effect + accuracy_effect + tool_effect + noise
+        quality = min(1.0, max(0.0, quality))
+
+        # duration 与 complexity 正相关
+        duration = 1.0 + complexity * 10 + np.random.exponential(2)
+
+        outcome = Outcome(
+            success=quality > 0.3,
+            quality=quality,
+            duration=duration,
+            resource_cost=complexity * 5 + tool_count * 0.5,
+            partial_success=quality,
+            llm_calls=np.random.poisson(5) + 1,
+            tool_calls=tool_count,
+            retry_count=np.random.poisson(1) if np.random.random() > 0.5 else 0,
+        )
+
+        record = TaskRecord(
+            task_id=f"causal_task_{i}",
+            task_type="data_analysis",
+            features=features,
+            strategy=strategy,
+            parameters={},
+            outcome=outcome,
+            timestamp=time.time() - (n_samples - i) * 3600,  # 逐渐过去的时间
+            domain="data_analysis",
+        )
+        records.append(record)
+
+    return records
+
+
+def create_meta_learning_test_data(n_domains: int = 3, n_tasks_per_domain: int = 10) -> tuple[list[TaskRecord], list[TaskRecord]]:
+    """
+    创建用于元学习的测试数据 - 支持集和查询集
+
+    返回: (support_set, query_set)
+    """
+    np.random.seed(42)
+    support_set = []
+    query_set = []
+
+    domains = [
+        (DomainArea.DATA_ANALYSIS, "data_analysis"),
+        (DomainArea.WEB_DEVELOPMENT, "web_dev"),
+        (DomainArea.API_INTEGRATION, "api_integration"),
+    ]
+
+    for domain_idx, (domain_area, domain_name) in enumerate(domains):
+        for task_idx in range(n_tasks_per_domain):
+            complexity = np.random.beta(2, 3)
+            quality = 0.5 + 0.3 * (1 - complexity) + np.random.randn() * 0.1
+
+            features = TaskFeatures(
+                input_size=InputSize.MEDIUM,
+                input_type=InputType.MIXED,
+                input_complexity=complexity,
+                has_api=domain_idx != 0,
+                has_database=domain_idx == 0,
+                domain_area=domain_area,
+                accuracy_required=np.random.uniform(0.6, 0.95),
+            )
+
+            strategy = Strategy(
+                name=f"{domain_name}_strategy",
+                features=StrategyFeatures(
+                    decomposition_depth=domain_idx + 1,
+                    tool_count=domain_idx + 1,
+                ),
+            )
+
+            outcome = Outcome(
+                success=True,
+                quality=min(1.0, max(0.0, quality)),
+                duration=1.0 + complexity * 5,
+                llm_calls=domain_idx + 2,
+                tool_calls=domain_idx + 1,
+            )
+
+            record = TaskRecord(
+                task_id=f"{domain_name}_task_{task_idx}",
+                task_type=domain_name,
+                features=features,
+                strategy=strategy,
+                parameters={},
+                outcome=outcome,
+                timestamp=time.time() - task_idx * 100,
+                domain=domain_name,
+            )
+
+            # 前部分作为支持集，后部分作为查询集
+            if task_idx < n_tasks_per_domain * 0.6:
+                support_set.append(record)
+            else:
+                query_set.append(record)
+
+    return support_set, query_set
+
+
+def create_causal_graph_test_data() -> dict:
+    """
+    创建用于因果规划器测试的因果图数据
+
+    因果图结构:
+    A -> B -> C
+    A -> D
+    B -> D
+    """
+    from usmsb_sdk.meta_agent.models.causal_graph import CausalGraph, CausalEdge
+
+    graph = CausalGraph(graph_id="test_graph")
+    graph.nodes = {"A", "B", "C", "D"}
+    graph.edges = [
+        CausalEdge(edge_id="e1", source="A", target="B", strength=0.9),
+        CausalEdge(edge_id="e2", source="B", target="C", strength=0.8),
+        CausalEdge(edge_id="e3", source="A", target="D", strength=0.7),
+        CausalEdge(edge_id="e4", source="B", target="D", strength=0.85),
+    ]
+
+    return {
+        "graph": graph,
+        "target_nodes": ["C", "D"],
+        "expected_paths": {
+            "C": [["A", "B", "C"]],
+            "D": [["A", "D"], ["A", "B", "D"]],
+        },
+    }
+
+
+def create_reasoning_test_data() -> list[dict]:
+    """
+    创建用于推理增强层测试的测试数据
+    """
+    return [
+        {
+            "input": """## 推理步骤 1
+分析问题：
+- 用户需要一个排序算法
+- 数据规模是 1000 个整数
+
+## 推理步骤 2
+选择策略：
+- quicksort: 平均 O(n log n)，原地排序
+- mergesort: O(n log n)，稳定排序
+
+## 最终结论
+选择 quicksort，因为平均性能好且原地排序省空间""",
+            "expected_steps": 2,
+            "has_conclusion": True,
+        },
+        {
+            "input": """## 推理步骤 1
+分析问题：
+- 需要实现 API 集成
+- 涉及多个外部服务调用
+
+存在问题：
+- 没有考虑错误处理
+
+## 最终结论
+需要添加重试机制和错误处理""",
+            "expected_steps": 2,
+            "has_conclusion": True,
+            "has_issues": True,
+        },
+        {
+            "input": "这个任务很简单，直接做就行了",
+            "expected_steps": 0,
+            "has_conclusion": False,
+        },
+    ]
+
+
+def create_skill_gap_test_data() -> list[dict]:
+    """
+    创建用于 Skill 自创建系统测试的 SkillGap 数据
+    """
+    return [
+        {
+            "gap_id": "gap_001",
+            "source_node": "execution",
+            "target_node": "quality",
+            "gap_type": "missing_skill",
+            "priority": 0.9,
+            "description": "需要 skill 来提升代码质量检测能力",
+        },
+        {
+            "gap_id": "gap_002",
+            "source_node": "planning",
+            "target_node": "execution",
+            "gap_type": "missing_causal_link",
+            "priority": 0.7,
+            "description": "缺少从规划到执行的有效转换策略",
+        },
+        {
+            "gap_id": "gap_003",
+            "source_node": "api_call",
+            "target_node": "success",
+            "gap_type": "knowledge_gap",
+            "priority": 0.6,
+            "description": "API 调用失败后的重试策略不明确",
+        },
+    ]
+
+
+def create_incremental_update_test_data(n_initial: int = 50, n_incremental: int = 10) -> tuple[list[TaskRecord], list[TaskRecord]]:
+    """
+    创建用于增量更新测试的数据
+
+    返回: (initial_records, new_records)
+    """
+    np.random.seed(100)
+    initial_records = create_causal_discovery_test_data(n_samples=n_initial, seed=100)
+
+    np.random.seed(200)
+    new_records = create_causal_discovery_test_data(n_samples=n_incremental, seed=200)
+
+    return initial_records, new_records
+
+
+# Fixtures for V2.1
+@pytest.fixture
+def causal_discovery_data():
+    """因果发现测试数据"""
+    return create_causal_discovery_test_data(n_samples=100)
+
+
+@pytest.fixture
+def meta_learning_data():
+    """元学习测试数据"""
+    return create_meta_learning_test_data(n_domains=3, n_tasks_per_domain=10)
+
+
+@pytest.fixture
+def causal_graph_data():
+    """因果图测试数据"""
+    return create_causal_graph_test_data()
+
+
+@pytest.fixture
+def reasoning_data():
+    """推理增强测试数据"""
+    return create_reasoning_test_data()
+
+
+@pytest.fixture
+def skill_gap_data():
+    """Skill Gap 测试数据"""
+    return create_skill_gap_test_data()
+
+
+@pytest.fixture
+def incremental_update_data():
+    """增量更新测试数据"""
+    return create_incremental_update_test_data()

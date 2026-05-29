@@ -15,9 +15,9 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
-    <div className="bg-bg-tertiary border border-border-primary rounded-lg px-3 py-2 text-sm">
-      <p className="font-mono" style={{ color: d.color }}>{d.name}</p>
-      <p className="text-text-primary font-mono">{d.value.toLocaleString()} VIBE</p>
+    <div className="bg-cyber-card border border-neon-blue/30 rounded-lg px-3 py-2 text-sm">
+      <p className="font-mono font-cyber" style={{ color: d.color }}>{d.name}</p>
+      <p className="text-gray-200 font-mono">{d.value.toLocaleString()} VIBE</p>
     </div>
   )
 }
@@ -32,8 +32,8 @@ export default function StakeDistributionChart() {
   const total = MOCK_STAKE.reduce((s, d) => s + d.value, 0)
 
   return (
-    <div className="bg-bg-secondary rounded-xl border border-border-primary p-4">
-      <h3 className="text-text-primary font-rajdhani font-semibold mb-3">质押分布</h3>
+    <div className="card hologram p-4">
+      <h3 className="text-neon-blue font-cyber font-semibold mb-3">质押分布</h3>
       <ResponsiveContainer width="100%" height={160}>
         <PieChart>
           <Pie
@@ -55,10 +55,10 @@ export default function StakeDistributionChart() {
       <div className="space-y-1.5">
         {MOCK_STAKE.map((entry, i) => (
           <div key={i} className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: entry.color }} />
-            <span className="text-text-muted text-xs flex-1">{entry.name}</span>
-            <span className="text-text-secondary text-xs font-mono">{entry.value.toLocaleString()}</span>
-            <span className="text-text-muted text-xs w-10 text-right">
+            <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: entry.color, boxShadow: `0 0 5px ${entry.color}` }} />
+            <span className="text-gray-500 text-xs flex-1 font-cyber">{entry.name}</span>
+            <span className="text-gray-200 text-xs font-mono">{entry.value.toLocaleString()}</span>
+            <span className="text-gray-500 text-xs w-10 text-right font-cyber">
               {((entry.value / total) * 100).toFixed(0)}%
             </span>
           </div>

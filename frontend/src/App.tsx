@@ -76,8 +76,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* Admin Panel - 管理员专用路由 */}
-        <Route path="/admin" element={<AdminApp />} />
-        <Route path="/admin/command-center" element={<AdminApp />} />
+        <Route path="/admin/*" element={<AdminApp />} />
 
         {/* Docs Page - full page without layout */}
         <Route path="/docs" element={<DocsPage />} />
@@ -180,6 +179,9 @@ function App() {
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         <Route path="/publish/service" element={<Navigate to="/app/publish/service" replace />} />
         <Route path="/publish/demand" element={<Navigate to="/app/publish/demand" replace />} />
+
+        {/* 403 Forbidden */}
+        <Route path="/403" element={<div style={{padding: '40px', textAlign: 'center'}}><h1>403 - Admin Access Required</h1><p>You need admin privileges to access this page.</p><button onClick={() => window.location.href='/app'}>Go to App</button></div>} />
 
         {/* Catch-all redirect to dashboard */}
         <Route path="*" element={<Navigate to="/app" replace />} />

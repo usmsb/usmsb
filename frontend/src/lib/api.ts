@@ -545,6 +545,7 @@ export interface VerifyResponse {
   expiresIn: number
   did: string
   isNewUser: boolean
+  userRole?: string
 }
 
 export interface SessionResponse {
@@ -554,6 +555,7 @@ export interface SessionResponse {
   did?: string
   stake?: number
   reputation?: number
+  userRole?: string
 }
 
 /**

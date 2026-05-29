@@ -20,24 +20,27 @@ export function ProgressBar({
   size = 'md',
   className = '',
 }: ProgressBarProps) {
-  const color = percent >= critical ? 'bg-danger' :
-                percent >= warning ? 'bg-warning' : 'bg-success'
+  const color = percent >= critical ? 'bg-neon-red' :
+                percent >= warning ? 'bg-neon-yellow' : 'bg-neon-green'
 
   const heights = { sm: 'h-1.5', md: 'h-2.5', lg: 'h-4' }
 
   return (
     <div className={clsx('flex items-center gap-2', className)}>
-      <div className={clsx('flex-1 bg-bg-tertiary rounded-full overflow-hidden', heights[size])}>
+      <div className={clsx('flex-1 bg-cyber-dark rounded-full overflow-hidden border border-neon-blue/20', heights[size])}>
         <div
           className={clsx('h-full rounded-full transition-all duration-500', color)}
-          style={{ width: `${Math.min(percent, 100)}%` }}
+          style={{
+            width: `${Math.min(percent, 100)}%`,
+            boxShadow: `0 0 10px ${percent >= critical ? '#ff0040' : percent >= warning ? '#ffff00' : '#00ff88'}`
+          }}
         />
       </div>
       {showLabel && (
         <span className={clsx(
           'text-xs font-mono w-10 text-right shrink-0',
-          percent >= critical ? 'text-danger' :
-          percent >= warning ? 'text-warning' : 'text-text-secondary',
+          percent >= critical ? 'text-neon-red' :
+          percent >= warning ? 'text-neon-yellow' : 'text-neon-green',
         )}>
           {percent.toFixed(0)}%
         </span>

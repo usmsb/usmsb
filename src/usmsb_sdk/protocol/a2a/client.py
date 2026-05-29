@@ -1,8 +1,22 @@
 """
 A2A Protocol Client
 
+.. deprecated::
+    This module is deprecated. Use usmsb_sdk.protocol.google_a2a.handler
+    for Google A2A and usmsb_sdk.protocol.custom_a2a.handler for Custom A2A.
+
 This module provides the A2A client implementation for agent-to-agent communication.
 """
+
+import warnings
+
+warnings.warn(
+    "usmsb_sdk.protocol.a2a is deprecated. "
+    "Use usmsb_sdk.protocol.google_a2a.handler or "
+    "usmsb_sdk.protocol.custom_a2a.handler instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import asyncio
 import json
@@ -19,51 +33,10 @@ from usmsb_sdk.protocol.base import (
     SkillDefinition,
 )
 
+# Import A2AEnvelope from new location (eliminates duplicate definition)
+from usmsb_sdk.protocol.types.envelope import A2AEnvelope
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class A2AEnvelope:
-    """Envelope for A2A protocol messages."""
-    version: str = "1.0"
-    sender_id: str = ""
-    receiver_id: str = ""
-    message_type: str = ""
-    payload: dict[str, Any] = field(default_factory=dict)
-    correlation_id: str = ""
-    timestamp: float = field(default_factory=time.time)
-    ttl: int = 3600  # Time-to-live in seconds
-    signature: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "version": self.version,
-            "sender_id": self.sender_id,
-            "receiver_id": self.receiver_id,
-            "message_type": self.message_type,
-            "payload": self.payload,
-            "correlation_id": self.correlation_id,
-            "timestamp": self.timestamp,
-            "ttl": self.ttl,
-            "signature": self.signature,
-            "metadata": self.metadata,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "A2AEnvelope":
-        return cls(
-            version=data.get("version", "1.0"),
-            sender_id=data.get("sender_id", ""),
-            receiver_id=data.get("receiver_id", ""),
-            message_type=data.get("message_type", ""),
-            payload=data.get("payload", {}),
-            correlation_id=data.get("correlation_id", ""),
-            timestamp=data.get("timestamp", time.time()),
-            ttl=data.get("ttl", 3600),
-            signature=data.get("signature"),
-            metadata=data.get("metadata", {}),
-        )
 
 
 @dataclass
@@ -243,7 +216,7 @@ class A2AClient(BaseProtocolHandler):
             timeout=timeout,
         )
 
-        # Create A2A envelope
+        # Create A2A envelope using the centralized A2AEnvelope
         envelope = A2AEnvelope(
             sender_id=self._agent_id,
             receiver_id=self._remote_agent_info.agent_id if self._remote_agent_info else "",
@@ -395,7 +368,7 @@ class A2AClient(BaseProtocolHandler):
         """
         if self._connection_info:
             self._connection_info.messages_sent += 1
-            self._connection_info.bytes_sent += len(json.dumps(envelope.to_dict()))
+            self._connection_info.bytes_sent += len(json.dumps(envelope.model_dump()))
 
         logger.debug(f"A2A sending envelope: {envelope.message_type}")
 
@@ -410,7 +383,7 @@ class A2AClient(BaseProtocolHandler):
         Args:
             data: The received envelope data.
         """
-        envelope = A2AEnvelope.from_dict(data)
+        envelope = A2AEnvelope.model_validate(data)
 
         if self._connection_info:
             self._connection_info.messages_received += 1

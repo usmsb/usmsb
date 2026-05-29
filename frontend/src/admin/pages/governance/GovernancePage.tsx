@@ -25,7 +25,9 @@ export default function GovernancePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-text-primary font-rajdhani">治理投票</h1>
+      <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-purple font-cyber">
+        治理投票
+      </h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="活跃提案" value={activeProposals} icon={Target} color="warning" loading={isLoading} />
@@ -41,14 +43,14 @@ export default function GovernancePage() {
       </div>
 
       {/* 提案列表（链上数据，可展开详情） */}
-      <div className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
-        <div className="px-4 py-3 border-b border-border-primary bg-bg-tertiary flex items-center justify-between">
-          <h3 className="text-text-primary font-rajdhani font-semibold">链上提案</h3>
+      <div className="card hologram overflow-hidden">
+        <div className="px-4 py-3 border-b border-neon-blue/20 bg-cyber-dark/50 flex items-center justify-between">
+          <h3 className="text-neon-blue font-cyber font-semibold">链上提案</h3>
           <a
             href="https://sepolia.basescan.org/address/0x27475aea1eEba485005B1717a35a7D411d144a1d"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline"
+            className="text-xs text-neon-blue hover:underline font-cyber"
           >
             Basescan ↗
           </a>
@@ -56,7 +58,7 @@ export default function GovernancePage() {
         <div className="p-4">
           {chainLoading ? (
             <div className="space-y-3">
-              {[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-bg-tertiary rounded-lg animate-pulse" />)}
+              {[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-cyber-dark rounded-lg animate-pulse" />)}
             </div>
           ) : chainProposals && chainProposals.length > 0 ? (
             <ProposalsTable
@@ -71,7 +73,7 @@ export default function GovernancePage() {
               }))}
             />
           ) : (
-            <div className="text-center text-text-muted py-12">
+            <div className="text-center text-gray-500 py-12">
               {proposals.length > 0 ? '链上暂无提案数据，使用数据库记录' : '暂无提案数据'}
             </div>
           )}
@@ -80,35 +82,35 @@ export default function GovernancePage() {
 
       {/* 数据库记录列表（备用） */}
       {proposals.length > 0 && (
-        <div className="bg-bg-secondary rounded-xl border border-border-primary overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-primary bg-bg-tertiary">
-            <h3 className="text-text-primary font-rajdhani font-semibold">数据库提案记录</h3>
+        <div className="card hologram overflow-hidden">
+          <div className="px-4 py-3 border-b border-neon-blue/20 bg-cyber-dark/50">
+            <h3 className="text-neon-purple font-cyber font-semibold">数据库提案记录</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border-primary bg-bg-tertiary">
-                  <th className="text-left px-4 py-3 text-text-muted font-normal">提案ID</th>
-                  <th className="text-left px-4 py-3 text-text-muted font-normal">状态</th>
-                  <th className="text-right px-4 py-3 text-text-muted font-normal">赞成</th>
-                  <th className="text-right px-4 py-3 text-text-muted font-normal">反对</th>
+                <tr className="border-b border-neon-blue/20 bg-cyber-dark/50">
+                  <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">提案ID</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-cyber font-normal">状态</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-cyber font-normal">赞成</th>
+                  <th className="text-right px-4 py-3 text-gray-500 font-cyber font-normal">反对</th>
                 </tr>
               </thead>
               <tbody>
                 {proposals.map((p: Record<string, unknown>) => (
-                  <tr key={p.proposal_id as string || p.id as string} className="border-b border-border-primary/50 hover:bg-bg-tertiary/50">
-                    <td className="px-4 py-3 font-mono text-xs text-text-secondary">
+                  <tr key={p.proposal_id as string || p.id as string} className="border-b border-neon-blue/10 hover:bg-cyber-dark/30">
+                    <td className="px-4 py-3 font-mono text-xs text-neon-blue">
                       {(p.proposal_id as string || p.id as string || '').slice(0, 8)}...
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-neon-blue/10 text-neon-blue border border-neon-blue/30">
                         {(p.status as string) || 'active'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-success">
+                    <td className="px-4 py-3 text-right font-mono text-neon-green">
                       {(p.votes_for as number || 0).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-danger">
+                    <td className="px-4 py-3 text-right font-mono text-neon-red">
                       {(p.votes_against as number || 0).toLocaleString()}
                     </td>
                   </tr>

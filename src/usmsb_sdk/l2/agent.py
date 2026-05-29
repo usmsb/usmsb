@@ -27,8 +27,7 @@ class L2Config:
     agent_id: str
     name: str = "L2Agent"
     model: str = "gpt-3.5-turbo"
-    llm_client = None  # LLM client instance
-    model: str = "gpt-3.5-turbo"  # LLM 模型
+    llm_client: Any = None  # LLM client instance
     max_context_length: int = 4096
     tool_timeout: float = 30.0  # 工具超时（秒）
     enable_memory: bool = True

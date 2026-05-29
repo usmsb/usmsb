@@ -15,7 +15,122 @@ import math
 from typing import Any
 
 import numpy as np
-from scipy import stats
+
+# scipy import with fallback for compatibility issues
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except Exception:
+    SCIPY_AVAILABLE = False
+    stats = None
+
+
+def _gammainc_series(a: float, x: float, max_iter: int = 100, tol: float = 1e-10) -> float:
+    """Series expansion for regularized incomplete gamma function P(a, x)"""
+    # P(a, x) = (x^a * e^(-x) / gamma(a)) * sum_{n=0}^∞ x^n / (a*(a+1)*...*(a+n))
+    if x == 0:
+        return 0.0
+    lg = math.lgamma(a)
+    term = 1.0 / a
+    total = term
+    for n in range(1, max_iter):
+        term *= x / (a + n)
+        total += term
+        if abs(term) < tol * abs(total):
+            break
+    return total * math.exp(-x + a * math.log(x) - lg)
+
+
+def _gammainc_cf(a: float, x: float, max_iter: int = 100, tol: float = 1e-10) -> float:
+    """Continued fraction for regularized incomplete gamma function Q(a, x) = 1 - P(a, x)"""
+    # Uses the Gauss continued fraction
+    from math import inf
+    b = x + 1.0 - a
+    c = 1.0 / 1e-30  # Avoid division by zero
+    d = 1.0 / b
+    h = d
+    for i in range(1, max_iter):
+        an = -i * (i - a)
+        b += 2.0
+        d = an * d + b
+        if abs(d) < 1e-30:
+            d = 1e-30
+        c = b + an / c
+        if abs(c) < 1e-30:
+            c = 1e-30
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < tol:
+            break
+    return math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+
+
+def _gammainc(a: float, x: float) -> float:
+    """Regularized incomplete gamma function P(a, x)"""
+    if x < 0 or a <= 0:
+        return 0.0
+    if x == 0:
+        return 0.0
+    # Use series for small x, continued fraction for large x
+    if x < a + 1:
+        return _gammainc_series(a, x)
+    else:
+        return 1.0 - _gammainc_cf(a, x)
+
+
+def _chi2_cdf_fallback(x: float, df: int) -> float:
+    """Pure Python fallback chi2 CDF using math.gamma"""
+    if x <= 0:
+        return 0.0
+    if df <= 0:
+        return 1.0
+    a = df / 2.0
+    y = x / 2.0
+    return _gammainc(a, y)
+
+
+if not SCIPY_AVAILABLE:
+    # Create a minimal stats-like object for fallback
+
+    def _chi2_contingency_fallback(contingency: np.ndarray) -> tuple:
+        """Fallback chi2 contingency test"""
+        # Calculate chi2 statistic manually
+        n_rows, n_cols = contingency.shape
+        row_totals = contingency.sum(axis=1, keepdims=True)
+        col_totals = contingency.sum(axis=0, keepdims=True)
+        n_total = contingency.sum()
+
+        if n_total == 0:
+            return 0.0, 1.0, 0, np.zeros_like(contingency)
+
+        expected = (row_totals * col_totals) / n_total
+
+        chi2 = 0.0
+        for i in range(n_rows):
+            for j in range(n_cols):
+                if expected[i, j] > 0:
+                    chi2 += (contingency[i, j] - expected[i, j]) ** 2 / expected[i, j]
+
+        df = (n_rows - 1) * (n_cols - 1)
+        p_value = 1 - _chi2_cdf_fallback(chi2, max(df, 1))
+
+        return chi2, p_value, df, expected
+
+    class _Chi2:
+        @staticmethod
+        def cdf(x, df):
+            return _chi2_cdf_fallback(x, df)
+
+    class _Chi2Contingency:
+        @staticmethod
+        def chi2_contingency(contingency):
+            return _chi2_contingency_fallback(contingency)
+
+    stats = type('stats', (), {
+        'chi2': _Chi2(),
+    })()
+    stats.chi2_contingency = lambda contingency: _chi2_contingency_fallback(contingency)
 
 
 class ConditionalIndependenceTest:
@@ -123,7 +238,7 @@ class ConditionalIndependenceTest:
         y_disc = self._discretize(y, n_bins)
 
         # 计算联合分布和边缘分布
-        pxy, px, py = self._compute_joint_marginal(x_disc, y_disc)
+        pxy, px, py = self._compute_joint_marginal(x_disc, y_disc, n_bins)
 
         # 计算互信息
         mi = 0.0
@@ -173,7 +288,7 @@ class ConditionalIndependenceTest:
             y_z_disc = self._discretize(y_z, n_bins)
 
             # 联合和边缘分布
-            pxy_z, px_z, py_z = self._compute_joint_marginal(x_z_disc, y_z_disc)
+            pxy_z, px_z, py_z = self._compute_joint_marginal(x_z_disc, y_z_disc, n_bins)
 
             # 计算该层内的条件互信息
             cmi_z = 0.0
@@ -273,7 +388,7 @@ class ConditionalIndependenceTest:
 
         if z is None or len(z) == 0:
             contingency = self._create_contingency_table(x_disc, y_disc, n_bins)
-            g, p_value = self._g_test_contingency(contingency)
+            g, p_value, _, _ = self._g_test_contingency(contingency)
             return g, p_value
 
         # 条件检验

@@ -408,10 +408,11 @@ class SelfEvolutionEngine:
                             result["full_rebuild_triggered"] = True
                             logger.info("Causal graph full rebuild triggered")
 
-                # 3. 记录用于元学习
-                for record in new_records:
-                    # 简单记录，实际应该更新元学习状态
-                    pass
+                # 3. 记录用于元学习 (placeholder - 元学习更新需要更复杂的实现)
+                # TODO: 实现元学习状态更新
+                new_records_count = len(new_records) if new_records else 0
+                if new_records_count > 0:
+                    logger.debug(f"Recorded {new_records_count} new records for meta-learning")
 
             # 4. 检查是否应该全量重构
             if self._causal_discovery.updater.should_full_rebuild():

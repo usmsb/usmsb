@@ -2,7 +2,7 @@
  * Admin Panel App Router
  * 管理员专用管理后台路由
  */
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import AdminLayout from './layouts/AdminLayout'
 
@@ -47,48 +47,66 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// 根据路径渲染对应的页面组件
+function AdminPageRouter() {
+  const location = useLocation()
+  const path = location.pathname.replace('/admin', '') || '/'
+
+  switch (path) {
+    case '/':
+    case '/dashboard':
+      return <DashboardPage />
+    case '/nodes':
+      return <NodesPage />
+    case '/agents':
+      return <AgentsPage />
+    case '/users':
+      return <UsersPage />
+    case '/transactions':
+      return <TransactionsPage />
+    case '/orders':
+      return <OrdersPage />
+    case '/matching':
+      return <MatchingPage />
+    case '/gene-capsules':
+      return <GeneCapsulesPage />
+    case '/intelligence':
+      return <IntelligencePage />
+    case '/governance':
+      return <GovernancePage />
+    case '/contracts':
+      return <ContractsOverviewPage />
+    case '/contracts/staking':
+      return <StakingPage />
+    case '/contracts/rewards':
+      return <RewardsPage />
+    case '/contracts/governance':
+      return <GovernanceContractsPage />
+    case '/contracts/market':
+      return <MarketPage />
+    case '/contracts/orders':
+      return <OrdersContractsPage />
+    case '/system':
+      return <SystemPage />
+    case '/system/health':
+      return <HealthPage />
+    case '/system/config':
+      return <ConfigPage />
+    case '/system/logs':
+      return <LogsPage />
+    case '/permissions':
+      return <PermissionsPage />
+    default:
+      return <DashboardPage />
+  }
+}
+
 export default function AdminApp() {
   return (
     <AdminRoute>
-      <Routes>
-        {/* 入口重定向 */}
-        <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-
-        {/* 主要页面 */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="nodes" element={<NodesPage />} />
-          <Route path="agents" element={<AgentsPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="matching" element={<MatchingPage />} />
-          <Route path="gene-capsules" element={<GeneCapsulesPage />} />
-          <Route path="intelligence" element={<IntelligencePage />} />
-          <Route path="governance" element={<GovernancePage />} />
-
-          {/* 合约子页面 */}
-          <Route path="contracts" element={<ContractsOverviewPage />} />
-          <Route path="contracts/staking" element={<StakingPage />} />
-          <Route path="contracts/rewards" element={<RewardsPage />} />
-          <Route path="contracts/governance" element={<GovernanceContractsPage />} />
-          <Route path="contracts/market" element={<MarketPage />} />
-          <Route path="contracts/orders" element={<OrdersContractsPage />} />
-
-          {/* 系统管理 */}
-          <Route path="system" element={<SystemPage />} />
-          <Route path="system/health" element={<HealthPage />} />
-          <Route path="system/config" element={<ConfigPage />} />
-          <Route path="system/logs" element={<LogsPage />} />
-
-          {/* 权限管理（仅 superadmin） */}
-          <Route path="permissions" element={<PermissionsPage />} />
-        </Route>
-
-        {/* 独立全屏路由 */}
-        <Route path="/admin/command-center" element={<CommandCenterPage />} />
-      </Routes>
+      <AdminLayout>
+        <AdminPageRouter />
+      </AdminLayout>
     </AdminRoute>
   )
 }

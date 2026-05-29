@@ -200,9 +200,10 @@ class ChatWebSocketClient {
   }
 
   send(type: string, payload: Record<string, any>) {
-    const readyState = this.ws?.readyState
+    const ws = this.ws
+    const readyState = ws?.readyState
     console.log(`[ChatWS] send() called: type=${type}, readyState=${readyState}, OPEN=${WebSocket.OPEN}`)
-    if (readyState === WebSocket.OPEN) {
+    if (readyState === WebSocket.OPEN && ws) {
       const data = JSON.stringify({
         type,
         payload,
@@ -211,7 +212,7 @@ class ChatWebSocketClient {
         timestamp: Date.now() / 1000,
       })
       console.log('[ChatWS] Sending:', data)
-      this.ws.send(data)
+      ws.send(data)
     } else {
       console.warn('[ChatWS] send() dropped message - WebSocket not OPEN')
     }
@@ -400,6 +401,10 @@ export class ChatService {
     this.wsClient?.cancelTask(taskId)
   }
 
+  getSessionId(): string {
+    return this.wsClient?.getSessionId() || ''
+  }
+
   subscribe(handler: ChatEventHandler): () => void {
     const unsubscribes: Array<() => void> = []
 
@@ -488,11 +493,12 @@ export function useChatStreaming(options: UseChatStreamingOptions) {
     // React StrictMode 会立即重新执行 effect，然后执行 cleanup
     // 如果 serviceRef.current 已有实例，说明是 StrictMode 触发的重复执行
     // 此时应该复用现有实例，而不是创建新的
-    if (serviceRef.current) {
+    const existingService = serviceRef.current
+    if (existingService) {
       // 确保状态同步
       if (!isConnected) {
         setIsConnected(true)
-        setSessionId(serviceRef.current.getSessionId())
+        setSessionId(existingService.getSessionId())
       }
       return
     }

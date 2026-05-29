@@ -84,6 +84,7 @@ class VerifyResponse(BaseModel):
     expiresIn: int
     did: str
     isNewUser: bool
+    userRole: str = "human"
 
 
 class SessionResponse(BaseModel):
@@ -93,6 +94,7 @@ class SessionResponse(BaseModel):
     did: str | None = None
     stake: float | None = None
     reputation: float | None = None
+    userRole: str = "human"
 
 
 class StakeRequest(BaseModel):
@@ -378,6 +380,7 @@ async def verify_signature(request: VerifyRequest):
         expiresIn=int(SESSION_DURATION_HOURS * 3600),
         did=user['did'],
         isNewUser=is_new_user,
+        userRole=user.get('user_role', 'human'),
     )
 
 
@@ -391,6 +394,7 @@ async def get_current_session(user: dict = Depends(get_current_user)):
         did=user.get('did'),
         stake=user.get('stake'),
         reputation=user.get('reputation'),
+        userRole=user.get('user_role', 'human'),
     )
 
 
