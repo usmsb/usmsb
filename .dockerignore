@@ -1,0 +1,48 @@
+# Keep the Docker named build context small and secret-free.
+*
+
+# Files required to install usmsb-sdk from pyproject.toml.
+!pyproject.toml
+!README.md
+!src/
+!src/**
+
+# Never send local environment or secret files.
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Exclude tests and test artifacts from the build context.
+test/
+tests/
+**/test/
+**/tests/
+**/test_*.py
+**/*_test.py
+**/*.test.py
+**/*.spec.py
+**/.pytest_cache/
+**/coverage/
+**/htmlcov/
+
+# Exclude local databases and runtime state.
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.db-journal
+data/
+**/data/
+
+# Exclude Python and tool caches.
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/dist/
+**/build/
+**/.mypy_cache/
+**/.ruff_cache/
