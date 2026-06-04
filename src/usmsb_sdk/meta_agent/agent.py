@@ -1554,6 +1554,7 @@ class MetaAgent:
         retries: int = 2,
         max_tokens: int | None = None,
         temperature: float | None = None,
+        **generation_kwargs: Any,
     ) -> dict[str, Any]:
         """
         Execute a skill that must return a validated JSON object.
@@ -1598,6 +1599,7 @@ class MetaAgent:
             return_metadata=True,
             max_tokens=max_tokens,
             temperature=temperature,
+            **generation_kwargs,
         )
         await self.learn_from_feedback(
             event_type="structured_skill_execution",

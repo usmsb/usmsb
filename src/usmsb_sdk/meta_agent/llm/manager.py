@@ -42,6 +42,8 @@ class LLMManager:
                 "base_url": self.config.base_url or "https://api.minimaxi.com/v1",
                 "temperature": self.config.temperature,
                 "max_tokens": self.config.max_tokens,
+                "reasoning_split": getattr(self.config, "reasoning_split", None),
+                "service_tier": getattr(self.config, "service_tier", None),
             },
         )
         self._adapter = MiniMaxAdapter(config)

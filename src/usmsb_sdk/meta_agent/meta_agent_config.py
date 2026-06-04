@@ -17,6 +17,8 @@ class LLMConfig:
     model: str = "MiniMax-M2.5"
     temperature: float = 0.7
     max_tokens: int = 4000
+    reasoning_split: bool | None = None
+    service_tier: str | None = None
 
 
 @dataclass

@@ -74,6 +74,8 @@ class MiniMaxAdapter(ILLMAdapter):
         self.max_tokens = config.extra_params.get("max_tokens", self.DEFAULT_MAX_TOKENS)
         self.temperature = config.extra_params.get("temperature", self.DEFAULT_TEMPERATURE)
         self.base_url = config.extra_params.get("base_url", self.OPENAI_COMPAT_BASE_URL)
+        self.reasoning_split = config.extra_params.get("reasoning_split")
+        self.service_tier = config.extra_params.get("service_tier")
         self.embedding_api_key = config.extra_params.get(
             "embedding_api_key", os.getenv("MINIMAX_EMBEDDING_API_KEY")
         ) or config.api_key  # fallback to main API key
@@ -154,6 +156,9 @@ class MiniMaxAdapter(ILLMAdapter):
         temperature: float | None = None,
         system: str | None = None,
         tools: list[dict[str, Any]] | None = None,
+        reasoning_split: bool | None = None,
+        service_tier: str | None = None,
+        **extra_payload: Any,
     ) -> dict[str, Any]:
         """
         Make a raw chat request to MiniMax API.
@@ -174,6 +179,15 @@ class MiniMaxAdapter(ILLMAdapter):
             "temperature": temperature if temperature is not None else self.temperature,
             "messages": messages,
         }
+        effective_reasoning_split = self.reasoning_split if reasoning_split is None else reasoning_split
+        effective_service_tier = self.service_tier if service_tier is None else service_tier
+        if effective_reasoning_split is not None:
+            payload["reasoning_split"] = bool(effective_reasoning_split)
+        if effective_service_tier:
+            payload["service_tier"] = effective_service_tier
+        for key, value in extra_payload.items():
+            if value is not None and key not in payload:
+                payload[key] = value
 
         # 添加系统消息（如果有）
         if system:
@@ -317,11 +331,17 @@ class MiniMaxAdapter(ILLMAdapter):
         try:
             max_tokens = kwargs.get("max_tokens", self.max_tokens)
             temperature = kwargs.get("temperature", self.temperature)
+            passthrough = {
+                key: value
+                for key, value in kwargs.items()
+                if key not in {"max_tokens", "temperature"}
+            }
 
             response = await self._raw_chat_request(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature,
+                **passthrough,
             )
 
             return self._extract_text_from_response(response)
@@ -356,12 +376,18 @@ class MiniMaxAdapter(ILLMAdapter):
             try:
                 max_tokens = kwargs.get("max_tokens", self.max_tokens)
                 temperature = kwargs.get("temperature", self.temperature)
+                passthrough = {
+                    key: value
+                    for key, value in kwargs.items()
+                    if key not in {"max_tokens", "temperature"}
+                }
 
                 response = await self._raw_chat_request(
                     messages=[{"role": "user", "content": user_prompt}],
                     max_tokens=max_tokens,
                     temperature=temperature,
                     system=system_prompt,
+                    **passthrough,
                 )
 
                 return self._extract_text_from_response(response)
