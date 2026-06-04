@@ -159,7 +159,9 @@ class LLMManager:
                     schema=schema,
                 )
 
-        raise ValueError(f"LLM did not produce valid JSON after {attempts} attempts: {errors[-1] if errors else 'unknown error'}")
+        raise ValueError(
+            f"LLM did not produce valid JSON after {attempts} attempts: {errors[-1] if errors else 'unknown error'}"
+        )
 
     def _extract_json_object(self, text: str) -> dict[str, Any]:
         """Extract the first JSON object from raw model output."""
@@ -230,7 +232,9 @@ class LLMManager:
         error: str,
         schema: dict[str, Any] | None,
     ) -> str:
-        schema_text = json.dumps(schema, ensure_ascii=False, indent=2) if schema else "No explicit schema."
+        schema_text = (
+            json.dumps(schema, ensure_ascii=False, indent=2) if schema else "No explicit schema."
+        )
         return f"""The previous response was invalid JSON for the requested structured task.
 
 Validation error:
@@ -253,24 +257,24 @@ Return only one valid JSON object. Do not include markdown, prose, or code fence
         system_prompt: str | None = None,
         max_tokens: int = 1024,
         temperature: float = 0.7,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         同步补全方法（供 PurposeGenerator 等使用）
-        
+
         Args:
             prompt: 用户提示
             system_prompt: 系统提示
             max_tokens: 最大 token 数
             temperature: 温度参数
             **kwargs: 其他参数
-            
+
         Returns:
             str: LLM 响应文本
         """
         import asyncio
         import concurrent.futures
-        
+
         def run_async():
             """在线程中运行异步代码"""
             loop = asyncio.new_event_loop()
@@ -279,7 +283,7 @@ Return only one valid JSON object. Do not include markdown, prose, or code fence
                 return loop.run_until_complete(self.chat(prompt, system_prompt))
             finally:
                 loop.close()
-        
+
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(run_async)

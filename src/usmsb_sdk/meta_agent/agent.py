@@ -14,6 +14,7 @@ import re
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import uuid4
 
+from ..l1.rule_engine import RuleEngine, Stimulus
 from .config.chat_config import ChatConfig
 from .context.manager import ContextManager, UserInfo
 from .core.background_processor import BackgroundTaskProcessor
@@ -36,13 +37,11 @@ from .intent.recognizer import IntentRecognizer
 from .knowledge.base import KnowledgeBase
 from .knowledge.vector_store import VectorKnowledgeBase
 from .llm.manager import LLMManager
-from ..l1.rule_engine import RuleEngine, Stimulus
 from .memory.conversation import MessageRole, ParticipantType
 from .memory.conversation_manager import ConversationManager
 from .memory.error_learning import ErrorDrivenLearning
 from .memory.experience_db import ExperienceDB
 from .memory.guardian_daemon import GuardianConfig, GuardianDaemon
-from .strategy_router import StrategyRouter
 from .memory.memory_manager import MemoryConfig, MemoryManager
 from .memory.smart_recall import IntelligentRecall
 from .meta_agent_config import MetaAgentConfig
@@ -75,6 +74,7 @@ from .sensitive.registry import (
 from .session.session_manager import SessionManager
 from .session.user_session import SessionConfig
 from .skills.manager import SkillsManager
+from .strategy_router import StrategyRouter
 from .tools.registry import Tool, ToolRegistry
 from .wallet.manager import WalletManager
 
@@ -177,7 +177,7 @@ class _InlineSuperAdmin:
                 return None
             # Check VIBE balance
             balance = await self.wallet_manager.get_balance()
-            vibe_balance = getattr(balance, 'balance_vibe', 0) if balance else 0
+            vibe_balance = getattr(balance, "balance_vibe", 0) if balance else 0
             if vibe_balance < 100:
                 return None  # Not enough to stake
             # Evaluate staking opportunity (simplified: if balance > 500, stake 20%)
@@ -216,8 +216,10 @@ class PlatformClient:
     Lightweight HTTP client for USMSB Platform REST API.
     Used by GeneCapsuleAdapter to access platform services.
     """
+
     def __init__(self, base_url: str = "http://localhost:8000"):
         import httpx
+
         self.base_url = base_url.rstrip("/")
         self._client = httpx.AsyncClient(timeout=30.0)
         self._api_key = os.environ.get("USMSB_API_KEY", "")
@@ -232,6 +234,7 @@ class PlatformClient:
 
     class GeneCapsuleClient:
         """Gene Capsule API sub-client."""
+
         def __init__(self, parent: "PlatformClient"):
             self._p = parent
 
@@ -245,40 +248,64 @@ class PlatformClient:
             except Exception as e:
                 return {"success": False, "error": str(e)}
 
-        async def add_experience(self, title: str, description: str, skills: list, auto_desensitize: bool = True) -> dict:
+        async def add_experience(
+            self, title: str, description: str, skills: list, auto_desensitize: bool = True
+        ) -> dict:
             url = f"{self._p.base_url}/gene-capsule/experiences/add"
             try:
-                r = await self._p._client.post(url, json={
-                    "agent_id": self._p._agent_id, "title": title,
-                    "description": description, "skills": skills,
-                    "auto_desensitize": auto_desensitize,
-                }, headers=self._p._headers())
+                r = await self._p._client.post(
+                    url,
+                    json={
+                        "agent_id": self._p._agent_id,
+                        "title": title,
+                        "description": description,
+                        "skills": skills,
+                        "auto_desensitize": auto_desensitize,
+                    },
+                    headers=self._p._headers(),
+                )
                 if r.status_code in (200, 201):
                     return {"success": True, "data": r.json()}
                 return {"success": False, "error": f"HTTP {r.status_code}"}
             except Exception as e:
                 return {"success": False, "error": str(e)}
 
-        async def match(self, task_description: str, required_skills: list, min_relevance: float, limit: int) -> dict:
+        async def match(
+            self, task_description: str, required_skills: list, min_relevance: float, limit: int
+        ) -> dict:
             url = f"{self._p.base_url}/gene-capsule/experiences/match"
             try:
-                r = await self._p._client.post(url, json={
-                    "task_description": task_description, "required_skills": required_skills,
-                    "min_relevance": min_relevance, "limit": limit,
-                }, headers=self._p._headers())
+                r = await self._p._client.post(
+                    url,
+                    json={
+                        "task_description": task_description,
+                        "required_skills": required_skills,
+                        "min_relevance": min_relevance,
+                        "limit": limit,
+                    },
+                    headers=self._p._headers(),
+                )
                 if r.status_code == 200:
                     return {"success": True, "data": r.json()}
                 return {"success": False, "error": f"HTTP {r.status_code}"}
             except Exception as e:
                 return {"success": False, "error": str(e)}
 
-        async def search_agents(self, task_description: str, required_skills: list, min_relevance: float, limit: int) -> dict:
+        async def search_agents(
+            self, task_description: str, required_skills: list, min_relevance: float, limit: int
+        ) -> dict:
             url = f"{self._p.base_url}/gene-capsule/agents/search"
             try:
-                r = await self._p._client.post(url, json={
-                    "task_description": task_description, "required_skills": required_skills,
-                    "min_relevance": min_relevance, "limit": limit,
-                }, headers=self._p._headers())
+                r = await self._p._client.post(
+                    url,
+                    json={
+                        "task_description": task_description,
+                        "required_skills": required_skills,
+                        "min_relevance": min_relevance,
+                        "limit": limit,
+                    },
+                    headers=self._p._headers(),
+                )
                 if r.status_code == 200:
                     return {"success": True, "data": r.json()}
                 return {"success": False, "error": f"HTTP {r.status_code}"}
@@ -291,7 +318,6 @@ class PlatformClient:
 
     async def close(self):
         await self._client.aclose()
-
 
 
 class MetaAgent:
@@ -465,9 +491,9 @@ class MetaAgent:
         self._mcp_gateway: Any = None
 
         # L4/L5 决策上下文（意识影响决策的关键数据）
-        self._l4_lessons: list = []      # L4 历史教训
+        self._l4_lessons: list = []  # L4 历史教训
         self._l4_recommendations: list = []  # L4 推荐行动
-        self._l5_synthesis: str = ""     # L5 集体综合结论
+        self._l5_synthesis: str = ""  # L5 集体综合结论
         self._last_strategy_confidence: float = 1.0
 
         # ========== L3 自主运行循环 ==========
@@ -558,6 +584,7 @@ class MetaAgent:
             try:
                 from usmsb_sdk.api.rest.gene_capsule_service import GeneCapsuleStorageService
                 from usmsb_sdk.services.schema import create_session
+
                 db_session = create_session()
                 gene_capsule_service = GeneCapsuleStorageService(db_session)
             except ImportError:
@@ -565,8 +592,9 @@ class MetaAgent:
 
             pre_match_service = None
             try:
-                from usmsb_sdk.services.value_contract.negotiation import ValueNegotiationService
                 from usmsb_sdk.services.schema import create_session
+                from usmsb_sdk.services.value_contract.negotiation import ValueNegotiationService
+
                 db_session = create_session()
                 pre_match_service = ValueNegotiationService(db_session)
             except ImportError:
@@ -586,7 +614,9 @@ class MetaAgent:
         # 启动主循环
         self._running = True
         self._main_loop_task = asyncio.create_task(self._main_loop())
-        logger.info(f"Meta Agent {self.agent_id} runtime started (main loop task={id(self._main_loop_task)})")
+        logger.info(
+            f"Meta Agent {self.agent_id} runtime started (main loop task={id(self._main_loop_task)})"
+        )
 
         # 阻塞直到被 stop() 取消（standalone 模式）
         # FastAPI 等外部管理生命周期的场景：block_forever=False，不阻塞
@@ -742,10 +772,11 @@ class MetaAgent:
         """Initialize OpenHarness integration and inject tools into registry."""
         try:
             from usmsb_sdk.adapters.openharness import OpenHarnessIntegration
+
             self.oh_integration = OpenHarnessIntegration.from_env(cwd=self.config.data_dir or ".")
             await self.oh_integration.initialize()
             logger.info("OpenHarness initialized")
-            
+
             # Inject OH tools into USMSB tool registry
             injected = self.oh_integration.inject_oh_tools_into_registry(
                 self.tool_registry,
@@ -761,8 +792,9 @@ class MetaAgent:
         try:
             base_url = os.environ.get("USMSB_PLATFORM_URL", "http://localhost:8000")
             self.platform_client = PlatformClient(base_url=base_url)
-            
+
             from usmsb_sdk.intelligence_adapters.gene_capsule_adapter import GeneCapsuleAdapter
+
             self.gene_capsule_adapter = GeneCapsuleAdapter(
                 platform_client=self.platform_client,
                 llm_adapter=self.llm_manager,  # Phase2: 使用真实 LLM Manager
@@ -787,11 +819,11 @@ class MetaAgent:
             self._mcp_gateway = MCPGateway(registry=registry)
 
             # 从 ToolRegistry 迁移已有工具到 MCP Gateway
-            if hasattr(self, 'tool_registry') and self.tool_registry:
+            if hasattr(self, "tool_registry") and self.tool_registry:
                 try:
                     existing_tools = self.tool_registry.list_tools()
                     for tool in existing_tools:
-                        tool_name = getattr(tool, 'name', None) or getattr(tool, 'tool_id', None)
+                        tool_name = getattr(tool, "name", None) or getattr(tool, "tool_id", None)
                         if tool_name:
                             self._mcp_gateway.register_tool(tool)
                     logger.info("[MCP] Migrated %d tools to MCP Gateway", len(existing_tools))
@@ -807,8 +839,7 @@ class MetaAgent:
         """Register this MetaAgent as an A2A agent with the platform HTTP server."""
         try:
             # Import A2A registration router
-            from usmsb_sdk.api.rest.routers.registration import register_via_a2a
-            
+
             agent_card = {
                 "name": f"MetaAgent-{self.agent_id}",
                 "description": "USMSB MetaAgent - L1-L5 autonomous agent with goal layer",
@@ -822,9 +853,10 @@ class MetaAgent:
                     "layers": ["L1", "L2", "L3", "L4", "L5"],
                 },
             }
-            
+
             # Post to local registration endpoint if server is running
             import httpx
+
             try:
                 base_url = os.environ.get("USMSB_PLATFORM_URL", "http://localhost:8000")
                 async with httpx.AsyncClient(timeout=5.0) as client:
@@ -835,7 +867,10 @@ class MetaAgent:
                     if r.status_code in (200, 201):
                         logger.info("A2A agent registration successful: %s", self.agent_id)
                     else:
-                        logger.warning("A2A registration returned HTTP %d (server may not be running)", r.status_code)
+                        logger.warning(
+                            "A2A registration returned HTTP %d (server may not be running)",
+                            r.status_code,
+                        )
             except Exception as e:
                 logger.warning("A2A registration skipped (platform server not reachable): %s", e)
 
@@ -873,6 +908,7 @@ class MetaAgent:
             # Keep legacy A2AAdapter for backward compatibility
             try:
                 from usmsb_sdk.protocol.a2a_adapter import A2AAdapter, A2AMessageType
+
                 self._a2a_adapter = A2AAdapter(agent_id=self.agent_id)
                 self._a2a_message_type = A2AMessageType
                 logger.info("Legacy A2AAdapter initialized (for backward compatibility)")
@@ -1012,13 +1048,14 @@ class MetaAgent:
             logger.info("TaskExecutor initialized with progress store")
         except Exception as e:
             import traceback
+
             logger.error(f"TaskExecutor initialization failed: {e}")
             logger.debug(f"Traceback: {traceback.format_exc()}")
             self.task_executor = None
 
     def _register_l1_rules(self):
         """注册 L1 规则（MetaAgent 专用快速匹配规则）"""
-        from ..l1.rule_engine import Rule, Condition, Action, ConditionType, ActionType
+        from ..l1.rule_engine import Action, ActionType, Condition, ConditionType, Rule
 
         rules = [
             # 简单查询类 - 直接响应
@@ -1170,7 +1207,9 @@ class MetaAgent:
                     response_parts.append(f"**可用脚本**: {', '.join(scripts)}")
 
                 response_parts.append("")
-                response_parts.append("请按照上述指令执行任务。如果指令中有多个步骤，请按顺序执行。")
+                response_parts.append(
+                    "请按照上述指令执行任务。如果指令中有多个步骤，请按顺序执行。"
+                )
 
                 return "\n".join(response_parts)
             except Exception as e:
@@ -1445,8 +1484,9 @@ class MetaAgent:
     async def _init_p2p_network(self) -> None:
         """Initialize P2P network for external Agent discovery."""
         try:
-            from usmsb_sdk.protocol.p2p.handler import P2PHandler
             from usmsb_sdk.protocol.base import ProtocolConfig
+            from usmsb_sdk.protocol.p2p.handler import P2PHandler
+
             self._p2p_handler = P2PHandler(
                 config=ProtocolConfig(enabled=True),
                 node_id=self.agent_id,
@@ -1480,6 +1520,7 @@ class MetaAgent:
         """Initialize L4 self-conscious agent."""
         try:
             from usmsb_sdk.l4.l4_agent import L4SelfConsciousAgent as L4Agent
+
             self.l4_agent = L4Agent(agent_id=self.agent_id, name=f"Agent-{self.agent_id}")
             logger.info("L4Agent initialized")
         except Exception as e:
@@ -1490,6 +1531,7 @@ class MetaAgent:
         """Initialize L5 Collective Intelligence."""
         try:
             from usmsb_sdk.l5.l5_collective import L5CollectiveIntelligence
+
             self.l5_collective = L5CollectiveIntelligence(
                 collective_id=self.agent_id,
                 llm_adapter=self.llm_manager,
@@ -1608,7 +1650,9 @@ class MetaAgent:
         l5_context: str,
         schema: dict[str, Any] | None,
     ) -> str:
-        schema_text = json.dumps(schema, ensure_ascii=False, indent=2) if schema else "No explicit schema."
+        schema_text = (
+            json.dumps(schema, ensure_ascii=False, indent=2) if schema else "No explicit schema."
+        )
         return f"""You are executing USMSB MetaAgent structured skill `{skill_name}`.
 
 Hard rules:
@@ -1696,13 +1740,15 @@ Hard rules:
         if self.error_learning and getattr(self.error_learning, "experience_db", None):
             try:
                 success = quality_score is None or quality_score >= 0.6
-                await self.error_learning.experience_db.add({
-                    "type": "success_experience" if success else "failure_lesson",
-                    "experience_type": event_type,
-                    "lesson_type": event_type,
-                    "content": json.dumps(payload, ensure_ascii=False, default=str),
-                    "context": {"tags": tags, "quality_score": quality_score},
-                })
+                await self.error_learning.experience_db.add(
+                    {
+                        "type": "success_experience" if success else "failure_lesson",
+                        "experience_type": event_type,
+                        "lesson_type": event_type,
+                        "content": json.dumps(payload, ensure_ascii=False, default=str),
+                        "context": {"tags": tags, "quality_score": quality_score},
+                    }
+                )
                 stored["experience_db"] = True
             except Exception as exc:
                 logger.warning("[FeedbackLearning] experience store failed: %s", exc)
@@ -1743,18 +1789,20 @@ Hard rules:
         """
         try:
             from usmsb_sdk.l3.autonomous_loop import AutonomousLoop, LoopConfig
-            from usmsb_sdk.l3.intrinsic_motivation import IntrinsicMotivationEngine
-            from usmsb_sdk.l3.purpose_generator import PurposeGenerator
             from usmsb_sdk.l3.emotional_goal_selector import EmotionalGoalSelector
+            from usmsb_sdk.l3.intrinsic_motivation import IntrinsicMotivationEngine
             from usmsb_sdk.l3.llm_goal_prioritizer import LLMGoalPrioritizer
+            from usmsb_sdk.l3.purpose_generator import PurposeGenerator
 
             # 创建 L3 核心组件
             motivation_engine = IntrinsicMotivationEngine()
 
             # PurposeGenerator 使用 LLMClient
             llm_client = None
-            if hasattr(self, 'llm_manager') and self.llm_manager:
-                llm_client = self.llm_manager._adapter if hasattr(self.llm_manager, '_adapter') else None
+            if hasattr(self, "llm_manager") and self.llm_manager:
+                llm_client = (
+                    self.llm_manager._adapter if hasattr(self.llm_manager, "_adapter") else None
+                )
 
             purpose_generator = PurposeGenerator(
                 agent_id=self.agent_id,
@@ -1764,7 +1812,7 @@ Hard rules:
 
             # EmotionalGoalSelector 依赖 L4 的情感架构
             emotional_selector = None
-            if self.l4_agent and hasattr(self.l4_agent, 'emotions'):
+            if self.l4_agent and hasattr(self.l4_agent, "emotions"):
                 emotional_selector = EmotionalGoalSelector(
                     emotional_architecture=self.l4_agent.emotions,
                 )
@@ -1780,6 +1828,7 @@ Hard rules:
             # P1: 集成 ValueSeedEngine - 价值观评估
             # 用于目标生成前的价值观过滤和目标执行后的价值观演化
             from usmsb_sdk.l3.value_seed_engine import ValueSeedEngine
+
             value_seed_engine = ValueSeedEngine(llm_adapter=llm_client)
             # 创建 Agent 的初始价值观种子
             value_seed_engine.create_value_seed(self.agent_id)
@@ -1787,13 +1836,14 @@ Hard rules:
 
             # P1: 集成 DynamicNegotiationEngine (用于多 Agent 协作场景)
             from usmsb_sdk.l3.dynamic_negotiation import NegotiationEngine
+
             negotiation_engine = NegotiationEngine(max_rounds=5)
             logger.info("[P1] NegotiationEngine initialized")
 
             # 配置自主循环
             config = LoopConfig(
-                cycle_interval=60.0,       # 每 60 秒一个循环
-                goal_timeout=120.0,       # 单个目标超时 2 分钟
+                cycle_interval=60.0,  # 每 60 秒一个循环
+                goal_timeout=120.0,  # 单个目标超时 2 分钟
                 max_retries=3,
                 log_cycles=True,
                 emotion_feedback=True,
@@ -1808,9 +1858,11 @@ Hard rules:
                 将自主生成的目标添加到 goal_engine 进行追踪和执行。
                 """
                 try:
-                    goal_name = getattr(goal, 'name', 'unknown') or getattr(goal, 'id', 'unknown')
-                    goal_desc = getattr(goal, 'description', '') or str(goal)
-                    logger.info(f"[AutonomousExecutor] Executing goal: {goal_name} - {goal_desc[:50]}")
+                    goal_name = getattr(goal, "name", "unknown") or getattr(goal, "id", "unknown")
+                    goal_desc = getattr(goal, "description", "") or str(goal)
+                    logger.info(
+                        f"[AutonomousExecutor] Executing goal: {goal_name} - {goal_desc[:50]}"
+                    )
 
                     # 将目标添加到 goal_engine
                     if self.goal_engine:
@@ -1819,7 +1871,7 @@ Hard rules:
 
                     # 如果有 LLM，发起一次对话来执行目标
                     # （实际执行由 LLM + 工具完成）
-                    if hasattr(self, 'llm_manager') and self.llm_manager:
+                    if hasattr(self, "llm_manager") and self.llm_manager:
                         try:
                             prompt = f"Execute this goal: {goal_desc}"
                             response = await self.llm_manager.chat(prompt)
@@ -1844,15 +1896,20 @@ Hard rules:
                 config=config,
                 executor=autonomous_executor,
                 llm_goal_prioritizer=llm_prioritizer,
-                gene_capsule_adapter=self.gene_capsule_adapter if hasattr(self, 'gene_capsule_adapter') else None,
+                gene_capsule_adapter=(
+                    self.gene_capsule_adapter if hasattr(self, "gene_capsule_adapter") else None
+                ),
                 value_seed_engine=value_seed_engine,  # P1: 价值观引擎
             )
 
             # P1: 保存 L3 引擎引用到 MetaAgent（供其他模块使用）
             self._value_seed_engine = value_seed_engine
             self._negotiation_engine = negotiation_engine
-            logger.info("[P1] L3 engines attached: value_seed_engine=%s, negotiation_engine=%s",
-                       value_seed_engine is not None, negotiation_engine is not None)
+            logger.info(
+                "[P1] L3 engines attached: value_seed_engine=%s, negotiation_engine=%s",
+                value_seed_engine is not None,
+                negotiation_engine is not None,
+            )
 
             # 配置
             self._autonomous_loop_config = {
@@ -1861,12 +1918,14 @@ Hard rules:
             }
 
             logger.info("[AutonomousLoop] Initialized - L3 self-driven loop ready with executor")
-            logger.info(f"[AutonomousLoop] Components: motivation_engine={motivation_engine is not None}, "
-                       f"purpose_generator={purpose_generator is not None}, "
-                       f"emotional_selector={emotional_selector is not None}, "
-                       f"llm_prioritizer={llm_prioritizer is not None}, "
-                       f"value_seed_engine={value_seed_engine is not None}, "
-                       f"executor=autonomous_executor")
+            logger.info(
+                f"[AutonomousLoop] Components: motivation_engine={motivation_engine is not None}, "
+                f"purpose_generator={purpose_generator is not None}, "
+                f"emotional_selector={emotional_selector is not None}, "
+                f"llm_prioritizer={llm_prioritizer is not None}, "
+                f"value_seed_engine={value_seed_engine is not None}, "
+                f"executor=autonomous_executor"
+            )
 
         except Exception as e:
             logger.warning("[AutonomousLoop] Init failed: %s", e)
@@ -1890,15 +1949,18 @@ Hard rules:
             if emotional_state and emotional_state not in ("neutral", "无情绪", ""):
                 parts.append(f"当前情绪: {emotional_state}")
             # 推荐行动
-            recommendations = getattr(self, '_l4_recommendations', [])
+            recommendations = getattr(self, "_l4_recommendations", [])
             if recommendations:
                 parts.append(f"推荐行动: {'; '.join(str(r) for r in recommendations[:3])}")
             # 历史教训
-            lessons = getattr(self, '_l4_lessons', [])
+            lessons = getattr(self, "_l4_lessons", [])
             if lessons:
                 parts.append(f"历史教训: {'; '.join(str(l) for l in lessons[-2:])}")
             # 元认知洞察
-            if hasattr(self.l4_agent, 'metacognitive_insights') and self.l4_agent.metacognitive_insights:
+            if (
+                hasattr(self.l4_agent, "metacognitive_insights")
+                and self.l4_agent.metacognitive_insights
+            ):
                 parts.append(f"元认知洞察: {self.l4_agent.metacognitive_insights[-1]}")
             return " | ".join(parts) if parts else ""
         except Exception as e:
@@ -1911,7 +1973,7 @@ Hard rules:
         将 L5 集体思考结论注入 StrategyRouter。
         """
         try:
-            synthesis = getattr(self, '_l5_synthesis', '')
+            synthesis = getattr(self, "_l5_synthesis", "")
             if synthesis:
                 return f"集体智能结论: {synthesis[:200]}"
             return ""
@@ -1927,22 +1989,22 @@ Hard rules:
         try:
             if not self.l4_agent:
                 return
-            quality = getattr(strategy_result, 'quality_score', 0.5)
-            strategy_name = getattr(strategy_result, 'strategy_name', 'unknown')
-            result = getattr(strategy_result, 'result', None)
+            quality = getattr(strategy_result, "quality_score", 0.5)
+            strategy_name = getattr(strategy_result, "strategy_name", "unknown")
+            result = getattr(strategy_result, "result", None)
             # 记录经验
             outcome = "success" if quality > 0.7 else "failure" if quality < 0.3 else "neutral"
             lesson = f"策略 {strategy_name} 质量={quality:.2f}"
-            lessons = getattr(self, '_l4_lessons', [])
+            lessons = getattr(self, "_l4_lessons", [])
             lessons.append(lesson)
             self._l4_lessons = lessons[-10:]  # 保留最近10条
             # 自我模型学习
             self.l4_agent.learn_from_experience(
-                experience_type="strategy_selection",
-                outcome=outcome,
-                lessons=[lesson]
+                experience_type="strategy_selection", outcome=outcome, lessons=[lesson]
             )
-            logger.info("[L4] Updated from strategy result: %s (quality=%.2f)", strategy_name, quality)
+            logger.info(
+                "[L4] Updated from strategy result: %s (quality=%.2f)", strategy_name, quality
+            )
         except Exception as e:
             logger.debug("_update_l4_from_result error: %s", e)
 
@@ -1987,17 +2049,20 @@ Hard rules:
             peer_ids: list[str] = []
             if hasattr(self, "_p2p_handler") and self._p2p_handler:
                 try:
-                    peers_dict = getattr(self._p2p_handler, '_peers', {})
+                    peers_dict = getattr(self._p2p_handler, "_peers", {})
                     peer_ids = [
-                        pid for pid, pinfo in peers_dict.items()
-                        if getattr(pinfo, 'status', '') == 'online'
+                        pid
+                        for pid, pinfo in peers_dict.items()
+                        if getattr(pinfo, "status", "") == "online"
                     ]
                 except Exception as e:
                     logger.debug("[A2A] Failed to get peer list: %s", e)
 
             if not peer_ids:
-                logger.info("[A2A] COLLAB scenario '%s' detected but no peers available",
-                           getattr(scenario_tag, 'scenario', '?'))
+                logger.info(
+                    "[A2A] COLLAB scenario '%s' detected but no peers available",
+                    getattr(scenario_tag, "scenario", "?"),
+                )
                 return sent_to
 
             for peer_id in peer_ids:
@@ -2007,16 +2072,19 @@ Hard rules:
                         description=f"COLLAB协作请求: {getattr(scenario_tag, 'scenario', 'unknown')}",
                         input_data={
                             "task": task,
-                            "scenario": getattr(scenario_tag, 'scenario', ''),
-                            "complexity": getattr(scenario_tag, 'complexity', ''),
-                            "layer": getattr(scenario_tag, 'suggested_layer', ''),
+                            "scenario": getattr(scenario_tag, "scenario", ""),
+                            "complexity": getattr(scenario_tag, "complexity", ""),
+                            "layer": getattr(scenario_tag, "suggested_layer", ""),
                             "source_agent": self.agent_id,
                         },
                         skill_id="collaboration",
                     )
                     sent_to.append(peer_id)
-                    logger.info("[A2A] Sent collaboration request to %s (task_id=%s)",
-                               peer_id, task_id[:12] if task_id else '?')
+                    logger.info(
+                        "[A2A] Sent collaboration request to %s (task_id=%s)",
+                        peer_id,
+                        task_id[:12] if task_id else "?",
+                    )
                 except Exception as e:
                     logger.warning("[A2A] Failed to send to %s: %s", peer_id, e)
 
@@ -2041,20 +2109,23 @@ Hard rules:
             peer_ids: list[str] = []
             if hasattr(self, "_p2p_handler") and self._p2p_handler:
                 try:
-                    peers_dict = getattr(self._p2p_handler, '_peers', {})
+                    peers_dict = getattr(self._p2p_handler, "_peers", {})
                     peer_ids = [
-                        pid for pid, pinfo in peers_dict.items()
-                        if getattr(pinfo, 'status', '') == 'online'
+                        pid
+                        for pid, pinfo in peers_dict.items()
+                        if getattr(pinfo, "status", "") == "online"
                     ]
                 except Exception as e:
                     logger.debug("[A2A] Failed to get peer list: %s", e)
 
             if not peer_ids:
-                logger.info("[A2A] COLLAB scenario '%s' detected but no peers available",
-                           getattr(scenario_tag, 'scenario', '?'))
+                logger.info(
+                    "[A2A] COLLAB scenario '%s' detected but no peers available",
+                    getattr(scenario_tag, "scenario", "?"),
+                )
                 return sent_to
 
-            msg_type = getattr(self, '_a2a_message_type', None)
+            msg_type = getattr(self, "_a2a_message_type", None)
             if msg_type is None:
                 return sent_to
 
@@ -2066,15 +2137,18 @@ Hard rules:
                         subject=f"COLLAB协作请求: {getattr(scenario_tag, 'scenario', 'unknown')}",
                         payload={
                             "task": task,
-                            "scenario": getattr(scenario_tag, 'scenario', ''),
-                            "complexity": getattr(scenario_tag, 'complexity', ''),
-                            "layer": getattr(scenario_tag, 'suggested_layer', ''),
+                            "scenario": getattr(scenario_tag, "scenario", ""),
+                            "complexity": getattr(scenario_tag, "complexity", ""),
+                            "layer": getattr(scenario_tag, "suggested_layer", ""),
                             "source_agent": self.agent_id,
-                        }
+                        },
                     )
                     sent_to.append(peer_id)
-                    logger.info("[A2A] Sent collaboration request to %s (msg_id=%s)",
-                               peer_id, msg.id[:12] if hasattr(msg, 'id') else '?')
+                    logger.info(
+                        "[A2A] Sent collaboration request to %s (msg_id=%s)",
+                        peer_id,
+                        msg.id[:12] if hasattr(msg, "id") else "?",
+                    )
                 except Exception as e:
                     logger.warning("[A2A] Failed to send to %s: %s", peer_id, e)
 
@@ -2123,17 +2197,19 @@ Hard rules:
         if not hasattr(self, "_p2p_handler") or not self._p2p_handler:
             return messages
         try:
-            peers_dict = getattr(self._p2p_handler, '_peers', {})
+            peers_dict = getattr(self._p2p_handler, "_peers", {})
             for peer_id, peer_info in peers_dict.items():
                 # 尝试从 peer 最近的入站消息中提取（handler 内部维护）
-                inbox = getattr(peer_info, 'inbox', [])
+                inbox = getattr(peer_info, "inbox", [])
                 for msg in inbox[:]:
-                    messages.append({
-                        "sender_id": peer_id,
-                        "message_type": getattr(msg, 'message_type', 'unknown'),
-                        "payload": getattr(msg, 'payload', {}),
-                        "message_id": getattr(msg, 'message_id', ''),
-                    })
+                    messages.append(
+                        {
+                            "sender_id": peer_id,
+                            "message_type": getattr(msg, "message_type", "unknown"),
+                            "payload": getattr(msg, "payload", {}),
+                            "message_id": getattr(msg, "message_id", ""),
+                        }
+                    )
                     inbox.remove(msg)
         except Exception as e:
             logger.debug("[P2P] Receive messages error: %s", e)
@@ -2155,12 +2231,14 @@ Hard rules:
             return metrics
         try:
             stats = self._p2p_handler.get_network_stats()
-            metrics.update({
-                "total_peers": stats.get("total_peers", 0),
-                "online_peers": stats.get("online_peers", 0),
-                "skills_available": stats.get("skills_available", 0),
-                "dht_entries": stats.get("dht_entries", 0),
-            })
+            metrics.update(
+                {
+                    "total_peers": stats.get("total_peers", 0),
+                    "online_peers": stats.get("online_peers", 0),
+                    "skills_available": stats.get("skills_available", 0),
+                    "dht_entries": stats.get("dht_entries", 0),
+                }
+            )
         except Exception:
             pass
         return metrics
@@ -2189,27 +2267,30 @@ Hard rules:
                     try:
                         # 设置为 RUNNING 状态以便 step() 可以执行
                         from usmsb_sdk.l3.autonomous_loop import LoopState
+
                         if self.autonomous_loop.state == LoopState.STOPPED:
                             self.autonomous_loop.state = LoopState.RUNNING
 
                         cycle_result = await self.autonomous_loop.step()
                         if cycle_result and cycle_result.goal_executed:
-                            goal_name = getattr(cycle_result.goal_executed, 'name', 'unknown')
+                            goal_name = getattr(cycle_result.goal_executed, "name", "unknown")
                             status = "✅" if cycle_result.goal_succeeded else "❌"
                             logger.info(f"[AutonomousLoop] {status} Goal: {goal_name}")
 
                             # L3→L4 反馈闭环：目标结果更新 L4 自模型
                             if self.l4_agent and cycle_result.goal_executed:
                                 try:
-                                    outcome = "success" if cycle_result.goal_succeeded else "failure"
+                                    outcome = (
+                                        "success" if cycle_result.goal_succeeded else "failure"
+                                    )
                                     lesson = f"Autonomous goal '{goal_name}' {outcome}"
                                     self.l4_agent.learn_from_experience(
                                         experience_type="autonomous_goal",
                                         outcome=outcome,
-                                        lessons=[lesson]
+                                        lessons=[lesson],
                                     )
                                     # 更新 _l4_lessons
-                                    lessons = getattr(self, '_l4_lessons', [])
+                                    lessons = getattr(self, "_l4_lessons", [])
                                     lessons.append(lesson)
                                     self._l4_lessons = lessons[-10:]  # 保留最近10条
                                 except Exception as e:
@@ -2242,12 +2323,16 @@ Hard rules:
                 try:
                     eth_info = await self.wallet_manager.get_native_balance()
                     if eth_info.get("success") and eth_info.get("balance_eth", 999) < 0.01:
-                        logger.warning("[PERCEIVE] Low ETH balance: %.4f ETH", eth_info["balance_eth"])
+                        logger.warning(
+                            "[PERCEIVE] Low ETH balance: %.4f ETH", eth_info["balance_eth"]
+                        )
                 except Exception:
                     pass
             # 监控任务队列深度
             if self.task_executor:
-                pending = len([t for t in getattr(self.task_executor, "_active_tasks", {}).values()])
+                pending = len(
+                    [t for t in getattr(self.task_executor, "_active_tasks", {}).values()]
+                )
                 if pending > 10:
                     logger.info("[PERCEIVE] Task queue depth: %d", pending)
             # 感知 P2P 网络状态（动态更新外部Agent连接状态）
@@ -2259,7 +2344,7 @@ Hard rules:
                     if peer_count > 0:
                         logger.info("[PERCEIVE] P2P peers online: %d", peer_count)
                     # P3: 周期性主动发现 peers（每10次主循环 = ~1分钟）
-                    discover_counter = getattr(self, '_peer_discovery_counter', 0) + 1
+                    discover_counter = getattr(self, "_peer_discovery_counter", 0) + 1
                     self._peer_discovery_counter = discover_counter
                     if discover_counter >= 10:
                         self._peer_discovery_counter = 0
@@ -2267,8 +2352,9 @@ Hard rules:
                         new_stats = self._p2p_handler.get_network_stats()
                         new_count = new_stats.get("online_peers", 0)
                         if new_count != peer_count:
-                            logger.info("[P2P] Peer discovery updated: %d → %d peers",
-                                       peer_count, new_count)
+                            logger.info(
+                                "[P2P] Peer discovery updated: %d → %d peers", peer_count, new_count
+                            )
                 except Exception:
                     self._external_agents_connected = False
         except Exception as e:
@@ -2281,18 +2367,25 @@ Hard rules:
                 return
             decision = await self._superadmin.evaluate_economic_opportunity()
             if decision and decision.get("action"):
-                logger.info("[WALLET] Proactive economic decision: %s %s",
-                            decision.get("action"), decision.get("detail", ""))
+                logger.info(
+                    "[WALLET] Proactive economic decision: %s %s",
+                    decision.get("action"),
+                    decision.get("detail", ""),
+                )
                 # Execute the decision
                 if decision["action"] == "stake" and self.wallet_manager:
                     amount = decision.get("amount_vibe", 0)
                     if amount > 0:
                         result = await self.wallet_manager.stake(amount=amount)
-                        logger.info("[WALLET] Proactive stake result: %s", result.get("message", ""))
+                        logger.info(
+                            "[WALLET] Proactive stake result: %s", result.get("message", "")
+                        )
                 elif decision["action"] == "vote" and self.wallet_manager:
                     pid = decision.get("proposal_id")
                     if pid:
-                        result = await self.wallet_manager.vote_proposal(proposal_id=pid, support=decision.get("support", True))
+                        result = await self.wallet_manager.vote_proposal(
+                            proposal_id=pid, support=decision.get("support", True)
+                        )
                         logger.info("[WALLET] Proactive vote result: %s", result.get("message", ""))
         except Exception as e:
             logger.warning("[WALLET] Economic evaluation failed: %s", e)
@@ -2308,8 +2401,8 @@ Hard rules:
             return
         try:
             # 获取 L4/L5 决策上下文
-            l4_recommendations = getattr(self, '_l4_recommendations', [])
-            l5_synthesis = getattr(self, '_l5_synthesis', '')
+            l4_recommendations = getattr(self, "_l4_recommendations", [])
+            l5_synthesis = getattr(self, "_l5_synthesis", "")
 
             # 内在动机检测：是否需要生成新目标
             state = {
@@ -2323,10 +2416,13 @@ Hard rules:
             # P0 修复: 如果 L4 有明确推荐，优先生成相关目标
             if l4_recommendations and len(l4_recommendations) > 0:
                 top_recommendation = str(l4_recommendations[0])
-                logger.info("[GOAL][L4] Using L4 recommendation for goal: %s...", top_recommendation[:50])
+                logger.info(
+                    "[GOAL][L4] Using L4 recommendation for goal: %s...", top_recommendation[:50]
+                )
                 state["priority_goal_hint"] = top_recommendation
 
             from usmsb_sdk.adapters.l3_adapter import L3Adapter
+
             adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
             signal = await adapter.detect_intrinsic_motivation(state)
 
@@ -2336,12 +2432,18 @@ Hard rules:
                 threshold = 0.50  # L4 有推荐时降低阈值
 
             if signal.intensity > threshold:
-                logger.info("[GOAL] Intrinsic motivation detected: intensity=%.2f, type=%s",
-                            signal.intensity, getattr(signal, 'motivation_type', 'unknown'))
+                logger.info(
+                    "[GOAL] Intrinsic motivation detected: intensity=%.2f, type=%s",
+                    signal.intensity,
+                    getattr(signal, "motivation_type", "unknown"),
+                )
                 new_goal = await adapter.generate_goal(state)
                 if new_goal:
                     await self.goal_engine.add_goal(new_goal)
-                    logger.info("[GOAL] New goal generated: %s", getattr(new_goal, 'description', str(new_goal)[:50]))
+                    logger.info(
+                        "[GOAL] New goal generated: %s",
+                        getattr(new_goal, "description", str(new_goal)[:50]),
+                    )
 
                     # L3→L4 反馈: 通知 L4 我们采纳了它的建议
                     if l4_recommendations and self.l4_agent:
@@ -2349,7 +2451,9 @@ Hard rules:
                             self.l4_agent.learn_from_experience(
                                 experience_type="goal_adoption",
                                 outcome="l4_recommendation_accepted",
-                                lessons=[f"Goal generated from L4 recommendation: {top_recommendation[:50]}"]
+                                lessons=[
+                                    f"Goal generated from L4 recommendation: {top_recommendation[:50]}"
+                                ],
                             )
                         except Exception:
                             pass
@@ -2380,7 +2484,10 @@ Hard rules:
                             capabilities=["task_execution", "tool_calling"],
                         )
                         if spawned:
-                            logger.info("[OH] Spawned worker agent to handle %d pending tasks", pending_count)
+                            logger.info(
+                                "[OH] Spawned worker agent to handle %d pending tasks",
+                                pending_count,
+                            )
                     except Exception as e:
                         logger.warning("[OH] spawn_agent failed: %s", e)
         except Exception as e:
@@ -2407,34 +2514,42 @@ Hard rules:
                 return
 
             import socket
+
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 sock.bind((host, port))
                 sock.close()
             except OSError:
-                logger.info("[SERVER] FastAPI server already running (port %d in use), skipping", port)
+                logger.info(
+                    "[SERVER] FastAPI server already running (port %d in use), skipping", port
+                )
                 return
 
             # 方案：用 asyncio.create_task() 在当前事件循环中运行 uvicorn
             # uvicorn.Config(..., loop=None) 会使用当前线程的事件循环，避免多进程
             async def _run_uvicorn():
-                import asyncio as _asy
+
                 from uvicorn import Config, Server
+
                 # loop=None 确保 uvicorn 使用当前线程的事件循环（就是 MetaAgent 的那个）
                 cfg = Config(
                     "usmsb_sdk.api.rest.main:app",
                     host=host,
                     port=port,
                     log_level="info",
-                    loop=None,          # 关键：复用当前事件循环
+                    loop=None,  # 关键：复用当前事件循环
                     reload=False,
-                    workers=1,          # 单进程，彻底避免 fork 问题
+                    workers=1,  # 单进程，彻底避免 fork 问题
                 )
                 srv = Server(cfg)
                 await srv.serve()
 
             self._api_server_task = asyncio.create_task(_run_uvicorn())
-            logger.info("[SERVER] FastAPI server starting on %s:%d (same process, same event loop)", host, port)
+            logger.info(
+                "[SERVER] FastAPI server starting on %s:%d (same process, same event loop)",
+                host,
+                port,
+            )
 
         except Exception as e:
             logger.warning("[SERVER] Failed to start API server: %s", e)
@@ -2465,7 +2580,9 @@ Hard rules:
             Agent 回复
         """
         # ========== DEBUG: Entry point ==========
-        print(f"DEBUG [CHAT] ===== ENTRY ===== message={message[:50]}..., skip_complexity={skip_complexity_detection}")
+        print(
+            f"DEBUG [CHAT] ===== ENTRY ===== message={message[:50]}..., skip_complexity={skip_complexity_detection}"
+        )
 
         # ========== L1 Fast Path: 规则引擎优先匹配 ==========
         if not skip_complexity_detection:
@@ -2480,9 +2597,13 @@ Hard rules:
                 )
                 l1_response = await self.l1_engine.react(stimulus)
                 if l1_response.action_result and l1_response.action_result not in (
-                    "", "我没有理解您的问题。", "unknown"
+                    "",
+                    "我没有理解您的问题。",
+                    "unknown",
                 ):
-                    logger.info(f"[L1 Fast Path] Matched rule, response: {l1_response.action_result[:50]}")
+                    logger.info(
+                        f"[L1 Fast Path] Matched rule, response: {l1_response.action_result[:50]}"
+                    )
                     return l1_response.action_result
             except Exception as e:
                 logger.warning(f"[L1 Fast Path] Failed: {e}")
@@ -2522,18 +2643,28 @@ Hard rules:
                 all_active_tasks = list(self.task_executor._active_tasks.values())
                 logger.info(f"[CHAT] Total active tasks in memory: {len(all_active_tasks)}")
                 for t in all_active_tasks:
-                    logger.info(f"[CHAT] Active task {t.task_id}: status={t.status}, wallet={t.wallet_address}")
+                    logger.info(
+                        f"[CHAT] Active task {t.task_id}: status={t.status}, wallet={t.wallet_address}"
+                    )
 
-                awaiting_tasks = [t for t in pending_tasks if t.status == TaskStatus.AWAITING_CONFIRM]
+                awaiting_tasks = [
+                    t for t in pending_tasks if t.status == TaskStatus.AWAITING_CONFIRM
+                ]
                 logger.info(f"[CHAT] Found {len(awaiting_tasks)} awaiting tasks")
 
                 # 如果没找到，也检查内存中的所有待确认任务
                 if not awaiting_tasks:
-                    awaiting_tasks = [t for t in all_active_tasks if t.status == TaskStatus.AWAITING_CONFIRM]
-                    logger.info(f"[CHAT] Fallback check found {len(awaiting_tasks)} awaiting tasks in memory")
+                    awaiting_tasks = [
+                        t for t in all_active_tasks if t.status == TaskStatus.AWAITING_CONFIRM
+                    ]
+                    logger.info(
+                        f"[CHAT] Fallback check found {len(awaiting_tasks)} awaiting tasks in memory"
+                    )
 
                 for t in pending_tasks:
-                    logger.info(f"[CHAT] Task {t.task_id}: status={t.status}, wallet={t.wallet_address}")
+                    logger.info(
+                        f"[CHAT] Task {t.task_id}: status={t.status}, wallet={t.wallet_address}"
+                    )
 
                 if awaiting_tasks:
                     # 执行最新的待确认任务
@@ -2556,7 +2687,9 @@ Hard rules:
                 else:
                     # 用户说确认但没有待确认任务，提示用户
                     logger.info(f"[CHAT] No awaiting tasks found for wallet: {wallet_address}")
-                    error_msg = "没有找到待确认的任务。请先描述您想要执行的任务，我会为您生成执行计划。"
+                    error_msg = (
+                        "没有找到待确认的任务。请先描述您想要执行的任务，我会为您生成执行计划。"
+                    )
                     # 🔧 修复：保存助手回复到会话
                     await self.conversation_manager.add_message(
                         conversation_id=conversation.id,
@@ -2619,7 +2752,9 @@ Hard rules:
         complexity = TaskComplexity.MEDIUM  # 设置默认值，避免变量未定义错误
         if not skip_complexity_detection:
             complexity = detect_task_complexity(message)
-            logger.info(f"[CHAT][COMPLEXITY] 检测到任务复杂度: {complexity.value}, message={message[:30]}...")
+            logger.info(
+                f"[CHAT][COMPLEXITY] 检测到任务复杂度: {complexity.value}, message={message[:30]}..."
+            )
             print(f"🔍 [CHAT] Task complexity: {complexity.value}")
 
             # 根据复杂度决定处理路径
@@ -2633,7 +2768,9 @@ Hard rules:
                             wallet_address=wallet_address,
                             conversation_id=str(conversation.id),
                         )
-                        logger.info(f"[CHAT][COMPLEXITY] 计划生成完成: task_id={plan.task_id}, status={plan.status.value}")
+                        logger.info(
+                            f"[CHAT][COMPLEXITY] 计划生成完成: task_id={plan.task_id}, status={plan.status.value}"
+                        )
 
                         # 返回计划供用户确认
                         if plan.status == TaskStatus.AWAITING_CONFIRM:
@@ -2646,7 +2783,9 @@ Hard rules:
                             logger.info("[CHAT][COMPLEXITY] 返回计划等待用户确认")
                             return plan_summary
                         else:
-                            logger.info(f"[CHAT][COMPLEXITY] 计划状态非AWAITING_CONFIRM: {plan.status.value}，继续执行")
+                            logger.info(
+                                f"[CHAT][COMPLEXITY] 计划状态非AWAITING_CONFIRM: {plan.status.value}，继续执行"
+                            )
                     except Exception as e:
                         logger.error(f"[CHAT][COMPLEXITY] 计划生成失败: {e}", exc_info=True)
                         # 计划生成失败，降级到MEDIUM处理
@@ -2665,11 +2804,15 @@ Hard rules:
                             wallet_address=wallet_address,
                             conversation_id=str(conversation.id),
                         )
-                        logger.info(f"[CHAT][COMPLEXITY] HIGH任务计划生成: {plan.task_id}, 共{len(plan.steps)}步")
+                        logger.info(
+                            f"[CHAT][COMPLEXITY] HIGH任务计划生成: {plan.task_id}, 共{len(plan.steps)}步"
+                        )
 
                         # 直接执行计划（不等待确认）
                         result = await self.task_executor.execute_plan(plan)
-                        logger.info(f"[CHAT][COMPLEXITY] HIGH任务执行完成: status={result.status.value}")
+                        logger.info(
+                            f"[CHAT][COMPLEXITY] HIGH任务执行完成: status={result.status.value}"
+                        )
 
                         # 格式化结果返回
                         if result.status == TaskStatus.COMPLETED:
@@ -2795,8 +2938,13 @@ Hard rules:
 
             # 构建简单的消息列表
             simple_messages = [
-                {"role": "system", "content": messages[0]["content"] if messages else "You are a helpful assistant."},
-                {"role": "user", "content": message}
+                {
+                    "role": "system",
+                    "content": (
+                        messages[0]["content"] if messages else "You are a helpful assistant."
+                    ),
+                },
+                {"role": "user", "content": message},
             ]
 
             try:
@@ -2869,7 +3017,9 @@ Hard rules:
         skills_schema = self.skills_manager.get_skills_schema(provider=llm_provider)
         # 也过滤 skills 中的无效工具
         skills_schema = [s for s in skills_schema if is_valid_tool(s)]
-        logger.info(f"[CHAT][TOOLS] 最终使用: tools={len(tools_schema)}, skills={len(skills_schema)}")
+        logger.info(
+            f"[CHAT][TOOLS] 最终使用: tools={len(tools_schema)}, skills={len(skills_schema)}"
+        )
 
         # =====================================================================
         # StrategyRouter 路由 - ALL tasks 唯一入口（全链路自主）
@@ -2881,33 +3031,50 @@ Hard rules:
 
                 # P4 守卫：scenario_tag 为 None 时跳过路由，直接走 LLM
                 if scenario_tag is None:
-                    logger.warning("[STRATEGY] _classify_scenario returned None, falling back to LLM")
-                    scenario_tag = getattr(self.strategy_router, '_last_scenario_tag', None)
+                    logger.warning(
+                        "[STRATEGY] _classify_scenario returned None, falling back to LLM"
+                    )
+                    scenario_tag = getattr(self.strategy_router, "_last_scenario_tag", None)
                     if scenario_tag is None:
                         # 创建默认 tag 避免后续空指针
                         from usmsb_sdk.meta_agent.strategy_router import ScenarioTag
+
                         scenario_tag = ScenarioTag(
-                            scenario="INFO", complexity="MEDIUM",
-                            confidence=0.5, reasoning="fallback",
-                            suggested_layer="L1", strategy_preference="internal"
+                            scenario="INFO",
+                            complexity="MEDIUM",
+                            confidence=0.5,
+                            reasoning="fallback",
+                            suggested_layer="L1",
+                            strategy_preference="internal",
                         )
 
-                logger.info("[STRATEGY] scenario=%s layer=%s preference=%s",
-                            scenario_tag.scenario, scenario_tag.suggested_layer, scenario_tag.strategy_preference)
+                logger.info(
+                    "[STRATEGY] scenario=%s layer=%s preference=%s",
+                    scenario_tag.scenario,
+                    scenario_tag.suggested_layer,
+                    scenario_tag.strategy_preference,
+                )
 
                 # P2: COLLAB 场景 → A2A 广播协作请求
-                if getattr(scenario_tag, 'scenario', None) == "COLLAB":
+                if getattr(scenario_tag, "scenario", None) == "COLLAB":
                     sent_peers = await self._broadcast_collaboration_request(message, scenario_tag)
                     if sent_peers:
                         logger.info("[A2A] COLLAB broadcast sent to %d peers", len(sent_peers))
 
                 # 加载 L4/L5 决策上下文（意识影响决策）
                 l4_context = self._get_l4_decision_context()
-                l5_context = self._get_l5_decision_context() if self._external_agents_connected else ""
+                l5_context = (
+                    self._get_l5_decision_context() if self._external_agents_connected else ""
+                )
 
                 async def internal_fn():
-                    return await self._chat_with_llm(messages, tools=tools_schema,
-                        skills=skills_schema, conversation_id=str(conversation.id), user_session=user_session)
+                    return await self._chat_with_llm(
+                        messages,
+                        tools=tools_schema,
+                        skills=skills_schema,
+                        conversation_id=str(conversation.id),
+                        user_session=user_session,
+                    )
 
                 async def sdk_fn():
                     try:
@@ -2915,15 +3082,23 @@ Hard rules:
                         if layer == "L2":
                             # L2: 使用 L2Agent.run() 执行任务
                             from usmsb_sdk.l2.agent import L2Agent, L2Config
+
                             config = L2Config(agent_id=self.agent_id, llm_client=self.llm_manager)
                             l2_agent = L2Agent(config=config)
                             return await l2_agent.run(message, context={"layer": "L2"})
                         elif layer == "L3":
                             # L3: 使用 L3Adapter.generate_goal() 生成目标
                             from usmsb_sdk.adapters.l3_adapter import L3Adapter
+
                             adapter = L3Adapter(agent_id=self.agent_id, llm_client=self.llm_manager)
-                            return await adapter.generate_goal({"task": message, "layer": "L3",
-                                                                 "l4_context": l4_context, "l5_context": l5_context})
+                            return await adapter.generate_goal(
+                                {
+                                    "task": message,
+                                    "layer": "L3",
+                                    "l4_context": l4_context,
+                                    "l5_context": l5_context,
+                                }
+                            )
                         elif layer == "L4" and self.l4_agent:
                             return await self.l4_agent.metacognize(message, context=l4_context)
                     except Exception as e:
@@ -2938,23 +3113,36 @@ Hard rules:
                     if l5_context:
                         awareness_prompt += f"\n[L5集体智能]: {l5_context}"
                     if awareness_prompt and messages and messages[0].role == "system":
-                        messages = [messages[0].model_copy(update={"content": messages[0].content + awareness_prompt})] + messages[1:]
+                        messages = [
+                            messages[0].model_copy(
+                                update={"content": messages[0].content + awareness_prompt}
+                            )
+                        ] + messages[1:]
 
                 # ALL scenarios go through StrategyRouter (universal router)
                 logger.info("[STRATEGY] Universal routing for %s scenario", scenario_tag.scenario)
                 strategy_result = await self.strategy_router.route(
-                    message, scenario_tag.suggested_layer, internal_fn, sdk_fn)
+                    message, scenario_tag.suggested_layer, internal_fn, sdk_fn
+                )
                 if strategy_result.result is not None:
                     from .models.chat import ChatResult
+
                     chat_result = ChatResult(
                         content=str(strategy_result.result),
-                        executed_tools=[], tool_results=[],
-                        iterations_used=0, is_complete=True,
-                        needs_background=False, needs_tool_retry=False)
+                        executed_tools=[],
+                        tool_results=[],
+                        iterations_used=0,
+                        is_complete=True,
+                        needs_background=False,
+                        needs_tool_retry=False,
+                    )
                     # L4/L5 feedback: store strategy result quality for next iteration
                     self._update_l4_from_result(strategy_result)
-                    logger.info("[STRATEGY] Winner=%s quality=%.2f",
-                                strategy_result.strategy_name, strategy_result.quality_score)
+                    logger.info(
+                        "[STRATEGY] Winner=%s quality=%.2f",
+                        strategy_result.strategy_name,
+                        strategy_result.quality_score,
+                    )
             except Exception as e:
                 logger.warning("[STRATEGY] Router failed: %s", e)
 
@@ -2967,7 +3155,9 @@ Hard rules:
             last_error = None
             for attempt in range(max_retries):
                 try:
-                    logger.info(f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value}, attempt={attempt + 1})")
+                    logger.info(
+                        f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value}, attempt={attempt + 1})"
+                    )
 
                     # 调用 LLM 获取完整结果
                     chat_result = await self._chat_with_llm(
@@ -2982,18 +3172,25 @@ Hard rules:
 
                 except Exception as e:
                     last_error = e
-                    wait_time = 2 ** attempt  # 1s, 2s, 4s
+                    wait_time = 2**attempt  # 1s, 2s, 4s
                     if attempt < max_retries - 1:
-                        logger.warning("[CHAT] LLM call failed (attempt %d/%d): %s. Retrying in %ds...",
-                                      attempt + 1, max_retries, e, wait_time)
+                        logger.warning(
+                            "[CHAT] LLM call failed (attempt %d/%d): %s. Retrying in %ds...",
+                            attempt + 1,
+                            max_retries,
+                            e,
+                            wait_time,
+                        )
                         await asyncio.sleep(wait_time)
                     else:
                         logger.error("[CHAT] LLM call failed after %d attempts: %s", max_retries, e)
                         chat_result = None
 
-        logger.info(f"[CHAT][RESULT] is_complete=%s needs_tool_retry=%s",
-                    chat_result.is_complete if chat_result else False,
-                    chat_result.needs_tool_retry if chat_result else False)
+        logger.info(
+            "[CHAT][RESULT] is_complete=%s needs_tool_retry=%s",
+            chat_result.is_complete if chat_result else False,
+            chat_result.needs_tool_retry if chat_result else False,
+        )
 
         # =====================================================================
         # 根据 ChatResult 状态决定后续处理
@@ -3010,15 +3207,23 @@ Hard rules:
         if chat_result and chat_result.is_complete and not chat_result.needs_background:
             logger.info("[CHAT][RESULT] 情况1: 正常完成，直接返回")
             await self.conversation_manager.add_message(
-                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
+                conversation_id=conversation.id,
+                role=MessageRole.ASSISTANT,
+                content=chat_result.content,
+            )
 
         # ========== L4 自我意识处理 ==========
         if self.l4_agent and chat_result and chat_result.content:
             try:
-                mood_result = await self.l4_agent.feel({
-                    "stimulus": "conversation", "content": chat_result.content, "message": message})
+                mood_result = await self.l4_agent.feel(
+                    {"stimulus": "conversation", "content": chat_result.content, "message": message}
+                )
                 if mood_result.emotion and mood_result.intensity > 0.5:
-                    logger.info("[L4] Emotion: %s (intensity=%.2f)", mood_result.emotion, mood_result.intensity)
+                    logger.info(
+                        "[L4] Emotion: %s (intensity=%.2f)",
+                        mood_result.emotion,
+                        mood_result.intensity,
+                    )
                 conv_count = getattr(self, "_conversation_count", 0) + 1
                 self._conversation_count = conv_count
                 if conv_count % 20 == 0:
@@ -3034,16 +3239,26 @@ Hard rules:
         if chat_result and chat_result.is_complete and chat_result.needs_background:
             logger.warning("[CHAT][RESULT] 情况2: needs_background=True，忽略，正常返回")
             await self.conversation_manager.add_message(
-                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
+                conversation_id=conversation.id,
+                role=MessageRole.ASSISTANT,
+                content=chat_result.content,
+            )
             return chat_result.content
 
         # 情况 3：需要工具重试
         if chat_result and chat_result.needs_tool_retry:
             logger.info("[CHAT][RESULT] 情况3: 需要工具重试")
             processor = BackgroundTaskProcessor(self)
-            asyncio.create_task(processor.process(
-                conversation_id=str(conversation.id), owner_id=owner_id, chat_result=chat_result,
-                messages=messages, user_session=user_session, wallet_address=wallet_address))
+            asyncio.create_task(
+                processor.process(
+                    conversation_id=str(conversation.id),
+                    owner_id=owner_id,
+                    chat_result=chat_result,
+                    messages=messages,
+                    user_session=user_session,
+                    wallet_address=wallet_address,
+                )
+            )
             return self.chat_config.task_submitted_message
 
         # 情况 4：需要继续处理
@@ -3051,19 +3266,32 @@ Hard rules:
             logger.info("[CHAT][RESULT] 情况4: 需要继续处理")
             if chat_result.tool_results:
                 processor = BackgroundTaskProcessor(self)
-                asyncio.create_task(processor.process(
-                    conversation_id=str(conversation.id), owner_id=owner_id, chat_result=chat_result,
-                    messages=messages, user_session=user_session, wallet_address=wallet_address))
+                asyncio.create_task(
+                    processor.process(
+                        conversation_id=str(conversation.id),
+                        owner_id=owner_id,
+                        chat_result=chat_result,
+                        messages=messages,
+                        user_session=user_session,
+                        wallet_address=wallet_address,
+                    )
+                )
                 return self.chat_config.task_submitted_message
             elif chat_result.content:
                 await self.conversation_manager.add_message(
-                    conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
+                    conversation_id=conversation.id,
+                    role=MessageRole.ASSISTANT,
+                    content=chat_result.content,
+                )
                 return chat_result.content
 
         # 情况 5：其他异常情况
         if chat_result and chat_result.content:
             await self.conversation_manager.add_message(
-                conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=chat_result.content)
+                conversation_id=conversation.id,
+                role=MessageRole.ASSISTANT,
+                content=chat_result.content,
+            )
             return chat_result.content
         else:
             return "抱歉，处理您的请求时遇到了问题。请稍后重试。"
@@ -3081,9 +3309,11 @@ Hard rules:
                 try:
                     evo_result = await self.evolution_engine.evolve()
                     if evo_result and evo_result.get("knowledge_added", 0) > 0:
-                        logger.info("[EVOLUTION] +%d knowledge, +%d patterns",
-                                    evo_result.get("knowledge_added", 0),
-                                    evo_result.get("patterns_identified", 0))
+                        logger.info(
+                            "[EVOLUTION] +%d knowledge, +%d patterns",
+                            evo_result.get("knowledge_added", 0),
+                            evo_result.get("patterns_identified", 0),
+                        )
                 except Exception as e:
                     logger.warning("[EVOLUTION] evolve() failed: %s", e)
 
@@ -3091,24 +3321,29 @@ Hard rules:
             if self.l4_agent:
                 try:
                     reflection = await self.l4_agent.self_reflect()
-                    if hasattr(reflection, 'observations') and reflection.observations:
+                    if hasattr(reflection, "observations") and reflection.observations:
                         logger.info("[L4] Self-insights: %s", str(reflection.observations)[:100])
-                    if hasattr(reflection, 'lessons') and reflection.lessons:
+                    if hasattr(reflection, "lessons") and reflection.lessons:
                         self._l4_lessons = reflection.lessons
-                    if hasattr(reflection, 'recommendations') and reflection.recommendations:
+                    if hasattr(reflection, "recommendations") and reflection.recommendations:
                         self._l4_recommendations = reflection.recommendations
-                    if hasattr(reflection, 'metacognitive_insight') and reflection.metacognitive_insight:
-                        logger.info("[L4] Metacognitive insight: %s", str(reflection.metacognitive_insight)[:100])
+                    if (
+                        hasattr(reflection, "metacognitive_insight")
+                        and reflection.metacognitive_insight
+                    ):
+                        logger.info(
+                            "[L4] Metacognitive insight: %s",
+                            str(reflection.metacognitive_insight)[:100],
+                        )
                 except Exception as e:
                     logger.warning("[L4] self_reflect failed: %s", e)
 
             # P2: L5 集体学习
             # 触发条件: 有外部 Agent 连接 OR 每 10 次主循环强制触发一次（单 Agent 模式）
-            _l5_cycle_counter = getattr(self, '_l5_cycle_counter', 0) + 1
+            _l5_cycle_counter = getattr(self, "_l5_cycle_counter", 0) + 1
             self._l5_cycle_counter = _l5_cycle_counter
-            _should_think = (
-                getattr(self, "_external_agents_connected", False) or
-                (_l5_cycle_counter >= 10)
+            _should_think = getattr(self, "_external_agents_connected", False) or (
+                _l5_cycle_counter >= 10
             )
             if _l5_cycle_counter >= 10:
                 self._l5_cycle_counter = 0  # 重置计数器
@@ -3116,7 +3351,7 @@ Hard rules:
             if self.l5_collective and _should_think:
                 try:
                     # 结合 L4 推荐来确定集体思考主题
-                    l4_topic = getattr(self, '_l4_recommendations', [])[:1]
+                    l4_topic = getattr(self, "_l4_recommendations", [])[:1]
                     topic = l4_topic[0] if l4_topic else "如何提升平台整体性能和用户体验"
                     thought = await self.l5_collective.think_collectively(topic)
                     if thought and thought.synthesis:
@@ -3125,16 +3360,22 @@ Hard rules:
                         # L4 ← L5: collective insight 更新自我模型（闭环）
                         if self.l4_agent:
                             try:
-                                await self.l4_agent.build_self_model([{
-                                    "type": "collective_insight",
-                                    "content": thought.synthesis,
-                                    "agents": getattr(thought, 'participants', []),
-                                }])
+                                await self.l4_agent.build_self_model(
+                                    [
+                                        {
+                                            "type": "collective_insight",
+                                            "content": thought.synthesis,
+                                            "agents": getattr(thought, "participants", []),
+                                        }
+                                    ]
+                                )
                             except Exception:
                                 pass
                     elif thought:
                         # 即使没有 synthesis，也保存 partial 结果
-                        self._l5_synthesis = getattr(thought, 'partial_insights', [''])[0] or self._l5_synthesis
+                        self._l5_synthesis = (
+                            getattr(thought, "partial_insights", [""])[0] or self._l5_synthesis
+                        )
                 except Exception as e:
                     logger.warning("[L5] think_collectively failed: %s", e)
         except Exception as e:
@@ -3162,7 +3403,9 @@ Hard rules:
         保留此方法用于向后兼容和调试。
         新代码应使用 BackgroundTaskProcessor。
         """
-        logger.warning("[DEPRECATED] Using legacy background task, should migrate to BackgroundTaskProcessor")
+        logger.warning(
+            "[DEPRECATED] Using legacy background task, should migrate to BackgroundTaskProcessor"
+        )
         # 旧的后台任务逻辑已移除，请使用 BackgroundTaskProcessor
         # 参见 core/background_processor.py
         pass
@@ -3232,7 +3475,6 @@ Hard rules:
         """
         if not self.llm_manager or not self.conversation_manager:
             return None
-
 
         # Step 1: LLM 判断是否需要检索 + 需要什么信息
         need_retrieval, task_info = await self._analyze_user_task(user_message)
@@ -4388,7 +4630,9 @@ Hard rules:
             # Step 1: 调用 LLM（带工具）
             logger.info(f"🔍 [AGENT_LOOP] 调用 LLM, iteration={iteration}")
             llm_response = await self._call_llm_with_tools(current_messages, all_tools)
-            logger.info(f"🔍 [AGENT_LOOP] LLM 返回了, content_len={len(llm_response.get('content', ''))}, tool_calls={len(llm_response.get('tool_calls', []))}")
+            logger.info(
+                f"🔍 [AGENT_LOOP] LLM 返回了, content_len={len(llm_response.get('content', ''))}, tool_calls={len(llm_response.get('tool_calls', []))}"
+            )
 
             # Step 2: 检查是否有工具调用
             tool_calls = llm_response.get("tool_calls", [])
@@ -4626,7 +4870,16 @@ Hard rules:
             # 设计初衷：只有参数错误才需要从历史记录中提取正确值重试
             param_error_patterns = {
                 "api_key": {
-                    "keywords": ["api key", "apikey", "api_key", "invalid key", "key is required", "unauthorized", "认证失败", "密钥"],
+                    "keywords": [
+                        "api key",
+                        "apikey",
+                        "api_key",
+                        "invalid key",
+                        "key is required",
+                        "unauthorized",
+                        "认证失败",
+                        "密钥",
+                    ],
                     "info_type": "credential",
                     "description": "需要正确的 API Key 或认证凭证",
                 },
@@ -4688,12 +4941,14 @@ Hard rules:
             if llm_response.get("content"):
                 raw_content_blocks.append({"type": "text", "text": llm_response.get("content")})
             for tc in tool_calls:
-                raw_content_blocks.append({
-                    "type": "tool_use",
-                    "id": tc["id"],
-                    "name": tc["function"]["name"],
-                    "input": tc["function"]["arguments"],
-                })
+                raw_content_blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": tc["id"],
+                        "name": tc["function"]["name"],
+                        "input": tc["function"]["arguments"],
+                    }
+                )
 
         # 添加 assistant 消息
         current_messages.append({"role": "assistant", "content": raw_content_blocks})
@@ -4715,11 +4970,13 @@ Hard rules:
                 logger.warning(f"Could not find tool_call_id for tool: {tool_result.get('tool')}")
                 continue
 
-            tool_result_blocks.append({
-                "type": "tool_result",
-                "tool_use_id": tool_call_id,
-                "content": json.dumps(_serialize_for_json(tool_result), ensure_ascii=False),
-            })
+            tool_result_blocks.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_call_id,
+                    "content": json.dumps(_serialize_for_json(tool_result), ensure_ascii=False),
+                }
+            )
 
         # 添加 user 消息（包含 tool_result blocks）
         current_messages.append({"role": "user", "content": tool_result_blocks})
@@ -4735,11 +4992,13 @@ Hard rules:
         current_messages: list[dict[str, Any]],
     ) -> None:
         """构建 OpenAI API 格式的工具消息"""
-        current_messages.append({
-            "role": "assistant",
-            "content": llm_response.get("content", ""),
-            "tool_calls": tool_calls,
-        })
+        current_messages.append(
+            {
+                "role": "assistant",
+                "content": llm_response.get("content", ""),
+                "tool_calls": tool_calls,
+            }
+        )
 
         for idx, tool_result in enumerate(tool_results):
             # 匹配工具调用的 ID：优先按索引匹配，其次按工具名匹配
@@ -4757,11 +5016,13 @@ Hard rules:
             if tool_call_id is None and tool_calls:
                 tool_call_id = tool_calls[0].get("id")
 
-            current_messages.append({
-                "role": "tool",
-                "content": json.dumps(_serialize_for_json(tool_result), ensure_ascii=False),
-                "tool_call_id": tool_call_id,
-            })
+            current_messages.append(
+                {
+                    "role": "tool",
+                    "content": json.dumps(_serialize_for_json(tool_result), ensure_ascii=False),
+                    "tool_call_id": tool_call_id,
+                }
+            )
 
     async def _check_needs_tools(
         self,
@@ -4828,7 +5089,9 @@ Hard rules:
                 try:
                     # 不使用 asyncio.wait_fort，因为 adapter 内部已经有超时控制（300秒）
                     result = await adapter.chat_with_tools(messages, tools)
-                    logger.info(f"DEBUG _call_llm_with_tools returned, content_len={len(result.get('content', ''))}, tool_calls={len(result.get('tool_calls', []))}")
+                    logger.info(
+                        f"DEBUG _call_llm_with_tools returned, content_len={len(result.get('content', ''))}, tool_calls={len(result.get('tool_calls', []))}"
+                    )
                     return result
                 except Exception as e:
                     logger.error(f"chat_with_tools failed: {e}", exc_info=True)
@@ -4915,9 +5178,7 @@ Hard rules:
                     results.append(
                         {
                             "tool": tool_name,
-                            "result": {
-                                "error": f"工具/技能 '{tool_name}' 不存在或无可用处理器。"
-                            },
+                            "result": {"error": f"工具/技能 '{tool_name}' 不存在或无可用处理器。"},
                             "success": False,
                         }
                     )
@@ -5032,7 +5293,11 @@ Hard rules:
                 # 安全获取 tool_name：优先使用局部变量，否则尝试从 tool_call 获取
                 tool_name_in_error = locals().get("tool_name")
                 if tool_name_in_error is None:
-                    tool_name_in_error = tool_call.get("function", {}).get("name", "unknown") if 'tool_call' in locals() else "unknown"
+                    tool_name_in_error = (
+                        tool_call.get("function", {}).get("name", "unknown")
+                        if "tool_call" in locals()
+                        else "unknown"
+                    )
                 results.append(
                     {
                         "tool": tool_name_in_error,
@@ -5291,13 +5556,15 @@ Hard rules:
             lines.append(f"  {i}. {status_emoji} **{step.name}** ({step.estimated_time}s)")
             lines.append(f"     {step.description}")
 
-        lines.extend([
-            "\n---",
-            "**请回复以下命令之一**:",
-            "- `确认执行` - 开始执行计划",
-            "- `取消` - 取消此任务",
-            "- `修改` - 提出修改建议",
-        ])
+        lines.extend(
+            [
+                "\n---",
+                "**请回复以下命令之一**:",
+                "- `确认执行` - 开始执行计划",
+                "- `取消` - 取消此任务",
+                "- `修改` - 提出修改建议",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -5311,7 +5578,9 @@ Hard rules:
         Returns:
             格式化的执行结果
         """
-        logger.info(f"[FORMAT_RESULT] 格式化任务结果: status={plan.status.value}, steps={len(plan.steps)}")
+        logger.info(
+            f"[FORMAT_RESULT] 格式化任务结果: status={plan.status.value}, steps={len(plan.steps)}"
+        )
 
         if plan.status == TaskStatus.COMPLETED:
             results = []
@@ -5326,7 +5595,9 @@ Hard rules:
                     else:
                         results.append(f"**步骤 {i+1}: {step.name}**\n{str(step.result)[:1000]}")
                 elif step.status == StepStatus.FAILED:
-                    results.append(f"❌ **步骤 {i+1}: {step.name}** 失败\n{step.error or '未知错误'}")
+                    results.append(
+                        f"❌ **步骤 {i+1}: {step.name}** 失败\n{step.error or '未知错误'}"
+                    )
 
             if results:
                 return "✅ **任务执行完成**\n\n" + "\n\n".join(results)
@@ -5379,18 +5650,20 @@ Hard rules:
                         if isinstance(step.result, dict):
                             output = step.result.get("output", "")
                             if output:
-                                results.append(f"**步骤 {i+1}: {step.name}**\n{output[:1000]}")  # 限制长度
+                                results.append(
+                                    f"**步骤 {i+1}: {step.name}**\n{output[:1000]}"
+                                )  # 限制长度
                         else:
-                            results.append(f"**步骤 {i+1}: {step.name}**\n{str(step.result)[:1000]}")
+                            results.append(
+                                f"**步骤 {i+1}: {step.name}**\n{str(step.result)[:1000]}"
+                            )
 
                 if results:
                     return "✅ **任务执行完成**\n\n" + "\n\n".join(results)
                 else:
                     return "✅ 任务执行完成（无详细结果）"
             else:
-                failed_steps = [
-                    s for s in executed_plan.steps if s.status.value == "failed"
-                ]
+                failed_steps = [s for s in executed_plan.steps if s.status.value == "failed"]
                 return f"⚠️ 任务部分完成，{len(failed_steps)} 个步骤失败"
         except Exception as e:
             logger.error(f"[CHAT] Plan execution failed: {e}")

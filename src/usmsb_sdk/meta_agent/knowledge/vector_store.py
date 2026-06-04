@@ -147,8 +147,7 @@ class LocalEmbeddingService:
                     logger.info("SentenceTransformer model loaded: all-MiniLM-L6-v2 (downloaded)")
             except ImportError:
                 raise ImportError(
-                    "sentence-transformers not installed. "
-                    "Run: pip install sentence-transformers"
+                    "sentence-transformers not installed. " "Run: pip install sentence-transformers"
                 )
         return cls._st_model
 
@@ -182,9 +181,7 @@ class LocalEmbeddingService:
         model = self._get_st_model()
         loop = asyncio.get_event_loop()
         # encode 是同步的，放在 executor 里避免阻塞事件循环
-        embedding = await loop.run_in_executor(
-            None, lambda: model.encode(text).tolist()
-        )
+        embedding = await loop.run_in_executor(None, lambda: model.encode(text).tolist())
         return embedding
 
     def _embed_local(self, text: str) -> list[float]:
@@ -260,7 +257,8 @@ class VectorKnowledgeBase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS knowledge (
                 id TEXT PRIMARY KEY,
                 content TEXT NOT NULL,
@@ -273,9 +271,11 @@ class VectorKnowledgeBase:
                 access_count INTEGER DEFAULT 0,
                 relevance_score REAL DEFAULT 0
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS knowledge_graph (
                 id TEXT PRIMARY KEY,
                 subject TEXT NOT NULL,
@@ -286,7 +286,8 @@ class VectorKnowledgeBase:
                 created_at REAL,
                 metadata TEXT
             )
-        """)
+        """
+        )
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge(category)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_source ON knowledge(source)")

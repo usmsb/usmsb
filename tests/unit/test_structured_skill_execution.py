@@ -70,10 +70,12 @@ class SequencedLLMManager(LLMManager):
 
 
 def test_llm_manager_generate_json_repairs_invalid_output():
-    manager = SequencedLLMManager([
-        "not json",
-        '{"title": "ok", "score": 100}',
-    ])
+    manager = SequencedLLMManager(
+        [
+            "not json",
+            '{"title": "ok", "score": 100}',
+        ]
+    )
 
     result = asyncio.run(
         manager.generate_json(
