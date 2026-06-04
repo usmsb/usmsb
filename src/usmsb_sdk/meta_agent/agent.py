@@ -1755,10 +1755,16 @@ Hard rules:
 
         if self.l4_agent and hasattr(self.l4_agent, "learn_from_experience"):
             try:
+                outcome_label = "success" if quality_score is None or quality_score >= 0.6 else "needs_improvement"
+                lessons = [
+                    f"event={event_type}",
+                    f"quality_score={quality_score if quality_score is not None else 'unknown'}",
+                    f"feedback={json.dumps(feedback, ensure_ascii=False, default=str)[:500]}",
+                ]
                 result = self.l4_agent.learn_from_experience(
                     experience_type=event_type,
-                    experience_data=payload,
-                    outcome={"quality_score": quality_score, "feedback": feedback},
+                    outcome=outcome_label,
+                    lessons=lessons,
                 )
                 if inspect.isawaitable(result):
                     await result
