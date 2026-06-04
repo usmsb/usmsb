@@ -665,6 +665,57 @@ class L5CollectiveIntelligence:
                 memory_type=memory_type
             )
             await self.collective_memory.store(agent_id, memory, importance)
+
+    async def learn_from_feedback(
+        self,
+        event_type: str,
+        input: Any,
+        output: Any,
+        feedback: Any,
+        quality_score: float | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        source_agent: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Store external task feedback as L5 collective memory.
+
+        This lets a single MetaAgent or a multi-agent collective accumulate
+        lessons from validated outcomes, user feedback, and review decisions.
+        """
+        tags = tags or []
+        source = source_agent or "collective"
+        importance = (
+            MemoryImportance.HIGH
+            if quality_score is not None and quality_score >= 0.8
+            else MemoryImportance.NORMAL
+        )
+        memory = Memory(
+            content={
+                "event_type": event_type,
+                "input": input,
+                "output": output,
+                "feedback": feedback,
+                "quality_score": quality_score,
+                "metadata": metadata or {},
+            },
+            memory_type=f"feedback:{event_type}",
+            tags=tags,
+        )
+        await self.collective_memory.store(source, memory, importance)
+
+        if quality_score is not None:
+            trait = "high_quality_feedback" if quality_score >= 0.8 else "feedback_learning"
+            if trait not in self.collective_self.identity.shared_traits:
+                self.collective_self.identity.shared_traits.append(trait)
+            self.collective_self.identity.status = CollectiveIdentityStatus.EVOLVING
+
+        return {
+            "stored": True,
+            "source_agent": source,
+            "memory_id": memory.id,
+            "importance": importance.value,
+        }
     
     async def recall_collective(
         self,

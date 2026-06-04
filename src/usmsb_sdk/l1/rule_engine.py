@@ -168,10 +168,39 @@ class Rule:
     last_triggered: float | None = None
     metadata: dict = field(default_factory=dict)
     
-    def can_trigger(self) -> bool:
+    def can_trigger(self, stimulus: "Stimulus | None" = None) -> bool:
         """检查是否可以触发"""
         if not self.enabled:
             return False
+
+        if stimulus is not None:
+            if stimulus.metadata.get("bypass_l1") or stimulus.metadata.get("skip_l1"):
+                return False
+
+            allowed_sources = self.metadata.get("allowed_sources") or self.metadata.get("sources")
+            if isinstance(allowed_sources, str):
+                allowed_sources = [allowed_sources]
+            if allowed_sources and stimulus.source not in allowed_sources:
+                return False
+
+            blocked_sources = self.metadata.get("blocked_sources")
+            if isinstance(blocked_sources, str):
+                blocked_sources = [blocked_sources]
+            if blocked_sources and stimulus.source in blocked_sources:
+                return False
+
+            task_type = stimulus.metadata.get("task_type")
+            allowed_task_types = self.metadata.get("allowed_task_types")
+            if isinstance(allowed_task_types, str):
+                allowed_task_types = [allowed_task_types]
+            if allowed_task_types and task_type not in allowed_task_types:
+                return False
+
+            blocked_task_types = self.metadata.get("blocked_task_types")
+            if isinstance(blocked_task_types, str):
+                blocked_task_types = [blocked_task_types]
+            if blocked_task_types and task_type in blocked_task_types:
+                return False
         
         if self.cooldown > 0 and self.last_triggered:
             elapsed = datetime.now().timestamp() - self.last_triggered
@@ -316,10 +345,19 @@ class RuleEngine:
             Response: 响应
         """
         start_time = datetime.now()
+
+        if stimulus.metadata.get("bypass_l1") or stimulus.metadata.get("skip_l1"):
+            return Response(
+                rule_id="none",
+                rule_name="bypassed",
+                action_result="",
+                confidence=0.0,
+                metadata={"bypassed": True},
+            )
         
         # 遍历规则找匹配
         for rule in self.rules:
-            if not rule.can_trigger():
+            if not rule.can_trigger(stimulus):
                 continue
             
             if rule.condition and rule.condition.matches(stimulus.text):

@@ -50,6 +50,42 @@ class SearchResult:
     score: float
     distance: float
 
+    @property
+    def id(self) -> str:
+        return self.item.id
+
+    @property
+    def content(self) -> str:
+        return self.item.content
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self.item.metadata
+
+    @property
+    def source(self) -> str:
+        return self.item.source
+
+    @property
+    def category(self) -> str:
+        return self.item.category
+
+    @property
+    def timestamp(self) -> float:
+        return self.item.created_at
+
+    @property
+    def importance(self) -> float:
+        return self.item.relevance_score or self.score or 0.5
+
+    @property
+    def user_emphasized(self) -> bool:
+        return bool(self.item.metadata.get("user_emphasized", False))
+
+    @property
+    def success(self) -> bool | None:
+        return self.item.metadata.get("success")
+
 
 def _get_embedding_provider() -> str:
     """从环境变量读取 embedding provider，默认 local_hash"""
@@ -347,6 +383,49 @@ class VectorKnowledgeBase:
             await self._increment_access_count(result.item.id)
 
         return results
+
+    async def search_knowledge_base(
+        self,
+        query: str,
+        top_k: int = 10,
+        category: str | None = None,
+        min_score: float = 0.0,
+    ) -> list[SearchResult]:
+        """Compatibility wrapper used by IntelligentRecall."""
+        return await self.search(
+            query=query,
+            top_k=top_k,
+            category=category,
+            min_score=min_score,
+        )
+
+    async def search_in_document(
+        self,
+        document_id: str,
+        query: str,
+        top_k: int = 10,
+        min_score: float = 0.0,
+    ) -> list[SearchResult]:
+        """Search within one document by matching common document metadata keys."""
+        candidates = await self.search(
+            query=query,
+            top_k=max(top_k * 3, top_k),
+            min_score=min_score,
+        )
+        if not document_id:
+            return candidates[:top_k]
+
+        filtered = []
+        for result in candidates:
+            metadata = result.metadata or {}
+            if (
+                metadata.get("document_id") == document_id
+                or metadata.get("doc_id") == document_id
+                or metadata.get("id") == document_id
+                or result.source == document_id
+            ):
+                filtered.append(result)
+        return filtered[:top_k]
 
     def _search_vectors(
         self,

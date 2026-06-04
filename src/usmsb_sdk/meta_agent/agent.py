@@ -6,6 +6,7 @@ Meta Agent 主类
 
 import asyncio
 import dataclasses
+import inspect
 import json
 import logging
 import os
@@ -1491,11 +1492,235 @@ class MetaAgent:
             from usmsb_sdk.l5.l5_collective import L5CollectiveIntelligence
             self.l5_collective = L5CollectiveIntelligence(
                 collective_id=self.agent_id,
+                llm_adapter=self.llm_manager,
             )
+            if self.l4_agent:
+                self.l5_collective.add_member(self.l4_agent)
             logger.info("L5CollectiveIntelligence initialized")
         except Exception as e:
             logger.warning("L5CollectiveIntelligence init failed: %s", e)
             self.l5_collective = None
+
+    async def execute_structured_skill(
+        self,
+        skill_name: str,
+        user_prompt: str,
+        schema: dict[str, Any] | None = None,
+        validator: Any | None = None,
+        wallet_address: str | None = None,
+        context: dict[str, Any] | None = None,
+        retries: int = 2,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> dict[str, Any]:
+        """
+        Execute a skill that must return a validated JSON object.
+
+        This is still a MetaAgent capability: it uses the registered skill
+        instructions, SmartRecall, L4/L5 awareness, and LLMManager. It skips the
+        normal conversational L1/StrategyRouter loop because structured tasks
+        need deterministic JSON validation and repair retries.
+        """
+        context = context or {}
+        skill_context = await self._load_structured_skill_context(skill_name)
+        smart_recall_context = ""
+        if self.smart_recall:
+            try:
+                smart_recall_context = await self.smart_recall.recall(
+                    user_input=user_prompt,
+                    context={
+                        **context,
+                        "wallet_address": wallet_address,
+                        "task_type": "structured_skill",
+                    },
+                )
+            except Exception as exc:
+                logger.warning("[StructuredSkill] SmartRecall failed: %s", exc)
+
+        l4_context = self._get_l4_decision_context()
+        l5_context = self._get_l5_decision_context()
+        system_prompt = self._build_structured_skill_system_prompt(
+            skill_name=skill_name,
+            skill_context=skill_context,
+            smart_recall_context=smart_recall_context,
+            l4_context=l4_context,
+            l5_context=l5_context,
+            schema=schema,
+        )
+        result = await self.llm_manager.generate_json(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            schema=schema,
+            validator=validator,
+            retries=retries,
+            return_metadata=True,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        await self.learn_from_feedback(
+            event_type="structured_skill_execution",
+            input={"skill_name": skill_name, "prompt": user_prompt, "context": context},
+            output=result.get("data"),
+            feedback={"attempts": result.get("attempts"), "errors": result.get("errors", [])},
+            quality_score=1.0 if not result.get("errors") else 0.7,
+            tags=["structured_skill", skill_name],
+            user_id=wallet_address,
+        )
+        return {
+            "type": "structured",
+            "skill": skill_name,
+            "data": result.get("data"),
+            "raw": result.get("raw"),
+            "attempts": result.get("attempts"),
+            "errors": result.get("errors", []),
+            "context_used": {
+                "skill_loaded": bool(skill_context),
+                "smart_recall": bool(smart_recall_context),
+                "l4": bool(l4_context),
+                "l5": bool(l5_context),
+            },
+        }
+
+    async def _load_structured_skill_context(self, skill_name: str) -> str:
+        """Load full skill instructions when available."""
+        try:
+            activation = await self.skills_manager.activate_skill(
+                skill_name,
+                include_scripts=False,
+                include_references=True,
+            )
+            if activation and not activation.get("error"):
+                parts = [activation.get("instructions") or ""]
+                references = activation.get("references_content") or {}
+                for name, content in references.items():
+                    parts.append(f"\n\n## Reference: {name}\n{content}")
+                return "\n".join(part for part in parts if part)
+        except Exception as exc:
+            logger.warning("[StructuredSkill] load skill failed: %s", exc)
+        return ""
+
+    def _build_structured_skill_system_prompt(
+        self,
+        skill_name: str,
+        skill_context: str,
+        smart_recall_context: str,
+        l4_context: str,
+        l5_context: str,
+        schema: dict[str, Any] | None,
+    ) -> str:
+        schema_text = json.dumps(schema, ensure_ascii=False, indent=2) if schema else "No explicit schema."
+        return f"""You are executing USMSB MetaAgent structured skill `{skill_name}`.
+
+Hard rules:
+1. Return exactly one JSON object.
+2. Do not include markdown, explanations, or code fences.
+3. Follow the skill instructions and schema.
+4. Use memory/L4/L5 context only when relevant.
+
+## Skill Instructions
+{skill_context or "No file-based skill instructions were found. Use the user task and schema directly."}
+
+## SmartRecall Context
+{smart_recall_context or "None"}
+
+## L4 Self-Awareness Context
+{l4_context or "None"}
+
+## L5 Collective Intelligence Context
+{l5_context or "None"}
+
+## Expected JSON Schema / Contract
+{schema_text}
+"""
+
+    async def learn_from_feedback(
+        self,
+        event_type: str,
+        input: Any,
+        output: Any,
+        feedback: Any,
+        quality_score: float | None = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        user_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Record feedback so L4/L5, knowledge, and experience stores can improve.
+        """
+        tags = tags or []
+        payload = {
+            "event_type": event_type,
+            "input": input,
+            "output": output,
+            "feedback": feedback,
+            "quality_score": quality_score,
+            "tags": tags,
+            "metadata": metadata or {},
+            "user_id": user_id,
+        }
+        stored: dict[str, Any] = {
+            "l5": False,
+            "knowledge_base": False,
+            "experience_db": False,
+            "l4": False,
+        }
+
+        if self.l5_collective and hasattr(self.l5_collective, "learn_from_feedback"):
+            try:
+                await self.l5_collective.learn_from_feedback(
+                    event_type=event_type,
+                    input=input,
+                    output=output,
+                    feedback=feedback,
+                    quality_score=quality_score,
+                    tags=tags,
+                    metadata=metadata,
+                    source_agent=user_id or self.agent_id,
+                )
+                stored["l5"] = True
+            except Exception as exc:
+                logger.warning("[FeedbackLearning] L5 store failed: %s", exc)
+
+        try:
+            content = json.dumps(payload, ensure_ascii=False, default=str)
+            await self.vector_kb.add_knowledge(
+                content=content,
+                metadata={"type": "feedback", "event_type": event_type, "tags": tags},
+                source=user_id or self.agent_id,
+                category="feedback",
+            )
+            stored["knowledge_base"] = True
+        except Exception as exc:
+            logger.warning("[FeedbackLearning] knowledge store failed: %s", exc)
+
+        if self.error_learning and getattr(self.error_learning, "experience_db", None):
+            try:
+                success = quality_score is None or quality_score >= 0.6
+                await self.error_learning.experience_db.add({
+                    "type": "success_experience" if success else "failure_lesson",
+                    "experience_type": event_type,
+                    "lesson_type": event_type,
+                    "content": json.dumps(payload, ensure_ascii=False, default=str),
+                    "context": {"tags": tags, "quality_score": quality_score},
+                })
+                stored["experience_db"] = True
+            except Exception as exc:
+                logger.warning("[FeedbackLearning] experience store failed: %s", exc)
+
+        if self.l4_agent and hasattr(self.l4_agent, "learn_from_experience"):
+            try:
+                result = self.l4_agent.learn_from_experience(
+                    experience_type=event_type,
+                    experience_data=payload,
+                    outcome={"quality_score": quality_score, "feedback": feedback},
+                )
+                if inspect.isawaitable(result):
+                    await result
+                stored["l4"] = True
+            except Exception as exc:
+                logger.warning("[FeedbackLearning] L4 update failed: %s", exc)
+
+        return {"success": any(stored.values()), "stored": stored, "event": payload}
 
     async def _init_autonomous_loop(self) -> None:
         """
@@ -2220,6 +2445,7 @@ class MetaAgent:
         wallet_address: str | None = None,
         participant_type: ParticipantType = ParticipantType.HUMAN,
         skip_complexity_detection: bool = False,
+        skip_l1_rules: bool = False,
     ) -> str:
         """
         处理用户对话 - 支持私有会话隔离和上下文检索
@@ -2244,7 +2470,14 @@ class MetaAgent:
         # ========== L1 Fast Path: 规则引擎优先匹配 ==========
         if not skip_complexity_detection:
             try:
-                stimulus = Stimulus(text=message)
+                stimulus = Stimulus(
+                    text=message,
+                    source="user",
+                    metadata={
+                        "task_type": "chat",
+                        "bypass_l1": skip_l1_rules,
+                    },
+                )
                 l1_response = await self.l1_engine.react(stimulus)
                 if l1_response.action_result and l1_response.action_result not in (
                     "", "我没有理解您的问题。", "unknown"
