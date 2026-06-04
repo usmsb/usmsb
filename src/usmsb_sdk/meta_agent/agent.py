@@ -1772,6 +1772,21 @@ Hard rules:
             except Exception as exc:
                 logger.warning("[FeedbackLearning] L4 update failed: %s", exc)
 
+        if stored["l5"]:
+            try:
+                feedback_summary = json.dumps(feedback, ensure_ascii=False, default=str)[:500]
+                output_summary = json.dumps(output, ensure_ascii=False, default=str)[:300]
+                synthesis = (
+                    f"{event_type}: quality_score={quality_score if quality_score is not None else 'unknown'}; "
+                    f"output={output_summary}; feedback={feedback_summary}"
+                )
+                previous = getattr(self, "_l5_synthesis", "") or ""
+                self._l5_synthesis = (
+                    f"{previous}\n{synthesis}" if previous and synthesis not in previous else synthesis
+                )[-1200:]
+            except Exception as exc:
+                logger.warning("[FeedbackLearning] L5 synthesis update failed: %s", exc)
+
         return {"success": any(stored.values()), "stored": stored, "event": payload}
 
     async def _init_autonomous_loop(self) -> None:
