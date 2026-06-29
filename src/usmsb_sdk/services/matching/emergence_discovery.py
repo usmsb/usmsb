@@ -92,9 +92,12 @@ class EmergenceDiscovery:
     BROADCAST_TIMEOUT_SECONDS = 300  # 5 minutes
     MAX_BROADCAST_RESPONSES = 20
 
-    def __init__(self, db_session=None):
+    def __init__(self, db_session=None, capability_fit=None):
         self.soul_manager = None
         self._db_session = db_session  # Optional DB session
+        # LLM-first 能力匹配（语义）。None=回退到关键词重叠（向后兼容）。
+        # 传入 LLMCapabilityFit(chat) 即启用语义匹配，替代 cap in goal 的子串判断。
+        self._capability_fit = capability_fit
 
     def _get_db_session(self):
         """Get or create DB session."""
@@ -297,21 +300,39 @@ class EmergenceDiscovery:
         all_agents = await self._get_all_agents()
 
         responses = []
+        task_goal = broadcast.content.get("goal", "")
         for agent_soul in all_agents:
             if agent_soul.agent_id == broadcast.agent_id:
                 continue
 
-            # Check if agent is interested
-            if self._agent_interested(agent_soul, broadcast):
+            # LLM-first：能力是否胜任任务，优先语义判断；无 LLM 时回退关键词
+            if self._capability_fit is not None:
+                base = await self._capability_fit.score(
+                    list(agent_soul.declared.capabilities), task_goal
+                )
+                interested = base > 0
+                match_score = self._apply_reputation(base, agent_soul)
+            else:
+                interested = self._agent_interested(agent_soul, broadcast)
+                match_score = self._calculate_response_match(agent_soul, broadcast)
+
+            if interested:
                 responses.append({
                     "agent_id": agent_soul.agent_id,
                     "agent_soul": agent_soul.to_dict(),
-                    "match_score": self._calculate_response_match(agent_soul, broadcast),
+                    "match_score": match_score,
                     "proposed_terms": self._generate_proposed_terms(agent_soul),
                     "responded_at": time.time(),
                 })
 
         return responses[:self.MAX_BROADCAST_RESPONSES]
+
+    @staticmethod
+    def _apply_reputation(base_score: float, agent_soul) -> float:
+        """按声誉微调匹配分（与关键词路径一致的加成逻辑）。"""
+        if getattr(agent_soul, "inferred", None):
+            base_score = base_score + (agent_soul.inferred.actual_success_rate - 0.5) * 0.2
+        return max(0.0, min(1.0, base_score))
 
     def _agent_interested(self, agent_soul, broadcast: AgentBroadcast) -> bool:
         """Check if an agent is interested in responding to a broadcast."""

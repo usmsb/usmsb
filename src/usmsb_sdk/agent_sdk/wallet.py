@@ -329,6 +329,36 @@ class WalletManager:
         self._balance_cache = None
         return await self.get_balance(use_cache=False)
 
+    # ─── P2P 转账 ────────────────────────────────────────────────────────────
+
+    async def transfer(self, to_address: str, amount: float) -> dict[str, Any]:
+        """P2P 转账 VIBE（真实链上 VIBEToken.transfer）。
+
+        这是 v3.0 补的缺口：原 WalletManager 只有 stake/balance，无法做服务结算转账。
+        无链/无私钥时优雅降级（返回 success=False，不抛异常），上层可回退到链下账本。
+
+        Returns:
+            {"success": bool, "tx_hash"?: str, "explorer_url"?: str, "reason"?: str}
+        """
+        if amount <= 0:
+            return {"success": False, "reason": "amount must be positive"}
+
+        # 支出前先过限额闸门（与 harness guard 一致的安全边界）
+        can = await self.check_can_spend(amount)
+        if not can.get("can_spend"):
+            return {"success": False, "reason": can.get("reason") or "spend not allowed"}
+
+        if not self._vibe_token or not self._private_key:
+            return {"success": False, "reason": "no web3 connection"}
+
+        try:
+            result = self._vibe_token.transfer(self._private_key, to_address, amount)
+            self._balance_cache = None  # 余额已变，清缓存
+            return result
+        except Exception as e:  # noqa: BLE001
+            self.logger.error(f"[WalletManager] transfer failed: {e}")
+            return {"success": False, "reason": str(e)}
+
     # ─── 质押 ────────────────────────────────────────────────────────────────
 
     async def get_stake_info(self) -> StakeInfo:

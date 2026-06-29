@@ -685,17 +685,8 @@ class MetaAgent:
         # StrategyRouter（LLM 双轨策略路由）
         await self._init_strategy_router()
 
-        # L4 自我意识 Agent
-        try:
-            await self._init_l4_agent()
-        except Exception as e:
-            logger.warning(f"L4Agent init failed (non-critical): {e}")
-
-        # L5 集体智能
-        try:
-            await self._init_l5_collective()
-        except Exception as e:
-            logger.warning(f"L5CollectiveIntelligence init failed (non-critical): {e}")
+        # L4/L5 认知插件（v3.0 双坐标：可选，不占主循环）
+        await self._maybe_init_cognitive_plugins()
 
         # L3 自主运行循环（依赖 L4）
         try:
@@ -933,6 +924,15 @@ class MetaAgent:
         # 停止进化引擎
         if self.evolution_engine:
             await self.evolution_engine.stop()
+
+        # 取消可能在跑的后台进化任务（非阻塞触发出来的 fire-and-forget）
+        bg_evo = getattr(self, "_evolution_bg_task", None)
+        if bg_evo is not None and not bg_evo.done():
+            bg_evo.cancel()
+            try:
+                await bg_evo
+            except asyncio.CancelledError:
+                pass
 
         # ========== 停止守护进程 ==========
         if self.guardian_daemon:
@@ -1515,6 +1515,22 @@ class MetaAgent:
         except Exception as e:
             logger.warning("StrategyRouter init failed: %s", e)
             self.strategy_router = None
+
+    async def _maybe_init_cognitive_plugins(self) -> None:
+        """按 config.enable_cognitive_plugins 决定是否加载 L4/L5（v3.0 双坐标可选插件）。"""
+        if not getattr(self.config, "enable_cognitive_plugins", True):
+            logger.info("Cognitive plugins (L4/L5) disabled via config")
+            self.l4_agent = None
+            self.l5_collective = None
+            return
+        try:
+            await self._init_l4_agent()
+        except Exception as e:
+            logger.warning(f"L4Agent init failed (non-critical): {e}")
+        try:
+            await self._init_l5_collective()
+        except Exception as e:
+            logger.warning(f"L5CollectiveIntelligence init failed (non-critical): {e}")
 
     async def _init_l4_agent(self) -> None:
         """Initialize L4 self-conscious agent."""
@@ -3319,26 +3335,55 @@ Hard rules:
         else:
             return "抱歉，处理您的请求时遇到了问题。请稍后重试。"
 
+    def _trigger_background_evolution(self) -> None:
+        """非阻塞触发一次进化：单飞 + 限频，绝不阻塞聊天路径。
+
+        - 单飞：已有后台进化在跑则跳过，避免 LLM 资源叠加。
+        - 限频：两次触发间隔不短于 _evolution_min_interval（默认 300s）。
+        """
+        if not self.evolution_engine:
+            return
+        task = getattr(self, "_evolution_bg_task", None)
+        if task is not None and not task.done():
+            return  # 单飞
+        try:
+            now = asyncio.get_running_loop().time()
+        except RuntimeError:
+            return  # 无运行中的事件循环
+        min_interval = getattr(self, "_evolution_min_interval", 300.0)
+        last = getattr(self, "_last_evolution_trigger", 0.0)
+        if now - last < min_interval:
+            return  # 限频
+        self._last_evolution_trigger = now
+        self._evolution_bg_task = asyncio.create_task(self._run_background_evolution())
+
+    async def _run_background_evolution(self) -> None:
+        """后台执行一次 evolve()，异常自吞，不影响主流程。"""
+        try:
+            evo_result = await self.evolution_engine.evolve()
+            if evo_result and evo_result.get("knowledge_added", 0) > 0:
+                logger.info(
+                    "[EVOLUTION] +%d knowledge, +%d patterns",
+                    evo_result.get("knowledge_added", 0),
+                    evo_result.get("patterns_identified", 0),
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            logger.warning("[EVOLUTION] background evolve() failed: %s", e)
+
     async def _learn_and_evolve(self):
         """学习进化 - L4/L5/Evolution 全链路增强版"""
         try:
             # 基础学习
             await self.learning.learn_from_experience()
 
-            # Evolution Engine 自我进化（每轮主循环调用一次）
-            # DISABLED: Evolution consumes too much LLM resources, causing chat requests to timeout
-            # TODO: Re-enable when LLM quota is sufficient or run Evolution as a separate background task
-            if False and self.evolution_engine:
-                try:
-                    evo_result = await self.evolution_engine.evolve()
-                    if evo_result and evo_result.get("knowledge_added", 0) > 0:
-                        logger.info(
-                            "[EVOLUTION] +%d knowledge, +%d patterns",
-                            evo_result.get("knowledge_added", 0),
-                            evo_result.get("patterns_identified", 0),
-                        )
-                except Exception as e:
-                    logger.warning("[EVOLUTION] evolve() failed: %s", e)
+            # Evolution Engine 自我进化（v3.0：改为非阻塞后台触发）
+            # 过去这里内联 await evolve()，每轮聊天都跑，导致请求超时（故曾被 if False 禁用）。
+            # 现改为「单飞 + 限频」的 fire-and-forget 后台任务：绝不阻塞聊天路径，
+            # 同时与引擎自带的周期循环（_evolution_loop，默认 300s）互补——
+            # 聊天产生的新经验可机会性触发一次增量进化。
+            self._trigger_background_evolution()
 
             # L4 自我反思（周期性）→ 结果进入决策回路
             if self.l4_agent:

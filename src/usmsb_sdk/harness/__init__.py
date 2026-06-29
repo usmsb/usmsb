@@ -58,6 +58,21 @@ from usmsb_sdk.harness.execution_engine import (
     EvaluationEngine,
 )
 
+# v3.0：轻量「一切皆 LLM + guard」经济公民 harness（支柱①）。
+# 与上面的重型 4 层 MAS 基础设施并存：新 PEA/经济 Agent 用 BaseHarness，
+# 旧的复杂编排场景仍可用 ExecutionOrchestrator 等。
+from usmsb_sdk.harness.base_harness import (
+    BaseHarness,
+    ChatProvider,
+    GuardDecision,
+    TurnResult,
+    parse_action,
+)
+from usmsb_sdk.harness.providers import (
+    LLMChatProvider,
+    make_minimax_provider,
+)
+
 __all__ = [
     # Knowledge Layer
     "KnowledgeLayer",
@@ -79,4 +94,12 @@ __all__ = [
     "GovernanceLayer",
     "TrajectoryRecord",
     "ExperienceRepository",
+    # v3.0 经济公民 harness
+    "BaseHarness",
+    "ChatProvider",
+    "GuardDecision",
+    "TurnResult",
+    "parse_action",
+    "LLMChatProvider",
+    "make_minimax_provider",
 ]
