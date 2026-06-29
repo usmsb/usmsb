@@ -17,9 +17,10 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from usmsb_sdk.core.elements import Agent, Goal, Resource
+from usmsb_sdk.services.matching.llm_capability_fit import LLMCapabilityFit
 from usmsb_sdk.platform.environment.broadcast_service import (
     BroadcastScope,
     BroadcastType,
@@ -35,6 +36,9 @@ from usmsb_sdk.services.active_matching_service import (
     NegotiationStrategy,
     SearchStrategy,
 )
+
+if TYPE_CHECKING:
+    from usmsb_sdk.harness.base_harness import ChatProvider
 
 logger = logging.getLogger(__name__)
 
@@ -195,11 +199,15 @@ class SupplyDemandMatchingService:
     - ExternalAgentAdapter for external agent integration
     """
 
+    # 语义匹配阈值：interested() 判定"关键词是否相关、保留与否"的下限（0..1）。
+    _SEMANTIC_MATCH_THRESHOLD = 0.5
+
     def __init__(
         self,
         active_matching_service: ActiveMatchingService,
         broadcast_service: EnvironmentBroadcastService,
         external_agent_adapter: ExternalAgentAdapter,
+        chat: ChatProvider | None = None,
     ):
         """
         Initialize the Supply-Demand Matching Service.
@@ -208,10 +216,17 @@ class SupplyDemandMatchingService:
             active_matching_service: Service for proactive matching
             broadcast_service: Service for environment broadcasts
             external_agent_adapter: Adapter for external agents
+            chat: 可选 ChatProvider。注入后关键词搜索走 LLM 语义匹配
+                （撮合是"判断/智能" → 走 LLM）；为 None 时回退关键词子串，
+                保持向后兼容。
         """
         self.active_matching = active_matching_service
         self.broadcast = broadcast_service
         self.external_adapter = external_agent_adapter
+
+        # LLM-first 关键词语义匹配。None=无 LLM，搜索回退关键词子串（向后兼容）。
+        # 与 emergence_discovery.py 同一模式（LLMCapabilityFit 注入 chat）。
+        self._capability_fit = LLMCapabilityFit(chat) if chat is not None else None
 
         # Listings
         self._supply_listings: dict[str, SupplyListing] = {}
@@ -320,7 +335,23 @@ class SupplyDemandMatchingService:
             if lid in self._supply_listings
         ]
 
-    def search_supply_listings(
+    async def _keywords_match_description(
+        self, keywords: list[str], description: str
+    ) -> bool:
+        """关键词与描述是否相关——撮合是"判断/智能"，优先 LLM 语义匹配。
+
+        注入 chat 时走 LLMCapabilityFit（keywords 当能力清单、description 当任务，
+        由 LLM 判断语义相关度，例如『视觉传达』命中『海报』）。无 LLM 时回退关键词
+        子串（任一命中即保留），与升级前 `any(kw in desc)` 行为完全一致，向后兼容。
+        """
+        if self._capability_fit is not None:
+            return await self._capability_fit.interested(
+                keywords, description, threshold=self._SEMANTIC_MATCH_THRESHOLD
+            )
+        desc_lower = description.lower()
+        return any(kw.lower() in desc_lower for kw in keywords)
+
+    async def search_supply_listings(
         self,
         capabilities: list[str] | None = None,
         price_max: float | None = None,
@@ -337,20 +368,20 @@ class SupplyDemandMatchingService:
             if listing.expires_at and time.time() > listing.expires_at:
                 continue
 
-            # Filter by capabilities
+            # Filter by capabilities（集合/协议判断 → 用代码）
             if capabilities:
                 if not any(c in listing.capabilities for c in capabilities):
                     continue
 
-            # Filter by price
+            # Filter by price（预算判断 → 用代码）
             if price_max is not None:
                 if listing.price_range.get("min", 0) > price_max:
                     continue
 
-            # Filter by keywords
+            # Filter by keywords（语义判断 → 优先 LLM，无 LLM 回退关键词）
             if keywords:
-                resource_desc = listing.resource.get("description", "").lower()
-                if not any(kw.lower() in resource_desc for kw in keywords):
+                resource_desc = listing.resource.get("description", "")
+                if not await self._keywords_match_description(keywords, resource_desc):
                     continue
 
             results.append(listing)
@@ -436,7 +467,7 @@ class SupplyDemandMatchingService:
             if lid in self._demand_listings
         ]
 
-    def search_demand_listings(
+    async def search_demand_listings(
         self,
         capabilities: list[str] | None = None,
         budget_min: float | None = None,
@@ -453,20 +484,20 @@ class SupplyDemandMatchingService:
             if listing.expires_at and time.time() > listing.expires_at:
                 continue
 
-            # Filter by capabilities
+            # Filter by capabilities（集合/协议判断 → 用代码）
             if capabilities:
                 if not any(c in listing.required_capabilities for c in capabilities):
                     continue
 
-            # Filter by budget
+            # Filter by budget（预算判断 → 用代码）
             if budget_min is not None:
                 if listing.budget.get("max", 0) < budget_min:
                     continue
 
-            # Filter by keywords
+            # Filter by keywords（语义判断 → 优先 LLM，无 LLM 回退关键词）
             if keywords:
-                req_desc = listing.requirement.get("description", "").lower()
-                if not any(kw.lower() in req_desc for kw in keywords):
+                req_desc = listing.requirement.get("description", "")
+                if not await self._keywords_match_description(keywords, req_desc):
                     continue
 
             results.append(listing)

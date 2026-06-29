@@ -2,6 +2,11 @@
 """
 ButlerAgent - 超级个体大管家 Agent
 
+.. deprecated:: v3.0
+    本模块为早期 stub，且导入链已断裂（依赖 l3_orchestrator → 已不存在的 GoogleAgentCard）。
+    请改用 `usmsb_sdk.products.super_individual.butler_pea.ButlerPea`
+    （基于 v3.0 harness：一切皆 LLM + guard + 钱包）。本文件仅为向后兼容保留。
+
 整合所有超级个体功能的主 Agent。
 
 功能：

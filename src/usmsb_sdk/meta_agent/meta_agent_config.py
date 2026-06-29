@@ -99,6 +99,11 @@ class MetaAgentConfig:
     strict_mode: bool = False  # 是否启用严格模式
     strict_mode_max_retries: int = 3  # 严格模式最大重试次数
 
+    # ========== 认知插件（L4 自我意识 / L5 集体智能）==========
+    # v3.0 双坐标：认知模块属"角色轴可选能力"，不应占主循环。
+    # 默认 True 保持向后兼容；经济公民 / PEA 路径走 harness，应设为 False 以省 LLM/延迟。
+    enable_cognitive_plugins: bool = True
+
     @classmethod
     def from_env(cls) -> "MetaAgentConfig":
         """从环境变量加载配置"""

@@ -2,6 +2,11 @@
 """
 TeamLeader - 团队 Leader Agent
 
+.. deprecated:: v3.0
+    本模块为早期内存 dict-CRUD stub（无智能、无经济）。请改用
+    `usmsb_sdk.products.team.team_leader_pea.TeamLeaderPea`
+    （多 PEA over A2A：LLM 拆解→能力发现组队→联合订单 Shapley 分账）。
+
 负责任务分配、进度跟踪、团队协调。
 
 功能：
