@@ -13,6 +13,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 
+@pytest.mark.requires_network
 class TestLiveBlockchainConnection:
     """真实区块链连接测试"""
 

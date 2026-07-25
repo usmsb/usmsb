@@ -9,6 +9,15 @@ from typing import Any
 
 from usmsb_sdk.intelligence_adapters.base import IntelligenceSourceConfig, IntelligenceSourceType
 from usmsb_sdk.intelligence_adapters.llm.minimax_adapter import MiniMaxAdapter
+from usmsb_sdk.llm_telemetry import (
+    LLMBillingContext,
+    LLMEventCallback,
+    LLMInvocationRecorder,
+    LLMTraceContext,
+    llm_context_scope,
+    resolve_llm_context,
+    update_llm_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +25,37 @@ logger = logging.getLogger(__name__)
 class LLMManager:
     """LLM 管理器，支持多 LLM"""
 
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        *,
+        event_callback: LLMEventCallback | None = None,
+        invocation_recorder: LLMInvocationRecorder | None = None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
+    ):
         self.config = config
         self.provider = config.provider
         self.model = config.model
+        self.max_tokens = getattr(config, "max_tokens", None)
         self._adapter = None
+        configured_recorder = invocation_recorder or getattr(
+            config, "invocation_recorder", None
+        )
+        configured_callback = event_callback or getattr(config, "llm_event_callback", None)
+        configured_context = default_context or getattr(config, "llm_trace_context", None)
+        if isinstance(configured_recorder, LLMInvocationRecorder):
+            self.invocation_recorder = configured_recorder
+            if configured_callback:
+                self.invocation_recorder.add_callback(configured_callback)
+            if configured_context is not None:
+                self.invocation_recorder.set_default_context(configured_context)
+        else:
+            self.invocation_recorder = LLMInvocationRecorder(
+                event_callback=configured_callback,
+                default_context=configured_context,
+                max_calls=int(getattr(config, "llm_history_size", 1000)),
+                capture_payloads=bool(getattr(config, "llm_capture_payloads", True)),
+            )
 
     async def init(self):
         """初始化"""
@@ -44,18 +79,96 @@ class LLMManager:
                 "max_tokens": self.config.max_tokens,
                 "reasoning_split": getattr(self.config, "reasoning_split", None),
                 "service_tier": getattr(self.config, "service_tier", None),
+                "invocation_recorder": self.invocation_recorder,
             },
         )
         self._adapter = MiniMaxAdapter(config)
         await self._adapter.initialize()
         logger.info("MiniMax adapter initialized in LLM Manager")
 
-    async def chat(self, message: str, system_prompt: str | None = None) -> str:
+    def configure_llm_tracking(
+        self,
+        *,
+        callback: LLMEventCallback | None = None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
+    ) -> None:
+        """Attach a non-blocking provider-attempt callback and default identity."""
+
+        if callback:
+            self.invocation_recorder.add_callback(callback)
+        if default_context is not None:
+            self.invocation_recorder.set_default_context(default_context)
+        if self._adapter and hasattr(self._adapter, "configure_llm_tracking"):
+            self._adapter.configure_llm_tracking(
+                callback=callback,
+                default_context=default_context,
+            )
+
+    def trace_scope(
+        self,
+        context: LLMTraceContext | dict[str, Any] | None = None,
+        *,
+        billing_context: LLMBillingContext | dict[str, Any] | None = None,
+    ):
+        resolved = resolve_llm_context(
+            context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            resolved = resolved.with_updates(billing=billing_context)
+        return llm_context_scope(resolved)
+
+    def update_trace_context(self, **updates: Any):
+        """Enrich the current task context (for example after conversation creation)."""
+
+        return update_llm_context(**updates)
+
+    def get_llm_call_details(self, **filters: Any) -> list[dict[str, Any]]:
+        return self.invocation_recorder.recent_calls(**filters)
+
+    def get_llm_events(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        return self.invocation_recorder.recent_events(limit=limit)
+
+    def drain_llm_events(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        return self.invocation_recorder.drain_events(limit=limit)
+
+    def _call_context(
+        self,
+        *,
+        operation: str,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: LLMBillingContext | dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> LLMTraceContext:
+        resolved = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            resolved = resolved.with_updates(billing=billing_context)
+        return resolved.for_logical_call(operation=operation, metadata=metadata)
+
+    async def chat(
+        self,
+        message: str,
+        system_prompt: str | None = None,
+        *,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: LLMBillingContext | dict[str, Any] | None = None,
+        operation: str = "chat",
+    ) -> str:
         """聊天"""
+        call_context = self._call_context(
+            operation=operation,
+            trace_context=trace_context,
+            billing_context=billing_context,
+        )
         if self.provider == "minimax" and self._adapter:
             return await self._adapter.generate_with_system(
                 system_prompt=system_prompt or "你是一个有用的AI助手。",
                 user_prompt=message,
+                trace_context=call_context,
+                operation=operation,
             )
         elif self.provider == "openai":
             return await self._chat_openai(message, system_prompt)
@@ -65,12 +178,17 @@ class LLMManager:
             return await self._chat_local(message, system_prompt)
         return "LLM not configured"
 
-    async def generate_with_system(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_with_system(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        **kwargs: Any,
+    ) -> str:
         """
         标准接口：system + user prompt → LLM 响应。
         供 GeneCapsuleAdapter 等组件使用，实现 LLM 驱动的体验生成。
         """
-        return await self.chat(message=user_prompt, system_prompt=system_prompt)
+        return await self.chat(message=user_prompt, system_prompt=system_prompt, **kwargs)
 
     async def generate(
         self,
@@ -88,6 +206,14 @@ class LLMManager:
         generate_with_system。这个方法统一转发到当前 provider，并保持向后兼容。
         """
         generation_kwargs = dict(kwargs)
+        trace_context = generation_kwargs.pop("trace_context", None)
+        billing_context = generation_kwargs.pop("billing_context", None)
+        operation = generation_kwargs.pop("operation", "generate")
+        call_context = self._call_context(
+            operation=operation,
+            trace_context=trace_context,
+            billing_context=billing_context,
+        )
         if max_tokens is not None:
             generation_kwargs["max_tokens"] = max_tokens
         if temperature is not None:
@@ -98,11 +224,23 @@ class LLMManager:
                 return await self._adapter.generate_with_system(
                     system_prompt=system_prompt,
                     user_prompt=prompt,
+                    trace_context=call_context,
+                    operation=operation,
                     **generation_kwargs,
                 )
-            return await self._adapter.generate_text(prompt, **generation_kwargs)
+            return await self._adapter.generate_text(
+                prompt,
+                trace_context=call_context,
+                operation=operation,
+                **generation_kwargs,
+            )
 
-        return await self.chat(message=prompt, system_prompt=system_prompt)
+        return await self.chat(
+            message=prompt,
+            system_prompt=system_prompt,
+            trace_context=call_context,
+            operation=operation,
+        )
 
     async def generate_json(
         self,
@@ -131,11 +269,27 @@ class LLMManager:
         prompt = user_prompt
         last_raw = ""
         attempts = max(0, retries) + 1
+        trace_context = kwargs.pop("trace_context", None)
+        billing_context = kwargs.pop("billing_context", None)
+        root_context = self._call_context(
+            operation="generate_json",
+            trace_context=trace_context,
+            billing_context=billing_context,
+        )
 
         for attempt in range(1, attempts + 1):
+            attempt_context = root_context.with_updates(
+                operation="generate_json" if attempt == 1 else "generate_json.repair",
+                metadata={
+                    "json_attempt": attempt,
+                    "json_attempt_kind": "initial" if attempt == 1 else "repair",
+                },
+            )
             last_raw = await self.generate(
                 prompt=prompt,
                 system_prompt=system_prompt,
+                trace_context=attempt_context,
+                operation=attempt_context.operation or "generate_json",
                 **kwargs,
             )
             try:
@@ -282,7 +436,15 @@ Return only one valid JSON object. Do not include markdown, prose, or code fence
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                return loop.run_until_complete(self.chat(prompt, system_prompt))
+                return loop.run_until_complete(
+                    self.chat(
+                        prompt,
+                        system_prompt,
+                        trace_context=kwargs.get("trace_context"),
+                        billing_context=kwargs.get("billing_context"),
+                        operation=kwargs.get("operation", "complete"),
+                    )
+                )
             finally:
                 loop.close()
 

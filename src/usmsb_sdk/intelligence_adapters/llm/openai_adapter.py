@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 try:
-    from openai import APIConnectionError, APIError, AsyncOpenAI, RateLimitError
+    from openai import AsyncOpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -22,6 +22,12 @@ from usmsb_sdk.intelligence_adapters.base import (
     IntelligenceSourceConfig,
     IntelligenceSourceStatus,
     IntelligenceSourceType,
+)
+from usmsb_sdk.llm_telemetry import (
+    LLMTraceContext,
+    LLMUsage,
+    platform_observation_context,
+    resolve_llm_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +70,107 @@ class OpenAIAdapter(ILLMAdapter):
 
         self._client: AsyncOpenAI | None = None
 
+    def _call_context(
+        self,
+        *,
+        operation: str,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
+    ) -> LLMTraceContext:
+        call_context = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            call_context = call_context.with_updates(billing=billing_context)
+        return call_context.for_logical_call(operation=operation)
+
+    async def _recorded_chat_request(
+        self,
+        *,
+        operation: str,
+        payload: dict[str, Any],
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
+    ) -> Any:
+        """Execute one non-streaming physical OpenAI request with one terminal event."""
+
+        attempt_id = self.invocation_recorder.requested(
+            provider="openai",
+            model=str(payload["model"]),
+            operation=operation,
+            request_payload=payload,
+            context=self._call_context(
+                operation=operation,
+                trace_context=trace_context,
+                billing_context=billing_context,
+            ),
+            metadata={"transport_retry_index": 0},
+        )
+        try:
+            response = await self._client.chat.completions.create(**payload)
+        except BaseException as exc:
+            self.invocation_recorder.failed(
+                attempt_id,
+                exc,
+                http_status=getattr(exc, "status_code", None),
+                metadata={"transport_retry_index": 0},
+            )
+            raise
+
+        self.invocation_recorder.completed(
+            attempt_id,
+            response_payload=response,
+            usage=LLMUsage.from_value(response),
+            response_id=getattr(response, "id", None),
+            http_status=200,
+            metadata={"transport_retry_index": 0},
+        )
+        return response
+
+    async def _recorded_embedding_request(
+        self,
+        *,
+        operation: str,
+        payload: dict[str, Any],
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
+    ) -> Any:
+        """Execute one physical OpenAI embedding request with input-normalized usage."""
+
+        attempt_id = self.invocation_recorder.requested(
+            provider="openai",
+            model=str(payload["model"]),
+            operation=operation,
+            request_payload=payload,
+            context=self._call_context(
+                operation=operation,
+                trace_context=trace_context,
+                billing_context=billing_context,
+            ),
+            metadata={"transport_retry_index": 0},
+        )
+        try:
+            response = await self._client.embeddings.create(**payload)
+        except BaseException as exc:
+            self.invocation_recorder.failed(
+                attempt_id,
+                exc,
+                http_status=getattr(exc, "status_code", None),
+                metadata={"transport_retry_index": 0},
+            )
+            raise
+
+        self.invocation_recorder.completed(
+            attempt_id,
+            response_payload=response,
+            usage=LLMUsage.from_embedding(response),
+            response_id=getattr(response, "id", None),
+            http_status=200,
+            metadata={"transport_retry_index": 0},
+        )
+        return response
+
     async def initialize(self) -> bool:
         """Initialize the OpenAI client."""
         if not OPENAI_AVAILABLE:
@@ -83,7 +190,8 @@ class OpenAIAdapter(ILLMAdapter):
                 api_key=self.config.api_key,
                 base_url=self.config.endpoint,
                 timeout=self.config.timeout,
-                max_retries=self.config.max_retries,
+                # Paid provider creation calls are never retried automatically.
+                max_retries=0,
             )
 
             # Test connection
@@ -114,11 +222,52 @@ class OpenAIAdapter(ILLMAdapter):
         if not self._client:
             return False
 
+        operation = "health_check.models.list"
+        call_context = platform_observation_context(
+            provider="openai",
+            operation=operation,
+            default=self.invocation_recorder.default_context,
+        )
+        attempt_id = self.invocation_recorder.requested(
+            provider="openai",
+            model=self.model,
+            operation=operation,
+            request_payload={"operation": "models.list"},
+            context=call_context,
+        )
         try:
             # Simple test - list models (lightweight operation)
-            await self._client.models.list()
+            response = await self._client.models.list()
+            models = getattr(response, "data", None)
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload={
+                    "available": True,
+                    "model_count": len(models) if isinstance(models, list) else None,
+                },
+                # models.list is a control-plane query with a known zero-token
+                # contract, not a generation call with missing usage.
+                usage=LLMUsage(source="provider_reported"),
+                http_status=200,
+            )
+            self.invocation_recorder.task_terminal(
+                context=call_context,
+                status="completed",
+            )
             return True
-        except Exception as e:
+        except BaseException as e:
+            self.invocation_recorder.failed(
+                attempt_id,
+                e,
+                http_status=getattr(e, "status_code", None),
+            )
+            self.invocation_recorder.task_terminal(
+                context=call_context,
+                status="failed",
+                error=e,
+            )
+            if not isinstance(e, Exception):
+                raise
             logger.warning(f"OpenAI API not available: {e}")
             return False
 
@@ -144,14 +293,20 @@ class OpenAIAdapter(ILLMAdapter):
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
-            response = await self._client.chat.completions.create(
-                model=kwargs.get("model", self.model),
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=kwargs.get("max_tokens", self.max_tokens),
-                temperature=kwargs.get("temperature", self.temperature),
-                top_p=kwargs.get("top_p", 1.0),
-                frequency_penalty=kwargs.get("frequency_penalty", 0.0),
-                presence_penalty=kwargs.get("presence_penalty", 0.0),
+            payload = {
+                "model": kwargs.get("model", self.model),
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+                "temperature": kwargs.get("temperature", self.temperature),
+                "top_p": kwargs.get("top_p", 1.0),
+                "frequency_penalty": kwargs.get("frequency_penalty", 0.0),
+                "presence_penalty": kwargs.get("presence_penalty", 0.0),
+            }
+            response = await self._recorded_chat_request(
+                operation=kwargs.get("operation", "generate_text"),
+                payload=payload,
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
 
             result = response.choices[0].message.content
@@ -208,12 +363,18 @@ class OpenAIAdapter(ILLMAdapter):
                 for msg in context["conversation_history"]:
                     messages.insert(-1, msg)
 
-            response = await self._client.chat.completions.create(
-                model=kwargs.get("model", self.model),
-                messages=messages,
-                max_tokens=kwargs.get("max_tokens", self.max_tokens),
-                temperature=kwargs.get("temperature", self.temperature),
-                top_p=kwargs.get("top_p", 1.0),
+            payload = {
+                "model": kwargs.get("model", self.model),
+                "messages": messages,
+                "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+                "temperature": kwargs.get("temperature", self.temperature),
+                "top_p": kwargs.get("top_p", 1.0),
+            }
+            response = await self._recorded_chat_request(
+                operation=kwargs.get("operation", "generate_with_system"),
+                payload=payload,
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
 
             result = response.choices[0].message.content
@@ -261,15 +422,21 @@ class OpenAIAdapter(ILLMAdapter):
 
 Respond in JSON format with keys: intent, entities (list), sentiment, urgency, confidence (0-1)."""
 
-            response = await self._client.chat.completions.create(
-                model=kwargs.get("model", self.model),
-                messages=[
+            payload = {
+                "model": kwargs.get("model", self.model),
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": text},
                 ],
-                max_tokens=kwargs.get("max_tokens", 1000),
-                temperature=0.3,  # Lower temperature for more consistent output
-                response_format={"type": "json_object"},
+                "max_tokens": kwargs.get("max_tokens", 1000),
+                "temperature": 0.3,  # Lower temperature for more consistent output
+                "response_format": {"type": "json_object"},
+            }
+            response = await self._recorded_chat_request(
+                operation=kwargs.get("operation", "understand_intent"),
+                payload=payload,
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
 
             result_text = response.choices[0].message.content
@@ -350,15 +517,21 @@ Respond in JSON format with keys: score, reasoning, strengths (list), weaknesses
 
 Criteria: {criteria}"""
 
-            response = await self._client.chat.completions.create(
-                model=kwargs.get("model", self.model),
-                messages=[
+            payload = {
+                "model": kwargs.get("model", self.model),
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=kwargs.get("max_tokens", 1000),
-                temperature=0.3,
-                response_format={"type": "json_object"},
+                "max_tokens": kwargs.get("max_tokens", 1000),
+                "temperature": 0.3,
+                "response_format": {"type": "json_object"},
+            }
+            response = await self._recorded_chat_request(
+                operation=kwargs.get("operation", "evaluate"),
+                payload=payload,
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
 
             result_text = response.choices[0].message.content
@@ -406,9 +579,15 @@ Criteria: {criteria}"""
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
-            response = await self._client.embeddings.create(
-                model=kwargs.get("embedding_model", self.embedding_model),
-                input=text,
+            payload = {
+                "model": kwargs.get("embedding_model", self.embedding_model),
+                "input": text,
+            }
+            response = await self._recorded_embedding_request(
+                operation=kwargs.get("operation", "embeddings.query"),
+                payload=payload,
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
 
             embedding = response.data[0].embedding
@@ -441,27 +620,94 @@ Criteria: {criteria}"""
 
         Yields chunks of generated text.
         """
+        operation = kwargs.get("operation", "generate_stream")
+        payload = {
+            "model": kwargs.get("model", self.model),
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+            "temperature": kwargs.get("temperature", self.temperature),
+            "stream": True,
+            # OpenAI sends usage on the final chunk only when explicitly requested.
+            "stream_options": {"include_usage": True},
+        }
+        call_context = self._call_context(
+            operation=operation,
+            trace_context=kwargs.get("trace_context"),
+            billing_context=kwargs.get("billing_context"),
+        )
+        attempt_id = self.invocation_recorder.requested(
+            provider="openai",
+            model=str(payload["model"]),
+            operation=operation,
+            request_payload=payload,
+            context=call_context,
+            metadata={"transport_retry_index": 0},
+        )
+        response_id: str | None = None
+        usage: Any = None
+        content_parts: list[str] = []
+        terminal_recorded = False
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
-            stream = await self._client.chat.completions.create(
-                model=kwargs.get("model", self.model),
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=kwargs.get("max_tokens", self.max_tokens),
-                temperature=kwargs.get("temperature", self.temperature),
-                stream=True,
-            )
+            stream = await self._client.chat.completions.create(**payload)
 
             async for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                response_id = getattr(chunk, "id", None) or response_id
+                chunk_usage = getattr(chunk, "usage", None)
+                if chunk_usage is not None:
+                    usage = chunk_usage
+                choices = getattr(chunk, "choices", None) or []
+                if choices and choices[0].delta.content:
+                    text = choices[0].delta.content
+                    content_parts.append(text)
+                    yield text
+
+            response_payload = {
+                "id": response_id,
+                "content": "".join(content_parts),
+                "usage": usage,
+            }
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=response_payload,
+                usage=LLMUsage.from_value(usage),
+                response_id=response_id,
+                http_status=200,
+                metadata={"transport_retry_index": 0},
+            )
+            terminal_recorded = True
+            normalized_usage = LLMUsage.from_value(usage)
+            self._record_request(
+                success=True,
+                tokens=normalized_usage.total_tokens,
+            )
 
             self.status = IntelligenceSourceStatus.READY
 
-        except Exception as e:
+        except BaseException as e:
+            if not terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload={
+                        "id": response_id,
+                        "content": "".join(content_parts),
+                        "usage": usage,
+                    },
+                    usage=LLMUsage.from_value(usage),
+                    response_id=response_id,
+                    http_status=getattr(e, "status_code", None),
+                    metadata={"transport_retry_index": 0},
+                )
+                self._record_request(success=False)
             self.status = IntelligenceSourceStatus.READY
             logger.error(f"Streaming generation failed: {e}")
             raise
+        finally:
+            # Closing a partially-consumed async generator raises GeneratorExit;
+            # the except branch records that physical request as failed.
+            self.status = IntelligenceSourceStatus.READY
 
     def _calculate_cost(self, usage) -> float:
         """Calculate cost based on token usage."""

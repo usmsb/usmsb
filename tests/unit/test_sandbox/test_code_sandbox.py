@@ -156,6 +156,62 @@ print(result)
             assert result.success is False
             assert "超时" in result.error or "timeout" in result.error.lower()
 
+            # The timed-out worker itself must be gone. A wait-only timeout
+            # leaves the infinite-loop thread alive and makes the complete CI
+            # process hang even though this assertion returned.
+            follow_up = await sandbox.execute("print('worker recovered')", timeout=2)
+            assert follow_up.success is True
+            assert "worker recovered" in follow_up.stdout
+
+    @pytest.mark.asyncio
+    async def test_timeout_cannot_be_swallowed_by_exception_handler(self):
+        """Sandbox code catching Exception cannot swallow the harness timeout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sandbox = CodeSandbox(
+                wallet_address="test_user_timeout_handler",
+                sandbox_root=temp_dir,
+            )
+
+            result = await sandbox.execute(
+                """
+try:
+    while True:
+        pass
+except Exception:
+    print("timeout was swallowed")
+""",
+                timeout=1,
+            )
+
+            assert result.success is False
+            assert result.error is not None
+            assert "超时" in result.error or "timeout" in result.error.lower()
+            assert "timeout was swallowed" not in result.stdout
+
+    @pytest.mark.asyncio
+    async def test_cancelled_execution_cleans_up_worker(self):
+        """Cancelling the coroutine also stops and joins its executor worker."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sandbox = CodeSandbox(
+                wallet_address="test_user_cancelled",
+                sandbox_root=temp_dir,
+            )
+
+            execution = asyncio.create_task(
+                sandbox.execute("while True: pass", timeout=30)
+            )
+            await asyncio.sleep(0.05)
+            execution.cancel()
+
+            with pytest.raises(asyncio.CancelledError):
+                await execution
+
+            follow_up = await sandbox.execute(
+                "print('worker recovered after cancellation')", timeout=2
+            )
+            assert follow_up.success is True
+            assert "worker recovered after cancellation" in follow_up.stdout
+
     @pytest.mark.asyncio
     async def test_long_running_safe_code(self):
         """测试长时间运行的安全代码"""

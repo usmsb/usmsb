@@ -1,4 +1,10 @@
 # Core
+# Source-tree deployments must use the SDK from the same repository revision;
+# the distributed runtime imports the physical-call telemetry contract added
+# alongside it.  The independently published package keeps its normal version
+# constraint in pyproject.toml and must only be released after that SDK version
+# is published.
+-e ..
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.0.0

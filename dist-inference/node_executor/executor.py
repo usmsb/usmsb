@@ -26,6 +26,7 @@ class InferenceRequestAPI(BaseModel):
     messages: List[Dict[str, str]]
     temperature: float = 0.7
     max_tokens: int = 2048
+    llm_context: Dict[str, Any]
 
 
 class InferenceResponseAPI(BaseModel):
@@ -122,7 +123,8 @@ async def inference(req: InferenceRequestAPI) -> InferenceResponseAPI:
         result = await vllm_engine.generate_async(
             messages=req.messages,
             temperature=req.temperature,
-            max_tokens=req.max_tokens
+            max_tokens=req.max_tokens,
+            telemetry_context=req.llm_context,
         )
 
         # 3. Calculate cost

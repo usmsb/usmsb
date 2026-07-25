@@ -105,6 +105,7 @@ class TestWeb3Client:
         assert client.w3 is not None
         assert client.config == config
 
+    @pytest.mark.requires_network
     def test_connection_test(self):
         """连接测试"""
         from usmsb_sdk.blockchain.web3_client import Web3Client
@@ -122,6 +123,7 @@ class TestWeb3Client:
 class TestBaseContractClient:
     """基础合约客户端测试"""
 
+    @pytest.mark.requires_network
     def test_transaction_building_uses_config_chain_id(self):
         """交易构建使用配置中的chainId"""
         from usmsb_sdk.blockchain.contracts.base import BaseContractClient
@@ -141,6 +143,7 @@ class TestBaseContractClient:
         assert tx["chainId"] == config.chain_id
         assert tx["chainId"] == 84532
 
+    @pytest.mark.requires_network
     def test_eip1559_transaction_support(self):
         """EIP-1559交易支持测试"""
         from usmsb_sdk.blockchain.contracts.base import BaseContractClient
@@ -368,6 +371,7 @@ class TestVIBEBlockchainClient:
         assert client._web3_client is not None
         assert web3 is not None
 
+    @pytest.mark.requires_network
     def test_test_connection(self):
         """连接测试方法"""
         from usmsb_sdk.blockchain import VIBEBlockchainClient

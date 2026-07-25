@@ -64,12 +64,15 @@ async def test_single_flight_no_duplicate_while_running():
 async def test_rate_limited_within_interval():
     eng = _FakeEngine()
     a = _agent(eng, min_interval=9999.0)
+    assert not hasattr(a, "_last_evolution_trigger")
     a._trigger_background_evolution()
-    await a._evolution_bg_task
+    first = a._evolution_bg_task
+    assert first is not None  # 首次触发没有历史时间戳，不能按 loop uptime 错误限频
+    await first
     assert eng.calls == 1
     a._trigger_background_evolution()          # 距上次太近 → 跳过
     # 没有新任务被创建（上一个已 done，且限频拦截）
-    assert a._evolution_bg_task.done()
+    assert a._evolution_bg_task is first and first.done()
     assert eng.calls == 1
 
 

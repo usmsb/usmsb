@@ -14,6 +14,8 @@ import re
 from typing import TYPE_CHECKING, Any, Optional
 from uuid import uuid4
 
+from usmsb_sdk.llm_telemetry import LLMBillingContext, LLMTraceContext, get_llm_context
+
 from ..l1.rule_engine import RuleEngine, Stimulus
 from .config.chat_config import ChatConfig
 from .context.manager import ContextManager, UserInfo
@@ -523,6 +525,12 @@ class MetaAgent:
                             设为 True 时会在后台启动，永远不返回。
                             设为 False 时仅初始化，适合嵌入 FastAPI 等外部管理生命周期的场景。
         """
+        # ``stop()`` drains recorder-owned workers.  Reacquire storage during
+        # startup rather than lazily doing filesystem work on the next provider
+        # hot path.  Environment spools are process-shared, so this is constant
+        # time after the first MetaAgent starts.
+        self.llm_manager.invocation_recorder.reopen_artifacts()
+
         # Phase 1: 基础组件（必须）
         await self._init_core()
 
@@ -961,6 +969,24 @@ class MetaAgent:
             logger.info("SessionManager stopped")
         except Exception as e:
             logger.error(f"Error stopping SessionManager: {e}")
+
+        # Provider calls have stopped at this point, so lifecycle shutdown may
+        # wait for the non-blocking artifact worker without adding latency to an
+        # LLM request.  Environment-configured spools are process-shared and this
+        # only flushes them; an explicitly recorder-owned spool is also closed.
+        try:
+            artifacts_flushed = await self.llm_manager.invocation_recorder.close_artifacts_async(
+                timeout=10.0
+            )
+            if not artifacts_flushed:
+                logger.warning(
+                    "LLM artifact spool reported an incomplete or failed flush for %s",
+                    self.agent_id,
+                )
+        except Exception as e:
+            # Telemetry persistence is observational and must not prevent the
+            # rest of MetaAgent shutdown from completing.
+            logger.warning("LLM artifact spool shutdown failed for %s: %s", self.agent_id, e)
 
         logger.info(f"Meta Agent {self.agent_id} stopped")
 
@@ -2593,7 +2619,161 @@ Hard rules:
         except Exception as e:
             logger.warning("[SERVER] Failed to start API server: %s", e)
 
+    def configure_llm_tracking(
+        self,
+        *,
+        callback=None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
+    ) -> None:
+        """Attach the embedding application's usage/trace event sink."""
+
+        self.llm_manager.configure_llm_tracking(
+            callback=callback,
+            default_context=default_context,
+        )
+
+    def get_llm_call_details(self, **filters: Any) -> list[dict[str, Any]]:
+        """Expose physical provider attempts produced by all internal loops."""
+
+        return self.llm_manager.get_llm_call_details(**filters)
+
+    async def chat_with_details(
+        self,
+        message: str,
+        wallet_address: str | None = None,
+        participant_type: ParticipantType = ParticipantType.HUMAN,
+        skip_complexity_detection: bool = False,
+        skip_l1_rules: bool = False,
+        *,
+        llm_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: LLMBillingContext | dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Compatibility-safe detailed variant of :meth:`chat`.
+
+        ``chat`` keeps returning a string.  This method returns the same
+        content plus the provider attempts and canonical OPC events emitted
+        before the foreground turn returned.  Background continuations keep
+        the same trace id and remain queryable/callback-deliverable.
+        """
+
+        context = LLMTraceContext.from_value(llm_context) or LLMTraceContext()
+        if not context.trace_id:
+            context = context.with_updates(trace_id=f"llm_trace_{uuid4().hex}")
+        recorder = self.llm_manager.invocation_recorder
+        starting_ids = {
+            item["provider_attempt_id"]
+            for item in recorder.recent_calls(limit=recorder.max_calls)
+        }
+        content = await self.chat(
+            message=message,
+            wallet_address=wallet_address,
+            participant_type=participant_type,
+            skip_complexity_detection=skip_complexity_detection,
+            skip_l1_rules=skip_l1_rules,
+            llm_context=context,
+            billing_context=billing_context,
+        )
+        calls = [
+            item
+            for item in reversed(
+                recorder.recent_calls(
+                    limit=recorder.max_calls,
+                    trace_id=context.trace_id,
+                )
+            )
+            if item.get("provider_attempt_id") not in starting_ids
+        ]
+        attempt_ids = {item.get("provider_attempt_id") for item in calls}
+        events = [
+            event
+            for event in recorder.recent_events(limit=recorder.max_calls * 3)
+            if (
+                (event.get("lineage") or {}).get("provider_attempt_id") in attempt_ids
+                and event.get("event_type") != "llm.artifact.resolved"
+            )
+        ]
+        return {
+            "content": content,
+            "trace_id": context.trace_id,
+            "llm_calls": calls,
+            "llm_events": events,
+            "llm_usage": {
+                "physical_calls": len(calls),
+                "completed_calls": sum(item.get("status") == "completed" for item in calls),
+                "failed_calls": sum(item.get("status") == "failed" for item in calls),
+                "input_tokens": sum(
+                    int((item.get("usage") or {}).get("input_tokens") or 0)
+                    for item in calls
+                ),
+                "cached_input_tokens": sum(
+                    int((item.get("usage") or {}).get("cached_input_tokens") or 0)
+                    for item in calls
+                ),
+                "output_tokens": sum(
+                    int((item.get("usage") or {}).get("output_tokens") or 0)
+                    for item in calls
+                ),
+                "total_tokens": sum(
+                    int((item.get("usage") or {}).get("total_tokens") or 0)
+                    for item in calls
+                ),
+            },
+            "background_events_pending": bool(
+                isinstance(content, str) and content == self.chat_config.task_submitted_message
+            ),
+        }
+
     async def chat(
+        self,
+        message: str,
+        wallet_address: str | None = None,
+        participant_type: ParticipantType = ParticipantType.HUMAN,
+        skip_complexity_detection: bool = False,
+        skip_l1_rules: bool = False,
+        *,
+        llm_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: LLMBillingContext | dict[str, Any] | None = None,
+    ) -> str:
+        """Run a complete MetaAgent turn inside one async-safe billing/trace scope.
+
+        Tool-loop iterations, JSON repair calls, memory compression and
+        background tasks inherit the task scope through ``ContextVar``.  Each
+        physical provider request still receives its own provider_attempt_id.
+        """
+
+        parsed_context = LLMTraceContext.from_value(llm_context) or LLMTraceContext()
+        if not parsed_context.trace_id:
+            parsed_context = parsed_context.with_updates(trace_id=f"llm_trace_{uuid4().hex}")
+        parsed_context = parsed_context.with_updates(
+            agent_id=self.agent_id,
+            source_service="usmsb.meta_agent",
+            operation="meta_agent.chat",
+            metadata={"entrypoint": "MetaAgent.chat"},
+        )
+        effective_billing = billing_context
+        if effective_billing is None and parsed_context.billing is None and wallet_address:
+            effective_billing = LLMBillingContext(
+                principal_id=wallet_address,
+                billing_user_id=wallet_address,
+                actor_user_id=wallet_address,
+                owner_user_id=wallet_address,
+                user_id=wallet_address,
+                principal_type="user",
+            )
+
+        with self.llm_manager.trace_scope(
+            parsed_context,
+            billing_context=effective_billing,
+        ):
+            return await self._chat_impl(
+                message=message,
+                wallet_address=wallet_address,
+                participant_type=participant_type,
+                skip_complexity_detection=skip_complexity_detection,
+                skip_l1_rules=skip_l1_rules,
+            )
+
+    async def _chat_impl(
         self,
         message: str,
         wallet_address: str | None = None,
@@ -2664,6 +2844,7 @@ Hard rules:
                 owner_id=owner_id,
                 owner_type=participant_type,
             )
+            self.llm_manager.update_trace_context(conversation_id=str(conversation.id))
             await self.conversation_manager.add_message(
                 conversation_id=conversation.id,
                 role=MessageRole.USER,
@@ -2771,6 +2952,7 @@ Hard rules:
             owner_id=owner_id,
             owner_type=participant_type,
         )
+        self.llm_manager.update_trace_context(conversation_id=str(conversation.id))
 
         # 添加用户消息
         await self.conversation_manager.add_message(
@@ -3049,9 +3231,9 @@ Hard rules:
         print(f"🔍 [TOOLS] 前10个工具: {tool_names}")
         logger.info(f"[CHAT][TOOLS] 有效工具: {len(tools_schema)}/{len(all_tools_schema)}")
 
-        # MEDIUM 复杂度：不限制工具数量，确保 LLM 能选择正确的工具
-        # 注意：MiniMax API 对工具数量有限制，过多会报错，但过少会导致 LLM 无法选择正确工具
-        # 当前 fallback 机制会在报错时重试，所以可以不过度限制
+        # MEDIUM 复杂度：不限制工具数量，确保 LLM 能选择正确的工具。
+        # Provider 请求是 single-shot；若数量超出模型能力，应由调用前的
+        # capability/预算策略处理，不能依赖失败后的自动重放。
 
         skills_schema = self.skills_manager.get_skills_schema(provider=llm_provider)
         # 也过滤 skills 中的无效工具
@@ -3064,6 +3246,7 @@ Hard rules:
         # StrategyRouter 路由 - ALL tasks 唯一入口（全链路自主）
         # =====================================================================
         chat_result = None  # 初始化，避免 UnboundLocalError
+        strategy_route_failed = False
         if self.strategy_router:
             try:
                 scenario_tag = await self.strategy_router._classify_scenario(message)
@@ -3164,8 +3347,6 @@ Hard rules:
                     message, scenario_tag.suggested_layer, internal_fn, sdk_fn
                 )
                 if strategy_result.result is not None:
-                    from .models.chat import ChatResult
-
                     chat_result = ChatResult(
                         content=str(strategy_result.result),
                         executed_tools=[],
@@ -3182,48 +3363,43 @@ Hard rules:
                         strategy_result.strategy_name,
                         strategy_result.quality_score,
                     )
+                else:
+                    # StrategyRouter may package a provider exception as an
+                    # error result. Re-entering the direct path would replay
+                    # the same paid creation request with ambiguous remote
+                    # side-effect state, so this turn must fail closed.
+                    strategy_route_failed = True
+                    logger.error(
+                        "[STRATEGY] Selected route returned no result; direct replay disabled: %s",
+                        strategy_result.error,
+                    )
             except Exception as e:
+                strategy_route_failed = True
                 logger.warning("[STRATEGY] Router failed: %s", e)
 
         # =====================================================================
         # 核心 LLM 调用逻辑 (MEDIUM/HIGH 复杂度)
         # =====================================================================
-        if chat_result is None:
-            # P4: 带指数退避的 LLM 重试（最多 3 次）
-            max_retries = 3
-            last_error = None
-            for attempt in range(max_retries):
-                try:
-                    logger.info(
-                        f"[CHAT][FLOW] 调用 _chat_with_llm (复杂度={complexity.value}, attempt={attempt + 1})"
-                    )
-
-                    # 调用 LLM 获取完整结果
-                    chat_result = await self._chat_with_llm(
-                        messages,
-                        tools=tools_schema,
-                        skills=skills_schema,
-                        conversation_id=str(conversation.id),
-                        user_session=user_session,
-                    )
-                    # 成功，跳出重试循环
-                    break
-
-                except Exception as e:
-                    last_error = e
-                    wait_time = 2**attempt  # 1s, 2s, 4s
-                    if attempt < max_retries - 1:
-                        logger.warning(
-                            "[CHAT] LLM call failed (attempt %d/%d): %s. Retrying in %ds...",
-                            attempt + 1,
-                            max_retries,
-                            e,
-                            wait_time,
-                        )
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error("[CHAT] LLM call failed after %d attempts: %s", max_retries, e)
-                        chat_result = None
+        if chat_result is None and not strategy_route_failed:
+            # One public chat attempt may contain explicit JSON/semantic
+            # revision calls inside the Harness, but an exception from the
+            # provider boundary must not blindly replay the same paid creation
+            # request. Its remote side-effect state may be unknown.
+            try:
+                logger.info(
+                    "[CHAT][FLOW] 调用 _chat_with_llm (复杂度=%s, single-shot)",
+                    complexity.value,
+                )
+                chat_result = await self._chat_with_llm(
+                    messages,
+                    tools=tools_schema,
+                    skills=skills_schema,
+                    conversation_id=str(conversation.id),
+                    user_session=user_session,
+                )
+            except Exception as e:
+                logger.error("[CHAT] LLM call failed; automatic replay disabled: %s", e)
+                chat_result = None
 
         logger.info(
             "[CHAT][RESULT] is_complete=%s needs_tool_retry=%s",
@@ -3351,8 +3527,8 @@ Hard rules:
         except RuntimeError:
             return  # 无运行中的事件循环
         min_interval = getattr(self, "_evolution_min_interval", 300.0)
-        last = getattr(self, "_last_evolution_trigger", 0.0)
-        if now - last < min_interval:
+        last = getattr(self, "_last_evolution_trigger", None)
+        if last is not None and now - last < min_interval:
             return  # 限频
         self._last_evolution_trigger = now
         self._evolution_bg_task = asyncio.create_task(self._run_background_evolution())
@@ -4649,6 +4825,58 @@ Hard rules:
         Returns:
             ChatResult: 包含完整状态的 LLM 调用结果
         """
+        recorder = self.llm_manager.invocation_recorder
+        starting_attempt_ids = {
+            item["provider_attempt_id"]
+            for item in recorder.recent_calls(limit=recorder.max_calls)
+        }
+        active_context = get_llm_context()
+        active_trace_id = active_context.trace_id if active_context else None
+
+        def _finalize_llm_result(result: ChatResult) -> ChatResult:
+            calls = recorder.recent_calls(
+                limit=recorder.max_calls,
+                trace_id=active_trace_id,
+            )
+            calls = [
+                item
+                for item in reversed(calls)
+                if item.get("provider_attempt_id") not in starting_attempt_ids
+            ]
+            attempt_ids = {item.get("provider_attempt_id") for item in calls}
+            events = [
+                event
+                for event in recorder.recent_events(limit=recorder.max_calls * 3)
+                if (
+                    (event.get("lineage") or {}).get("provider_attempt_id") in attempt_ids
+                    and event.get("event_type") != "llm.artifact.resolved"
+                )
+            ]
+            result.llm_calls = calls
+            result.llm_events = events
+            result.llm_usage = {
+                "physical_calls": len(calls),
+                "completed_calls": sum(item.get("status") == "completed" for item in calls),
+                "failed_calls": sum(item.get("status") == "failed" for item in calls),
+                "input_tokens": sum(
+                    int((item.get("usage") or {}).get("input_tokens") or 0)
+                    for item in calls
+                ),
+                "cached_input_tokens": sum(
+                    int((item.get("usage") or {}).get("cached_input_tokens") or 0)
+                    for item in calls
+                ),
+                "output_tokens": sum(
+                    int((item.get("usage") or {}).get("output_tokens") or 0)
+                    for item in calls
+                ),
+                "total_tokens": sum(
+                    int((item.get("usage") or {}).get("total_tokens") or 0)
+                    for item in calls
+                ),
+            }
+            return result
+
         # 合并 tools 和 skills
         all_tools = []
         if tools:
@@ -4664,7 +4892,7 @@ Hard rules:
         if not all_tools:
             logger.info("DEBUG no tools, calling _call_llm_simple")
             content = await self._call_llm_simple(messages)
-            return ChatResult(
+            return _finalize_llm_result(ChatResult(
                 content=content,
                 executed_tools=[],
                 tool_results=[],
@@ -4672,7 +4900,7 @@ Hard rules:
                 is_complete=True,
                 needs_background=False,
                 needs_tool_retry=False,
-            )
+            ))
 
         logger.info("DEBUG has tools, entering agent loop")
 
@@ -4733,27 +4961,13 @@ Hard rules:
                     current_messages.append({"role": "user", "content": warning})
                     continue  # 继续循环，让 LLM 重试
 
-                # 检查是否是第一次尝试失败，降级处理
-                if iteration == 1 and content and "失败" in content:
-                    logger.info("[DEBUG] Tool call failed, falling back to simple chat")
-                    fallback_content = await self._call_llm_simple(current_messages)
-                    return ChatResult(
-                        content=fallback_content,
-                        executed_tools=executed_tools,
-                        tool_results=all_tool_results,
-                        iterations_used=iteration,
-                        is_complete=True,
-                        needs_background=False,
-                        needs_tool_retry=False,
-                    )
-
                 # === 检测 LLM 是否匆忙结束（关键改进）===
                 # 设计初衷：处理 LLM 返回"正在处理中"但实际上后续没有继续的情况
                 needs_continuation, continuation_reason = self._detect_hasty_completion(content)
 
                 if needs_continuation:
                     logger.info(f"[CHAT_RESULT] Detected hasty completion: {continuation_reason}")
-                    return ChatResult(
+                    return _finalize_llm_result(ChatResult(
                         content=content,
                         executed_tools=executed_tools,
                         tool_results=all_tool_results,
@@ -4766,10 +4980,10 @@ Hard rules:
                             "last_tool_results": all_tool_results[-1] if all_tool_results else None,
                             "pending_action": continuation_reason,
                         },
-                    )
+                    ))
 
                 # === 正常完成 ===
-                return ChatResult(
+                return _finalize_llm_result(ChatResult(
                     content=content,
                     executed_tools=executed_tools,
                     tool_results=all_tool_results,
@@ -4777,7 +4991,7 @@ Hard rules:
                     is_complete=True,
                     needs_background=False,
                     needs_tool_retry=False,
-                )
+                ))
 
             # Step 3: 执行工具调用
             tool_results = await self._execute_tool_calls(tool_calls, user_session=user_session)
@@ -4805,7 +5019,7 @@ Hard rules:
 
             if tool_retry_info:
                 logger.info(f"[CHAT_RESULT] Tool needs retry: {tool_retry_info.get('tool_name')}")
-                return ChatResult(
+                return _finalize_llm_result(ChatResult(
                     content="",
                     executed_tools=executed_tools,
                     tool_results=all_tool_results,
@@ -4815,7 +5029,7 @@ Hard rules:
                     needs_tool_retry=True,
                     needs_continuation=False,
                     retry_info=tool_retry_info,
-                )
+                ))
 
             # Step 5: 构建消息继续循环
             if is_anthropic_format:
@@ -4829,7 +5043,7 @@ Hard rules:
 
         # === 超过最大迭代次数 ===
         logger.warning(f"[CHAT_RESULT] Max iterations reached: {max_iterations}")
-        return ChatResult(
+        return _finalize_llm_result(ChatResult(
             content="抱歉，这个问题需要处理较长时间，请稍后再试。或者你可以尝试简化问题。",
             executed_tools=executed_tools,
             tool_results=all_tool_results,
@@ -4839,7 +5053,7 @@ Hard rules:
             needs_tool_retry=False,
             needs_continuation=True,
             error="max_iterations_reached",
-        )
+        ))
 
     def _detect_hasty_completion(self, content: str) -> tuple:
         """
@@ -5163,14 +5377,17 @@ Hard rules:
                     return result
                 except Exception as e:
                     logger.error(f"chat_with_tools failed: {e}", exc_info=True)
-                    return {"content": f"LLM 调用失败: {str(e)}", "tool_calls": []}
+                    # The provider may already have accepted the paid request.
+                    # Propagate the failure so no simple-chat fallback can
+                    # replay the same creation call.
+                    raise
             else:
                 try:
                     content = await adapter.chat_with_messages(messages)
                     return {"content": content, "tool_calls": []}
                 except Exception as e:
                     logger.error(f"chat_with_messages failed: {e}", exc_info=True)
-                    return {"content": f"LLM 调用失败: {str(e)}", "tool_calls": []}
+                    raise
         else:
             # 没有 LLM 适配器，返回降级响应
             logger.warning("DEBUG adapter is None!")

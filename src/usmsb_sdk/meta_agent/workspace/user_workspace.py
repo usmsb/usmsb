@@ -179,7 +179,14 @@ class UserWorkspace:
         self.config = config or WorkspaceConfig()
 
         # 工作空间根目录
-        self.workspace_root = Path(self.config.workspace_root) / wallet_address / "workspace"
+        # Canonicalize the root once so every path comparison uses the same
+        # filesystem identity.  This is security-relevant on platforms such
+        # as macOS where ``/var`` is a symlink to ``/private/var``: resolving
+        # only child paths would otherwise make a legitimate file appear to
+        # escape the configured workspace.
+        self.workspace_root = (
+            Path(self.config.workspace_root) / wallet_address / "workspace"
+        ).resolve()
 
         # 子目录
         self.temp_dir = self.workspace_root / DirectoryType.TEMP.value

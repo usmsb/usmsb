@@ -42,6 +42,7 @@ class NodeCapability:
     port: int = 8080  # Node Executor port
     status: NodeStatus = NodeStatus.IDLE
     gpu_count: int = 0
+    gpu_type: str = ""
     gpus: List[GPUInfo] = field(default_factory=list)
     total_vram_gb: int = 0
     available_vram_gb: int = 0
@@ -52,6 +53,8 @@ class NodeCapability:
     def __post_init__(self):
         if not self.gpus:
             self.gpus = []
+        if not self.gpu_type and self.gpus:
+            self.gpu_type = self.gpus[0].gpu_type
 
 
 @dataclass
@@ -75,13 +78,38 @@ class InferenceRequest:
     temperature: float = 0.7
     max_tokens: int = 2048
     user_id: str = "anonymous"
+    llm_context: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def create(cls, model_name: str, messages: List[Dict[str, str]], **kwargs):
+        request_id = str(kwargs.pop("request_id", "") or f"req_{uuid.uuid4().hex[:12]}")
+        user_id = str(kwargs.get("user_id") or "anonymous")
+        llm_context = kwargs.pop("llm_context", None)
+        if not llm_context:
+            trace_id = f"dist_trace_{uuid.uuid4().hex}"
+            llm_context = {
+                "trace_id": trace_id,
+                "logical_call_id": f"llm_call_{uuid.uuid4().hex}",
+                "source_service": "usmsb-dist-inference-scheduler",
+                "operation": "vllm.generate",
+                "billing_context": {
+                    "schema": "opc.billing-context.v1",
+                    "principal_id": user_id,
+                    "principal_type": "user",
+                    "billing_user_id": user_id,
+                    "billing_task_id": request_id,
+                    "task_scope_type": "distributed_inference_request",
+                    "task_scope_id": request_id,
+                    "admission_status": "admitted",
+                    "pricing_policy_id": "usmsb-dist-inference.v1",
+                    "trace_id": trace_id,
+                },
+            }
         return cls(
-            request_id=f"req_{uuid.uuid4().hex[:12]}",
+            request_id=request_id,
             model_name=model_name,
             messages=messages,
+            llm_context=dict(llm_context),
             **kwargs
         )
 

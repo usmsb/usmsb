@@ -13,6 +13,13 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from usmsb_sdk.llm_telemetry import (
+    LLMEventCallback,
+    LLMInvocationRecorder,
+    LLMTraceContext,
+    llm_context_scope,
+)
+
 
 class IntelligenceSourceType(StrEnum):
     """Types of intelligence sources."""
@@ -137,6 +144,48 @@ class ILLMAdapter(IIntelligenceSource):
     Provides text generation, understanding, reasoning, and evaluation
     capabilities from LLM services.
     """
+
+    def __init__(self, config: IntelligenceSourceConfig):
+        super().__init__(config)
+        configured_recorder = config.extra_params.get("invocation_recorder")
+        callback = config.extra_params.get("llm_event_callback")
+        if isinstance(configured_recorder, LLMInvocationRecorder):
+            self.invocation_recorder = configured_recorder
+            if callback:
+                self.invocation_recorder.add_callback(callback)
+        else:
+            self.invocation_recorder = LLMInvocationRecorder(
+                event_callback=callback,
+                default_context=config.extra_params.get("llm_trace_context"),
+                max_calls=int(config.extra_params.get("llm_history_size", 1000)),
+                capture_payloads=bool(config.extra_params.get("llm_capture_payloads", True)),
+            )
+
+    def configure_llm_tracking(
+        self,
+        *,
+        callback: LLMEventCallback | None = None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
+    ) -> None:
+        """Configure provider-attempt events without changing generation APIs."""
+
+        if callback:
+            self.invocation_recorder.add_callback(callback)
+        if default_context is not None:
+            self.invocation_recorder.set_default_context(default_context)
+
+    def llm_context_scope(
+        self,
+        context: LLMTraceContext | dict[str, Any] | None,
+    ):
+        """Bind trace and billing identity to this asynchronous execution path."""
+
+        return llm_context_scope(context, default=self.invocation_recorder.default_context)
+
+    def get_llm_call_details(self, **filters: Any) -> list[dict[str, Any]]:
+        """Return recent physical-provider call details for diagnostics/tests."""
+
+        return self.invocation_recorder.recent_calls(**filters)
 
     @abstractmethod
     async def generate_text(

@@ -3,7 +3,9 @@ Meta Agent 配置
 """
 
 import os
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -19,6 +21,18 @@ class LLMConfig:
     max_tokens: int = 4000
     reasoning_split: bool | None = None
     service_tier: str | None = None
+    # Provider-attempt telemetry is optional and backward compatible.  The
+    # callback receives requested/completed/failed event dictionaries and is
+    # dispatched best-effort outside the LLM hot path.
+    llm_event_callback: Callable[[dict[str, Any]], Any] | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    llm_trace_context: Mapping[str, Any] | None = field(default=None, repr=False)
+    llm_capture_payloads: bool = True
+    llm_history_size: int = 1000
+    invocation_recorder: Any = field(default=None, repr=False, compare=False)
 
 
 @dataclass

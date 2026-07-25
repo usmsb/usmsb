@@ -41,9 +41,18 @@ USMSB 分布式推理平台是 USMSB 网络中的一个**超级智能体**，旨
 ### 1. 安装依赖
 
 ```bash
-cd usmsb-dist-inference
+git clone https://github.com/usmsb/usmsb.git
+cd usmsb
+python -m pip install -e .
+cd dist-inference
 pip install -r requirements.txt
 ```
+
+源码部署必须让 SDK 与 `dist-inference` 来自同一个 Git revision；不要只从
+PyPI 安装旧的 `usmsb-sdk>=0.9.0a0`，否则其中可能还没有
+`usmsb_sdk.llm_telemetry`。独立发布 `usmsb-dist-inference` wheel 前，应先发布
+包含该模块的 SDK 版本并同步提高 `pyproject.toml` 中的最低版本；运行时若缺少
+统一 Telemetry 合同会 fail-closed，而不会绕过审计继续推理。
 
 ### 2. 启动 Global Scheduler
 
@@ -53,9 +62,27 @@ python -m global_scheduler.main --port 8000
 
 ### 3. 启动 Node Executor (另一终端)
 
+真实 vLLM 节点必须由宿主注入统一的 `LLMInvocationRecorder`。工厂采用
+`package.module:callable` 格式，并应在 recorder 上配置 OPC/宿主的非阻塞事件
+callback；没有这个配置时节点会 fail-closed，不会暴露无法审计的 LLM 调用。
+
 ```bash
+export USMSB_DIST_LLM_TELEMETRY_FACTORY="my_runtime.telemetry:build_llm_recorder"
 python -m node_executor.main --node-id node_001 --scheduler-url http://localhost:8000 --port 8080
 ```
+
+工厂的最小合同：
+
+```python
+from usmsb_sdk.llm_telemetry import LLMInvocationRecorder
+
+def build_llm_recorder() -> LLMInvocationRecorder:
+    return LLMInvocationRecorder(event_callback=publish_event_nowait)
+```
+
+每次真实 `vLLM.generate()` 都会生成同一 `provider_attempt_id` 下的
+`llm.provider.requested` 与一个终态事件。推理和远程派发均为 single-shot；网络
+超时或 Provider 失败不会换节点重放。
 
 ### 4. 调用 API
 
@@ -121,7 +148,7 @@ usmsb-dist-inference/
 ### Global Scheduler
 
 - **API Server**: 提供 OpenAI 兼容的 `/v1/chat/completions` 接口
-- **Router**: 请求路由，支持节点故障重试
+- **Router**: 请求路由；付费推理单次派发，失败不跨节点重放
 - **GPU Pool**: 管理所有 GPU 节点，节点选择算法
 - **Model Registry**: 管理可用模型列表
 - **Billing Engine**: Vibe 代币计费，平台抽成 30%

@@ -117,6 +117,16 @@ class ChatResult:
     error_type: str | None = None
     """错误类型：timeout, rate_limit, api_error, tool_error 等"""
 
+    # === LLM provider-attempt receipts ===
+    llm_calls: list[dict[str, Any]] = field(default_factory=list)
+    """本轮 Agent Loop 发起的逐次物理 Provider 调用明细。"""
+
+    llm_events: list[dict[str, Any]] = field(default_factory=list)
+    """本轮可直接投递给 OPC 的规范化 requested/completed/failed 事件。"""
+
+    llm_usage: dict[str, Any] = field(default_factory=dict)
+    """本轮物理调用的 Token 汇总；逐次调用仍以 ``llm_calls`` 为准。"""
+
     def to_dict(self) -> dict[str, Any]:
         """转换为字典，用于日志和序列化"""
         return {
@@ -129,6 +139,9 @@ class ChatResult:
             "needs_tool_retry": self.needs_tool_retry,
             "needs_continuation": self.needs_continuation,
             "error": self.error,
+            "llm_calls": self.llm_calls,
+            "llm_events": self.llm_events,
+            "llm_usage": self.llm_usage,
         }
 
 

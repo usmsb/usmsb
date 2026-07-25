@@ -4,9 +4,26 @@ Unit tests for GPU Pool
 
 import pytest
 import asyncio
+import global_scheduler.db as scheduler_db
 from global_scheduler.gpu_pool import GPUPool, NodeExecutor
 from global_scheduler.model_registry import ModelRegistry
-from shared.types import NodeCapability, NodeStatus, GPUInfo
+from shared.types import NodeCapability, NodeStatus, GPUInfo, InferenceRequest
+
+
+@pytest.fixture(autouse=True)
+async def isolated_scheduler_db(tmp_path, monkeypatch):
+    """Keep GPU-pool persistence deterministic and isolated for every test."""
+    await scheduler_db.close_db()
+    monkeypatch.setattr(
+        scheduler_db,
+        "_db_path",
+        str(tmp_path / "gpu-pool-tests.db"),
+    )
+    await scheduler_db.init_db()
+    try:
+        yield
+    finally:
+        await scheduler_db.close_db()
 
 
 class TestGPUPool:
@@ -196,6 +213,67 @@ class TestNodeExecutor:
         self.executor.capability.status = NodeStatus.BUSY
         await self.executor.set_idle()
         assert self.executor.capability.status == NodeStatus.IDLE
+
+    @pytest.mark.asyncio
+    async def test_execute_propagates_llm_context_to_physical_node(self, monkeypatch):
+        request = InferenceRequest.create(
+            model_name="Qwen/Qwen2.5-7B-Instruct",
+            messages=[{"role": "user", "content": "hello"}],
+            user_id="user-propagation",
+        )
+        response_payload = {
+            "request_id": request.request_id,
+            "model_name": request.model_name,
+            "content": "world",
+            "usage": {
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": 2,
+            },
+            "gpu_seconds": 0.1,
+            "cost_vibe": 0.1,
+            "node_id": "test_node",
+            "finish_reason": "stop",
+            "error": None,
+        }
+        captured: dict = {}
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return response_payload
+
+        class FakeAsyncClient:
+            def __init__(self, **_kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return None
+
+            async def post(self, url, *, json):
+                captured["url"] = url
+                captured["payload"] = json
+                return FakeResponse()
+
+        monkeypatch.setattr(
+            "global_scheduler.gpu_pool.httpx.AsyncClient",
+            FakeAsyncClient,
+        )
+
+        await self.executor.execute(request)
+
+        assert captured["url"] == "http://localhost:8080/inference"
+        payload = captured["payload"]
+        assert payload["llm_context"] == request.llm_context
+        assert (
+            payload["llm_context"]["billing_context"]["billing_user_id"]
+            == "user-propagation"
+        )
 
 
 if __name__ == "__main__":

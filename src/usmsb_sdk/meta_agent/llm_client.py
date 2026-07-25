@@ -18,9 +18,18 @@ LLM Client - 统一 LLM 客户端
 """
 
 import os
-import json
-import requests
 from typing import Any
+
+import requests
+
+from usmsb_sdk.llm_telemetry import (
+    LLMBillingContext,
+    LLMEventCallback,
+    LLMInvocationRecorder,
+    LLMTraceContext,
+    LLMUsage,
+    resolve_llm_context,
+)
 
 
 class LLMClient:
@@ -38,6 +47,9 @@ class LLMClient:
         provider: str = "auto",
         api_key: str | None = None,
         base_url: str | None = None,
+        event_callback: LLMEventCallback | None = None,
+        invocation_recorder: LLMInvocationRecorder | None = None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
     ):
         """
         初始化 LLM 客户端
@@ -60,6 +72,50 @@ class LLMClient:
             "anthropic": base_url or "https://api.anthropic.com/v1",
             "minimax": base_url or "https://api.minimax.chat/v1",
         }
+        self.invocation_recorder = invocation_recorder or LLMInvocationRecorder(
+            event_callback=event_callback,
+            default_context=default_context,
+        )
+        if invocation_recorder and event_callback:
+            invocation_recorder.add_callback(event_callback)
+
+    def configure_llm_tracking(
+        self,
+        *,
+        callback: LLMEventCallback | None = None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
+    ) -> None:
+        if callback:
+            self.invocation_recorder.add_callback(callback)
+        if default_context is not None:
+            self.invocation_recorder.set_default_context(default_context)
+
+    def get_llm_call_details(self, **filters: Any) -> list[dict[str, Any]]:
+        return self.invocation_recorder.recent_calls(**filters)
+
+    @staticmethod
+    def _response_payload(response: requests.Response) -> Any:
+        """Preserve provider error bodies as trace evidence before status checks."""
+
+        try:
+            return response.json()
+        except ValueError:
+            return {"raw_text": response.text}
+
+    def _call_context(
+        self,
+        *,
+        operation: str,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: LLMBillingContext | dict[str, Any] | None = None,
+    ) -> LLMTraceContext:
+        resolved = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            resolved = resolved.with_updates(billing=billing_context)
+        return resolved.for_logical_call(operation=operation)
     
     def complete(
         self,
@@ -89,6 +145,16 @@ class LLMClient:
         
         # 根据模型选择提供者
         provider = self._get_provider(model)
+        trace_context = kwargs.pop("trace_context", None)
+        billing_context = kwargs.pop("billing_context", None)
+        operation = kwargs.pop("operation", "complete")
+        call_context = self._call_context(
+            operation=operation,
+            trace_context=trace_context,
+            billing_context=billing_context,
+        )
+        kwargs["trace_context"] = call_context
+        kwargs["operation"] = operation
         
         if provider == "openai":
             return self._openai_complete(prompt, model, max_tokens, temperature, system_prompt, **kwargs)
@@ -156,6 +222,23 @@ class LLMClient:
             "temperature": temperature,
             **kwargs
         }
+        trace_context = data.pop("trace_context", None)
+        operation = data.pop("operation", "complete")
+        billing_context = data.pop("billing_context", None)
+        attempt_id = self.invocation_recorder.requested(
+            provider="openai",
+            model=str(data.get("model") or model),
+            operation=operation,
+            request_payload=data,
+            context=self._call_context(
+                operation=operation,
+                trace_context=trace_context,
+                billing_context=billing_context,
+            ),
+        )
+        result: Any = None
+        http_status: int | None = None
+        provider_terminal_recorded = False
         
         try:
             response = requests.post(
@@ -164,10 +247,26 @@ class LLMClient:
                 json=data,
                 timeout=60
             )
+            http_status = response.status_code
+            result = self._response_payload(response)
             response.raise_for_status()
-            result = response.json()
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=result,
+                usage=LLMUsage.from_value(result),
+                http_status=http_status,
+            )
+            provider_terminal_recorded = True
             return result["choices"][0]["message"]["content"]
         except Exception as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=result,
+                    usage=LLMUsage.from_value(result),
+                    http_status=http_status,
+                )
             print(f"[LLMClient] OpenAI API error: {e}")
             return f"[OpenAI Error: {e}]"
     
@@ -199,6 +298,23 @@ class LLMClient:
             "temperature": temperature,
             **kwargs
         }
+        trace_context = data.pop("trace_context", None)
+        operation = data.pop("operation", "complete")
+        billing_context = data.pop("billing_context", None)
+        attempt_id = self.invocation_recorder.requested(
+            provider="anthropic",
+            model=str(data.get("model") or model),
+            operation=operation,
+            request_payload=data,
+            context=self._call_context(
+                operation=operation,
+                trace_context=trace_context,
+                billing_context=billing_context,
+            ),
+        )
+        result: Any = None
+        http_status: int | None = None
+        provider_terminal_recorded = False
         
         try:
             response = requests.post(
@@ -207,10 +323,26 @@ class LLMClient:
                 json=data,
                 timeout=60
             )
+            http_status = response.status_code
+            result = self._response_payload(response)
             response.raise_for_status()
-            result = response.json()
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=result,
+                usage=LLMUsage.from_value(result),
+                http_status=http_status,
+            )
+            provider_terminal_recorded = True
             return result["content"][0]["text"]
         except Exception as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=result,
+                    usage=LLMUsage.from_value(result),
+                    http_status=http_status,
+                )
             print(f"[LLMClient] Anthropic API error: {e}")
             return f"[Anthropic Error: {e}]"
     
@@ -231,9 +363,6 @@ class LLMClient:
         - Supports Chinese natively
         """
         if not self.minimax_key:
-            # 如果没有 MiniMax key，回退到 OpenAI
-            if self.api_key:
-                return self._openai_complete(prompt, "gpt-3.5-turbo", max_tokens, temperature, system_prompt, **kwargs)
             return "[No MiniMax API Key]"
         
         headers = {
@@ -254,6 +383,23 @@ class LLMClient:
             "temperature": temperature,
             **kwargs
         }
+        trace_context = data.pop("trace_context", None)
+        operation = data.pop("operation", "complete")
+        billing_context = data.pop("billing_context", None)
+        attempt_id = self.invocation_recorder.requested(
+            provider="minimax",
+            model=str(data.get("model") or model),
+            operation=operation,
+            request_payload=data,
+            context=self._call_context(
+                operation=operation,
+                trace_context=trace_context,
+                billing_context=billing_context,
+            ),
+        )
+        result: Any = None
+        http_status: int | None = None
+        provider_terminal_recorded = False
         
         try:
             response = requests.post(
@@ -262,8 +408,16 @@ class LLMClient:
                 json=data,
                 timeout=60
             )
+            http_status = response.status_code
+            result = self._response_payload(response)
             response.raise_for_status()
-            result = response.json()
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=result,
+                usage=LLMUsage.from_value(result),
+                http_status=http_status,
+            )
+            provider_terminal_recorded = True
             
             # MiniMax 返回格式
             if "choices" in result and len(result["choices"]) > 0:
@@ -274,10 +428,15 @@ class LLMClient:
                 return str(result)
                 
         except Exception as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=result,
+                    usage=LLMUsage.from_value(result),
+                    http_status=http_status,
+                )
             print(f"[LLMClient] MiniMax API error: {e}")
-            # 回退到其他 provider
-            if self.api_key:
-                return self._openai_complete(prompt, "gpt-3.5-turbo", max_tokens, temperature, system_prompt, **kwargs)
             return f"[MiniMax Error: {e}]"
     
     def __repr__(self) -> str:

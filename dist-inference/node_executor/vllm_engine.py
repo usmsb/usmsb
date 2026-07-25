@@ -2,11 +2,17 @@
 vLLM Engine Wrapper
 """
 
-import os
-from typing import List, Dict, Optional, Any
 import asyncio
-from threading import Thread
-import time
+from collections.abc import Mapping
+from typing import Any
+
+from usmsb_sdk.llm_telemetry import LLMInvocationRecorder, LLMUsage
+
+from shared.llm_telemetry_contract import (
+    DIST_INFERENCE_PHYSICAL_ATTEMPT_CONTRACT,
+    require_invocation_recorder,
+    resolve_required_trace_context,
+)
 
 try:
     from vllm import LLM, SamplingParams
@@ -44,19 +50,21 @@ class VLLMEngine:
     def __init__(
         self,
         tensor_parallel_size: int = 1,
-        gpu_memory_utilization: float = 0.9
+        gpu_memory_utilization: float = 0.9,
+        invocation_recorder: LLMInvocationRecorder | None = None,
     ):
         self.tensor_parallel_size = tensor_parallel_size
         self.gpu_memory_utilization = gpu_memory_utilization
         self.llm = None
-        self.loaded_model_name: Optional[str] = None
+        self.loaded_model_name: str | None = None
         self._loading = False
+        self.invocation_recorder = invocation_recorder
 
     def is_available(self) -> bool:
         """Check if vLLM is available"""
         return VLLM_AVAILABLE
 
-    def get_supported_models(self) -> List[str]:
+    def get_supported_models(self) -> list[str]:
         """Get list of supported models"""
         return list(VRAM_ESTIMATES.keys())
 
@@ -73,7 +81,10 @@ class VLLMEngine:
 
         if not VLLM_AVAILABLE:
             # Mock mode: just mark as loaded
-            print(f"[VLLM] Mock mode: marking {model_name} as loaded (vLLM not available)")
+            print(
+                f"[VLLM] Mock mode: marking {model_name} as loaded "
+                "(vLLM not available)"
+            )
             self.loaded_model_name = model_name
             return
 
@@ -104,16 +115,19 @@ class VLLMEngine:
 
     def generate(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: int = 2048
-    ) -> Dict[str, Any]:
+        max_tokens: int = 2048,
+        telemetry_context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Synchronous generation (mock mode when vLLM not available)
         """
 
-        # Mock mode: return fake response when vLLM not available
-        if not self.llm:
+        # Mock mode has no physical LLM call and therefore emits no provider
+        # attempt.  A real runtime with an unloaded model must never masquerade
+        # as a successful inference.
+        if not VLLM_AVAILABLE:
             content = f"[Mock] Processed: {messages[-1].get('content', '')}"
             prompt_tokens = 10
             completion_tokens = 20
@@ -125,6 +139,11 @@ class VLLMEngine:
                     "total_tokens": prompt_tokens + completion_tokens
                 }
             }
+        if self.llm is None:
+            raise RuntimeError("vLLM model is not loaded")
+
+        recorder = require_invocation_recorder(self.invocation_recorder)
+        call_context = resolve_required_trace_context(recorder, telemetry_context)
 
         # Convert messages to prompt
         prompt = self._messages_to_prompt(messages)
@@ -135,34 +154,89 @@ class VLLMEngine:
             stop=None
         )
 
-        outputs = self.llm.generate([prompt], sampling_params)
-        output = outputs[0]
-
-        return {
-            "content": output.outputs[0].text,
-            "usage": {
-                "prompt_tokens": len(output.prompt_token_ids),
-                "completion_tokens": len(output.outputs[0].token_ids),
-                "total_tokens": len(output.prompt_token_ids) + len(output.outputs[0].token_ids)
+        attempt_id = recorder.requested(
+            provider="vllm",
+            model=str(self.loaded_model_name or "unknown"),
+            operation="vllm.generate",
+            request_payload={
+                "messages": messages,
+                "prompt": prompt,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+            context=call_context,
+            metadata={
+                "retry_policy": "single_shot",
+                "transport_retry_index": 0,
+                "attempt_evidence": DIST_INFERENCE_PHYSICAL_ATTEMPT_CONTRACT,
+            },
+        )
+        try:
+            # Canonical physical inference boundary.  There is deliberately no
+            # loop, fallback model or re-dispatch after an exception.
+            outputs = self.llm.generate([prompt], sampling_params)
+            if not outputs:
+                raise RuntimeError("vLLM returned no request output")
+            output = outputs[0]
+            candidates = getattr(output, "outputs", None)
+            if not candidates:
+                raise RuntimeError("vLLM returned no completion candidate")
+            candidate = candidates[0]
+            prompt_tokens = len(getattr(output, "prompt_token_ids", None) or [])
+            completion_tokens = len(getattr(candidate, "token_ids", None) or [])
+            usage = {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
             }
-        }
+            result = {
+                "content": str(getattr(candidate, "text", "") or ""),
+                "usage": usage,
+            }
+            recorder.completed(
+                attempt_id,
+                response_payload={
+                    **result,
+                    "finish_reason": getattr(candidate, "finish_reason", None),
+                },
+                response_id=str(getattr(output, "request_id", "") or "") or None,
+                usage=LLMUsage.from_value(usage),
+                metadata={
+                    "retry_policy": "single_shot",
+                    "transport_retry_index": 0,
+                    "attempt_evidence": DIST_INFERENCE_PHYSICAL_ATTEMPT_CONTRACT,
+                },
+            )
+            return result
+        except BaseException as error:
+            recorder.failed(
+                attempt_id,
+                error,
+                metadata={
+                    "retry_policy": "single_shot",
+                    "transport_retry_index": 0,
+                    "attempt_evidence": DIST_INFERENCE_PHYSICAL_ATTEMPT_CONTRACT,
+                },
+            )
+            raise
 
     async def generate_async(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: int = 2048
-    ) -> Dict[str, Any]:
+        max_tokens: int = 2048,
+        telemetry_context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Async generation (execute sync vLLM call in thread pool)
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             None,
-            lambda: self.generate(messages, temperature, max_tokens)
+            lambda: self.generate(messages, temperature, max_tokens, telemetry_context)
         )
 
-    def _messages_to_prompt(self, messages: List[Dict[str, str]]) -> str:
+    def _messages_to_prompt(self, messages: list[dict[str, str]]) -> str:
         """
         Convert OpenAI messages format to prompt
 

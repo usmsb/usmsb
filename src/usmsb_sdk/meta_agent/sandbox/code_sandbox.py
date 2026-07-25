@@ -10,12 +10,17 @@ import io
 import logging
 import os
 import tempfile
+import threading
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+class _SandboxExecutionStoppedError(BaseException):
+    """Internal cooperative stop signal that sandbox code cannot catch as Exception."""
 
 
 @dataclass
@@ -618,21 +623,75 @@ async def _execute_code(self, code: str, timeout: int) -> SandboxResult:
         # 在独立线程中执行代码以支持超时
         loop = asyncio.get_event_loop()
 
-
-        def run_code():
-            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                execute_sandboxed_code(
-                    code, safe_builtins, globals_dict, self._imported_modules.copy()
-                )
-
         # 执行代码并设置超时
         actual_timeout = min(timeout, self.max_timeout)
+        stop_requested = threading.Event()
+        deadline = time.monotonic() + actual_timeout
+
+        def run_code():
+            import sys
+
+            def enforce_deadline(frame, event, _arg):
+                # Python 3.11 does not emit a new line event for every
+                # iteration of a one-line loop. Opcode tracing on sandbox
+                # frames is therefore required for "while True: pass".
+                if event == "call" and frame.f_code.co_filename == "<sandbox>":
+                    frame.f_trace_opcodes = True
+
+                if stop_requested.is_set() or time.monotonic() >= deadline:
+                    # BaseException is intentional: allowed user code can
+                    # catch Exception, but must not swallow the harness stop.
+                    raise _SandboxExecutionStoppedError(
+                        f"sandbox execution exceeded {actual_timeout} seconds"
+                    )
+                return enforce_deadline
+
+            sys.settrace(enforce_deadline)
+            try:
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    execute_sandboxed_code(
+                        code,
+                        safe_builtins,
+                        globals_dict,
+                        self._imported_modules.copy(),
+                    )
+            finally:
+                sys.settrace(None)
+
+        worker_future = loop.run_in_executor(None, run_code)
+
+        async def stop_and_wait_for_worker():
+            # asyncio cannot kill an executing thread. Signal it through the
+            # trace hook and do not return until redirect/trace cleanup has
+            # completed in that same worker. This is cooperative for Python
+            # bytecode; a blocking C call has no trace events, so cleanup waits
+            # for that call to return. A hard limit for C calls would require
+            # process isolation rather than an executor thread.
+            stop_requested.set()
+            try:
+                await asyncio.shield(worker_future)
+            except _SandboxExecutionStoppedError:
+                pass
+            except Exception:
+                # A worker exception racing with timeout/cancellation must not
+                # replace the controlling timeout/cancellation result.
+                pass
+
         try:
+            # Shield keeps wait_for from cancelling only the asyncio wrapper
+            # while leaving its underlying executor thread alive.
             await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: run_code()), timeout=actual_timeout
+                asyncio.shield(worker_future), timeout=actual_timeout
             )
+        except _SandboxExecutionStoppedError as exc:
+            raise TimeoutError(
+                f"sandbox execution exceeded {actual_timeout} seconds"
+            ) from exc
         except TimeoutError:
-            # Already caught in outer except block, re-raise to be handled there
+            await stop_and_wait_for_worker()
+            raise
+        except asyncio.CancelledError:
+            await stop_and_wait_for_worker()
             raise
 
         # 获取输出

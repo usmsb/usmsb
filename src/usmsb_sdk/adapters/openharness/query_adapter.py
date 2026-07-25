@@ -55,6 +55,18 @@ from usmsb_sdk.adapters.openharness.exceptions import (
     QueryError,
     OpenHarnessNotAvailableError,
 )
+from usmsb_sdk.llm_telemetry import (
+    LLMEventCallback,
+    LLMInvocationRecorder,
+    LLMTraceContext,
+    llm_context_scope,
+    resolve_llm_context,
+)
+from usmsb_sdk.openharness_telemetry import (
+    OpenHarnessPhysicalTelemetryClient,
+    OpenHarnessTelemetryContractError,
+    install_openharness_physical_telemetry,
+)
 
 log = logging.getLogger(__name__)
 
@@ -168,6 +180,9 @@ class QueryAdapter:
         engine: QueryEngine | None = None,
         config: LLMConfig | None = None,
         cwd: str | Path = ".",
+        invocation_recorder: LLMInvocationRecorder | None = None,
+        llm_event_callback: LLMEventCallback | None = None,
+        default_context: LLMTraceContext | dict[str, Any] | None = None,
     ):
         """
         Initialize QueryAdapter.
@@ -183,6 +198,15 @@ class QueryAdapter:
         self._engine = engine
         self._config = config or LLMConfig()
         self._cwd = Path(cwd).resolve()
+        self.invocation_recorder = invocation_recorder or LLMInvocationRecorder(
+            event_callback=llm_event_callback,
+            default_context=default_context,
+        )
+        if invocation_recorder and llm_event_callback:
+            self.invocation_recorder.add_callback(llm_event_callback)
+        if invocation_recorder and default_context is not None:
+            self.invocation_recorder.set_default_context(default_context)
+        self._physical_telemetry_client: OpenHarnessPhysicalTelemetryClient | None = None
         
         # Cost tracking
         self._total_usage: UsageSnapshot | None = None
@@ -191,8 +215,49 @@ class QueryAdapter:
         
         # Message history (for non-streaming convenience)
         self._message_history: list[ConversationMessage] = []
+
+        if self._engine is not None:
+            self._ensure_physical_telemetry()
         
         log.info("QueryAdapter initialized with model: %s", self._config.model)
+
+    def _ensure_physical_telemetry(self) -> OpenHarnessPhysicalTelemetryClient:
+        """Install verified provider-boundary telemetry or reject before sending."""
+
+        if self._engine is None:
+            raise QueryError(message="QueryEngine not initialized", model=self._config.model)
+        try:
+            self._physical_telemetry_client = install_openharness_physical_telemetry(
+                self._engine,
+                invocation_recorder=self.invocation_recorder,
+                provider=str(getattr(self._config.provider, "value", self._config.provider)),
+            )
+        except OpenHarnessTelemetryContractError as error:
+            raise QueryError(
+                message=str(error),
+                model=self._config.model,
+                details={
+                    "telemetry_status": "fail_closed",
+                    "billing_eligible": False,
+                    "provider_request_sent": False,
+                },
+            ) from error
+        return self._physical_telemetry_client
+
+    def _root_context(
+        self,
+        *,
+        operation: str,
+        trace_context: LLMTraceContext | dict[str, Any] | None,
+        billing_context: dict[str, Any] | None,
+    ) -> LLMTraceContext:
+        root = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            root = root.with_updates(billing=billing_context)
+        return root.for_logical_call(operation=operation)
 
     @property
     def engine(self) -> QueryEngine:
@@ -229,6 +294,7 @@ class QueryAdapter:
             engine: OH QueryEngine instance
         """
         self._engine = engine
+        self._ensure_physical_telemetry()
 
     def set_model(self, model: str) -> None:
         """
@@ -272,6 +338,8 @@ class QueryAdapter:
         stream: bool = True,
         max_turns: int | None = None,
         message_history: list[ConversationMessage] | None = None,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Execute a query with optional streaming.
@@ -298,6 +366,11 @@ class QueryAdapter:
         """
         if self._engine is None:
             raise QueryError(message="QueryEngine not initialized")
+
+        # Re-check before every execution in case another component replaced the
+        # engine's API client after initialization.  Unsupported clients are
+        # rejected before ``submit_message`` can send a paid provider request.
+        self._ensure_physical_telemetry()
         
         try:
             # Build message
@@ -320,27 +393,32 @@ class QueryAdapter:
             final_message = None
             tool_calls = []
             
-            # Execute query
-            async for event in self._engine.submit_message(user_message):
-                stream_event = self._convert_event(
-                    event,
-                    current_turn=current_turn,
-                )
-                
-                if stream_event:
-                    # Track turn completion
-                    if stream_event.event_type == "turn_complete":
-                        current_turn += 1
-                    
-                    # Track final message
-                    if stream_event.event_type == "message_complete":
-                        final_message = stream_event.data
-                    
-                    # Track tool calls
-                    if stream_event.event_type == "tool_call":
-                        tool_calls.append(stream_event.data)
-                    
-                    yield stream_event
+            root_context = self._root_context(
+                operation="openharness.query",
+                trace_context=trace_context,
+                billing_context=billing_context,
+            )
+            with llm_context_scope(root_context):
+                async for event in self._engine.submit_message(user_message):
+                    stream_event = self._convert_event(
+                        event,
+                        current_turn=current_turn,
+                    )
+
+                    if stream_event:
+                        # Track turn completion
+                        if stream_event.event_type == "turn_complete":
+                            current_turn += 1
+
+                        # Track final message
+                        if stream_event.event_type == "message_complete":
+                            final_message = stream_event.data
+
+                        # Track tool calls
+                        if stream_event.event_type == "tool_call":
+                            tool_calls.append(stream_event.data)
+
+                        yield stream_event
             
             # Update state
             self._query_count += 1
@@ -358,6 +436,8 @@ class QueryAdapter:
             if max_turns is not None:
                 self._engine.set_max_turns(original_max_turns)
             
+        except QueryError:
+            raise
         except Exception as e:
             raise QueryError(
                 message=f"Query execution failed: {e}",
@@ -370,6 +450,8 @@ class QueryAdapter:
         system_prompt: str | None = None,
         tools: list[dict[str, Any]] | None = None,
         max_turns: int | None = None,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
     ) -> QueryResult:
         """
         Execute a query and return complete result.
@@ -397,6 +479,8 @@ class QueryAdapter:
             system_prompt=system_prompt,
             tools=tools,
             max_turns=max_turns,
+            trace_context=trace_context,
+            billing_context=billing_context,
         ):
             if event.event_type == "text":
                 message_parts.append(event.data)
@@ -411,7 +495,9 @@ class QueryAdapter:
         return QueryResult(
             message="".join(message_parts),
             usage=usage,
-            stop_reason=final_message.stop_reason if hasattr(final_message, 'stop_reason') else None,
+            stop_reason=final_message.stop_reason
+            if hasattr(final_message, "stop_reason")
+            else None,
             tool_calls=tool_calls,
             total_turns=total_turns,
         )
@@ -541,6 +627,8 @@ class QueryAdapter:
     async def continue_pending(
         self,
         max_turns: int | None = None,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """
         Continue an interrupted tool loop.
@@ -553,13 +641,31 @@ class QueryAdapter:
         """
         if self._engine is None:
             raise QueryError(message="QueryEngine not initialized")
+
+        self._ensure_physical_telemetry()
         
         current_turn = self._turn_count
         
-        async for event in self._engine.continue_pending(max_turns=max_turns):
-            stream_event = self._convert_event(event, current_turn=current_turn)
-            if stream_event:
-                yield stream_event
+        root_context = self._root_context(
+            operation="openharness.continue_pending",
+            trace_context=trace_context,
+            billing_context=billing_context,
+        )
+        with llm_context_scope(root_context):
+            async for event in self._engine.continue_pending(max_turns=max_turns):
+                stream_event = self._convert_event(event, current_turn=current_turn)
+                if stream_event:
+                    yield stream_event
+
+    def get_llm_call_details(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        """Return physical provider attempts captured by this adapter."""
+
+        return self.invocation_recorder.recent_calls(limit=limit)
+
+    def get_llm_events(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        """Return provider-attempt lifecycle events captured by this adapter."""
+
+        return self.invocation_recorder.recent_events(limit=limit)
 
     def get_statistics(self) -> dict[str, Any]:
         """Get query statistics."""

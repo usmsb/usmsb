@@ -8,6 +8,7 @@ Uses httpx to call MiniMax API directly with proper Authorization header.
 import asyncio
 import json
 import logging
+import math
 import os
 from typing import Any
 
@@ -18,6 +19,12 @@ from usmsb_sdk.intelligence_adapters.base import (
     IntelligenceSourceConfig,
     IntelligenceSourceStatus,
     IntelligenceSourceType,
+)
+from usmsb_sdk.llm_telemetry import (
+    LLMTraceContext,
+    LLMUsage,
+    platform_observation_context,
+    resolve_llm_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -139,15 +146,40 @@ class MiniMaxAdapter(ILLMAdapter):
         """Check if MiniMax API is available."""
         if not self._client:
             return False
+        probe_context = platform_observation_context(
+            provider="minimax",
+            operation="health_check.chat",
+            default=self.invocation_recorder.default_context,
+        )
         try:
             response = await self._raw_chat_request(
                 messages=[{"role": "user", "content": "Hi"}],
                 max_tokens=1,
+                trace_context=probe_context,
+                operation="health_check.chat",
             )
-            return response is not None
+            if response is None:
+                raise RuntimeError("MiniMax health check returned no response")
+        except asyncio.CancelledError as error:
+            self.invocation_recorder.task_terminal(
+                context=probe_context,
+                status="cancelled",
+                error=error,
+            )
+            raise
         except Exception as e:
+            self.invocation_recorder.task_terminal(
+                context=probe_context,
+                status="failed",
+                error=e,
+            )
             logger.warning(f"MiniMax API not available: {e}")
             return False
+        self.invocation_recorder.task_terminal(
+            context=probe_context,
+            status="completed",
+        )
+        return True
 
     async def _raw_chat_request(
         self,
@@ -158,6 +190,9 @@ class MiniMaxAdapter(ILLMAdapter):
         tools: list[dict[str, Any]] | None = None,
         reasoning_split: bool | None = None,
         service_tier: str | None = None,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
+        operation: str = "chat.completions",
         **extra_payload: Any,
     ) -> dict[str, Any]:
         """
@@ -196,102 +231,67 @@ class MiniMaxAdapter(ILLMAdapter):
 
         if tools:
             payload["tools"] = tools
-            # 打印 payload 中的 tools 结构
-            print(f"🔍 [MINIMAX PAYLOAD] tools[0] structure: {json.dumps(tools[0], ensure_ascii=False)[:500]}")
-            logger.info(f"MiniMax payload tools[0]: {json.dumps(tools[0], ensure_ascii=False)[:500]}")
-            print(f"DEBUG: Sending {len(tools)} tools to MiniMax")
-            # Print all tool names
-            print("DEBUG: All tool names in minimax_adapter:")
-            for i, t in enumerate(tools):
-                func = t.get("function", {})
-                name = func.get("name", "EMPTY")
-                print(f"  Tool {i}: '{name}'")
-            logger.info(f"MiniMax API: sending {len(tools)} tools")
-            # Detailed check for all tools
-            for i, t in enumerate(tools):
-                func = t.get("function", {})
-                name = func.get("name", "")
-                params = func.get("parameters", {})
+            # Request content and tool schemas are captured by the controlled
+            # artifact recorder.  Application logs must only contain bounded
+            # metadata so user prompts and tool arguments cannot bypass Trace
+            # RBAC/redaction controls.
+            logger.debug("MiniMax API request includes %d tools", len(tools))
 
-                if not name:
-                    print(f"DEBUG: Tool {i}: EMPTY NAME")
-                    logger.info(f"Tool {i}: EMPTY NAME")
-                    continue
+        call_context = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            call_context = call_context.with_updates(billing=billing_context)
+        call_context = call_context.for_logical_call(operation=operation)
 
-                if not params:
-                    print(f"DEBUG: Tool {i} ({name}): EMPTY parameters")
-                    logger.info(f"Tool {i} ({name}): EMPTY parameters")
-                    continue
+        # Paid creation calls are deliberately single-shot.  A timeout or
+        # transport/provider error is ambiguous (the provider may already have
+        # accepted and billed the request), so retrying here can duplicate cost
+        # and output.  Only a new explicit upper-layer invocation may call again.
+        attempt_id = self.invocation_recorder.requested(
+            provider="minimax",
+            model=str(payload.get("model") or self.model),
+            operation=operation,
+            request_payload=payload,
+            context=call_context,
+            metadata={"transport_retry_index": 0, "retry_policy": "single_shot"},
+        )
+        raw_response: dict[str, Any] | None = None
+        http_status: int | None = None
+        try:
+            response = await self._client.post("/text/chatcompletion_v2", json=payload)
+            http_status = response.status_code
 
-                props = params.get("properties", {})
+            logger.info("MiniMax status_code: %s", response.status_code)
 
-                # Check for empty properties
-                if not props or props == {}:
-                    print(f"DEBUG: Tool {i} ({name}): EMPTY properties")
-                    logger.info(f"Tool {i} ({name}): EMPTY properties")
-                    continue
+            raw_response = response.json()
+            response.raise_for_status()
 
-                for pname, pval in props.items():
-                    if pval is None:
-                        print(f"DEBUG: Tool {i} ({name}): param {pname} is None")
-                        logger.info(f"Tool {i} ({name}): param {pname} is None")
+            base_resp = raw_response.get("base_resp", {})
+            if base_resp.get("status_code") != 0:
+                error_msg = base_resp.get("status_msg", "Unknown error")
+                logger.error(f"MiniMax API error: {error_msg}")
+                raise RuntimeError(f"MiniMax API error: {error_msg}")
 
-            # Log first tool as sample
-            if tools:
-                sample = json.dumps(tools[0], ensure_ascii=False)[:300]
-                print(f"DEBUG: First tool: {sample}")
-                logger.info(f"Sample tool: {sample}")
-
-        max_retries = 3
-        retry_count = 0
-        last_error = None
-
-        while retry_count < max_retries:
-            try:
-                # 使用 OpenAI 兼容端点
-                # 注意：base_url 已经是 https://api.minimaxi.com/v1，所以这里只需要路径 /text/chatcompletion_v2
-                response = await self._client.post("/text/chatcompletion_v2", json=payload)
-
-                print(f"🔍 [MINIMAX] status_code: {response.status_code}")
-                logger.info(f"MiniMax status_code: {response.status_code}")
-
-                # 先解析响应
-                raw_response = response.json()
-                print(f"🔍 [MINIMAX RAW] response keys: {raw_response.keys()}")
-                print(f"🔍 [MINIMAX RAW] response: {json.dumps(raw_response, ensure_ascii=False)[:500]}")
-                logger.info(f"MiniMax raw response: {raw_response}")
-
-                # 检查是否有 API 错误
-                base_resp = raw_response.get("base_resp", {})
-                if base_resp.get("status_code") != 0:
-                    error_msg = base_resp.get("status_msg", "Unknown error")
-                    logger.error(f"MiniMax API error: {error_msg}")
-                    raise RuntimeError(f"MiniMax API error: {error_msg}")
-
-                return raw_response
-            except httpx.ConnectError as e:
-                last_error = e
-                retry_count += 1
-                logger.warning(f"MiniMax connection error (attempt {retry_count}/{max_retries}): {e}")
-                if retry_count < max_retries:
-                    await asyncio.sleep(2 ** retry_count)  # 指数退避
-                    continue
-                raise
-            except httpx.ReadTimeout as e:
-                last_error = e
-                retry_count += 1
-                logger.warning(f"MiniMax read timeout (attempt {retry_count}/{max_retries}): {e}")
-                if retry_count < max_retries:
-                    await asyncio.sleep(2 ** retry_count)
-                    continue
-                raise
-            except httpx.HTTPError as e:
-                logger.error(f"MiniMax HTTP error: {e}")
-                raise
-
-        # 如果所有重试都失败
-        if last_error:
-            raise last_error
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=raw_response,
+                usage=LLMUsage.from_value(raw_response),
+                http_status=http_status,
+                metadata={"transport_retry_index": 0, "retry_policy": "single_shot"},
+            )
+            return raw_response
+        except BaseException as error:
+            self.invocation_recorder.failed(
+                attempt_id,
+                error,
+                response_payload=raw_response,
+                usage=LLMUsage.from_value(raw_response),
+                http_status=http_status,
+                metadata={"transport_retry_index": 0, "retry_policy": "single_shot"},
+            )
+            raise
 
     def _extract_text_from_response(self, response: dict[str, Any]) -> str:
         """
@@ -331,16 +331,29 @@ class MiniMaxAdapter(ILLMAdapter):
         try:
             max_tokens = kwargs.get("max_tokens", self.max_tokens)
             temperature = kwargs.get("temperature", self.temperature)
+            trace_context = kwargs.get("trace_context")
+            billing_context = kwargs.get("billing_context")
+            operation = kwargs.get("operation", "generate_text")
             passthrough = {
                 key: value
                 for key, value in kwargs.items()
-                if key not in {"max_tokens", "temperature"}
+                if key
+                not in {
+                    "max_tokens",
+                    "temperature",
+                    "trace_context",
+                    "billing_context",
+                    "operation",
+                }
             }
 
             response = await self._raw_chat_request(
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature,
+                trace_context=trace_context,
+                billing_context=billing_context,
+                operation=operation,
                 **passthrough,
             )
 
@@ -368,44 +381,47 @@ class MiniMaxAdapter(ILLMAdapter):
         Returns:
             Generated text
         """
-        max_retries = 3
-        retry_count = 0
-        last_error = None
+        trace_context = kwargs.get("trace_context")
+        billing_context = kwargs.get("billing_context")
+        operation = kwargs.get("operation", "generate_with_system")
+        call_context = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            call_context = call_context.with_updates(billing=billing_context)
+        call_context = call_context.for_logical_call(operation=operation)
 
-        while retry_count < max_retries:
-            try:
-                max_tokens = kwargs.get("max_tokens", self.max_tokens)
-                temperature = kwargs.get("temperature", self.temperature)
-                passthrough = {
-                    key: value
-                    for key, value in kwargs.items()
-                    if key not in {"max_tokens", "temperature"}
+        try:
+            max_tokens = kwargs.get("max_tokens", self.max_tokens)
+            temperature = kwargs.get("temperature", self.temperature)
+            passthrough = {
+                key: value
+                for key, value in kwargs.items()
+                if key
+                not in {
+                    "max_tokens",
+                    "temperature",
+                    "trace_context",
+                    "billing_context",
+                    "operation",
                 }
+            }
 
-                response = await self._raw_chat_request(
-                    messages=[{"role": "user", "content": user_prompt}],
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    system=system_prompt,
-                    **passthrough,
-                )
+            response = await self._raw_chat_request(
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system_prompt,
+                trace_context=call_context,
+                operation=operation,
+                **passthrough,
+            )
 
-                return self._extract_text_from_response(response)
-            except (httpx.ConnectError, httpx.ReadTimeout, ConnectionResetError) as e:
-                last_error = e
-                retry_count += 1
-                logger.warning(f"MiniMax generation error (attempt {retry_count}/{max_retries}): {e}")
-                if retry_count < max_retries:
-                    await asyncio.sleep(2 ** retry_count)
-                    continue
-                logger.error(f"MiniMax generation with system prompt failed after {max_retries} retries: {e}")
-                raise
-            except Exception as e:
-                logger.error(f"MiniMax generation with system prompt failed: {e}")
-                raise
-
-        if last_error:
-            raise last_error
+            return self._extract_text_from_response(response)
+        except Exception as e:
+            logger.error(f"MiniMax generation with system prompt failed: {e}")
+            raise
 
     async def chat_with_messages(
         self,
@@ -435,6 +451,9 @@ class MiniMaxAdapter(ILLMAdapter):
         try:
             max_tokens = kwargs.get("max_tokens", self.max_tokens)
             temperature = kwargs.get("temperature", self.temperature)
+            trace_context = kwargs.get("trace_context")
+            billing_context = kwargs.get("billing_context")
+            operation = kwargs.get("operation", "chat_with_messages")
 
             # Separate system prompt from messages
             system_prompt = ""
@@ -458,6 +477,9 @@ class MiniMaxAdapter(ILLMAdapter):
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system=system_prompt if system_prompt else None,
+                trace_context=trace_context,
+                billing_context=billing_context,
+                operation=operation,
             )
 
             return self._extract_text_from_response(response)
@@ -636,65 +658,83 @@ class MiniMaxAdapter(ILLMAdapter):
             "texts": [text],  # MiniMax requires texts as array
             "type": "query",  # Required for query
         }
+        trace_context = kwargs.get("trace_context")
+        billing_context = kwargs.get("billing_context")
+        call_context = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            call_context = call_context.with_updates(billing=billing_context)
+        call_context = call_context.for_logical_call(operation="embeddings.query")
+        attempt_id = self.invocation_recorder.requested(
+            provider="minimax",
+            model=str(model),
+            operation="embeddings.query",
+            request_payload=payload,
+            context=call_context,
+        )
+        response_payload: Any = None
+        http_status: int | None = None
+        provider_terminal_recorded = False
 
         try:
             logger.info(
-                f"MiniMax embed request: model={model}, texts={payload.get('texts')}, type={payload.get('type')}"
+                "MiniMax embed request: model=%s, text_count=%d, type=%s",
+                model,
+                len(payload["texts"]),
+                payload["type"],
             )
             response = await self._embedding_client.post("/v1/embeddings", json=payload)
-            logger.info(f"MiniMax embed response: {response.status_code} - {response.text[:300]}")
+            http_status = response.status_code
+            logger.info("MiniMax embed response status: %s", response.status_code)
 
             if response.status_code != 200:
                 error_text = response.text
-                logger.error(f"MiniMax embedding API error: {response.status_code} - {error_text}")
-                raise RuntimeError(
-                    f"MiniMax embedding API error: {response.status_code} - {error_text}"
-                )
+                response_payload = {"raw_text": error_text}
+                logger.error("MiniMax embedding API error: HTTP %s", response.status_code)
+                raise RuntimeError(f"MiniMax embedding API error: HTTP {response.status_code}")
 
             result = response.json()
-            logger.debug(f"MiniMax embedding response: {result}")
+            response_payload = result
+            # A HTTP 200 is not sufficient evidence of a successful provider
+            # attempt.  MiniMax reports application errors in ``base_resp`` and
+            # malformed/empty vectors are unusable artifacts.  Validate both
+            # before emitting the single terminal ``completed`` event.
+            self._validate_embedding_base_response(result)
+            embedding = self._extract_single_embedding(result)
 
-            # Handle different response formats
-            if "vectors" in result:
-                # MiniMax native format: {"vectors": [...], "base_resp": {...}}
-                vectors = result["vectors"]
-                # Check for errors in base_resp
-                base_resp = result.get("base_resp", {})
-                status_code = base_resp.get("status_code", 0)
-                status_msg = base_resp.get("status_msg", "")
-
-                if status_code != 0:
-                    logger.error(f"MiniMax embedding API error: {status_code} - {status_msg}")
-                    raise RuntimeError(f"MiniMax embedding API error: {status_code} - {status_msg}")
-
-                if isinstance(vectors, list) and len(vectors) > 0:
-                    # Each vector is a list of floats
-                    embedding = vectors[0] if isinstance(vectors[0], list) else vectors
-                else:
-                    logger.error(f"Empty vectors in MiniMax response. Full response: {result}")
-                    raise ValueError("Empty vectors in MiniMax response")
-            elif "data" in result:
-                # OpenAI-compatible format
-                embedding = result["data"][0]["embedding"]
-            elif "embeddings" in result:
-                # Alternative format (some MiniMax versions)
-                embedding = (
-                    result["embeddings"][0]
-                    if isinstance(result["embeddings"][0], list)
-                    else result["embeddings"][0].get("embedding", result["embeddings"][0])
-                )
-            elif "vector" in result:
-                # Another alternative format
-                embedding = result["vector"]
-            else:
-                logger.error(f"Unexpected MiniMax embedding response format: {result.keys()}")
-                raise ValueError(f"Unexpected embedding response format: {list(result.keys())}")
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=result,
+                usage=LLMUsage.from_embedding(result),
+                http_status=http_status,
+            )
+            provider_terminal_recorded = True
 
             logger.debug(f"Generated embedding with dimension {len(embedding)}")
             return embedding
 
         except httpx.HTTPError as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=response_payload,
+                    usage=LLMUsage.from_embedding(response_payload),
+                    http_status=http_status,
+                )
             logger.error(f"MiniMax embedding HTTP error: {e}")
+            raise
+        except Exception as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=response_payload,
+                    usage=LLMUsage.from_embedding(response_payload),
+                    http_status=http_status,
+                )
             raise
 
     async def embed_batch(
@@ -726,34 +766,48 @@ class MiniMaxAdapter(ILLMAdapter):
             "texts": texts,
             "type": "db",
         }
+        trace_context = kwargs.get("trace_context")
+        billing_context = kwargs.get("billing_context")
+        call_context = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            call_context = call_context.with_updates(billing=billing_context)
+        call_context = call_context.for_logical_call(operation="embeddings.batch")
+        attempt_id = self.invocation_recorder.requested(
+            provider="minimax",
+            model=str(model),
+            operation="embeddings.batch",
+            request_payload=payload,
+            context=call_context,
+        )
+        response_payload: Any = None
+        http_status: int | None = None
+        provider_terminal_recorded = False
 
         try:
             response = await self._embedding_client.post("/v1/embeddings", json=payload)
+            http_status = response.status_code
 
             if response.status_code != 200:
                 error_text = response.text
-                logger.error(f"MiniMax embedding API error: {response.status_code} - {error_text}")
-                raise RuntimeError(
-                    f"MiniMax embedding API error: {response.status_code} - {error_text}"
-                )
+                response_payload = {"raw_text": error_text}
+                logger.error("MiniMax embedding API error: HTTP %s", response.status_code)
+                raise RuntimeError(f"MiniMax embedding API error: HTTP {response.status_code}")
 
             result = response.json()
-            logger.debug(f"MiniMax batch embedding response: {result}")
+            response_payload = result
+            self._validate_embedding_base_response(result)
+            embeddings = self._extract_batch_embeddings(result, expected_count=len(texts))
 
-            # Handle different response formats
-            if "vectors" in result:
-                # MiniMax native format: {"vectors": [[...], [...]], "base_resp": {...}}
-                embeddings = result["vectors"]
-            elif "data" in result:
-                # OpenAI-compatible format
-                # Sort by index to ensure correct order
-                embeddings_data = sorted(result["data"], key=lambda x: x.get("index", 0))
-                embeddings = [item["embedding"] for item in embeddings_data]
-            else:
-                logger.error(f"Unexpected MiniMax batch embedding response format: {result.keys()}")
-                raise ValueError(
-                    f"Unexpected batch embedding response format: {list(result.keys())}"
-                )
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=result,
+                usage=LLMUsage.from_embedding(result),
+                http_status=http_status,
+            )
+            provider_terminal_recorded = True
 
             logger.debug(
                 f"Generated {len(embeddings)} embeddings with dimension {len(embeddings[0]) if embeddings else 0}"
@@ -761,8 +815,147 @@ class MiniMaxAdapter(ILLMAdapter):
             return embeddings
 
         except httpx.HTTPError as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=response_payload,
+                    usage=LLMUsage.from_embedding(response_payload),
+                    http_status=http_status,
+                )
             logger.error(f"MiniMax batch embedding HTTP error: {e}")
             raise
+        except Exception as e:
+            if not provider_terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload=response_payload,
+                    usage=LLMUsage.from_embedding(response_payload),
+                    http_status=http_status,
+                )
+            raise
+
+    @staticmethod
+    def _validate_embedding_base_response(result: dict[str, Any]) -> None:
+        """Reject MiniMax application errors carried inside a HTTP 200 body."""
+
+        if "base_resp" not in result:
+            return
+        base_resp = result.get("base_resp")
+        if not isinstance(base_resp, dict):
+            raise ValueError("MiniMax embedding response has invalid base_resp")
+        status_code = base_resp.get("status_code")
+        if status_code not in (0, "0"):
+            status_msg = base_resp.get("status_msg", "Unknown error")
+            raise RuntimeError(f"MiniMax embedding API error: {status_code} - {status_msg}")
+
+    @staticmethod
+    def _validate_embedding_vector(value: Any, *, location: str) -> list[float]:
+        """Return a finite, non-empty embedding vector or fail closed."""
+
+        if not isinstance(value, list) or not value:
+            raise ValueError(
+                f"Invalid MiniMax embedding vector at {location}: expected non-empty list"
+            )
+        vector: list[float] = []
+        for index, item in enumerate(value):
+            if isinstance(item, bool) or not isinstance(item, (int, float)):
+                raise ValueError(
+                    f"Invalid MiniMax embedding value at {location}[{index}]: expected number"
+                )
+            normalized = float(item)
+            if not math.isfinite(normalized):
+                raise ValueError(
+                    f"Invalid MiniMax embedding value at {location}[{index}]: expected finite number"
+                )
+            vector.append(normalized)
+        return vector
+
+    @classmethod
+    def _extract_single_embedding(cls, result: dict[str, Any]) -> list[float]:
+        """Normalize supported MiniMax/OpenAI response shapes after validation."""
+
+        candidate: Any
+        location: str
+        if "vectors" in result:
+            vectors = result["vectors"]
+            if not isinstance(vectors, list) or not vectors:
+                raise ValueError("Empty vectors in MiniMax embedding response")
+            candidate = vectors[0] if isinstance(vectors[0], list) else vectors
+            location = "vectors[0]" if isinstance(vectors[0], list) else "vectors"
+        elif "data" in result:
+            data = result["data"]
+            if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+                raise ValueError("Invalid data in MiniMax embedding response")
+            candidate = data[0].get("embedding")
+            location = "data[0].embedding"
+        elif "embeddings" in result:
+            embeddings = result["embeddings"]
+            if not isinstance(embeddings, list) or not embeddings:
+                raise ValueError("Empty embeddings in MiniMax embedding response")
+            first = embeddings[0]
+            candidate = first.get("embedding") if isinstance(first, dict) else first
+            location = "embeddings[0].embedding" if isinstance(first, dict) else "embeddings[0]"
+        elif "vector" in result:
+            candidate = result["vector"]
+            location = "vector"
+        else:
+            raise ValueError(f"Unexpected embedding response format: {list(result.keys())}")
+        return cls._validate_embedding_vector(candidate, location=location)
+
+    @classmethod
+    def _extract_batch_embeddings(
+        cls,
+        result: dict[str, Any],
+        *,
+        expected_count: int,
+    ) -> list[list[float]]:
+        """Normalize a batch while preserving the provider's input index mapping."""
+
+        raw_embeddings: list[Any]
+        if "vectors" in result:
+            vectors = result["vectors"]
+            if not isinstance(vectors, list):
+                raise ValueError("Invalid vectors in MiniMax batch embedding response")
+            raw_embeddings = vectors
+        elif "data" in result:
+            data = result["data"]
+            if not isinstance(data, list):
+                raise ValueError("Invalid data in MiniMax batch embedding response")
+            indexed: dict[int, Any] = {}
+            for fallback_index, item in enumerate(data):
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        f"Invalid MiniMax batch embedding item at data[{fallback_index}]"
+                    )
+                raw_index = item.get("index", fallback_index)
+                if isinstance(raw_index, bool) or not isinstance(raw_index, int):
+                    raise ValueError(
+                        f"Invalid MiniMax batch embedding index at data[{fallback_index}]"
+                    )
+                if raw_index in indexed:
+                    raise ValueError(f"Duplicate MiniMax batch embedding index: {raw_index}")
+                indexed[raw_index] = item.get("embedding")
+            expected_indexes = set(range(expected_count))
+            if set(indexed) != expected_indexes:
+                raise ValueError(
+                    "MiniMax batch embedding indexes do not match input texts: "
+                    f"expected={sorted(expected_indexes)}, actual={sorted(indexed)}"
+                )
+            raw_embeddings = [indexed[index] for index in range(expected_count)]
+        else:
+            raise ValueError(f"Unexpected batch embedding response format: {list(result.keys())}")
+
+        if len(raw_embeddings) != expected_count:
+            raise ValueError(
+                "MiniMax batch embedding count does not match input texts: "
+                f"expected={expected_count}, actual={len(raw_embeddings)}"
+            )
+        return [
+            cls._validate_embedding_vector(value, location=f"embeddings[{index}]")
+            for index, value in enumerate(raw_embeddings)
+        ]
 
     async def chat_with_tools(
         self,
@@ -796,6 +989,9 @@ class MiniMaxAdapter(ILLMAdapter):
         try:
             max_tokens = kwargs.get("max_tokens", self.max_tokens)
             temperature = kwargs.get("temperature", self.temperature)
+            trace_context = kwargs.get("trace_context")
+            billing_context = kwargs.get("billing_context")
+            operation = kwargs.get("operation", "chat_with_tools")
 
             # Separate system prompt and build messages
             system_prompt = ""
@@ -837,6 +1033,9 @@ class MiniMaxAdapter(ILLMAdapter):
                 temperature=temperature,
                 system=system_prompt if system_prompt else None,
                 tools=tools if tools else None,
+                trace_context=trace_context,
+                billing_context=billing_context,
+                operation=operation,
             )
 
             # Parse OpenAI format response
@@ -874,11 +1073,11 @@ class MiniMaxAdapter(ILLMAdapter):
             if not tool_calls and text_content:
                 tool_calls = self._parse_tool_calls_from_text(text_content)
 
-            # 记录返回值
-            print(f"🔍 [MINIMAX] chat_with_tools 返回: content_len={len(text_content)}, tool_calls={len(tool_calls)}")
-            if tool_calls:
-                print(f"🔍 [MINIMAX] tool_calls详情: {tool_calls}")
-            logger.info(f"MiniMax chat_with_tools 返回: content_len={len(text_content)}, tool_calls={len(tool_calls)}, text_content={text_content[:200] if text_content else 'EMPTY'}")
+            logger.info(
+                "MiniMax chat_with_tools completed: content_len=%d, tool_calls=%d",
+                len(text_content),
+                len(tool_calls),
+            )
 
             return {
                 "content": text_content,
@@ -900,7 +1099,6 @@ class MiniMaxAdapter(ILLMAdapter):
         """Parse tool calls from text content when LLM returns them as text."""
         import re
 
-        print(f"🔍 [_parse_tool_calls_from_text] START, text_content={text_content[:300]}")
         tool_calls = []
         try:
             # 方法1: 匹配 [TOOL_CALL] 格式

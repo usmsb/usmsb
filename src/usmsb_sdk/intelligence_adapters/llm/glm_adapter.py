@@ -19,6 +19,12 @@ from usmsb_sdk.intelligence_adapters.base import (
     IntelligenceSourceStatus,
     IntelligenceSourceType,
 )
+from usmsb_sdk.llm_telemetry import (
+    LLMTraceContext,
+    LLMUsage,
+    platform_observation_context,
+    resolve_llm_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +86,84 @@ class GLMAdapter(ILLMAdapter):
 
         self._client: httpx.AsyncClient | None = None
 
+    def _call_context(
+        self,
+        *,
+        operation: str,
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
+    ) -> LLMTraceContext:
+        call_context = resolve_llm_context(
+            trace_context,
+            default=self.invocation_recorder.default_context,
+        )
+        if billing_context:
+            call_context = call_context.with_updates(billing=billing_context)
+        return call_context.for_logical_call(operation=operation)
+
+    @staticmethod
+    def _response_payload(response: Any) -> Any:
+        if response is None:
+            return None
+        try:
+            return response.json()
+        except Exception:
+            return {"raw_text": getattr(response, "text", "")}
+
+    async def _recorded_post(
+        self,
+        *,
+        path: str,
+        operation: str,
+        payload: dict[str, Any],
+        trace_context: LLMTraceContext | dict[str, Any] | None = None,
+        billing_context: dict[str, Any] | None = None,
+        embedding: bool = False,
+    ) -> dict[str, Any]:
+        """Execute one GLM HTTP request and emit exactly one terminal event."""
+
+        attempt_id = self.invocation_recorder.requested(
+            provider="glm",
+            model=str(payload["model"]),
+            operation=operation,
+            request_payload=payload,
+            context=self._call_context(
+                operation=operation,
+                trace_context=trace_context,
+                billing_context=billing_context,
+            ),
+        )
+        response: Any = None
+        try:
+            response = await self._client.post(path, json=payload)
+            response.raise_for_status()
+            data = response.json()
+        except BaseException as exc:
+            response_payload = self._response_payload(response)
+            usage = (
+                LLMUsage.from_embedding(response_payload)
+                if embedding
+                else LLMUsage.from_value(response_payload)
+            )
+            self.invocation_recorder.failed(
+                attempt_id,
+                exc,
+                response_payload=response_payload,
+                usage=usage,
+                http_status=getattr(response, "status_code", None),
+            )
+            raise
+
+        usage = LLMUsage.from_embedding(data) if embedding else LLMUsage.from_value(data)
+        self.invocation_recorder.completed(
+            attempt_id,
+            response_payload=data,
+            usage=usage,
+            response_id=data.get("id"),
+            http_status=response.status_code,
+        )
+        return data
+
     async def initialize(self) -> bool:
         """Initialize the GLM client."""
         if not self.config.api_key:
@@ -127,18 +211,37 @@ class GLMAdapter(ILLMAdapter):
         if not self._client:
             return False
 
+        operation = "health_check.chat"
+        call_context = platform_observation_context(
+            provider="glm",
+            operation=operation,
+            default=self.invocation_recorder.default_context,
+        )
         try:
             # Simple test - generate a minimal response
-            response = await self._client.post(
-                "/chat/completions",
-                json={
+            await self._recorded_post(
+                path="/chat/completions",
+                operation=operation,
+                payload={
                     "model": self.model,
                     "messages": [{"role": "user", "content": "hi"}],
                     "max_tokens": 5,
                 },
+                trace_context=call_context,
             )
-            return response.status_code == 200
-        except Exception as e:
+            self.invocation_recorder.task_terminal(
+                context=call_context,
+                status="completed",
+            )
+            return True
+        except BaseException as e:
+            self.invocation_recorder.task_terminal(
+                context=call_context,
+                status="failed",
+                error=e,
+            )
+            if not isinstance(e, Exception):
+                raise
             logger.warning(f"GLM API not available: {e}")
             return False
 
@@ -164,19 +267,19 @@ class GLMAdapter(ILLMAdapter):
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
-            response = await self._client.post(
-                "/chat/completions",
-                json={
+            data = await self._recorded_post(
+                path="/chat/completions",
+                operation=kwargs.get("operation", "generate_text"),
+                payload={
                     "model": kwargs.get("model", self.model),
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": kwargs.get("max_tokens", self.max_tokens),
                     "temperature": kwargs.get("temperature", self.temperature),
                     "top_p": kwargs.get("top_p", 0.9),
                 },
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
-            response.raise_for_status()
-
-            data = response.json()
             result = data["choices"][0]["message"]["content"]
             latency = time.time() - start_time
 
@@ -232,19 +335,19 @@ class GLMAdapter(ILLMAdapter):
                 for msg in context["conversation_history"]:
                     messages.insert(-1, msg)
 
-            response = await self._client.post(
-                "/chat/completions",
-                json={
+            data = await self._recorded_post(
+                path="/chat/completions",
+                operation=kwargs.get("operation", "generate_with_system"),
+                payload={
                     "model": kwargs.get("model", self.model),
                     "messages": messages,
                     "max_tokens": kwargs.get("max_tokens", self.max_tokens),
                     "temperature": kwargs.get("temperature", self.temperature),
                     "top_p": kwargs.get("top_p", 0.9),
                 },
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
-            response.raise_for_status()
-
-            data = response.json()
             result = data["choices"][0]["message"]["content"]
             latency = time.time() - start_time
 
@@ -287,9 +390,10 @@ class GLMAdapter(ILLMAdapter):
 
 以JSON格式回复，包含键：intent, entities (列表), sentiment, urgency, confidence (0-1)。"""
 
-            response = await self._client.post(
-                "/chat/completions",
-                json={
+            data = await self._recorded_post(
+                path="/chat/completions",
+                operation=kwargs.get("operation", "understand_intent"),
+                payload={
                     "model": kwargs.get("model", self.model),
                     "messages": [
                         {"role": "system", "content": system_prompt},
@@ -298,10 +402,9 @@ class GLMAdapter(ILLMAdapter):
                     "max_tokens": kwargs.get("max_tokens", 1000),
                     "temperature": 0.3,
                 },
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
-            response.raise_for_status()
-
-            data = response.json()
             result_text = data["choices"][0]["message"]["content"]
             result = json.loads(result_text)
 
@@ -373,9 +476,10 @@ class GLMAdapter(ILLMAdapter):
 
 评估标准：{criteria}"""
 
-            response = await self._client.post(
-                "/chat/completions",
-                json={
+            data = await self._recorded_post(
+                path="/chat/completions",
+                operation=kwargs.get("operation", "evaluate"),
+                payload={
                     "model": kwargs.get("model", self.model),
                     "messages": [
                         {"role": "system", "content": system_prompt},
@@ -384,10 +488,9 @@ class GLMAdapter(ILLMAdapter):
                     "max_tokens": kwargs.get("max_tokens", 1000),
                     "temperature": 0.3,
                 },
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
-            response.raise_for_status()
-
-            data = response.json()
             result_text = data["choices"][0]["message"]["content"]
             result = json.loads(result_text)
 
@@ -424,16 +527,17 @@ class GLMAdapter(ILLMAdapter):
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
-            response = await self._client.post(
-                "/embeddings",
-                json={
+            data = await self._recorded_post(
+                path="/embeddings",
+                operation=kwargs.get("operation", "embeddings.query"),
+                payload={
                     "model": kwargs.get("embedding_model", self.embedding_model),
                     "input": text,
                 },
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
+                embedding=True,
             )
-            response.raise_for_status()
-
-            data = response.json()
             embedding = data["data"][0]["embedding"]
             latency = time.time() - start_time
 
@@ -461,20 +565,41 @@ class GLMAdapter(ILLMAdapter):
         **kwargs
     ):
         """Generate text with streaming."""
+        operation = kwargs.get("operation", "generate_stream")
+        payload = {
+            "model": kwargs.get("model", self.model),
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+            "temperature": kwargs.get("temperature", self.temperature),
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        attempt_id = self.invocation_recorder.requested(
+            provider="glm",
+            model=str(payload["model"]),
+            operation=operation,
+            request_payload=payload,
+            context=self._call_context(
+                operation=operation,
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
+            ),
+        )
+        content_parts: list[str] = []
+        response_id: str | None = None
+        usage: Any = None
+        http_status: int | None = None
+        terminal_recorded = False
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
             async with self._client.stream(
                 "POST",
                 "/chat/completions",
-                json={
-                    "model": kwargs.get("model", self.model),
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": kwargs.get("max_tokens", self.max_tokens),
-                    "temperature": kwargs.get("temperature", self.temperature),
-                    "stream": True,
-                },
+                json=payload,
             ) as response:
+                http_status = response.status_code
+                response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
                         data_str = line[6:]
@@ -482,17 +607,54 @@ class GLMAdapter(ILLMAdapter):
                             break
                         try:
                             data = json.loads(data_str)
-                            if data["choices"][0].get("delta", {}).get("content"):
-                                yield data["choices"][0]["delta"]["content"]
+                            response_id = data.get("id") or response_id
+                            if data.get("usage") is not None:
+                                usage = data["usage"]
+                            choices = data.get("choices") or []
+                            if choices and choices[0].get("delta", {}).get("content"):
+                                text = choices[0]["delta"]["content"]
+                                content_parts.append(text)
+                                yield text
                         except json.JSONDecodeError:
                             continue
 
+            response_payload = {
+                "id": response_id,
+                "content": "".join(content_parts),
+                "usage": usage,
+            }
+            self.invocation_recorder.completed(
+                attempt_id,
+                response_payload=response_payload,
+                usage=LLMUsage.from_value(usage),
+                response_id=response_id,
+                http_status=http_status,
+            )
+            terminal_recorded = True
+            normalized_usage = LLMUsage.from_value(usage)
+            self._record_request(success=True, tokens=normalized_usage.total_tokens)
             self.status = IntelligenceSourceStatus.READY
 
-        except Exception as e:
+        except BaseException as e:
+            if not terminal_recorded:
+                self.invocation_recorder.failed(
+                    attempt_id,
+                    e,
+                    response_payload={
+                        "id": response_id,
+                        "content": "".join(content_parts),
+                        "usage": usage,
+                    },
+                    usage=LLMUsage.from_value(usage),
+                    response_id=response_id,
+                    http_status=http_status,
+                )
+                self._record_request(success=False)
             self.status = IntelligenceSourceStatus.READY
             logger.error(f"Streaming generation failed: {e}")
             raise
+        finally:
+            self.status = IntelligenceSourceStatus.READY
 
     async def function_call(
         self,
@@ -518,18 +680,18 @@ class GLMAdapter(ILLMAdapter):
         try:
             self.status = IntelligenceSourceStatus.BUSY
 
-            response = await self._client.post(
-                "/chat/completions",
-                json={
+            data = await self._recorded_post(
+                path="/chat/completions",
+                operation=kwargs.get("operation", "function_call"),
+                payload={
                     "model": kwargs.get("model", self.model),
                     "messages": [{"role": "user", "content": prompt}],
                     "tools": [{"type": "function", "function": f} for f in functions],
                     "tool_choice": kwargs.get("tool_choice", "auto"),
                 },
+                trace_context=kwargs.get("trace_context"),
+                billing_context=kwargs.get("billing_context"),
             )
-            response.raise_for_status()
-
-            data = response.json()
             message = data["choices"][0]["message"]
 
             result = {

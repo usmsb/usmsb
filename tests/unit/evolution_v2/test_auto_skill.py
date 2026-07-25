@@ -45,8 +45,8 @@ class TestSkillCreator:
     """Skill 创建器测试"""
 
     @pytest.fixture
-    def creator(self):
-        return SkillCreator()
+    def creator(self, tmp_path):
+        return SkillCreator(skills_base_dir=str(tmp_path / "skills"))
 
     @pytest.mark.asyncio
     async def test_create_prompt_skill(self, creator, tmp_path):

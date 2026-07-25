@@ -8,7 +8,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 import httpx
 
-from shared.types import NodeCapability, NodeStatus, ModelInfo, GPUInfo
+from shared.types import GPUInfo, InferenceRequest, InferenceResponse, NodeCapability, NodeStatus
 from . import db
 
 
@@ -32,7 +32,18 @@ class GPUPool:
             gpus = []
             util_list = json.loads(row["gpu_utilization"] or "[]")
             for i, util in enumerate(util_list):
-                gpus.append(GPUInfo(gpu_id=i, gpu_type=row["gpu_type"], utilization=util, memory_used_gb=0))
+                gpus.append(
+                    GPUInfo(
+                        gpu_id=i,
+                        gpu_type=row["gpu_type"],
+                        vram_gb=(
+                            int(row["total_vram_gb"] or 0)
+                            // max(int(row["gpu_count"] or 0), 1)
+                        ),
+                        utilization=util,
+                        used_vram_gb=0,
+                    )
+                )
             node = NodeCapability(
                 node_id=row["node_id"],
                 hostname=row["hostname"],
@@ -190,7 +201,8 @@ class NodeExecutor:
                         "model_name": request.model_name,
                         "messages": request.messages,
                         "temperature": request.temperature,
-                        "max_tokens": request.max_tokens
+                        "max_tokens": request.max_tokens,
+                        "llm_context": request.llm_context,
                     }
                 )
                 resp.raise_for_status()

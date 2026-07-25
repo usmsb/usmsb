@@ -9,6 +9,7 @@ from .executor import NodeExecutor
 from .gpu_monitor import GPUMonitor
 from .model_manager import ModelManager
 from .vllm_engine import VLLMEngine
+from shared.llm_telemetry_contract import load_invocation_recorder_from_factory
 
 
 async def main():
@@ -33,7 +34,8 @@ async def main():
     print(f"               Total VRAM: {total_vram}GB")
 
     # Initialize components
-    vllm_engine = VLLMEngine()
+    invocation_recorder = load_invocation_recorder_from_factory()
+    vllm_engine = VLLMEngine(invocation_recorder=invocation_recorder)
     model_manager = ModelManager(vllm_engine, total_vram, gpu_count)
     executor = NodeExecutor(
         node_id=node_id,

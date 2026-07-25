@@ -10,6 +10,8 @@ This module provides an integrated service that combines:
 It serves as the main entry point for supply-demand matching in the platform.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
@@ -20,7 +22,6 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from usmsb_sdk.core.elements import Agent, Goal, Resource
-from usmsb_sdk.services.matching.llm_capability_fit import LLMCapabilityFit
 from usmsb_sdk.platform.environment.broadcast_service import (
     BroadcastScope,
     BroadcastType,
@@ -36,6 +37,7 @@ from usmsb_sdk.services.active_matching_service import (
     NegotiationStrategy,
     SearchStrategy,
 )
+from usmsb_sdk.services.matching.llm_capability_fit import LLMCapabilityFit
 
 if TYPE_CHECKING:
     from usmsb_sdk.harness.base_harness import ChatProvider
@@ -843,12 +845,12 @@ class SupplyDemandMatchingService:
         return {
             **self._stats.to_dict(),
             "active_supply_listings": sum(
-                1 for l in self._supply_listings.values()
-                if l.status == "active"
+                1 for listing in self._supply_listings.values()
+                if listing.status == "active"
             ),
             "active_demand_listings": sum(
-                1 for l in self._demand_listings.values()
-                if l.status == "active"
+                1 for listing in self._demand_listings.values()
+                if listing.status == "active"
             ),
             "active_matches": sum(
                 1 for m in self._matches.values()

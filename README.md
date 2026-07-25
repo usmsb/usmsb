@@ -79,6 +79,26 @@ python -m pytest tests/unit/test_pea_market.py tests/unit/test_joint_order.py \
   tests/unit/test_capability_discovery.py tests/unit/test_delegation_guard.py -q
 ```
 
+## Durable LLM trace artifacts
+
+Provider telemetry always emits redacted request/response SHA-256 values. Full
+redacted payloads are persisted asynchronously only when an absolute spool path
+is configured; provider execution never waits for filesystem I/O:
+
+```bash
+export USMSB_LLM_ARTIFACT_SPOOL_DIR=/var/lib/usmsb/llm-artifacts
+export USMSB_LLM_ARTIFACT_SPOOL_REQUIRED=true
+```
+
+Optional limits are `USMSB_LLM_ARTIFACT_SPOOL_MAX_QUEUE` (default `1024`),
+`USMSB_LLM_ARTIFACT_SPOOL_MAX_PENDING_BYTES` (default `256 MiB`), and
+`USMSB_LLM_ARTIFACT_SPOOL_MAX_ARTIFACT_BYTES` (default `64 MiB`). Canonical
+events contain `file://` URIs under
+`<root>/sha256/<first-2>/<next-2>/<sha256>.json`; consumers must restrict reads
+to the configured root and verify the hash. Call
+`close_shared_llm_artifact_spools_async()` during process shutdown after LLM
+traffic has stopped.
+
 ## Project structure
 
 ```
