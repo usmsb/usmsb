@@ -1,17 +1,26 @@
 # USMSB SDK - Backend Development Dockerfile
 # With hot-reload support for development
 
-FROM python:3.11-slim
+FROM public.ecr.aws/docker/library/python:3.14-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30
+
+# Use the same reachable Debian mirror as the release image.
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 update \
+    && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
     build-essential \
     curl \
     git \
     libffi-dev \
+    libgmp-dev \
     libssl-dev \
     netcat-openbsd \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -22,11 +31,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install Python dependencies
+COPY scripts/prepare_coincurve_py314_build.py /tmp/prepare_coincurve_py314_build.py
+RUN --mount=type=cache,id=usmsb-pip-py314,target=/root/.cache/pip \
+    pip install \
+        cffi==2.0.0 \
+        cmake==4.4.0 \
+        hatchling==1.31.0 \
+        scikit-build-core==1.0.3 \
+        setuptools==83.0.0 \
+    && python3.14 /tmp/prepare_coincurve_py314_build.py \
+    && pip install --no-build-isolation coincurve==21.0.0
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,id=usmsb-pip-py314,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
 # Install development dependencies
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,id=usmsb-pip-py314,target=/root/.cache/pip \
+    pip install \
     watchdog \
     uvicorn[standard]
 
@@ -47,7 +68,7 @@ EXPOSE 8000 8080 9000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/api/health/live || exit 1
 
 # Start development server with hot-reload
 CMD ["uvicorn", "usmsb_sdk.api.rest.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

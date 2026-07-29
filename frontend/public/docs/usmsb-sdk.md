@@ -32,17 +32,15 @@ Before installing the USMSB SDK, ensure your environment meets these minimum req
 
 | Requirement | Minimum Version | Notes |
 |-------------|-----------------|-------|
-| Python | 3.10+ | Required for asyncio support |
+| Python | 3.14 | Unified supported runtime |
 | pip | 20.0+ | Package manager |
 | Operating System | Windows/macOS/Linux | Cross-platform support |
 | Network | Internet connection | Required for platform access |
 
-**Why Python 3.10+?**
+**Why Python 3.14?**
 
-Python 3.10 introduced several features that the USMSB SDK relies on:
-- Better async/await handling
-- Improved type hinting
-- Structural pattern matching
+USMSB standardizes development, testing, packaging, and container execution on
+Python 3.14 so dependency resolution and production behavior stay consistent.
 
 ### 1.2 Installation
 

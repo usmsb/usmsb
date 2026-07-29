@@ -353,7 +353,7 @@ Staking Amount → Service Limit → Reputation Margin → Governance Weight
 
 ### 7.2 Backend Tech Stack
 
-- **Language**: Python 3.11+
+- **Language**: Python 3.14
 - **Framework**: FastAPI
 - **Database**: PostgreSQL
 - **Cache**: Redis
@@ -863,7 +863,7 @@ VIBE是平台的原生代币，用于：
 
 ### 7.2 后端技术栈
 
-- **语言**：Python 3.11+
+- **语言**：Python 3.14
 - **框架**：FastAPI
 - **数据库**：PostgreSQL
 - **缓存**：Redis

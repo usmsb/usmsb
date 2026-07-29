@@ -13,13 +13,9 @@ Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.8
-Classifier: Programming Language :: Python :: 3.9
-Classifier: Programming Language :: Python :: 3.10
-Classifier: Programming Language :: Python :: 3.11
-Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.14
 Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
-Requires-Python: >=3.8
+Requires-Python: <3.15,>=3.14
 Description-Content-Type: text/markdown
 Requires-Dist: aiohttp>=3.8.0
 Requires-Dist: pydantic>=2.0.0
@@ -250,7 +246,7 @@ main();
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.14
 - Node.js 16+
 
 ### Project Structure

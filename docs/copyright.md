@@ -245,7 +245,7 @@ USMSB SDK includes or depends on the following third-party components:
 
 | Component | Version | License | Purpose |
 |-----------|---------|---------|---------|
-| Python | 3.9+ | PSF License | Runtime |
+| Python | 3.14 | PSF License | Runtime |
 | FastAPI | 0.100+ | MIT | REST API |
 | Pydantic | 2.0+ | MIT | Data validation |
 | SQLAlchemy | 2.0+ | MIT | ORM |
@@ -253,8 +253,9 @@ USMSB SDK includes or depends on the following third-party components:
 | httpx | 0.24+ | BSD | HTTP client |
 | openai | 1.0+ | MIT | OpenAI adapter |
 | anthropic | 0.18+ | MIT | Claude adapter |
-| google-generativeai | 0.3+ | Apache 2.0 | Gemini adapter |
+| google-genai | 2.14+ | Apache 2.0 | Gemini adapter |
 | langchain | 0.1+ | MIT | Agentic framework |
+| NumPy | 2.3.4+ | BSD-3-Clause | Meta-agent causal learning |
 
 ### 4.2 Third-Party License Texts
 

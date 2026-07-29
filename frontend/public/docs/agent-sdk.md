@@ -72,7 +72,7 @@ pip install usmsb-sdk[all]
 
 | Requirement | Minimum Version | Notes |
 |-------------|-----------------|-------|
-| Python | 3.10+ | Required for asyncio support |
+| Python | 3.14 | Unified supported runtime |
 | asyncio | Built-in | Native async/await support |
 | pydantic | 2.0+ | For data validation |
 

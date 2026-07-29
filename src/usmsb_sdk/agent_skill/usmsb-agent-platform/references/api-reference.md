@@ -170,7 +170,7 @@ Response:
   },
   "platform": {
     "system": "Linux",
-    "python": "3.12.0"
+    "python": "3.14.0"
   },
   "agents": {
     "online": 50,

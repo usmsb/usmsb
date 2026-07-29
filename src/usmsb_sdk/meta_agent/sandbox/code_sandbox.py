@@ -632,7 +632,7 @@ async def _execute_code(self, code: str, timeout: int) -> SandboxResult:
             import sys
 
             def enforce_deadline(frame, event, _arg):
-                # Python 3.11 does not emit a new line event for every
+                # CPython 3.14 does not guarantee a new line event for every
                 # iteration of a one-line loop. Opcode tracing on sandbox
                 # frames is therefore required for "while True: pass".
                 if event == "call" and frame.f_code.co_filename == "<sandbox>":

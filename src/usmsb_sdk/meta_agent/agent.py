@@ -1514,7 +1514,7 @@ class MetaAgent:
             from usmsb_sdk.protocol.p2p.handler import P2PHandler
 
             self._p2p_handler = P2PHandler(
-                config=ProtocolConfig(enabled=True),
+                config=ProtocolConfig(),
                 node_id=self.agent_id,
                 node_name=f"MetaAgent-{self.agent_id[:8]}",
                 port=int(os.environ.get("USMSB_P2P_PORT", "9000")),

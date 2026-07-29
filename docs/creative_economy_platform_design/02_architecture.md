@@ -282,7 +282,7 @@ class OnchainMode(Enum):
 
 | Component | Technology Choice |
 |-----------|-------------------|
-| Language | Python 3.10+ |
+| Language | Python 3.14 |
 | Web Framework | FastAPI |
 | Async Runtime | asyncio |
 | Database | SQLite / PostgreSQL |
@@ -623,7 +623,7 @@ class OnchainMode(Enum):
 
 | 组件 | 技术选型 |
 |------|----------|
-| 语言 | Python 3.10+ |
+| 语言 | Python 3.14 |
 | Web框架 | FastAPI |
 | 异步运行时 | asyncio |
 | 数据库 | SQLite / PostgreSQL |

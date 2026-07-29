@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.14
 """Keep every USMSB physical LLM/embedding call behind a telemetry gateway."""
 
 from __future__ import annotations

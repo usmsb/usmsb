@@ -74,7 +74,7 @@ pip install usmsb-sdk[all]
 
 | 要求 | 最低版本 | 备注 |
 |-------------|-----------------|-------|
-| Python | 3.10+ | 需要 asyncio 支持 |
+| Python | 3.14 | 统一支持的运行时 |
 | asyncio | 内置 | 原生 async/await 支持 |
 | pydantic | 2.0+ | 用于数据验证 |
 

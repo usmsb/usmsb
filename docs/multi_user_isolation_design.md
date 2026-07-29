@@ -1798,7 +1798,7 @@ class AuditConfig:
 | 组件 | 最低要求 | 推荐配置 | 说明 |
 |------|---------|---------|------|
 | 操作系统 | Linux / Windows / macOS | Ubuntu 22.04 LTS | 支持 Docker 容器化部署 |
-| Python | 3.10+ | 3.12+ | 需要 asyncio 支持 |
+| Python | 3.14 | 3.14 | 统一使用 Python 3.14 运行时 |
 | 内存 | 4GB | 8GB+ | 每个会话约占用 50-100MB |
 | CPU | 2核 | 4核+ | 代码执行需要独立线程 |
 | 磁盘 | 10GB | 50GB+ | 用户数据存储 |
@@ -2343,7 +2343,7 @@ SELECT * FROM knowledge_items WHERE user_id = ?;
 
 ```dockerfile
 # Dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \

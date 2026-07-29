@@ -275,7 +275,7 @@ profile = client.get_json(cid)
 
 ```dockerfile
 # Agent Docker 模板
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 COPY requirements.txt .

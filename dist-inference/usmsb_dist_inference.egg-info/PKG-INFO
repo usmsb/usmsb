@@ -8,10 +8,8 @@ Keywords: llm,inference,distributed,vllm,agent
 Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
-Classifier: Programming Language :: Python :: 3.10
-Classifier: Programming Language :: Python :: 3.11
-Classifier: Programming Language :: Python :: 3.12
-Requires-Python: >=3.10
+Classifier: Programming Language :: Python :: 3.14
+Requires-Python: <3.15,>=3.14
 Description-Content-Type: text/markdown
 Requires-Dist: fastapi>=0.100.0
 Requires-Dist: uvicorn[standard]>=0.23.0

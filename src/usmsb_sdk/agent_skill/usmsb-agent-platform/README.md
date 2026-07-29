@@ -219,7 +219,7 @@ main();
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.14
 - Node.js 16+
 
 ### Project Structure

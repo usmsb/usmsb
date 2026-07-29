@@ -178,6 +178,23 @@ class TestIntegration:
         from usmsb_sdk.meta_agent import MetaAgentConfig
         assert MetaAgentConfig is not None
 
+    @pytest.mark.asyncio
+    async def test_meta_agent_initializes_p2p_with_current_protocol_config(
+        self, monkeypatch
+    ):
+        """P2P 初始化必须使用 ProtocolConfig 当前支持的字段。"""
+        from usmsb_sdk.meta_agent import MetaAgent
+        from usmsb_sdk.protocol.p2p.handler import P2PHandler
+
+        monkeypatch.delenv("USMSB_P2P_BOOTSTRAP", raising=False)
+        agent = MetaAgent.__new__(MetaAgent)
+        agent.agent_id = "test-meta-agent"
+
+        await agent._init_p2p_network()
+
+        assert isinstance(agent._p2p_handler, P2PHandler)
+        assert agent._p2p_handler._node_id == "test-meta-agent"
+
     def test_sensitive_registry_in_config(self):
         """测试敏感信息注册表在配置中的使用"""
         from usmsb_sdk.meta_agent.sensitive.registry import (

@@ -3,9 +3,10 @@ pydantic-settings>=2.0
 python-dotenv>=1.0
 pyyaml>=6.0
 aiohttp>=3.9
+aiofiles>=23.0
 httpx>=0.25
 openai>=1.0
-google-generativeai>=0.3
+google-genai<3.0.0,>=2.14.0
 langchain>=0.1
 langchain-openai>=0.0.5
 fastapi>=0.109
@@ -13,7 +14,10 @@ uvicorn>=0.27
 sqlalchemy>=2.0
 aiosqlite>=0.19
 redis>=5.0
+web3>=6.0
+eth-account>=0.11
 structlog>=24.1
+numpy<3.0.0,>=2.3.4
 
 [dev]
 pytest>=7.0

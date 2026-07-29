@@ -5,7 +5,7 @@ services:
   usmsb-node-1:
     build:
       context: ../
-      dockerfile: Dockerfile.node
+      dockerfile: docker/Dockerfile.node
     container_name: usmsb-node-1
     hostname: node1
     ports:
@@ -25,7 +25,7 @@ services:
     networks:
       - usmsb-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -36,7 +36,7 @@ services:
   usmsb-node-2:
     build:
       context: ../
-      dockerfile: Dockerfile.node
+      dockerfile: docker/Dockerfile.node
     container_name: usmsb-node-2
     hostname: node2
     ports:
@@ -56,7 +56,7 @@ services:
     networks:
       - usmsb-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -67,7 +67,7 @@ services:
   usmsb-node-3:
     build:
       context: ../
-      dockerfile: Dockerfile.node
+      dockerfile: docker/Dockerfile.node
     container_name: usmsb-node-3
     hostname: node3
     ports:
@@ -87,7 +87,7 @@ services:
     networks:
       - usmsb-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3

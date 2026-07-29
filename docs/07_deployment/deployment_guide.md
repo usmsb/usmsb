@@ -14,7 +14,7 @@
 
 ## 1. Environment Requirements
 
-- Python 3.10+
+- Python 3.14
 - SQLite
 - 4GB+ RAM
 
@@ -73,7 +73,7 @@ database:
 
 ## 1. 环境要求
 
-- Python 3.10+
+- Python 3.14
 - SQLite
 - 4GB+ RAM
 

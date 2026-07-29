@@ -241,7 +241,7 @@ USMSB SDK includes or depends on the following third-party components:
 
 | Component | Version | License | Purpose |
 |-----------|---------|---------|---------|
-| Python | 3.9+ | PSF License | Runtime |
+| Python | 3.14 | PSF License | Runtime |
 | FastAPI | 0.100+ | MIT | REST API |
 | Pydantic | 2.0+ | MIT | Data validation |
 | SQLAlchemy | 2.0+ | MIT | ORM |

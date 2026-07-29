@@ -4,8 +4,15 @@
 # Files required to install usmsb-sdk from pyproject.toml.
 !pyproject.toml
 !README.md
+!requirements.txt
 !src/
 !src/**
+!scripts/
+scripts/*
+!scripts/prepare_coincurve_py314_build.py
+!docker/
+docker/*
+!docker/entrypoint.node.sh
 
 # Never send local environment or secret files.
 .env
@@ -46,3 +53,4 @@ data/
 **/build/
 **/.mypy_cache/
 **/.ruff_cache/
+**/node_modules/

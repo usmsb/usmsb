@@ -7,7 +7,7 @@ on:
     branches: [ master, main ]
 
 env:
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.14"
 
 jobs:
   lint:
@@ -67,6 +67,7 @@ jobs:
 
       - name: Run physical telemetry, artifact, Harness and replay contracts
         run: |
+          python scripts/check_python314_baseline.py
           python scripts/check_llm_provider_bypasses.py
           python -m pytest -p no:cacheprovider \
             tests/unit/test_llm_provider_telemetry.py \

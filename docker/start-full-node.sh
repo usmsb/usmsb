@@ -35,11 +35,11 @@ echo "Starting USMSB Platform..."
 cd /app
 
 # Run database migrations if needed
-python -c "from usmsb_sdk.data_management.models import init_db; init_db()" 2>/dev/null || true
+python3.14 -c "from usmsb_sdk.data_management.models import init_db; init_db()" 2>/dev/null || true
 
 # Start the REST API server
 echo "Starting REST API on port 8000..."
-python -m uvicorn usmsb_sdk.api.rest.main:app \
+python3.14 -m uvicorn usmsb_sdk.api.rest.main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 4 \
@@ -52,7 +52,7 @@ sleep 3
 
 # Start the P2P node
 echo "Starting P2P Node on port 8080..."
-python -c "
+python3.14 -c "
 import asyncio
 from usmsb_sdk.node.decentralized_node import DecentralizedPlatform
 
@@ -79,7 +79,7 @@ P2P_PID=$!
 # Start the custom blockchain (if enabled)
 if [ "${ENABLE_BLOCKCHAIN:-true}" = "true" ]; then
     echo "Starting Custom Blockchain on port 9000..."
-    python -c "
+    python3.14 -c "
 import asyncio
 from usmsb_sdk.platform.blockchain.custom_chain_adapter import CustomChainAdapter, CustomChainNetwork
 

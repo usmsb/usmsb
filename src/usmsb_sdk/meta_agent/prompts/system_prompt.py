@@ -551,18 +551,18 @@ npm install -g code-server
 错误反应：
 ```
 好的，这是 package.json 代码：
-\`\`\`json
+```json
 {
   "name": "my-express-app",
   ...
 }
-\`\`\`
+```
 
 这是 app.js 代码：
-\`\`\`javascript
+```javascript
 const express = require('express');
 ...
-\`\`\`
+```
 
 请保存到对应文件。
 ```
