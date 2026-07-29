@@ -116,16 +116,18 @@ class TestTaxCalculation:
     def test_tax_rate(self):
         """测试税率计算"""
         from usmsb_sdk.blockchain.contracts.vibe_token import VIBETokenClient
-        from usmsb_sdk.blockchain import VIBEBlockchainClient
 
-        client = VIBEBlockchainClient()
+        # Tax calculation is a pure client-side operation. Construct the token
+        # client directly so this unit test does not require generated Hardhat
+        # artifacts or a live chain connection.
+        client = VIBETokenClient()
 
         # 测试不同金额的税费计算
         amounts = [100, 1000, 10000, 1000000]
 
         for amount in amounts:
             amount_wei = amount * (10 ** 18)
-            breakdown = client.token.get_tax_breakdown(amount_wei)
+            breakdown = client.get_tax_breakdown(amount_wei)
 
             # 验证税率是0.8%
             assert breakdown["tax_rate"] == 0.008
