@@ -13,16 +13,22 @@ import asyncio
 import os
 import sys
 import tempfile
+from pathlib import Path
+
 import pytest
 from unittest.mock import MagicMock
 
 # 直接从文件加载，跳过 __init__.py 的重量级导入
-sys.path.insert(0, '/Users/gujun/vibecode/usmsb/src')
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+SOURCE_ROOT = REPOSITORY_ROOT / "src"
+CONTEXT_MODULE_PATH = SOURCE_ROOT / "usmsb_sdk" / "meta_agent" / "memory" / "context.py"
+sys.path.insert(0, str(SOURCE_ROOT))
 import importlib.util
 spec = importlib.util.spec_from_file_location(
     "context",
-    "/Users/gujun/vibecode/usmsb/src/usmsb_sdk/meta_agent/memory/context.py"
+    CONTEXT_MODULE_PATH,
 )
+assert spec is not None and spec.loader is not None
 context_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(context_module)
 ContextManager = context_module.ContextManager

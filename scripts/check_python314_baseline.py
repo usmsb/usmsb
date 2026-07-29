@@ -105,6 +105,11 @@ def main() -> int:
         for path in documentation_root.rglob("*.md"):
             if "tests" in path.parts or "node_modules" in path.parts:
                 continue
+            # Some documentation aliases are tracked symlinks. Their canonical
+            # source is scanned under ``docs``; do not make the baseline depend
+            # on a developer-machine-specific or temporarily unavailable target.
+            if path.is_symlink():
+                continue
             if LEGACY_DOCUMENTATION_TARGET.search(path.read_text(encoding="utf-8")):
                 errors.append(
                     f"{path.relative_to(ROOT)} contains a legacy Python documentation target"
