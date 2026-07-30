@@ -312,3 +312,25 @@ def test_one_outcome_cannot_be_promoted_directly_to_skill() -> None:
     evidence = PromotionEvidence(evaluation_ref="eval-1", policy_version="policy-1")
     with pytest.raises(ExperienceTransitionError):
         loop.transition(candidate, ExperienceState.PROMOTED_SKILL, evidence)
+
+
+@pytest.mark.asyncio
+async def test_model_selected_wait_exposes_a_durable_wake_deadline(objective) -> None:
+    harness = GrowthEconomicHarness(
+        ScriptedModel(
+            [
+                decision(
+                    "wait",
+                    arguments={
+                        "wake_conditions": ["new_market_signal"],
+                        "wake_after_seconds": 900,
+                    },
+                    rationale="Wait for an independent market observation.",
+                )
+            ]
+        )
+    )
+    result = await harness.step(objective=objective)
+    assert result.kind == "wait"
+    assert result.wait.wake_conditions == ["new_market_signal"]
+    assert result.wait.wake_after_seconds == 900

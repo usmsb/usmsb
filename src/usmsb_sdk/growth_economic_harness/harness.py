@@ -222,6 +222,19 @@ class GrowthEconomicHarness:
                         "wake_conditions must be a list of strings",
                         checkpoint,
                     )
+                wake_after_seconds = draft.arguments.get("wake_after_seconds")
+                if (
+                    wake_after_seconds is not None
+                    and (
+                        isinstance(wake_after_seconds, bool)
+                        or not isinstance(wake_after_seconds, int)
+                        or not 1 <= wake_after_seconds <= 2_592_000
+                    )
+                ):
+                    raise HarnessDecisionError(
+                        "wake_after_seconds must be an integer from 1 to 2592000",
+                        checkpoint,
+                    )
                 waiting = checkpoint.model_copy(update={"status": "waiting"})
                 return HarnessStepResult(
                     kind="wait",
@@ -229,6 +242,7 @@ class GrowthEconomicHarness:
                     wait=WaitIntent(
                         reason=draft.rationale,
                         wake_conditions=wake_conditions,
+                        wake_after_seconds=wake_after_seconds,
                         requires_gate=draft.kind == ActionKind.REQUEST_GATE,
                     ),
                 )

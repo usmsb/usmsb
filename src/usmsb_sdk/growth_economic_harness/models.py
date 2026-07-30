@@ -192,6 +192,7 @@ class HarnessCheckpoint(StrictModel):
 class WaitIntent(StrictModel):
     reason: str = Field(min_length=1, max_length=4_000)
     wake_conditions: list[str] = Field(default_factory=list, max_length=50)
+    wake_after_seconds: int | None = Field(default=None, ge=1, le=2_592_000)
     requires_gate: bool = False
 
 
@@ -220,4 +221,3 @@ class HarnessStepResult(StrictModel):
         if sum(value is not None for value in payloads.values()) != 1:
             raise ValueError("step result must contain exactly one terminal payload")
         return self
-
