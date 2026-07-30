@@ -1886,8 +1886,7 @@ Hard rules:
             llm_prioritizer = None
             if llm_client:
                 llm_prioritizer = LLMGoalPrioritizer(
-                    agent_id=self.agent_id,
-                    llm_client=llm_client,
+                    llm_manager=self.llm_manager,
                 )
 
             # P1: 集成 ValueSeedEngine - 价值观评估
