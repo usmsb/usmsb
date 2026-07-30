@@ -41,16 +41,12 @@ try:
         AllowedPath as OHAllowedPath,
         sanitize_name,
         sanitize_agent_name,
+        write_team_file,
     )
-    from openharness.swarm.registry import TeamRegistry
-    from openharness.swarm.types import BackendType
-    from openharness.swarm.mailbox import MailboxMessage
     OPENHARNESS_AVAILABLE = True
 except ImportError:
     OPENHARNESS_AVAILABLE = False
     TeamLifecycleManager = None
-    TeamRegistry = None
-    BackendType = None
 
 from usmsb_sdk.adapters.openharness.config import SwarmConfig, SwarmBackend
 from usmsb_sdk.adapters.openharness.exceptions import (
@@ -78,6 +74,19 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+@dataclass
+class MailboxMessage:
+    """USMSB mailbox view; OpenHarness persistence stays behind its adapter."""
+
+    message_id: str
+    from_agent: str
+    to_agent: str
+    content: str
+    message_type: str = "text"
+    metadata: dict[str, Any] = field(default_factory=dict)
+    read: bool = False
 
 
 @dataclass
@@ -303,9 +312,7 @@ class SwarmAdapter:
         self._teams_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize OH TeamLifecycleManager
-        self._lifecycle_manager = TeamLifecycleManager(
-            teams_dir=str(self._teams_dir),
-        )
+        self._lifecycle_manager = TeamLifecycleManager()
         
         # In-memory cache of team/agent info
         self._teams: dict[str, TeamInfo] = {}
@@ -376,21 +383,28 @@ class SwarmAdapter:
             backend = backend_type or self._config.backend
             
             # Map to OH BackendType
-            oh_backend_map = {
-                SwarmBackend.TMUX: BackendType.TMUX,
-                SwarmBackend.SUBPROCESS: BackendType.SUBPROCESS,
-                SwarmBackend.WORKTREE: BackendType.WORKTREE,
-            }
-            oh_backend = oh_backend_map.get(backend, BackendType.SUBPROCESS)
-            
-            # Create team via OH lifecycle manager
-            team = await self._lifecycle_manager.create_team(
-                team_name=sanitize_name(team_id),
-                lead_agent_id=leader_id,
+            oh_backend = "tmux" if backend == SwarmBackend.TMUX else "subprocess"
+
+            # OpenHarness 0.1.9 lifecycle methods are synchronous and accept
+            # TeamMember values rather than the removed keyword-heavy API.
+            team = self._lifecycle_manager.create_team(
+                sanitize_name(team_id),
                 description=description,
-                member_ids=[sanitize_agent_name(m) for m in (member_ids or [])],
-                backend_type=oh_backend,
             )
+            team.lead_agent_id = leader_id
+            team.team_allowed_paths = [
+                OHAllowedPath(path=path, tool_name="file_edit", added_by=leader_id or "system")
+                for path in (allowed_paths or [])
+            ]
+            write_team_file(sanitize_name(team_id), team)
+            for member_id in member_ids or []:
+                member = OHTeamMember(
+                    agent_id=sanitize_agent_name(member_id),
+                    name=sanitize_agent_name(member_id),
+                    backend_type=oh_backend,
+                    joined_at=time.time(),
+                )
+                self._lifecycle_manager.add_member(sanitize_name(team_id), member)
             
             # Create team info
             team_info = TeamInfo(
@@ -426,7 +440,7 @@ class SwarmAdapter:
             True if deleted, False if not found
         """
         try:
-            await self._lifecycle_manager.delete_team(sanitize_name(team_id))
+            self._lifecycle_manager.delete_team(sanitize_name(team_id))
             
             if team_id in self._teams:
                 del self._teams[team_id]
@@ -489,14 +503,17 @@ class SwarmAdapter:
                 )
             
             # Register with OH lifecycle manager
-            await self._lifecycle_manager.add_member(
-                team_name=sanitize_name(team_id),
+            member = OHTeamMember(
                 agent_id=sanitize_agent_name(agent_id),
+                name=name or sanitize_agent_name(agent_id),
+                backend_type=("tmux" if self._config.backend == SwarmBackend.TMUX else "subprocess"),
+                joined_at=time.time(),
                 agent_type=agent_type,
                 model=model,
                 prompt=prompt,
                 color=color,
             )
+            self._lifecycle_manager.add_member(sanitize_name(team_id), member)
             
             # Create agent info
             agent_info = AgentInfo(
@@ -542,9 +559,9 @@ class SwarmAdapter:
             if not agent:
                 return False
             
-            await self._lifecycle_manager.remove_member(
-                team_name=sanitize_name(agent.team_id),
-                agent_id=sanitize_agent_name(agent_id),
+            self._lifecycle_manager.remove_member(
+                sanitize_name(agent.team_id),
+                sanitize_agent_name(agent_id),
             )
             
             # Remove from team
@@ -859,12 +876,13 @@ class SwarmAdapter:
             return False
         
         try:
-            await self._lifecycle_manager.add_allowed_path(
-                team_name=sanitize_name(team_id),
-                path=path,
-                tool_name=tool_name,
-                added_by=added_by,
+            oh_team = self._lifecycle_manager.get_team(sanitize_name(team_id))
+            if oh_team is None:
+                return False
+            oh_team.team_allowed_paths.append(
+                OHAllowedPath(path=path, tool_name=tool_name, added_by=added_by)
             )
+            write_team_file(sanitize_name(team_id), oh_team)
             
             team.allowed_paths.append(path)
             return True

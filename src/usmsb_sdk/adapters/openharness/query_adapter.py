@@ -33,7 +33,16 @@ from typing import Any, AsyncIterator
 try:
     from openharness.engine.query_engine import QueryEngine
     from openharness.engine.messages import ConversationMessage, TextBlock, ToolResultBlock
-    from openharness.engine.stream_events import StreamEvent as OHStreamEvent, AssistantTurnComplete
+    from openharness.engine.stream_events import (
+        AssistantTextDelta,
+        AssistantTurnComplete,
+        CompactProgressEvent,
+        ErrorEvent,
+        StatusEvent,
+        StreamEvent as OHStreamEvent,
+        ToolExecutionCompleted,
+        ToolExecutionStarted,
+    )
     from openharness.api.client import (
         ApiMessageRequest,
         ApiStreamEvent,
@@ -279,8 +288,8 @@ class QueryAdapter:
         if self._total_usage:
             return CostSummary(
                 total_tokens=self._total_usage.total_tokens,
-                prompt_tokens=self._total_usage.promptTokens,
-                completion_tokens=self._total_usage.completionTokens,
+                prompt_tokens=self._total_usage.input_tokens,
+                completion_tokens=self._total_usage.output_tokens,
                 total_cost=self._estimate_cost(self._total_usage),
                 model=self._config.model,
             )
@@ -371,20 +380,24 @@ class QueryAdapter:
         # engine's API client after initialization.  Unsupported clients are
         # rejected before ``submit_message`` can send a paid provider request.
         self._ensure_physical_telemetry()
-        
+        original_max_turns = self._engine.max_turns
+
         try:
             # Build message
             user_message = ConversationMessage.from_user_text(prompt)
             
-            # Use provided history or adapter's history
-            history = message_history or self._message_history
+            # A supplied history is canonical for this invocation.  Merely
+            # assigning it to a local variable (the former behaviour) silently
+            # discarded restored context after a process restart.
+            if message_history is not None:
+                self._message_history = list(message_history)
+                self._engine.load_messages(self._message_history)
             
             # Inject system prompt if different from engine's
             if system_prompt:
                 self._engine.set_system_prompt(system_prompt)
             
             # Override max turns if provided
-            original_max_turns = self._engine.max_turns
             if max_turns is not None:
                 self._engine.set_max_turns(max_turns)
             
@@ -407,7 +420,7 @@ class QueryAdapter:
 
                     if stream_event:
                         # Track turn completion
-                        if stream_event.event_type == "turn_complete":
+                        if stream_event.event_type in {"turn_complete", "message_complete"}:
                             current_turn += 1
 
                         # Track final message
@@ -432,10 +445,6 @@ class QueryAdapter:
             if final_message:
                 self._message_history.append(final_message)
             
-            # Restore max turns
-            if max_turns is not None:
-                self._engine.set_max_turns(original_max_turns)
-            
         except QueryError:
             raise
         except Exception as e:
@@ -443,6 +452,11 @@ class QueryAdapter:
                 message=f"Query execution failed: {e}",
                 model=self._config.model,
             )
+        finally:
+            # A failed provider/tool turn must not leak a one-call override into
+            # the next resumed loop.
+            if max_turns is not None:
+                self._engine.set_max_turns(original_max_turns)
 
     async def query_complete(
         self,
@@ -491,6 +505,7 @@ class QueryAdapter:
             elif event.event_type == "message_complete":
                 final_message = event.data
                 usage = event.metadata.get("usage")
+                total_turns += 1
         
         return QueryResult(
             message="".join(message_parts),
@@ -508,63 +523,61 @@ class QueryAdapter:
         current_turn: int,
     ) -> StreamEvent | None:
         """Convert OH stream event to USMSB StreamEvent."""
-        # Handle different OH event types
-        if hasattr(event, "text"):
-            # ApiTextDeltaEvent
+        if isinstance(event, AssistantTextDelta):
             return StreamEvent(
                 event_type="text",
                 data=event.text,
             )
-        
-        if hasattr(event, "message") and hasattr(event, "usage"):
-            # ApiMessageCompleteEvent
+
+        if isinstance(event, AssistantTurnComplete):
             msg = event.message
-            text = ""
-            if hasattr(msg, "text") and msg.text:
-                text = msg.text
-            elif hasattr(msg, "content"):
-                for block in msg.content:
-                    if hasattr(block, "text"):
-                        text += block.text
-            
             return StreamEvent(
                 event_type="message_complete",
                 data=msg,
                 metadata={
                     "usage": self._to_cost_summary(event.usage),
-                    "stop_reason": event.stop_reason,
+                    "turn": current_turn + 1,
                 },
             )
-        
-        if hasattr(event, "message"):
-            # RetryEvent or other
-            if hasattr(event, "attempt"):
-                return StreamEvent(
-                    event_type="retry",
-                    data={
-                        "attempt": event.attempt,
-                        "max_attempts": event.max_attempts,
-                        "message": event.message if hasattr(event, "message") else "",
-                    },
-                )
-        
-        if isinstance(event, AssistantTurnComplete):
+
+        if isinstance(event, ToolExecutionStarted):
             return StreamEvent(
-                event_type="turn_complete",
-                data={"turn": current_turn + 1},
+                event_type="tool_call",
+                data={"tool_name": event.tool_name, "tool_input": event.tool_input},
             )
-        
-        # Check for tool use in message
-        if hasattr(event, "tool_uses") and event.tool_uses:
-            for tool_use in event.tool_uses:
-                return StreamEvent(
-                    event_type="tool_call",
-                    data={
-                        "tool_name": tool_use.name,
-                        "tool_input": tool_use.input,
-                    },
-                )
-        
+
+        if isinstance(event, ToolExecutionCompleted):
+            return StreamEvent(
+                event_type="tool_result",
+                data={
+                    "tool_name": event.tool_name,
+                    "output": event.output,
+                    "is_error": event.is_error,
+                },
+            )
+
+        if isinstance(event, CompactProgressEvent):
+            return StreamEvent(
+                event_type="compact",
+                data={
+                    "phase": event.phase,
+                    "trigger": event.trigger,
+                    "checkpoint": event.checkpoint,
+                    "message": event.message,
+                },
+                metadata=event.metadata or {},
+            )
+
+        if isinstance(event, StatusEvent):
+            return StreamEvent(event_type="status", data=event.message)
+
+        if isinstance(event, ErrorEvent):
+            return StreamEvent(
+                event_type="error",
+                data=event.message,
+                metadata={"recoverable": event.recoverable},
+            )
+
         return None
 
     def _to_cost_summary(self, usage: UsageSnapshot | None) -> CostSummary | None:
@@ -573,9 +586,9 @@ class QueryAdapter:
             return None
         
         return CostSummary(
-            total_tokens=usage.totalTokens,
-            prompt_tokens=usage.promptTokens,
-            completion_tokens=usage.completionTokens,
+            total_tokens=usage.total_tokens,
+            prompt_tokens=usage.input_tokens,
+            completion_tokens=usage.output_tokens,
             total_cost=self._estimate_cost(usage),
             model=self._config.model,
         )
@@ -597,8 +610,8 @@ class QueryAdapter:
         
         rates = pricing.get(self._config.model, {"prompt": 1.0, "completion": 3.0})
         
-        prompt_cost = (usage.promptTokens / 1_000_000) * rates["prompt"]
-        completion_cost = (usage.completionTokens / 1_000_000) * rates["completion"]
+        prompt_cost = (usage.input_tokens / 1_000_000) * rates["prompt"]
+        completion_cost = (usage.output_tokens / 1_000_000) * rates["completion"]
         
         return prompt_cost + completion_cost
 

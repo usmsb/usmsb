@@ -36,43 +36,27 @@ Usage:
     >>> result = await tool_adapter.execute_tool("file_read", path="/tmp/test.txt")
 """
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Optional
+from usmsb_sdk.adapters.openharness.compatibility import (
+    OPENHARNESS_COMMIT,
+    OPENHARNESS_VERSION,
+    OpenHarnessCapabilities,
+    probe_openharness,
+    require_openharness_019,
+)
 
-# Import OpenHarness components (installed separately)
-# OpenHarness 0.1.0 API structure:
-# - openharness.tools.tool.Tool (base class)
-# - openharness.tools.read_file.ReadFileTool
-# - openharness.tools.write_file.WriteFileTool
-# - openharness.tools.search.SearchTool
-# - openharness.tools.run_tests.RunTestsTool
-# - openharness.core.harness.Harness, SimpleHarness
-# - openharness.trajectory.store.TrajectoryStore
+_capabilities = probe_openharness()
+OPENHARNESS_AVAILABLE = _capabilities.compatible
+
 try:
-    from openharness.tools.tool import Tool
-    from openharness.tools.read_file import ReadFileTool
-    from openharness.tools.write_file import WriteFileTool
-    from openharness.tools.search import SearchTool
-    from openharness.tools.run_tests import RunTestsTool
-    from openharness.core.harness import Harness, SimpleHarness
-    from openharness.trajectory.store import TrajectoryStore
-    
-    # Alias for compatibility
-    BaseTool = Tool
-    OPENHARNESS_AVAILABLE = True
-except ImportError as e:
-    OPENHARNESS_AVAILABLE = False
-    # Stub types for when OH is not installed
-    Tool = None
+    from openharness.engine.query_engine import QueryEngine
+    from openharness.tools.base import BaseTool, ToolRegistry
+
+    Tool = BaseTool
+except ImportError:  # optional dependency remains import-safe
     BaseTool = None
-    ReadFileTool = None
-    WriteFileTool = None
-    SearchTool = None
-    RunTestsTool = None
-    Harness = None
-    SimpleHarness = None
-    TrajectoryStore = None
+    Tool = None
+    ToolRegistry = None
+    QueryEngine = None
 
 from usmsb_sdk.adapters.openharness.config import (
     OpenHarnessConfig,
@@ -156,10 +140,20 @@ from usmsb_sdk.adapters.openharness.oh_meta_agent import MetaAgentWithOH, ChildA
 
 __version__ = "0.2.0"
 
+# Public USMSB aliases.  Do not leak similarly named OpenHarness enums/results.
+PermissionMode = USMSBPermissionMode
+PermissionDecision = USMSBPermissionDecision
+StreamEvent = USMSBStreamEvent
+
 __all__ = [
     # Version
     "__version__",
     "OPENHARNESS_AVAILABLE",
+    "OPENHARNESS_VERSION",
+    "OPENHARNESS_COMMIT",
+    "OpenHarnessCapabilities",
+    "probe_openharness",
+    "require_openharness_019",
     # Config
     "OpenHarnessConfig",
     "USMSBConfig",

@@ -1,386 +1,185 @@
-# SPDX-License-Identifier: MIT
-# Copyright (c) 2026 HKUDS/OpenHarness Integration for USMSB
-# OpenHarnessIntegration - Unified Integration Class (v0.1.0 compatible)
+"""Unified USMSB facade for the pinned OpenHarness 0.1.9 runtime.
 
-"""
-OpenHarnessIntegration - Simplified OpenHarness 0.1.0 Integration for USMSB.
-
-This module provides a simplified integration layer for OpenHarness 0.1.0,
-which provides basic tools (file read/write, search, run_tests) and
-a Harness system for agent execution.
-
-OpenHarness 0.1.0 Components:
-    - Tools: ReadFileTool, WriteFileTool, SearchTool, RunTestsTool
-    - Harness: SimpleHarness, Harness (base class)
-    - TrajectoryStore: For recording execution trajectories
-
-Usage:
-    >>> from usmsb_sdk.adapters.openharness import OpenHarnessIntegration
-    >>> integration = OpenHarnessIntegration()
-    >>> await integration.initialize()
-    >>> 
-    >>> # Execute a tool directly
-    >>> result = integration.execute_tool("read_file", path="/tmp/test.txt")
-    >>> 
-    >>> # Use Harness for multi-step tasks
-    >>> harness = integration.create_harness(tools=[...], tasks=[...])
+This facade deliberately does not recreate the removed 0.1.0 ``SimpleHarness``
+API.  OpenHarness 0.1.9 exposes a ``QueryEngine`` agent loop plus independent
+tool, permission, hook, memory and swarm subsystems; USMSB composes those
+capabilities through narrow adapters and fails closed when the exact contract
+is unavailable.
 """
 
 from __future__ import annotations
 
-import asyncio
-import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from openharness.tools.tool import Tool
-from openharness.tools.read_file import ReadFileTool
-from openharness.tools.write_file import WriteFileTool
-from openharness.tools.search import SearchTool
-from openharness.tools.run_tests import RunTestsTool
-from openharness.core.harness import SimpleHarness, Harness
-from openharness.trajectory.store import TrajectoryStore
-
-OPENHARNESS_AVAILABLE = True
-
-from usmsb_sdk.adapters.openharness.config import (
-    OpenHarnessConfig,
-    USMSBConfig,
-    ToolConfig,
-    PermissionConfig,
-    MemoryConfig,
-    SwarmConfig,
-    HookConfig,
-    LLMConfig,
+from usmsb_sdk.adapters.openharness.compatibility import (
+    OPENHARNESS_VERSION,
+    OpenHarnessCapabilities,
+    require_openharness_019,
 )
-from usmsb_sdk.adapters.openharness.exceptions import (
-    OpenHarnessNotAvailableError,
-    ConfigurationError,
-    ToolExecutionError,
-)
-
-log = logging.getLogger(__name__)
+from usmsb_sdk.adapters.openharness.config import OpenHarnessConfig, USMSBConfig
+from usmsb_sdk.adapters.openharness.exceptions import ConfigurationError
+from usmsb_sdk.adapters.openharness.hook_adapter import HookAdapter
+from usmsb_sdk.adapters.openharness.memory_adapter import MemoryAdapter
+from usmsb_sdk.adapters.openharness.meta_agent_adapter import MetaAgentAdapter
+from usmsb_sdk.adapters.openharness.permission_adapter import PermissionAdapter
+from usmsb_sdk.adapters.openharness.query_adapter import QueryAdapter
+from usmsb_sdk.adapters.openharness.swarm_adapter import SwarmAdapter
+from usmsb_sdk.adapters.openharness.tool_adapter import ToolAdapter, ToolExecutionResult
 
 
 @dataclass
 class IntegrationStatistics:
-    """Statistics for the integration."""
+    """Non-canonical operational counters for the adapter facade."""
+
     tools_executed: int = 0
     total_execution_time_ms: float = 0.0
-    harness_episodes: int = 0
-    successful_episodes: int = 0
-    failed_episodes: int = 0
+    query_engines_bound: int = 0
+    compatibility_checks: int = 0
     last_reset: float = field(default_factory=time.time)
 
 
 class OpenHarnessIntegration:
-    """
-    Simplified OpenHarness 0.1.0 Integration.
-    
-    This class provides a simple interface to OpenHarness's core functionality:
-    - Direct tool execution (read_file, write_file, search, run_tests)
-    - Harness-based multi-step task execution
-    - Trajectory recording for learning
-    
-    Note: OpenHarness 0.1.0 is a simplified version. Full features like
-    PermissionChecker, QueryEngine, HookExecutor, SwarmAdapter, etc. are
-    not available in this version.
-    """
-
-    # Tool name mapping
-    OH_TOOLS = {
-        "read_file": ReadFileTool,
-        "write_file": WriteFileTool,
-        "search": SearchTool,
-        "run_tests": RunTestsTool,
-    }
+    """Construct the 0.1.9 adapters without initiating external work."""
 
     def __init__(
         self,
         config: OpenHarnessConfig | None = None,
         usmsb_config: USMSBConfig | None = None,
         cwd: str | Path = ".",
-    ):
-        """
-        Initialize OpenHarness integration.
-        
-        Args:
-            config: OH configuration (optional)
-            usmsb_config: USMSB-specific configuration (optional)
-            cwd: Current working directory
-        """
-        if not OPENHARNESS_AVAILABLE:
-            raise OpenHarnessNotAvailableError(
-                "OpenHarness is not installed. Install with: pip install openharness"
-            )
-        
+        *,
+        query_engine: Any | None = None,
+    ) -> None:
         self._config = config or OpenHarnessConfig()
         self._usmsb_config = usmsb_config or USMSBConfig()
         self._cwd = Path(cwd).resolve()
-        self._start_time = time.time()
-        
-        # Tool instances
-        self._tools: dict[str, Tool] = {}
-        
-        # Trajectory store for recording episodes
-        self._trajectory_store = TrajectoryStore()
-        
-        # Statistics
+        self._query_engine = query_engine
+        self._capabilities: OpenHarnessCapabilities | None = None
         self._stats = IntegrationStatistics()
-        
-        # Track initialization
         self._initialized = False
-        
-        log.info("OpenHarnessIntegration created (version 0.1.0 compatible)")
+
+        self.tool_adapter: ToolAdapter | None = None
+        self.permission_adapter: PermissionAdapter | None = None
+        self.memory_adapter: MemoryAdapter | None = None
+        self.swarm_adapter: SwarmAdapter | None = None
+        self.query_adapter: QueryAdapter | None = None
+        self.hook_adapter: HookAdapter | None = None
+        self.meta_agent_adapter: MetaAgentAdapter | None = None
 
     @classmethod
     def from_env(
         cls,
         usmsb_config: USMSBConfig | None = None,
         cwd: str | Path = ".",
+        *,
+        query_engine: Any | None = None,
     ) -> "OpenHarnessIntegration":
-        """Create integration from environment variables."""
-        config = OpenHarnessConfig.from_env()
-        return cls(config=config, usmsb_config=usmsb_config, cwd=cwd)
+        return cls(
+            config=OpenHarnessConfig.from_env(),
+            usmsb_config=usmsb_config,
+            cwd=cwd,
+            query_engine=query_engine,
+        )
 
     async def initialize(self) -> None:
-        """
-        Initialize the integration.
-        
-        This method must be called before using any tools or harnesses.
-        """
         if self._initialized:
-            log.warning("Integration already initialized")
             return
-        
-        log.info("Initializing OpenHarness 0.1.0 integration...")
-        
-        try:
-            # Initialize tools
-            self._tools = {
-                "read_file": ReadFileTool(base_dir=str(self._cwd)),
-                "write_file": WriteFileTool(base_dir=str(self._cwd)),
-                "search": SearchTool(base_dir=str(self._cwd)),
-                "run_tests": RunTestsTool(base_dir=str(self._cwd)),
-            }
-            log.info("Initialized %d tools: %s", len(self._tools), list(self._tools.keys()))
-            
-            self._initialized = True
-            log.info("OpenHarness integration initialized successfully")
-            
-        except Exception as e:
-            log.error("Failed to initialize integration: %s", e)
-            raise ConfigurationError(message=f"Initialization failed: {e}") from e
 
-    @property
-    def initialized(self) -> bool:
-        """Check if integration is initialized."""
+        capabilities = require_openharness_019()
+        self._stats.compatibility_checks += 1
+        if self._config.oh_version != f"=={OPENHARNESS_VERSION}":
+            raise ConfigurationError(
+                message=(
+                    "OpenHarnessConfig.oh_version must remain exactly "
+                    f"=={OPENHARNESS_VERSION}; got {self._config.oh_version!r}"
+                )
+            )
+
+        permission_adapter = PermissionAdapter(
+            config=self._config.permission,
+            cwd=self._cwd,
+        )
+        tool_adapter = ToolAdapter(
+            permission_checker=permission_adapter.checker,
+            cwd=self._cwd,
+        )
+        self.permission_adapter = permission_adapter
+        self.tool_adapter = tool_adapter
+        self.memory_adapter = MemoryAdapter(cwd=self._cwd, config=self._config.memory)
+        self.hook_adapter = HookAdapter(config=self._config.hook, cwd=self._cwd)
+        self.query_adapter = QueryAdapter(
+            engine=self._query_engine,
+            config=self._config.llm,
+            cwd=self._cwd,
+        )
+        self.swarm_adapter = SwarmAdapter(config=self._config.swarm)
+        self.meta_agent_adapter = MetaAgentAdapter(config=self._config.swarm)
+        self._capabilities = capabilities
+        self._initialized = True
+        if self._query_engine is not None:
+            self._stats.query_engines_bound += 1
+
+    def is_initialized(self) -> bool:
         return self._initialized
 
     @property
-    def tool_names(self) -> list[str]:
-        """Return list of available tool names."""
-        return list(self._tools.keys())
+    def capabilities(self) -> OpenHarnessCapabilities:
+        if self._capabilities is None:
+            raise ConfigurationError(message="OpenHarness integration is not initialized")
+        return self._capabilities
 
-    def get_tool(self, name: str) -> Tool | None:
-        """Get a tool by name."""
-        return self._tools.get(name)
+    async def bind_query_engine(self, engine: Any) -> None:
+        """Bind the OPC-instrumented QueryEngine used for physical LLM calls."""
 
-    def list_tools(self) -> list[dict[str, Any]]:
-        """List all available tools with metadata."""
-        result = []
-        for name, tool in self._tools.items():
-            result.append({
-                "name": name,
-                "description": tool.get_description(),
-            })
-        return result
+        if not self._initialized or self.query_adapter is None:
+            self._query_engine = engine
+            return
+        await self.query_adapter.set_engine(engine)
+        self._query_engine = engine
+        self._stats.query_engines_bound += 1
 
-    def execute_tool(
+    async def execute_tool(
         self,
         tool_name: str,
-        check_permission: bool = False,
-        **kwargs: Any,
-    ) -> str:
-        """
-        Execute a tool directly.
-        
-        Args:
-            tool_name: Name of the tool (read_file, write_file, search, run_tests)
-            check_permission: Ignored in 0.1.0 (no permission system)
-            **kwargs: Tool-specific arguments
-            
-        Returns:
-            Tool output as string
-            
-        Raises:
-            ToolExecutionError: If tool execution fails
-        """
-        self._check_initialized()
-        
-        tool = self._tools.get(tool_name)
-        if not tool:
-            raise ToolExecutionError(f"Tool '{tool_name}' not found. Available: {list(self._tools.keys())}")
-        
-        start_time = time.time()
-        try:
-            result = tool.run(**kwargs)
-            self._stats.tools_executed += 1
-            self._stats.total_execution_time_ms += (time.time() - start_time) * 1000
-            return result
-        except Exception as e:
-            raise ToolExecutionError(f"Tool '{tool_name}' failed: {e}") from e
-
-    def create_harness(
-        self,
-        tools: list[Tool] | None = None,
-        tasks: list[dict[str, Any]] | None = None,
-        max_steps: int = 10,
-    ) -> SimpleHarness:
-        """
-        Create a SimpleHarness for multi-step task execution.
-        
-        Args:
-            tools: List of tools (uses default OH tools if None)
-            tasks: List of task definitions
-            max_steps: Maximum steps per episode
-            
-        Returns:
-            SimpleHarness instance
-        """
-        self._check_initialized()
-        
-        if tools is None:
-            tools = list(self._tools.values())
-        
-        harness = SimpleHarness(tools=tools, tasks=tasks or [])
-        harness.max_steps = max_steps
-        log.info("Created SimpleHarness with %d tools, %d tasks", len(tools), len(tasks or []))
-        return harness
-
-    def get_trajectory_store(self) -> TrajectoryStore:
-        """Get the trajectory store for recording episodes."""
-        return self._trajectory_store
+        *,
+        check_permission: bool = True,
+        **arguments: Any,
+    ) -> ToolExecutionResult:
+        if not self._initialized or self.tool_adapter is None:
+            raise ConfigurationError(message="Call await initialize() before executing tools")
+        started = time.monotonic()
+        result = await self.tool_adapter.execute_tool(
+            tool_name,
+            check_permission=check_permission,
+            **arguments,
+        )
+        self._stats.tools_executed += 1
+        self._stats.total_execution_time_ms += (time.monotonic() - started) * 1000
+        return result
 
     def get_statistics(self) -> IntegrationStatistics:
-        """Get integration statistics."""
         return self._stats
 
     def reset_statistics(self) -> None:
-        """Reset statistics counters."""
         self._stats = IntegrationStatistics()
 
-    def inject_oh_tools_into_registry(
-        self,
-        usmsb_tool_registry: Any,
-        capability_filter: str | None = None,
-    ) -> int:
-        """
-        Inject OH tools into USMSB ToolRegistry.
-        
-        Args:
-            usmsb_tool_registry: USMSB's ToolRegistry instance
-            capability_filter: Ignored in 0.1.0
-            
-        Returns:
-            Number of tools injected
-        """
-        from usmsb_sdk.meta_agent.tools.registry import Tool
-        
-        self._check_initialized()
-        injected = 0
-        
-        for name, tool in self._tools.items():
-            # Check if tool already exists
-            if hasattr(usmsb_tool_registry, "get_tool"):
-                if usmsb_tool_registry.get_tool(name):
-                    continue
-            elif hasattr(usmsb_tool_registry, "tool_names"):
-                if name in usmsb_tool_registry.tool_names:
-                    continue
-            
-            # Create handler that wraps synchronous tool.run()
-            # USMSB calls: handler(params=dict) for no-session tools
-            def make_handler(_name=name, _tool=tool):
-                async def handler(params: dict = None, **kw):
-                    # Get arguments from params dict
-                    args = params if params is not None else kw
-                    return _tool.run(**args)
-                return handler
-            
-            # Create USMSB Tool wrapper
-            schema = self._get_tool_schema(name)
-            usmsb_tool = Tool(
-                name=name,
-                description=tool.get_description(),
-                handler=make_handler(),
-                required_permissions=[],
-                security_level="medium",
-                requires_session=False,
-                parameters=schema,
-            )
-            
-            try:
-                if hasattr(usmsb_tool_registry, "register"):
-                    usmsb_tool_registry.register(usmsb_tool)
-                elif hasattr(usmsb_tool_registry, "register_tool"):
-                    usmsb_tool_registry.register_tool(usmsb_tool)
-                injected += 1
-            except Exception as e:
-                log.warning("Failed to inject OH tool %s: %s", name, e)
-        
-        log.info("OH tool injection: %d/%d registered", injected, len(self._tools))
-        return injected
+    def create_harness(self, *_: Any, **__: Any) -> None:
+        """Reject the removed 0.1.0 API instead of returning a fake harness."""
 
-    def _get_tool_schema(self, tool_name: str) -> dict[str, Any]:
-        """Get tool parameter schema based on actual OpenHarness 0.1.0 API."""
-        schemas = {
-            "read_file": {
-                "properties": {
-                    "path": {"type": "string", "description": "File path to read"}
-                },
-                "required": ["path"]
-            },
-            "write_file": {
-                "properties": {
-                    "path": {"type": "string", "description": "File path to write"},
-                    "content": {"type": "string", "description": "Content to write"}
-                },
-                "required": ["path", "content"]
-            },
-            "search": {
-                "properties": {
-                    "pattern": {"type": "string", "description": "Regex pattern to search for"},
-                    "path": {"type": "string", "description": "Directory to search (default: current directory)"}
-                },
-                "required": ["pattern"]
-            },
-            "run_tests": {
-                "properties": {
-                    "test_path": {"type": "string", "description": "Path to test file or directory"}
-                },
-                "required": ["test_path"]
-            },
-        }
-        return schemas.get(tool_name, {})
-
-    def _check_initialized(self) -> None:
-        """Check if initialized, raise if not."""
-        if not self._initialized:
-            raise ConfigurationError(
-                "Integration not initialized. Call await initialize() first."
+        raise ConfigurationError(
+            message=(
+                "OpenHarness 0.1.9 has no SimpleHarness API. Bind a QueryEngine "
+                "or use usmsb_sdk.growth_economic_harness.GrowthEconomicHarness."
             )
+        )
 
     def __repr__(self) -> str:
         return (
-            f"OpenHarnessIntegration("
-            f"initialized={self._initialized}, "
-            f"tools={len(self._tools)}, "
-            f"version=0.1.0)"
+            "OpenHarnessIntegration("
+            f"initialized={self._initialized}, version={OPENHARNESS_VERSION!r})"
         )
 
 
-# Backward compatibility alias
 OpenHarnessIntegration_v1 = OpenHarnessIntegration

@@ -24,28 +24,29 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import inspect
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, TypeVar, Generic
+from typing import Any, Callable, TypeVar, Generic, get_type_hints
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, create_model
 
 try:
-    from openharness.tools.tool import Tool as BaseTool
-    from openharness.tools.read_file import ReadFileTool
-    from openharness.tools.write_file import WriteFileTool
-    from openharness.tools.search import SearchTool
-    from openharness.tools.run_tests import RunTestsTool
+    from openharness.tools.base import (
+        BaseTool,
+        ToolExecutionContext,
+        ToolRegistry,
+        ToolResult,
+    )
     OPENHARNESS_AVAILABLE = True
 except ImportError:
     OPENHARNESS_AVAILABLE = False
     # Stub for type hints when OH not installed
     BaseTool = None
-    ReadFileTool = None
-    WriteFileTool = None
-    SearchTool = None
-    RunTestsTool = None
+    ToolExecutionContext = None
+    ToolRegistry = None
+    ToolResult = None
 
 from usmsb_sdk.adapters.openharness.exceptions import (
     ToolExecutionError,
@@ -273,22 +274,24 @@ class ToolAdapter:
             A BaseTool instance wrapping the callable
         """
         tool_name = kwargs.get("name", getattr(func, "__name__", "unknown"))
-        description = kwargs.get("description", f"Wrapped tool: {func.__name__}")
+        tool_description = kwargs.get("description", f"Wrapped tool: {func.__name__}")
+        input_model = kwargs.get("input_model") or self._create_input_model(func, kwargs)
+        read_only = bool(kwargs.get("is_read_only", False))
         
         class SimpleTool(BaseTool):
-            name: str = tool_name
-            description: str = description
-            input_model: type[BaseModel] = kwargs.get(
-                "input_model",
-                self._create_input_model(func, kwargs)
-            )
+            # Assign the captured values after the class body.  Class scopes do
+            # not close over a same-named local (``description = description``),
+            # which previously made callable registration fail at runtime.
+            name: str
+            description: str
+            input_model: type[BaseModel]
             
             async def execute(self, arguments: BaseModel, context: ToolExecutionContext) -> ToolResult:
                 try:
                     # Convert Pydantic model to dict, excluding None values
                     args = arguments.model_dump(exclude_none=True)
                     # Execute the wrapped function
-                    if asyncio.iscoroutinefunction(func):
+                    if inspect.iscoroutinefunction(func):
                         result = await func(**args)
                     else:
                         result = func(**args)
@@ -297,23 +300,30 @@ class ToolAdapter:
                     return ToolResult(output=str(e), is_error=True)
             
             def is_read_only(self, arguments: BaseModel) -> bool:
-                return kwargs.get("is_read_only", False)
+                del arguments
+                return read_only
         
+        SimpleTool.name = tool_name
+        SimpleTool.description = tool_description
+        SimpleTool.input_model = input_model
         return SimpleTool()
 
     def _create_input_model(self, func: Callable, kwargs: dict) -> type[BaseModel]:
         """Create a Pydantic input model from function signature."""
-        import inspect
-        
         sig = inspect.signature(func)
         fields = {}
-        annotations = sig.parameters
-        
-        for param_name, param in annotations.items():
-            if param.annotation is inspect.Parameter.empty:
+        try:
+            type_hints = get_type_hints(func)
+        except (NameError, TypeError):
+            # A callable can legitimately contain an annotation whose module is
+            # not importable in this process.  Keep registration possible and
+            # let Pydantic validate the remaining resolvable fields.
+            type_hints = {}
+
+        for param_name, param in sig.parameters.items():
+            field_type = type_hints.get(param_name, param.annotation)
+            if field_type is inspect.Parameter.empty or isinstance(field_type, str):
                 field_type = str
-            else:
-                field_type = param.annotation
             
             default = ...  # Required by default
             if param.default is not inspect.Parameter.empty:
@@ -321,7 +331,7 @@ class ToolAdapter:
             
             fields[param_name] = (field_type, default)
         
-        return type("InputModel", (BaseModel,), fields)
+        return create_model(f"{getattr(func, '__name__', 'Tool')}Input", **fields)
 
     async def execute_tool(
         self,
@@ -372,9 +382,10 @@ class ToolAdapter:
         
         # Check permission
         if check_permission and self._permission_checker:
+            input_model = tool.input_model(**kwargs)
             decision = self._permission_checker.evaluate(
                 tool_name=tool_name,
-                is_read_only=tool.is_read_only,
+                is_read_only=tool.is_read_only(input_model),
                 file_path=kwargs.get("path") or kwargs.get("file_path"),
                 command=kwargs.get("command"),
             )
@@ -402,14 +413,14 @@ class ToolAdapter:
             raise ToolExecutionError(
                 tool_name=tool_name,
                 message=f"Argument validation error: {e}",
-            )
+            ) from e
         
         # Execute with timeout
         timeout = self._tool_metadata.get(tool_name)
         timeout_seconds = timeout.timeout_seconds if timeout else 300
         
         try:
-            if asyncio.iscoroutinefunction(tool.execute):
+            if inspect.iscoroutinefunction(tool.execute):
                 result = await asyncio.wait_for(
                     tool.execute(input_model, context),
                     timeout=timeout_seconds,
@@ -422,16 +433,16 @@ class ToolAdapter:
                     ),
                     timeout=timeout_seconds,
                 )
-        except asyncio.TimeoutError:
+        except TimeoutError as error:
             raise ToolExecutionError(
                 tool_name=tool_name,
                 message=f"Tool execution timed out after {timeout_seconds}s",
-            )
+            ) from error
         except Exception as e:
             raise ToolExecutionError(
                 tool_name=tool_name,
                 message=f"Tool execution failed: {e}",
-            )
+            ) from e
         
         # Track execution stats
         execution_time = (time.time() - start_time) * 1000

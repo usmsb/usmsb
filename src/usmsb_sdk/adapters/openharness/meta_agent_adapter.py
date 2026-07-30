@@ -35,15 +35,14 @@ from typing import Any, AsyncIterator
 try:
     from openharness.swarm.team_lifecycle import (
         TeamLifecycleManager,
+        TeamMember as OHTeamMember,
         sanitize_name,
         sanitize_agent_name,
     )
-    from openharness.swarm.types import BackendType
     OPENHARNESS_AVAILABLE = True
 except ImportError:
     OPENHARNESS_AVAILABLE = False
     TeamLifecycleManager = None
-    BackendType = None
 
 from usmsb_sdk.adapters.openharness.config import SwarmConfig, SwarmBackend
 from usmsb_sdk.adapters.openharness.exceptions import (
@@ -239,9 +238,7 @@ class MetaAgentAdapter:
         self._teams_dir = Path(teams_dir or self._config.teams_dir).expanduser().resolve()
         
         # Create OH lifecycle manager
-        self._lifecycle_manager = TeamLifecycleManager(
-            teams_dir=str(self._teams_dir),
-        )
+        self._lifecycle_manager = TeamLifecycleManager()
         
         # Agent registry
         self._agents: dict[str, SpawnedAgent] = {}
@@ -290,25 +287,26 @@ class MetaAgentAdapter:
             )
             
             # Map backend
-            backend_map = {
-                SwarmBackend.TMUX: BackendType.TMUX,
-                SwarmBackend.SUBPROCESS: BackendType.SUBPROCESS,
-                SwarmBackend.WORKTREE: BackendType.WORKTREE,
-            }
-            oh_backend = backend_map.get(spec.backend, BackendType.SUBPROCESS)
+            oh_backend = "tmux" if spec.backend == SwarmBackend.TMUX else "subprocess"
             
             # Create event queue
             self._agent_events[agent_id] = asyncio.Queue()
             
             # Spawn via OH lifecycle manager
-            await self._lifecycle_manager.add_member(
-                team_name=sanitize_name(team_id or "default"),
+            normalized_team = sanitize_name(team_id or "default")
+            if self._lifecycle_manager.get_team(normalized_team) is None:
+                self._lifecycle_manager.create_team(normalized_team, description="USMSB dynamic team")
+            member = OHTeamMember(
                 agent_id=sanitize_agent_name(agent_id),
+                name=agent.name,
+                backend_type=oh_backend,
+                joined_at=time.time(),
                 agent_type=spec.agent_type,
                 model=spec.model,
                 prompt=spec.prompt,
                 color=spec.color,
             )
+            self._lifecycle_manager.add_member(normalized_team, member)
             
             # Update state
             agent.state = AgentState.INITIALIZING
@@ -368,9 +366,9 @@ class MetaAgentAdapter:
             
             # Remove from team if in one
             if agent.team_id:
-                await self._lifecycle_manager.remove_member(
-                    team_name=sanitize_name(agent.team_id),
-                    agent_id=sanitize_agent_name(agent_id),
+                self._lifecycle_manager.remove_member(
+                    sanitize_name(agent.team_id),
+                    sanitize_agent_name(agent_id),
                 )
             
             agent.state = AgentState.STOPPED
@@ -621,9 +619,8 @@ class MetaAgentAdapter:
             Team ID
         """
         try:
-            await self._lifecycle_manager.create_team(
-                team_name=sanitize_name(team_id),
-                lead_agent_id="",
+            self._lifecycle_manager.create_team(
+                sanitize_name(team_id),
                 description=description,
             )
             
@@ -654,13 +651,16 @@ class MetaAgentAdapter:
             return False
         
         try:
-            await self._lifecycle_manager.add_member(
-                team_name=sanitize_name(team_id),
+            member = OHTeamMember(
                 agent_id=sanitize_agent_name(agent_id),
+                name=agent.name,
+                backend_type=("tmux" if agent.spec.backend == SwarmBackend.TMUX else "subprocess"),
+                joined_at=time.time(),
                 agent_type=agent.spec.agent_type,
                 model=agent.spec.model,
                 prompt=agent.spec.prompt,
             )
+            self._lifecycle_manager.add_member(sanitize_name(team_id), member)
             
             agent.team_id = team_id
             return True

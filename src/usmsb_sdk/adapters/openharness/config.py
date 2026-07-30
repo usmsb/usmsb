@@ -12,7 +12,7 @@ OpenHarness with USMSB. Configuration can be loaded from:
     3. Direct Python objects
 
 Environment Variables:
-    OPENHARNESS_VERSION: str (default: ">=0.1.6")
+    OPENHARNESS_VERSION: str (default: "==0.1.9")
     OPENHARNESS_API_BASE: str (default: "https://api.minimaxi.com")
     OPENHARNESS_API_KEY: str (optional)
     OPENHARNESS_MODEL: str (default: "minimax-m1")
@@ -126,7 +126,7 @@ class OpenHarnessConfig:
         >>> integration = OpenHarnessIntegration(config)
     """
     # Version constraint
-    oh_version: str = ">=0.1.6"
+    oh_version: str = "==0.1.9"
     
     # Sub-configurations
     tool: ToolConfig = field(default_factory=ToolConfig)

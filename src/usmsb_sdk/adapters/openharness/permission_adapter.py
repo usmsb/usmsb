@@ -214,6 +214,12 @@ class PermissionAdapter:
         
         log.info("PermissionAdapter initialized with mode: %s", self._config.mode)
 
+    @property
+    def checker(self) -> PermissionChecker:
+        """Expose the verified OpenHarness checker to QueryEngine/ToolAdapter."""
+
+        return self._checker
+
     def _build_oh_settings(self) -> PermissionSettings:
         """Build OH PermissionSettings from USMSB config."""
         # Import here to avoid circular reference
@@ -222,19 +228,17 @@ class PermissionAdapter:
         # Map our config mode to OH mode
         mode_map = {
             PermissionMode.FULL_AUTO: OHModes.FULL_AUTO,
-            PermissionMode.MODERATE: OHModes.MODERATE,
+            PermissionMode.MODERATE: OHModes.DEFAULT,
             PermissionMode.PLAN: OHModes.PLAN,
         }
         
-        class Settings:
-            def __init__(self, config: PermissionConfig):
-                self.mode = mode_map.get(config.mode, OHModes.MODERATE)
-                self.denied_tools = config.denied_tools
-                self.allowed_tools = config.allowed_tools
-                self.denied_commands = config.denied_commands
-                self.path_rules = config.path_rules
-        
-        return Settings(self._config)
+        return PermissionSettings(
+            mode=mode_map.get(self._config.mode, OHModes.DEFAULT),
+            denied_tools=self._config.denied_tools,
+            allowed_tools=self._config.allowed_tools,
+            denied_commands=self._config.denied_commands,
+            path_rules=self._config.path_rules,
+        )
 
     def _build_default_rules(self) -> None:
         """Build default USMSB-specific path rules."""

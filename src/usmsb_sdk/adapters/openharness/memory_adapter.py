@@ -42,7 +42,7 @@ try:
         get_memory_entrypoint,
     )
     from openharness.memory.types import MemoryHeader
-    from openharness.memory.search import search_memory
+    from openharness.memory.search import find_relevant_memories
     OPENHARNESS_AVAILABLE = True
 except ImportError:
     OPENHARNESS_AVAILABLE = False
@@ -52,7 +52,7 @@ except ImportError:
     get_project_memory_dir = None
     get_memory_entrypoint = None
     MemoryHeader = None
-    search_memory = None
+    find_relevant_memories = None
 
 from usmsb_sdk.adapters.openharness.config import MemoryConfig
 from usmsb_sdk.adapters.openharness.exceptions import (

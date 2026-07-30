@@ -80,6 +80,11 @@ vector-db = [
 graph-db = [
     "neo4j>=5.15",
 ]
+openharness = [
+    # Exact tag/commit contract: v0.1.9 / a0f8552c69d6d0b25d613af288823212a8b6b59a.
+    # Keep this exact until the adapter contract suite is updated for a newer release.
+    "openharness-ai==0.1.9",
+]
 
 [project.scripts]
 usmsb = "usmsb_sdk.cli:main"
