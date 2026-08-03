@@ -63,6 +63,21 @@ class HarnessConfig:
     max_model_output_bytes: int = 256_000
     experience_recall_limit: int = 20
 
+    def __post_init__(self) -> None:
+        bounds = {
+            "max_internal_decisions_per_step": (self.max_internal_decisions_per_step, 1, 100),
+            "max_structured_output_repairs": (self.max_structured_output_repairs, 0, 10),
+            "max_model_output_bytes": (self.max_model_output_bytes, 1_024, 1_048_576),
+            "experience_recall_limit": (self.experience_recall_limit, 0, 1_000),
+        }
+        for name, (value, minimum, maximum) in bounds.items():
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not minimum <= value <= maximum
+            ):
+                raise ValueError(f"{name} must be an integer from {minimum} to {maximum}")
+
 
 class GrowthEconomicHarness:
     """A cognitive state machine whose transition function is the model."""

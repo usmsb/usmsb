@@ -5,13 +5,22 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 
 class StrictModel(BaseModel):
     """Forbid projection drift at every process boundary."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+def _require_json_number(value: Any, *, field: str) -> Any:
+    if not isinstance(value, dict) or field not in value:
+        return value
+    number = value[field]
+    if isinstance(number, bool) or not isinstance(number, (int, float)):
+        raise ValueError(f"{field} must be a JSON number")
+    return value
 
 
 class ActionKind(str, Enum):
@@ -76,6 +85,11 @@ class ExperienceDraft(StrictModel):
     counter_evidence_refs: list[str] = Field(default_factory=list, max_length=100)
     confidence: float = Field(ge=0, le=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_confidence(cls, value: Any) -> Any:
+        return _require_json_number(value, field="confidence")
+
 
 class ActionDraft(StrictModel):
     kind: ActionKind
@@ -114,10 +128,15 @@ class ModelCompletion(StrictModel):
     provider: str | None = Field(default=None, max_length=100)
     model: str | None = Field(default=None, max_length=200)
     attempt_id: str | None = Field(default=None, max_length=200)
-    input_tokens: int = Field(default=0, ge=0)
-    output_tokens: int = Field(default=0, ge=0)
+    input_tokens: StrictInt = Field(default=0, ge=0)
+    output_tokens: StrictInt = Field(default=0, ge=0)
     cost: float = Field(default=0, ge=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_cost(cls, value: Any) -> Any:
+        return _require_json_number(value, field="cost")
 
 
 class HarnessObjective(StrictModel):
@@ -139,6 +158,11 @@ class Observation(StrictModel):
     cost: float = Field(default=0, ge=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_cost(cls, value: Any) -> Any:
+        return _require_json_number(value, field="cost")
+
 
 class ContextEntry(StrictModel):
     kind: Literal["decision", "observation", "group", "reflection", "revision", "compact"]
@@ -158,6 +182,11 @@ class ExperienceRecord(StrictModel):
     source_run_id: str = Field(min_length=1, max_length=200)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_confidence(cls, value: Any) -> Any:
+        return _require_json_number(value, field="confidence")
+
 
 class ActionIntent(StrictModel):
     action_id: str = Field(min_length=1, max_length=200)
@@ -175,7 +204,7 @@ class HarnessCheckpoint(StrictModel):
     schema_version: Literal["growth-harness.checkpoint.v1"] = "growth-harness.checkpoint.v1"
     run_id: str = Field(min_length=1, max_length=200)
     objective: HarnessObjective
-    step_index: int = Field(default=0, ge=0)
+    step_index: StrictInt = Field(default=0, ge=0)
     status: Literal["running", "awaiting_observation", "waiting", "completed", "failed"] = (
         "running"
     )
@@ -185,15 +214,15 @@ class HarnessCheckpoint(StrictModel):
     context: list[ContextEntry] = Field(default_factory=list, max_length=1_000)
     experience_candidates: list[ExperienceRecord] = Field(default_factory=list, max_length=200)
     pending_action: ActionIntent | None = None
-    compacted_entries: int = Field(default=0, ge=0)
+    compacted_entries: StrictInt = Field(default=0, ge=0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class WaitIntent(StrictModel):
     reason: str = Field(min_length=1, max_length=4_000)
     wake_conditions: list[str] = Field(default_factory=list, max_length=50)
-    wake_after_seconds: int | None = Field(default=None, ge=1, le=2_592_000)
-    requires_gate: bool = False
+    wake_after_seconds: StrictInt | None = Field(default=None, ge=1, le=2_592_000)
+    requires_gate: StrictBool = False
 
 
 class CycleResult(StrictModel):

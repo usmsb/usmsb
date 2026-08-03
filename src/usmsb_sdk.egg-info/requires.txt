@@ -36,6 +36,9 @@ freezegun>=1.4
 [graph-db]
 neo4j>=5.15
 
+[openharness]
+openharness-ai==0.1.9
+
 [test]
 pytest>=7.0
 pytest-asyncio>=0.21

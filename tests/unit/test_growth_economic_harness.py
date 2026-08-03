@@ -12,6 +12,7 @@ from usmsb_sdk.growth_economic_harness import (
     ContextLoop,
     ExperienceDraft,
     ExperienceLoop,
+    ExperiencePromotionPolicy,
     ExperienceState,
     ExperienceTransitionError,
     GroupContribution,
@@ -312,6 +313,108 @@ def test_one_outcome_cannot_be_promoted_directly_to_skill() -> None:
     evidence = PromotionEvidence(evaluation_ref="eval-1", policy_version="policy-1")
     with pytest.raises(ExperienceTransitionError):
         loop.transition(candidate, ExperienceState.PROMOTED_SKILL, evidence)
+
+
+def test_experience_promotion_is_attributable_audited_and_reversible() -> None:
+    policy = ExperiencePromotionPolicy(
+        version="policy-1",
+        promotion_requires_approval=True,
+    )
+    loop = ExperienceLoop(policy)
+    candidate = loop.candidate_from(
+        ExperienceDraft(
+            lesson="A verified counterexample should revise the next hypothesis.",
+            applicability="Evidence-led autonomous programs.",
+            evidence_refs=["artifact://episode/1"],
+            confidence=0.8,
+        ),
+        run_id="run-1",
+    )
+    probation = loop.transition(
+        candidate,
+        ExperienceState.PROBATION,
+        PromotionEvidence(
+            evaluation_ref="eval-1",
+            policy_version="policy-1",
+            observed_run_ids=("run-1",),
+        ),
+    )
+    validated = loop.transition(
+        probation,
+        ExperienceState.VALIDATED,
+        PromotionEvidence(
+            evaluation_ref="eval-2",
+            policy_version="policy-1",
+            observed_run_ids=("run-1", "run-2"),
+            outcome_refs=("artifact://outcome/1", "artifact://outcome/2"),
+            repeated_outcomes=2,
+            independent_evidence_refs=("artifact://independent/1",),
+            scope="evidence-led programs",
+            counter_evidence_resolved=True,
+        ),
+    )
+    promoted = loop.transition(
+        validated,
+        ExperienceState.PROMOTED_SKILL,
+        PromotionEvidence(
+            evaluation_ref="eval-3",
+            policy_version="policy-1",
+            observed_run_ids=("run-1", "run-2", "run-3"),
+            outcome_refs=(
+                "artifact://outcome/1",
+                "artifact://outcome/2",
+                "artifact://outcome/3",
+            ),
+            repeated_outcomes=3,
+            independent_evidence_refs=("artifact://independent/1",),
+            counterfactual_ref="artifact://counterfactual/1",
+            scope="evidence-led programs",
+            k_threshold_passed=True,
+            counter_evidence_resolved=True,
+            approved_by="service-principal:experience-governor",
+        ),
+    )
+    revoked = loop.transition(
+        promoted,
+        ExperienceState.REVOKED,
+        PromotionEvidence(
+            evaluation_ref="eval-revoke-1",
+            policy_version="policy-1",
+        ),
+    )
+    assert revoked.state == ExperienceState.REVOKED
+    assert [item["to"] for item in revoked.metadata["transition_history"]] == [
+        "probation",
+        "validated",
+        "promoted_skill",
+        "revoked",
+    ]
+
+
+def test_legacy_repeated_count_cannot_fake_validation_runs() -> None:
+    loop = ExperienceLoop(ExperiencePromotionPolicy(version="policy-1"))
+    candidate = loop.candidate_from(
+        ExperienceDraft(
+            lesson="Repeated counters are not attributable outcomes.",
+            applicability="Legacy imports.",
+            evidence_refs=["artifact://legacy/1"],
+            confidence=0.5,
+        ),
+        run_id="legacy-source",
+    )
+    with pytest.raises(ExperienceTransitionError):
+        loop.transition(
+            candidate,
+            ExperienceState.VALIDATED,
+            PromotionEvidence(
+                evaluation_ref="eval-legacy",
+                policy_version="policy-1",
+                repeated_outcomes=99,
+                independent_evidence_refs=("artifact://legacy/evidence",),
+                outcome_refs=("artifact://legacy/outcome",),
+                scope="legacy",
+            ),
+        )
 
 
 @pytest.mark.asyncio
