@@ -142,9 +142,15 @@ class ExperienceLoop:
     def __init__(self, policy: ExperiencePromotionPolicy | None = None) -> None:
         self.policy = policy or ExperiencePromotionPolicy()
 
-    def candidate_from(self, draft: ExperienceDraft, *, run_id: str) -> ExperienceRecord:
+    def candidate_from(
+        self,
+        draft: ExperienceDraft,
+        *,
+        run_id: str,
+        experience_id: str | None = None,
+    ) -> ExperienceRecord:
         return ExperienceRecord(
-            experience_id=f"exp_{uuid4().hex}",
+            experience_id=experience_id or f"exp_{uuid4().hex}",
             state=ExperienceState.CANDIDATE,
             lesson=draft.lesson,
             applicability=draft.applicability,

@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, TypeVar
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from usmsb_sdk.growth_economic_harness.models import ModelDecision
 
 
 class StructuredOutputError(ValueError):
     """A model result cannot safely become an action."""
+
+
+StrictOutput = TypeVar("StrictOutput", bound=BaseModel)
 
 
 def _reject_constant(value: str) -> None:
@@ -29,6 +32,17 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def decode_model_decision(raw_output: str, *, max_bytes: int = 256_000) -> ModelDecision:
     """Decode exactly one UTF-8 JSON object and validate the action schema."""
+
+    return decode_strict_model(raw_output, ModelDecision, max_bytes=max_bytes)
+
+
+def decode_strict_model(
+    raw_output: str,
+    model_type: type[StrictOutput],
+    *,
+    max_bytes: int = 256_000,
+) -> StrictOutput:
+    """Decode one JSON object into a strict Pydantic boundary model."""
 
     try:
         encoded = raw_output.encode("utf-8", errors="strict")
@@ -60,7 +74,8 @@ def decode_model_decision(raw_output: str, *, max_bytes: int = 256_000) -> Model
     if not isinstance(decoded, dict):
         raise StructuredOutputError("top-level model output must be a JSON object")
     try:
-        return ModelDecision.model_validate(decoded)
+        return model_type.model_validate(decoded)
     except ValidationError as error:
-        raise StructuredOutputError(f"model decision schema validation failed: {error}") from error
-
+        raise StructuredOutputError(
+            f"{model_type.__name__} schema validation failed: {error}"
+        ) from error
