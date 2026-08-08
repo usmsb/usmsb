@@ -28,9 +28,11 @@ from usmsb_sdk.growth_economic_harness.models import (
     ContinuityState,
     CycleHandoff,
     CycleResult,
+    EpisodeOutcome,
     ExperienceEpisode,
     ExperienceRecord,
     HarnessCheckpoint,
+    HarnessMutationBatch,
     HarnessObjective,
     HarnessStepResult,
     ModelDecision,
@@ -145,6 +147,8 @@ class GrowthEconomicHarness:
         observation: Observation | None = None,
         tools: Iterable[ToolDescriptor] = (),
         recalled_experiences: list[ExperienceRecord] | None = None,
+        resolved_artifacts: list[ArtifactRecord] | None = None,
+        persist_experience_mutations: bool = True,
     ) -> HarnessStepResult:
         """Advance cognition until an external action, wait, or completion yields."""
 
@@ -157,7 +161,13 @@ class GrowthEconomicHarness:
 
         if checkpoint.status == "completed":
             raise HarnessProtocolError("completed checkpoint cannot be resumed")
-        await self._persist_observation_episode(checkpoint, observation)
+        episode = await self._persist_observation_episode(
+            checkpoint,
+            observation,
+            persist=persist_experience_mutations,
+        )
+        mutation_episodes = [episode] if episode is not None else []
+        mutation_candidates: list[ExperienceRecord] = []
         checkpoint = self._accept_observation(checkpoint, observation)
         checkpoint = await self._refresh_context(checkpoint)
         tool_catalog = list(tools)
@@ -170,7 +180,11 @@ class GrowthEconomicHarness:
                 limit=self.config.experience_recall_limit,
             )
         )
-        resolved_artifacts = await self._resolve_relevant_artifacts(checkpoint)
+        resolved_artifacts = (
+            list(resolved_artifacts)
+            if resolved_artifacts is not None
+            else await self._resolve_relevant_artifacts(checkpoint)
+        )
 
         for internal_index in range(self.config.max_internal_decisions_per_step):
             decision, checkpoint = await self._decide(
@@ -179,7 +193,16 @@ class GrowthEconomicHarness:
                 experiences,
                 resolved_artifacts,
             )
-            checkpoint = await self._record_decision(checkpoint, decision)
+            checkpoint, candidate = await self._record_decision(
+                checkpoint,
+                decision,
+                persist=persist_experience_mutations,
+            )
+            if candidate is not None and all(
+                item.experience_id != candidate.experience_id
+                for item in mutation_candidates
+            ):
+                mutation_candidates.append(candidate)
             draft = decision.action
 
             if draft.capability == "cognitive.deliberate":
@@ -196,7 +219,9 @@ class GrowthEconomicHarness:
                         objective=checkpoint.objective.model_dump(mode="json"),
                         team_plan=draft.team_plan,
                         context=[entry.model_dump(mode="json") for entry in checkpoint.context],
-                        checkpoint_metadata=checkpoint.metadata,
+                        checkpoint_metadata=self.context_loop.project_checkpoint_metadata(
+                            checkpoint.metadata
+                        ),
                         wake_events=continuity.wake_events if continuity else [],
                         cycle_handoff=continuity.cycle_handoff if continuity else None,
                         memory_manifest=continuity.memory_manifest if continuity else None,
@@ -266,20 +291,39 @@ class GrowthEconomicHarness:
                         "reflect requires experience_candidate",
                         checkpoint,
                     )
-                candidate = checkpoint.experience_candidates[-1]
+                if candidate is None:
+                    raise HarnessDecisionError(
+                        "reflect did not produce a candidate for this decision",
+                        checkpoint,
+                    )
+                reflected_candidate = next(
+                    (
+                        item
+                        for item in checkpoint.experience_candidates
+                        if item.experience_id == candidate.experience_id
+                    ),
+                    None,
+                )
+                if reflected_candidate is None:
+                    raise HarnessDecisionError(
+                        "reflect candidate is absent from the canonical checkpoint",
+                        checkpoint,
+                    )
                 checkpoint = checkpoint.model_copy(
                     update={
                         "context": [
                             *checkpoint.context,
                             ContextEntry(
                                 kind="reflection",
-                                summary=candidate.lesson,
-                                artifact_refs=candidate.evidence_refs,
+                                summary=reflected_candidate.lesson,
+                                artifact_refs=reflected_candidate.evidence_refs,
                                 metadata={
-                                    "experience_id": candidate.experience_id,
-                                    "applicability": candidate.applicability,
-                                    "counter_evidence_refs": candidate.counter_evidence_refs,
-                                    "confidence": candidate.confidence,
+                                    "experience_id": reflected_candidate.experience_id,
+                                    "applicability": reflected_candidate.applicability,
+                                    "counter_evidence_refs": (
+                                        reflected_candidate.counter_evidence_refs
+                                    ),
+                                    "confidence": reflected_candidate.confidence,
                                 },
                             ),
                         ]
@@ -319,12 +363,25 @@ class GrowthEconomicHarness:
                         wake_after_seconds=wake_after_seconds,
                         requires_gate=draft.kind == ActionKind.REQUEST_GATE,
                     ),
+                    mutations=self._mutation_batch(
+                        mutation_candidates,
+                        mutation_episodes,
+                    ),
                 )
 
             if draft.kind == ActionKind.COMPLETE:
                 result = self._cycle_result(checkpoint, draft.arguments, draft.rationale)
                 completed = checkpoint.model_copy(update={"status": "completed"})
-                return HarnessStepResult(kind="complete", checkpoint=completed, result=result)
+                return HarnessStepResult(
+                    kind="complete",
+                    checkpoint=completed,
+                    result=result,
+                    mutations=self._mutation_batch(
+                        mutation_candidates,
+                        mutation_episodes,
+                        cycle_handoff=result.cycle_handoff,
+                    ),
+                )
 
             intent = self._external_intent(checkpoint, decision, tool_catalog)
             awaiting = checkpoint.model_copy(
@@ -334,7 +391,12 @@ class GrowthEconomicHarness:
                     "pending_action": intent,
                 }
             )
-            return HarnessStepResult(kind="action", checkpoint=awaiting, action=intent)
+            return HarnessStepResult(
+                kind="action",
+                checkpoint=awaiting,
+                action=intent,
+                mutations=self._mutation_batch(mutation_candidates, mutation_episodes),
+            )
 
         waiting = checkpoint.model_copy(update={"status": "waiting"})
         return HarnessStepResult(
@@ -344,9 +406,13 @@ class GrowthEconomicHarness:
                 reason="bounded internal cognition limit reached; persist and resume",
                 wake_conditions=["resume_same_cycle"],
             ),
+            mutations=self._mutation_batch(mutation_candidates, mutation_episodes),
         )
 
     async def _refresh_context(self, checkpoint: HarnessCheckpoint) -> HarnessCheckpoint:
+        project = getattr(self.context_repository, "project_checkpoint", None)
+        if callable(project):
+            await project(checkpoint)
         recall = getattr(self.context_repository, "recall_manifest", None)
         if not callable(recall) or self.config.context_recall_limit == 0:
             return checkpoint
@@ -428,13 +494,13 @@ class GrowthEconomicHarness:
         self,
         checkpoint: HarnessCheckpoint,
         observation: Observation | None,
-    ) -> None:
+        *,
+        persist: bool,
+    ) -> ExperienceEpisode | None:
         pending = checkpoint.pending_action
         if pending is None or observation is None or pending.action_id != observation.action_id:
-            return
-        persist = getattr(self.experience_repository, "persist_episode", None)
-        if not callable(persist):
-            return
+            return None
+        persist_episode = getattr(self.experience_repository, "persist_episode", None)
         canonical = json.dumps(
             {
                 "run_id": checkpoint.run_id,
@@ -459,6 +525,18 @@ class GrowthEconomicHarness:
             team_plan=checkpoint.selected_team,
             action=pending,
             observation=observation,
+            outcomes=[
+                EpisodeOutcome(
+                    outcome_id=f"outcome_{digest[:32]}",
+                    action_id=pending.action_id,
+                    status=observation.status,
+                    summary=observation.summary,
+                    metrics=observation.facts,
+                    artifact_refs=observation.artifact_refs,
+                    cost=observation.cost,
+                    metadata=observation.metadata,
+                )
+            ],
             evidence_refs=evidence_refs,
             metadata={
                 "step_index": checkpoint.step_index,
@@ -466,7 +544,9 @@ class GrowthEconomicHarness:
                 "observation_cost": observation.cost,
             },
         )
-        await persist(episode)
+        if persist and callable(persist_episode):
+            await persist_episode(episode)
+        return episode
 
     def _accept_observation(
         self,
@@ -553,10 +633,112 @@ class GrowthEconomicHarness:
         self,
         checkpoint: HarnessCheckpoint,
         decision: ModelDecision,
-    ) -> HarnessCheckpoint:
+        *,
+        persist: bool,
+    ) -> tuple[HarnessCheckpoint, ExperienceRecord | None]:
+        commitments = list(dict.fromkeys(checkpoint.open_commitments))
+        additions = list(
+            dict.fromkeys([*decision.open_commitments, *decision.commitments_to_add])
+        )
+        if any(not isinstance(item, str) or not item.strip() for item in additions):
+            raise HarnessDecisionError("open commitments must be non-empty strings", checkpoint)
+        for commitment in additions:
+            if commitment not in commitments:
+                commitments.append(commitment)
+
+        resolutions = {item.commitment: item for item in decision.resolved_commitments}
+        if len(resolutions) != len(decision.resolved_commitments):
+            raise HarnessDecisionError(
+                "resolved_commitments must not resolve the same commitment twice",
+                checkpoint,
+            )
+        unknown_commitments = sorted(set(resolutions) - set(checkpoint.open_commitments))
+        if unknown_commitments:
+            raise HarnessDecisionError(
+                "resolved_commitments must reference commitments open before this decision: "
+                f"{unknown_commitments}",
+                checkpoint,
+            )
+        known_evidence = self._known_evidence_refs(checkpoint)
+        known_observation_ids = {
+            str(entry.metadata["action_id"])
+            for entry in checkpoint.context
+            if entry.kind == "observation" and entry.metadata.get("action_id")
+        }
+        for resolution in resolutions.values():
+            unknown_refs = sorted(set(resolution.evidence_refs) - known_evidence)
+            if unknown_refs:
+                raise HarnessDecisionError(
+                    "commitment resolution cited unknown evidence refs: "
+                    f"{unknown_refs}",
+                    checkpoint,
+                )
+            if (
+                resolution.observation_action_id is not None
+                and resolution.observation_action_id not in known_observation_ids
+            ):
+                raise HarnessDecisionError(
+                    "commitment resolution cited an unknown observation_action_id: "
+                    f"{resolution.observation_action_id!r}",
+                    checkpoint,
+                )
+        commitments = [item for item in commitments if item not in resolutions]
+        if len(commitments) > 50:
+            raise HarnessDecisionError("open commitments exceed the checkpoint limit of 50", checkpoint)
+
+        continuity = checkpoint.continuity
+        consumed_now = list(dict.fromkeys(decision.consumed_wake_event_ids))
+        consumed_event_refs: list[str] = []
+        if consumed_now and continuity is None:
+            raise HarnessDecisionError(
+                "consumed_wake_event_ids were supplied but no wake events are active",
+                checkpoint,
+            )
+        if continuity is not None:
+            active_events = {event.event_id: event for event in continuity.wake_events}
+            unknown_event_ids = sorted(set(consumed_now) - set(active_events))
+            if unknown_event_ids:
+                raise HarnessDecisionError(
+                    "consumed_wake_event_ids must reference currently active wake events: "
+                    f"{unknown_event_ids}",
+                    checkpoint,
+                )
+            for event_id in consumed_now:
+                for artifact_ref in active_events[event_id].artifact_refs:
+                    if artifact_ref not in consumed_event_refs:
+                        consumed_event_refs.append(artifact_ref)
+            consumed_all = list(
+                dict.fromkeys([*continuity.consumed_wake_event_ids, *consumed_now])
+            )
+            continuity = continuity.model_copy(
+                update={
+                    "wake_events": [
+                        event
+                        for event in continuity.wake_events
+                        if event.event_id not in set(consumed_now)
+                    ],
+                    "consumed_wake_event_ids": consumed_all,
+                }
+            )
+
         candidates = list(checkpoint.experience_candidates)
         new_candidate: ExperienceRecord | None = None
         if decision.experience_candidate is not None:
+            candidate_refs = set(decision.experience_candidate.evidence_refs)
+            if not candidate_refs:
+                raise HarnessDecisionError(
+                    "experience candidate requires at least one canonical evidence ref",
+                    checkpoint,
+                )
+            unknown_candidate_refs = sorted(
+                candidate_refs - self._known_evidence_refs(checkpoint)
+            )
+            if unknown_candidate_refs:
+                raise HarnessDecisionError(
+                    "experience candidate cited unknown evidence refs: "
+                    f"{unknown_candidate_refs}",
+                    checkpoint,
+                )
             candidate_payload = json.dumps(
                 decision.experience_candidate.model_dump(mode="json"),
                 ensure_ascii=False,
@@ -579,11 +761,18 @@ class GrowthEconomicHarness:
         entry = ContextEntry(
             kind="decision",
             summary=decision.action.rationale,
+            artifact_refs=consumed_event_refs,
             metadata={
                 "kind": decision.action.kind.value,
                 "capability": decision.action.capability,
                 "expected_observation": decision.action.expected_observation,
                 "side_effect_class": decision.action.side_effect_class.value,
+                "commitments_added": additions,
+                "commitments_resolved": [
+                    item.model_dump(mode="json")
+                    for item in decision.resolved_commitments
+                ],
+                "consumed_wake_event_ids": consumed_now,
             },
         )
         updated = checkpoint.model_copy(
@@ -591,7 +780,8 @@ class GrowthEconomicHarness:
                 "current_hypothesis": (
                     decision.current_hypothesis or checkpoint.current_hypothesis
                 ),
-                "open_commitments": decision.open_commitments,
+                "open_commitments": commitments,
+                "continuity": continuity,
                 "experience_candidates": candidates,
                 "context": [*checkpoint.context, entry],
             }
@@ -600,11 +790,24 @@ class GrowthEconomicHarness:
             updated = updated.model_copy(
                 update={"plan_state": self._apply_plan_delta(updated, decision.plan_delta)}
             )
-        if new_candidate is not None:
-            persist = getattr(self.experience_repository, "persist_candidate", None)
-            if callable(persist):
-                await persist(new_candidate, checkpoint=updated)
-        return updated
+        if new_candidate is not None and persist:
+            persist_candidate = getattr(self.experience_repository, "persist_candidate", None)
+            if callable(persist_candidate):
+                await persist_candidate(new_candidate, checkpoint=updated)
+        return updated, new_candidate
+
+    @staticmethod
+    def _mutation_batch(
+        candidates: list[ExperienceRecord],
+        episodes: list[ExperienceEpisode],
+        *,
+        cycle_handoff: CycleHandoff | None = None,
+    ) -> HarnessMutationBatch:
+        return HarnessMutationBatch(
+            experience_candidates=candidates,
+            episodes=episodes,
+            cycle_handoff=cycle_handoff,
+        )
 
     @staticmethod
     def _apply_plan_delta(
@@ -620,8 +823,51 @@ class GrowthEconomicHarness:
             )
         nodes = {node.node_id: node for node in current.nodes}
         for node_id in delta.remove_node_ids:
+            existing = nodes.get(node_id)
+            if existing is not None and existing.status.value in {"completed", "abandoned"}:
+                raise HarnessDecisionError(
+                    f"terminal plan node {node_id!r} cannot be removed; add a revision node",
+                    checkpoint,
+                )
             nodes.pop(node_id, None)
         for node in delta.upsert_nodes:
+            existing = nodes.get(node.node_id)
+            if (
+                existing is not None
+                and existing.status.value in {"completed", "abandoned"}
+                and node != existing
+            ):
+                raise HarnessDecisionError(
+                    f"terminal plan node {node.node_id!r} is immutable; add a revision node",
+                    checkpoint,
+                )
+            if node.status.value == "completed":
+                if not node.success_evidence:
+                    raise HarnessDecisionError(
+                        f"completed plan node {node.node_id!r} requires success_evidence",
+                        checkpoint,
+                    )
+                unknown_evidence = sorted(
+                    set(node.success_evidence)
+                    - GrowthEconomicHarness._known_evidence_refs(checkpoint)
+                )
+                if unknown_evidence:
+                    raise HarnessDecisionError(
+                        f"completed plan node {node.node_id!r} cited unknown evidence: "
+                        f"{unknown_evidence}",
+                        checkpoint,
+                    )
+            if node.status.value in {"blocked", "abandoned"}:
+                basis = (
+                    node.status_basis
+                    or node.metadata.get("failure_basis")
+                    or node.metadata.get("stop_reason")
+                )
+                if not isinstance(basis, str) or not basis.strip():
+                    raise HarnessDecisionError(
+                        f"{node.status.value} plan node {node.node_id!r} requires status_basis",
+                        checkpoint,
+                    )
             nodes[node.node_id] = node
         focus = delta.focus_node_ids
         if focus is None:
@@ -663,7 +909,7 @@ class GrowthEconomicHarness:
             )
         try:
             validate_json_schema(draft.arguments, descriptor.input_schema)
-        except JsonSchemaValidationError as error:
+        except (JsonSchemaValidationError, TypeError, ValueError) as error:
             raise HarnessDecisionError(
                 f"model arguments failed {descriptor.capability!r} input_schema: {error}",
                 checkpoint,
@@ -703,6 +949,11 @@ class GrowthEconomicHarness:
         evidence = arguments.get("success_evidence_refs", [])
         unresolved = arguments.get("unresolved", [])
         wake_conditions = arguments.get("wake_conditions", [])
+        outcome_status = arguments.get(
+            "outcome_status",
+            arguments.get("completion_status", "success"),
+        )
+        stop_reason = arguments.get("stop_reason")
         if not isinstance(summary, str):
             raise HarnessProtocolError("complete summary must be a string")
         if not isinstance(evidence, list) or not all(isinstance(item, str) for item in evidence):
@@ -715,6 +966,22 @@ class GrowthEconomicHarness:
             isinstance(item, str) for item in wake_conditions
         ):
             raise HarnessProtocolError("wake_conditions must be a list of strings")
+        if outcome_status not in {"success", "stopped", "failed"}:
+            raise HarnessProtocolError(
+                "complete outcome_status must be success, stopped, or failed"
+            )
+        if stop_reason is not None and not isinstance(stop_reason, str):
+            raise HarnessProtocolError("complete stop_reason must be a string")
+        if outcome_status == "success" and not evidence:
+            raise HarnessDecisionError(
+                "successful completion requires at least one success_evidence_ref",
+                checkpoint,
+            )
+        if outcome_status in {"stopped", "failed"} and not unresolved and not stop_reason:
+            raise HarnessDecisionError(
+                f"{outcome_status} completion requires unresolved items or stop_reason",
+                checkpoint,
+            )
         known_evidence = GrowthEconomicHarness._known_evidence_refs(checkpoint)
         unknown = sorted(set(evidence) - known_evidence)
         if unknown:
@@ -730,6 +997,12 @@ class GrowthEconomicHarness:
             or entry.metadata.get("error")
         ]
         artifact_refs = sorted(known_evidence)
+        if len(artifact_refs) > 300:
+            raise HarnessDecisionError(
+                "cycle handoff exceeds 300 canonical artifact refs; compact the cycle "
+                "into bounded immutable evidence manifests before completion",
+                checkpoint,
+            )
         canonical = json.dumps(
             {
                 "run_id": checkpoint.run_id,
@@ -764,9 +1037,11 @@ class GrowthEconomicHarness:
             },
         )
         return CycleResult(
+            outcome_status=outcome_status,
             summary=summary,
             success_evidence_refs=evidence,
             unresolved=unresolved,
+            stop_reason=stop_reason,
             cycle_handoff=handoff,
         )
 

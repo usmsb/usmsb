@@ -60,7 +60,6 @@ _SUPPORTED_KEYWORDS = {
     "minLength",
     "maxLength",
     "pattern",
-    "format",
     "minimum",
     "maximum",
     "exclusiveMinimum",
@@ -74,7 +73,183 @@ def validate_json_schema(value: Any, schema: dict[str, Any]) -> None:
         raise JsonSchemaValidationError("tool input_schema must be a JSON object")
     if not schema:
         return
+    _validate_schema_node(schema, root=schema, path="$schema", active=set())
     _validate(value, schema, root=schema, path="$")
+
+
+def _validate_schema_node(
+    schema: Any,
+    *,
+    root: dict[str, Any],
+    path: str,
+    active: set[int],
+) -> None:
+    """Validate the supported schema itself before it can guard any value."""
+
+    if isinstance(schema, bool):
+        return
+    if not isinstance(schema, dict):
+        raise JsonSchemaValidationError(f"{path}: schema node must be an object or boolean")
+    identity = id(schema)
+    if identity in active:
+        raise JsonSchemaValidationError(f"{path}: cyclic in-memory schema objects are forbidden")
+    active.add(identity)
+    try:
+        unsupported = set(schema) - _ANNOTATION_KEYWORDS - _SUPPORTED_KEYWORDS
+        if unsupported:
+            raise JsonSchemaValidationError(
+                f"{path}: unsupported input_schema keywords: {sorted(unsupported)}"
+            )
+
+        for key in ("$schema", "$id", "$anchor", "title", "description"):
+            if key in schema and not isinstance(schema[key], str):
+                raise JsonSchemaValidationError(f"{path}: {key} must be a string")
+        for key in ("deprecated", "readOnly", "writeOnly"):
+            if key in schema and not isinstance(schema[key], bool):
+                raise JsonSchemaValidationError(f"{path}: {key} must be a boolean")
+        if "examples" in schema and not isinstance(schema["examples"], list):
+            raise JsonSchemaValidationError(f"{path}: examples must be an array")
+
+        if "$ref" in schema:
+            _resolve_local_ref(schema["$ref"], root=root, path=path)
+        for keyword in ("$defs", "definitions", "properties", "patternProperties"):
+            if keyword not in schema:
+                continue
+            mapping = schema[keyword]
+            if not isinstance(mapping, dict):
+                raise JsonSchemaValidationError(f"{path}: {keyword} must be an object")
+            for name, child in mapping.items():
+                if keyword == "patternProperties":
+                    try:
+                        re.compile(name)
+                    except re.error as error:
+                        raise JsonSchemaValidationError(
+                            f"{path}: invalid patternProperties regex: {error}"
+                        ) from error
+                _validate_schema_node(
+                    child,
+                    root=root,
+                    path=f"{path}.{keyword}.{name}",
+                    active=active,
+                )
+
+        if "type" in schema:
+            declared = schema["type"]
+            types = [declared] if isinstance(declared, str) else declared
+            allowed = {"null", "boolean", "object", "array", "number", "integer", "string"}
+            if (
+                not isinstance(types, list)
+                or not types
+                or not all(isinstance(item, str) and item in allowed for item in types)
+                or len(types) != len(set(types))
+            ):
+                raise JsonSchemaValidationError(
+                    f"{path}: type must be a supported string or unique non-empty string list"
+                )
+        if "enum" in schema and not isinstance(schema["enum"], list):
+            raise JsonSchemaValidationError(f"{path}: enum must be an array")
+
+        for keyword in ("allOf", "anyOf", "oneOf"):
+            if keyword not in schema:
+                continue
+            options = schema[keyword]
+            if not isinstance(options, list) or not options:
+                raise JsonSchemaValidationError(f"{path}: {keyword} must be a non-empty array")
+            for index, child in enumerate(options):
+                _validate_schema_node(
+                    child,
+                    root=root,
+                    path=f"{path}.{keyword}[{index}]",
+                    active=active,
+                )
+        for keyword in ("not", "propertyNames", "contains", "items", "additionalProperties"):
+            if keyword in schema:
+                _validate_schema_node(
+                    schema[keyword],
+                    root=root,
+                    path=f"{path}.{keyword}",
+                    active=active,
+                )
+        if "prefixItems" in schema:
+            prefix = schema["prefixItems"]
+            if not isinstance(prefix, list):
+                raise JsonSchemaValidationError(f"{path}: prefixItems must be an array")
+            for index, child in enumerate(prefix):
+                _validate_schema_node(
+                    child,
+                    root=root,
+                    path=f"{path}.prefixItems[{index}]",
+                    active=active,
+                )
+
+        required = schema.get("required", [])
+        if (
+            not isinstance(required, list)
+            or not all(isinstance(item, str) for item in required)
+            or len(required) != len(set(required))
+        ):
+            raise JsonSchemaValidationError(f"{path}: required must be a unique string array")
+        dependencies = schema.get("dependentRequired", {})
+        if not isinstance(dependencies, dict):
+            raise JsonSchemaValidationError(f"{path}: dependentRequired must be an object")
+        for name, values in dependencies.items():
+            if (
+                not isinstance(values, list)
+                or not all(isinstance(item, str) for item in values)
+                or len(values) != len(set(values))
+            ):
+                raise JsonSchemaValidationError(
+                    f"{path}: dependentRequired[{name!r}] must be a unique string array"
+                )
+
+        for minimum, maximum in (
+            ("minProperties", "maxProperties"),
+            ("minItems", "maxItems"),
+            ("minLength", "maxLength"),
+            ("minContains", "maxContains"),
+        ):
+            for keyword in (minimum, maximum):
+                if keyword in schema and (
+                    isinstance(schema[keyword], bool)
+                    or not isinstance(schema[keyword], int)
+                    or schema[keyword] < 0
+                ):
+                    raise JsonSchemaValidationError(
+                        f"{path}: {keyword} must be a non-negative integer"
+                    )
+            if (
+                minimum in schema
+                and maximum in schema
+                and schema[minimum] > schema[maximum]
+            ):
+                raise JsonSchemaValidationError(f"{path}: {minimum} exceeds {maximum}")
+        if ("minContains" in schema or "maxContains" in schema) and "contains" not in schema:
+            raise JsonSchemaValidationError(
+                f"{path}: minContains/maxContains require contains"
+            )
+        if "uniqueItems" in schema and not isinstance(schema["uniqueItems"], bool):
+            raise JsonSchemaValidationError(f"{path}: uniqueItems must be a boolean")
+        if "pattern" in schema:
+            if not isinstance(schema["pattern"], str):
+                raise JsonSchemaValidationError(f"{path}: pattern must be a string")
+            try:
+                re.compile(schema["pattern"])
+            except re.error as error:
+                raise JsonSchemaValidationError(f"{path}: invalid pattern: {error}") from error
+        for keyword in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"):
+            if keyword in schema and (
+                not _is_number(schema[keyword])
+                or not math.isfinite(float(schema[keyword]))
+            ):
+                raise JsonSchemaValidationError(f"{path}: {keyword} must be a finite number")
+        if "multipleOf" in schema and (
+            not _is_number(schema["multipleOf"])
+            or not math.isfinite(float(schema["multipleOf"]))
+            or schema["multipleOf"] <= 0
+        ):
+            raise JsonSchemaValidationError(f"{path}: multipleOf must be a positive finite number")
+    finally:
+        active.remove(identity)
 
 
 def _validate(value: Any, schema: Any, *, root: dict[str, Any], path: str) -> None:

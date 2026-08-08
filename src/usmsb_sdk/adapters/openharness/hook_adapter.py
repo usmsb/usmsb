@@ -224,6 +224,7 @@ class HookAdapter:
         executor: HookExecutor | None = None,
         config: HookConfig | None = None,
         cwd: str | Path = ".",
+        max_action_log_entries: int = 10_000,
     ):
         """
         Initialize HookAdapter.
@@ -239,6 +240,13 @@ class HookAdapter:
         self._executor = executor
         self._config = config or HookConfig()
         self._cwd = Path(cwd).resolve()
+        if (
+            isinstance(max_action_log_entries, bool)
+            or not isinstance(max_action_log_entries, int)
+            or not 1 <= max_action_log_entries <= 1_000_000
+        ):
+            raise ValueError("max_action_log_entries must be an integer from 1 to 1000000")
+        self._max_action_log_entries = max_action_log_entries
         
         # USMSB-specific hook registry
         self._usmsb_registry = USMSBHookRegistry()
@@ -330,7 +338,7 @@ class HookAdapter:
             Tuple of (allowed, reason). If reason is non-empty, execution should be blocked.
         """
         # Log action
-        self._action_log.append({
+        self._append_action_log({
             "type": "pre_tool",
             "agent_id": agent_id,
             "tool_name": tool_name,
@@ -361,7 +369,7 @@ class HookAdapter:
             error: Error message (if failed)
         """
         # Log outcome
-        self._action_log.append({
+        self._append_action_log({
             "type": "post_tool",
             "agent_id": agent_id,
             "tool_name": tool_name,
@@ -375,6 +383,12 @@ class HookAdapter:
         await self._usmsb_registry.execute_post_hooks(
             agent_id, tool_name, params, allowed, result
         )
+
+    def _append_action_log(self, entry: dict[str, Any]) -> None:
+        self._action_log.append(entry)
+        overflow = len(self._action_log) - self._max_action_log_entries
+        if overflow > 0:
+            del self._action_log[:overflow]
 
     async def execute_oh_hook(
         self,
