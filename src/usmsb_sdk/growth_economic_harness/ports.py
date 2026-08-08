@@ -34,6 +34,34 @@ _SENSITIVE_COGNITIVE_PATTERNS = (
     re.compile(r"(?i)(?:微信|wechat|wxid)\s*[:：=]\s*[A-Za-z][A-Za-z0-9_-]{5,}"),
     re.compile(r"(?i)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*\S+"),
 )
+_FORBIDDEN_COGNITIVE_KEYS = {
+    "fullname",
+    "personalname",
+    "customername",
+    "phone",
+    "mobile",
+    "email",
+    "address",
+    "visitorid",
+    "subjectref",
+    "prospectid",
+    "customerid",
+    "conversationid",
+    "assessmentid",
+    "orderid",
+    "paymentid",
+    "bankcard",
+    "trackingnumber",
+    "openid",
+    "unionid",
+    "wechatid",
+    "password",
+    "cookie",
+    "credential",
+    "accesstoken",
+    "refreshtoken",
+    "secret",
+}
 
 
 def enforce_cognitive_request_policy(
@@ -68,7 +96,16 @@ def enforce_cognitive_request_policy(
 
     def inspect(value: Any) -> None:
         if isinstance(value, dict):
-            for item in value.values():
+            for key, item in value.items():
+                normalized = "".join(
+                    character
+                    for character in str(key).casefold()
+                    if character.isalnum()
+                )
+                if normalized in _FORBIDDEN_COGNITIVE_KEYS:
+                    raise ValueError(
+                        "cognitive request contains a forbidden sensitive field"
+                    )
                 inspect(item)
         elif isinstance(value, (list, tuple)):
             for item in value:
@@ -146,6 +183,7 @@ class GroupContribution(StrictModel):
     objections: list[str] = Field(default_factory=list, max_length=100)
     confidence: float = Field(ge=0, le=1)
     artifact_ref: str | None = Field(default=None, max_length=1_000)
+    host_verified_artifact_refs: list[str] = Field(default_factory=list, max_length=300)
 
     @model_validator(mode="before")
     @classmethod
@@ -164,6 +202,7 @@ class GroupResult(StrictModel):
     conflicts: list[str] = Field(default_factory=list, max_length=100)
     evidence_gaps: list[str] = Field(default_factory=list, max_length=100)
     artifact_refs: list[str] = Field(default_factory=list, max_length=300)
+    host_verified_artifact_refs: list[str] = Field(default_factory=list, max_length=300)
 
 
 class GroupReasoner(Protocol):

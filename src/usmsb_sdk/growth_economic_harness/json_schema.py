@@ -77,6 +77,23 @@ def validate_json_schema(value: Any, schema: dict[str, Any]) -> None:
     _validate(value, schema, root=schema, path="$")
 
 
+def validate_schema_definition(schema: dict[str, Any]) -> None:
+    """Admit a finite supported tool schema before it can enter a prompt."""
+
+    if not isinstance(schema, dict):
+        raise JsonSchemaValidationError("tool input_schema must be a JSON object")
+    if not schema:
+        return
+    _validate_schema_node(schema, root=schema, path="$schema", active=set())
+    declared = schema.get("type")
+    if declared is not None:
+        declared_types = [declared] if isinstance(declared, str) else declared
+        if not isinstance(declared_types, list) or "object" not in declared_types:
+            raise JsonSchemaValidationError(
+                "tool input_schema root must accept a JSON object"
+            )
+
+
 def _validate_schema_node(
     schema: Any,
     *,
@@ -111,7 +128,13 @@ def _validate_schema_node(
             raise JsonSchemaValidationError(f"{path}: examples must be an array")
 
         if "$ref" in schema:
-            _resolve_local_ref(schema["$ref"], root=root, path=path)
+            resolved = _resolve_local_ref(schema["$ref"], root=root, path=path)
+            _validate_schema_node(
+                resolved,
+                root=root,
+                path=f"{path}.$ref",
+                active=active,
+            )
         for keyword in ("$defs", "definitions", "properties", "patternProperties"):
             if keyword not in schema:
                 continue
@@ -252,7 +275,14 @@ def _validate_schema_node(
         active.remove(identity)
 
 
-def _validate(value: Any, schema: Any, *, root: dict[str, Any], path: str) -> None:
+def _validate(
+    value: Any,
+    schema: Any,
+    *,
+    root: dict[str, Any],
+    path: str,
+    _active_refs: set[tuple[int, str]] | None = None,
+) -> None:
     if isinstance(schema, bool):
         if not schema:
             raise JsonSchemaValidationError(f"{path}: value is forbidden by schema")
@@ -266,11 +296,34 @@ def _validate(value: Any, schema: Any, *, root: dict[str, Any], path: str) -> No
         )
 
     if "$ref" in schema:
-        resolved = _resolve_local_ref(schema["$ref"], root=root, path=path)
+        reference = str(schema["$ref"])
+        active_refs = _active_refs if _active_refs is not None else set()
+        identity = (id(value), reference)
+        if identity in active_refs:
+            raise JsonSchemaValidationError(
+                f"{path}: recursive $ref validation is forbidden"
+            )
+        resolved = _resolve_local_ref(reference, root=root, path=path)
         siblings = {key: item for key, item in schema.items() if key != "$ref"}
-        _validate(value, resolved, root=root, path=path)
-        if siblings:
-            _validate(value, siblings, root=root, path=path)
+        active_refs.add(identity)
+        try:
+            _validate(
+                value,
+                resolved,
+                root=root,
+                path=path,
+                _active_refs=active_refs,
+            )
+            if siblings:
+                _validate(
+                    value,
+                    siblings,
+                    root=root,
+                    path=path,
+                    _active_refs=active_refs,
+                )
+        finally:
+            active_refs.remove(identity)
         return
 
     if "const" in schema and value != schema["const"]:

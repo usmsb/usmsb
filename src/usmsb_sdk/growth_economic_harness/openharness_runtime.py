@@ -1272,7 +1272,11 @@ or simulate external tools. Return exactly one GroupContribution JSON object."""
         )
         if not isinstance(decoded, GroupContribution):
             raise OpenHarnessGrowthRuntimeError("unreachable role output type")
-        return decoded
+        return decoded.model_copy(
+            update={
+                "host_verified_artifact_refs": specialist_artifact_refs,
+            }
+        )
 
 
 class OpenHarnessGroupSynthesizer:
@@ -1358,6 +1362,13 @@ object matching GroupSynthesis; the host preserves member contributions separate
             conflicts=synthesis.conflicts,
             evidence_gaps=synthesis.evidence_gaps,
             artifact_refs=synthesis.artifact_refs,
+            host_verified_artifact_refs=list(
+                dict.fromkeys(
+                    reference
+                    for contribution in contributions
+                    for reference in contribution.host_verified_artifact_refs
+                )
+            ),
         )
 
 
@@ -1723,6 +1734,7 @@ class OpenHarnessGrowthRuntime:
         runtime_budget = context_budget or ContextBudget()
         telemetry_sink = telemetry or NullTelemetry()
         hook_adapter = HookAdapter(max_action_log_entries=1_000)
+        openharness_hooks_ready = hook_adapter.executor is not None
         call_recorder = _PhysicalCallRecorder(
             telemetry_sink,
             physical_call_governor,
@@ -1884,8 +1896,14 @@ class OpenHarnessGrowthRuntime:
             external_actions_hosted=True,
             dynamic_group_bound=True,
             openharness_swarm_bound=swarm_ready,
-            openharness_hooks_bound=True,
-            openharness_memory_bound=openharness_memory_ready or external_host_ready,
+            # The built-in Python lifecycle recorder is useful but is not an
+            # OpenHarness HookExecutor. Report the physical binding honestly;
+            # enabling executable command/HTTP hooks requires separate host
+            # authorization and must never happen implicitly.
+            openharness_hooks_bound=openharness_hooks_ready,
+            # A signed external MemoryManifest is durable continuity, not a
+            # physical OpenHarness file-memory adapter.
+            openharness_memory_bound=openharness_memory_ready,
             semantic_compaction_bound=semantic_compactor is not None,
             persistent_context_repository=context_ready
             and not isinstance(contexts, EmptyContextRepository),

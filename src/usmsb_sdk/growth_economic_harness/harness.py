@@ -19,6 +19,7 @@ from usmsb_sdk.growth_economic_harness.experience_loop import ExperienceLoop
 from usmsb_sdk.growth_economic_harness.json_schema import (
     JsonSchemaValidationError,
     validate_json_schema,
+    validate_schema_definition,
 )
 from usmsb_sdk.growth_economic_harness.models import (
     ActionIntent,
@@ -232,6 +233,23 @@ class GrowthEconomicHarness:
                         resolved_artifacts=resolved_artifacts,
                     )
                 )
+                allowed_group_refs = self._known_evidence_refs(checkpoint)
+                allowed_group_refs.update(
+                    item.artifact_ref for item in resolved_artifacts
+                )
+                allowed_group_refs.update(group_result.host_verified_artifact_refs)
+                cited_group_refs = set(group_result.artifact_refs)
+                for contribution in group_result.contributions:
+                    cited_group_refs.update(contribution.evidence_refs)
+                    if contribution.artifact_ref:
+                        cited_group_refs.add(contribution.artifact_ref)
+                unknown_group_refs = sorted(cited_group_refs - allowed_group_refs)
+                if unknown_group_refs:
+                    raise HarnessDecisionError(
+                        "group reasoning cited non-canonical evidence refs: "
+                        f"{unknown_group_refs}",
+                        checkpoint,
+                    )
                 checkpoint = checkpoint.model_copy(
                     update={
                         "selected_team": draft.team_plan,
@@ -611,8 +629,20 @@ class GrowthEconomicHarness:
                     completion.raw_output,
                     max_bytes=self.config.max_model_output_bytes,
                 )
+                await self._validate_decision_semantics(
+                    checkpoint,
+                    decision,
+                    tools,
+                )
                 validation_error = None
-            except StructuredOutputError as error:
+            except (
+                StructuredOutputError,
+                HarnessDecisionError,
+                HarnessProtocolError,
+                JsonSchemaValidationError,
+                TypeError,
+                ValueError,
+            ) as error:
                 validation_error = str(error)
                 decision = None
             await self.telemetry.model_attempt(
@@ -625,9 +655,79 @@ class GrowthEconomicHarness:
             if decision is not None:
                 return decision, checkpoint
         raise HarnessDecisionError(
-            f"model failed strict structured output after bounded repair: {validation_error}",
+            "model failed strict structured/semantic validation after bounded repair: "
+            f"{validation_error}",
             checkpoint,
         )
+
+    async def _validate_decision_semantics(
+        self,
+        checkpoint: HarnessCheckpoint,
+        decision: ModelDecision,
+        tools: list[ToolDescriptor],
+    ) -> None:
+        """Validate a provisional transition before any candidate is persisted.
+
+        Pydantic proves only the output shape. This admission step also proves
+        that the decision is executable against the current checkpoint and
+        signed tool catalog. Failures are returned to the model by ``_decide``
+        through the same bounded repair loop as malformed JSON.
+        """
+
+        provisional, candidate = await self._record_decision(
+            checkpoint,
+            decision,
+            persist=False,
+        )
+        draft = decision.action
+        if draft.capability == "cognitive.deliberate":
+            if self.group_reasoner is None or draft.team_plan is None:
+                raise HarnessDecisionError(
+                    "cognitive.deliberate requires an available GroupReasoner and team_plan",
+                    checkpoint,
+                )
+            return
+        if draft.kind == ActionKind.REVISE:
+            if not decision.current_hypothesis:
+                raise HarnessDecisionError(
+                    "revise requires current_hypothesis",
+                    checkpoint,
+                )
+            return
+        if draft.kind == ActionKind.REFLECT:
+            if decision.experience_candidate is None or candidate is None:
+                raise HarnessDecisionError(
+                    "reflect requires a valid evidence-grounded experience_candidate",
+                    checkpoint,
+                )
+            return
+        if draft.kind in {ActionKind.WAIT, ActionKind.REQUEST_GATE}:
+            wake_conditions = draft.arguments.get("wake_conditions", [])
+            if not isinstance(wake_conditions, list) or not all(
+                isinstance(item, str) and item.strip() for item in wake_conditions
+            ):
+                raise HarnessDecisionError(
+                    "wake_conditions must be a list of non-empty strings",
+                    checkpoint,
+                )
+            wake_after_seconds = draft.arguments.get("wake_after_seconds")
+            if (
+                wake_after_seconds is not None
+                and (
+                    isinstance(wake_after_seconds, bool)
+                    or not isinstance(wake_after_seconds, int)
+                    or not 1 <= wake_after_seconds <= 2_592_000
+                )
+            ):
+                raise HarnessDecisionError(
+                    "wake_after_seconds must be an integer from 1 to 2592000",
+                    checkpoint,
+                )
+            return
+        if draft.kind == ActionKind.COMPLETE:
+            self._cycle_result(provisional, draft.arguments, draft.rationale)
+            return
+        self._external_intent(provisional, decision, tools)
 
     async def _record_decision(
         self,
@@ -1074,4 +1174,10 @@ class GrowthEconomicHarness:
                 )
             if tool.capability in seen:
                 raise HarnessProtocolError(f"duplicate capability: {tool.capability}")
+            try:
+                validate_schema_definition(tool.input_schema)
+            except JsonSchemaValidationError as exc:
+                raise HarnessProtocolError(
+                    f"invalid input_schema for capability {tool.capability!r}: {exc}"
+                ) from exc
             seen.add(tool.capability)

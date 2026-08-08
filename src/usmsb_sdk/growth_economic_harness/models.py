@@ -15,6 +15,22 @@ class StrictModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
+    def model_copy(
+        self,
+        *,
+        update: dict[str, Any] | None = None,
+        deep: bool = False,
+    ) -> "StrictModel":
+        """Copy through full validation; Pydantic's default skips validators."""
+
+        payload = self.model_dump(mode="python")
+        if deep:
+            from copy import deepcopy
+
+            payload = deepcopy(payload)
+        payload.update(update or {})
+        return type(self).model_validate(payload)
+
 
 def _require_json_number(value: Any, *, field: str) -> Any:
     if not isinstance(value, dict) or field not in value:
@@ -176,6 +192,19 @@ class ContinuityState(StrictModel):
     consumed_wake_event_ids: list[str] = Field(default_factory=list, max_length=500)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def validate_wake_state(self) -> "ContinuityState":
+        active = [item.event_id for item in self.wake_events]
+        consumed = list(self.consumed_wake_event_ids)
+        if len(active) != len(set(active)):
+            raise ValueError("active wake event IDs must be unique")
+        if len(consumed) != len(set(consumed)):
+            raise ValueError("consumed wake event IDs must be unique")
+        overlap = sorted(set(active) & set(consumed))
+        if overlap:
+            raise ValueError("active and consumed wake event IDs must be disjoint")
+        return self
+
 
 class PlanNode(StrictModel):
     """One model-created mission or experiment in a domain-neutral plan graph."""
@@ -189,6 +218,16 @@ class PlanNode(StrictModel):
     stop_conditions: list[str] = Field(default_factory=list, max_length=50)
     status_basis: str | None = Field(default=None, max_length=4_000)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_status_evidence(self) -> "PlanNode":
+        if self.status == PlanNodeStatus.COMPLETED and not self.success_evidence:
+            raise ValueError("completed plan node requires success_evidence")
+        if self.status in {PlanNodeStatus.BLOCKED, PlanNodeStatus.ABANDONED} and not (
+            self.status_basis and self.status_basis.strip()
+        ):
+            raise ValueError("blocked or abandoned plan node requires status_basis")
+        return self
 
 
 class PlanState(StrictModel):
@@ -625,6 +664,17 @@ class HarnessCheckpoint(StrictModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     continuity: ContinuityState | None = None
     plan_state: PlanState | None = None
+
+    @model_validator(mode="after")
+    def validate_runtime_state(self) -> "HarnessCheckpoint":
+        awaiting = self.status == "awaiting_observation"
+        if awaiting != (self.pending_action is not None):
+            raise ValueError(
+                "awaiting_observation must contain exactly one pending action"
+            )
+        if self.status in {"completed", "failed"} and self.pending_action is not None:
+            raise ValueError("terminal checkpoint cannot retain a pending action")
+        return self
 
 
 class WaitIntent(StrictModel):

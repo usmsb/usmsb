@@ -137,10 +137,18 @@ class ExperiencePromotionPolicy:
         if any(
             isinstance(value, bool)
             or not isinstance(value, int)
-            or value < 0
+            or value < 1
             for value in values
         ):
-            raise ValueError("experience promotion thresholds must be non-negative")
+            raise ValueError("experience promotion thresholds must be positive integers")
+        if not (
+            self.probation_min_distinct_runs
+            <= self.validation_min_distinct_runs
+            <= self.promotion_min_distinct_runs
+        ):
+            raise ValueError(
+                "experience run thresholds must be monotonic from probation to promotion"
+            )
         if any(
             type(value) is not bool
             for value in (

@@ -27,13 +27,14 @@ class ContextBudgetExceeded(RuntimeError):
 
 
 def estimate_tokens(text: str) -> int:
-    """Conservative dependency-free estimate used for admission and compaction."""
+    """Fail-safe tokenizer-independent upper bound used for admission."""
 
     if not text:
         return 0
-    ascii_count = sum(1 for char in text if ord(char) < 128)
-    non_ascii_count = len(text) - ascii_count
-    return max(1, (ascii_count + 3) // 4 + non_ascii_count)
+    # A token cannot encode less than zero bytes. Treating every UTF-8 byte as
+    # one token intentionally overestimates JSON punctuation, hashes and CJK
+    # rather than risking an over-context provider call.
+    return max(1, len(text.encode("utf-8")))
 
 
 @dataclass(frozen=True)
