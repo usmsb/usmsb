@@ -618,14 +618,6 @@ class ExperienceRecord(StrictModel):
         return _require_json_number(value, field="confidence")
 
 
-class ArtifactRecord(StrictModel):
-    artifact_ref: str = Field(min_length=1, max_length=1_000)
-    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    artifact_type: str = Field(min_length=1, max_length=200)
-    content: Any
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
 class ActionIntent(StrictModel):
     action_id: str = Field(min_length=1, max_length=200)
     kind: ActionKind
