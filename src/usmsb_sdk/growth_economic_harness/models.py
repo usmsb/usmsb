@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from enum import Enum
 from typing import Any, Literal
 
@@ -13,17 +15,20 @@ class StrictModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    def validated_copy(self, *, update: dict[str, Any]) -> "StrictModel":
-        """Copy through full Pydantic validation.
-
-        ``model_copy(update=...)`` deliberately skips validation and is unsafe
-        at a durable-host boundary: a long-running loop could otherwise emit a
-        checkpoint that it cannot load after restart.  State transitions use
-        this helper so list bounds and cross-field invariants are rechecked.
-        """
+    def model_copy(
+        self,
+        *,
+        update: dict[str, Any] | None = None,
+        deep: bool = False,
+    ) -> "StrictModel":
+        """Copy through full validation; Pydantic's default skips validators."""
 
         payload = self.model_dump(mode="python")
-        payload.update(update)
+        if deep:
+            from copy import deepcopy
+
+            payload = deepcopy(payload)
+        payload.update(update or {})
         return type(self).model_validate(payload)
 
 
@@ -70,80 +75,116 @@ class ExperienceState(str, Enum):
 
 
 class PlanNodeStatus(str, Enum):
+    """Lifecycle of a model-created plan node, not a business workflow stage."""
+
     PROPOSED = "proposed"
     ACTIVE = "active"
     BLOCKED = "blocked"
+    WAITING = "waiting"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
 
 
 class WakeEvent(StrictModel):
-    event_id: str = Field(min_length=1, max_length=200)
-    condition: str = Field(min_length=1, max_length=1_000)
-    facts: dict[str, Any] = Field(default_factory=dict)
+    """Durable reason why a continuous program was resumed."""
+
+    event_id: str = Field(min_length=1, max_length=300)
+    event_type: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=20_000)
+    source: str | None = Field(default=None, max_length=300)
     artifact_refs: list[str] = Field(default_factory=list, max_length=200)
-    observed_at: str | None = Field(default=None, max_length=100)
+    facts: dict[str, Any] = Field(default_factory=dict)
+    occurred_at: str | None = Field(default=None, max_length=100)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class CycleHandoff(StrictModel):
-    from_cycle_id: str = Field(min_length=1, max_length=200)
-    summary: str = Field(min_length=1, max_length=12_000)
-    open_commitments: list[str] = Field(default_factory=list, max_length=50)
-    unresolved_questions: list[str] = Field(default_factory=list, max_length=100)
-    artifact_refs: list[str] = Field(default_factory=list, max_length=200)
+    """Lossless-enough continuity contract between completed cognitive cycles."""
+
+    handoff_id: str = Field(min_length=1, max_length=300)
+    previous_run_id: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=20_000)
+    current_hypothesis: str | None = Field(default=None, max_length=4_000)
+    open_commitments: list[str] = Field(default_factory=list, max_length=100)
+    unresolved: list[str] = Field(default_factory=list, max_length=100)
+    failed_approaches: list[str] = Field(default_factory=list, max_length=100)
+    wake_conditions: list[str] = Field(default_factory=list, max_length=100)
+    artifact_refs: list[str] = Field(default_factory=list, max_length=300)
+    experience_refs: list[str] = Field(default_factory=list, max_length=200)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MemoryReference(StrictModel):
-    memory_id: str = Field(min_length=1, max_length=500)
-    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    state: str = Field(min_length=1, max_length=100)
-    source_run_id: str | None = Field(default=None, max_length=200)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    """A host-resolvable memory pointer with an optional bounded preview."""
 
-
-class MemoryManifest(StrictModel):
-    query: str = Field(min_length=1, max_length=4_000)
-    memories: list[MemoryReference] = Field(default_factory=list, max_length=200)
-    generated_at: str = Field(min_length=1, max_length=100)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class BudgetContext(StrictModel):
-    max_input_tokens: StrictInt | None = Field(default=None, ge=1)
-    reserved_output_tokens: StrictInt | None = Field(default=None, ge=0)
-    model_context_window: StrictInt | None = Field(default=None, ge=1)
-    remaining_cost: float | None = Field(default=None, ge=0)
-    spent_cost: float = Field(default=0, ge=0)
+    memory_id: str = Field(min_length=1, max_length=300)
+    kind: Literal["working", "episodic", "semantic", "skill", "artifact"]
+    summary: str | None = Field(default=None, max_length=10_000)
+    artifact_refs: list[str] = Field(default_factory=list, max_length=200)
+    relevance: float | None = Field(default=None, ge=0, le=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
-    def require_exact_numbers(cls, value: Any) -> Any:
+    def require_exact_relevance(cls, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("relevance") is not None:
+            return _require_json_number(value, field="relevance")
+        return value
+
+
+class MemoryManifest(StrictModel):
+    """Relevant memory selected by the host for this cognitive turn."""
+
+    query: str | None = Field(default=None, max_length=4_000)
+    memories: list[MemoryReference] = Field(default_factory=list, max_length=500)
+    generated_at: str | None = Field(default=None, max_length=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BudgetContext(StrictModel):
+    """Current cognitive and economic limits visible to the model."""
+
+    model_context_window: StrictInt | None = Field(default=None, ge=1)
+    max_input_tokens: StrictInt | None = Field(default=None, ge=1)
+    reserved_output_tokens: StrictInt | None = Field(default=None, ge=0)
+    remaining_actions: StrictInt | None = Field(default=None, ge=0)
+    spent_cost: float = Field(default=0, ge=0)
+    remaining_cost: float | None = Field(default=None, ge=0)
+    currency: str | None = Field(default=None, max_length=20)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_costs(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
         value = _require_json_number(value, field="spent_cost")
-        if isinstance(value, dict) and value.get("remaining_cost") is not None:
+        if value.get("remaining_cost") is not None:
             value = _require_json_number(value, field="remaining_cost")
         return value
 
     @model_validator(mode="after")
-    def validate_limits(self) -> "BudgetContext":
+    def validate_token_limits(self) -> "BudgetContext":
         if (
             self.max_input_tokens is not None
             and self.reserved_output_tokens is not None
             and self.reserved_output_tokens >= self.max_input_tokens
         ):
-            raise ValueError("reserved_output_tokens must be below max_input_tokens")
+            raise ValueError("reserved_output_tokens must be smaller than max_input_tokens")
         if (
             self.model_context_window is not None
             and self.reserved_output_tokens is not None
             and self.reserved_output_tokens >= self.model_context_window
         ):
-            raise ValueError("reserved_output_tokens must be below model_context_window")
+            raise ValueError(
+                "reserved_output_tokens must be smaller than model_context_window"
+            )
         return self
 
 
 class ContinuityState(StrictModel):
+    """Optional V3 continuity projection; absent on legacy checkpoint.v1 payloads."""
+
     wake_events: list[WakeEvent] = Field(default_factory=list, max_length=500)
     cycle_handoff: CycleHandoff | None = None
     memory_manifest: MemoryManifest | None = None
@@ -152,20 +193,22 @@ class ContinuityState(StrictModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_wake_identity(self) -> "ContinuityState":
+    def validate_wake_state(self) -> "ContinuityState":
         active = [item.event_id for item in self.wake_events]
-        consumed = self.consumed_wake_event_ids
+        consumed = list(self.consumed_wake_event_ids)
         if len(active) != len(set(active)):
-            raise ValueError("active wake event ids must be unique")
+            raise ValueError("active wake event IDs must be unique")
         if len(consumed) != len(set(consumed)):
-            raise ValueError("consumed wake event ids must be unique")
-        overlap = set(active) & set(consumed)
+            raise ValueError("consumed wake event IDs must be unique")
+        overlap = sorted(set(active) & set(consumed))
         if overlap:
-            raise ValueError(f"active and consumed wake events overlap: {sorted(overlap)}")
+            raise ValueError("active and consumed wake event IDs must be disjoint")
         return self
 
 
 class PlanNode(StrictModel):
+    """One model-created mission or experiment in a domain-neutral plan graph."""
+
     node_id: str = Field(min_length=1, max_length=200)
     goal: str = Field(min_length=1, max_length=4_000)
     status: PlanNodeStatus = PlanNodeStatus.PROPOSED
@@ -177,15 +220,19 @@ class PlanNode(StrictModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_terminal_evidence(self) -> "PlanNode":
+    def validate_status_evidence(self) -> "PlanNode":
         if self.status == PlanNodeStatus.COMPLETED and not self.success_evidence:
-            raise ValueError("completed plan node requires success evidence")
-        if self.status in {PlanNodeStatus.BLOCKED, PlanNodeStatus.ABANDONED} and not self.status_basis:
-            raise ValueError(f"{self.status.value} plan node requires status_basis")
+            raise ValueError("completed plan node requires success_evidence")
+        if self.status in {PlanNodeStatus.BLOCKED, PlanNodeStatus.ABANDONED} and not (
+            self.status_basis and self.status_basis.strip()
+        ):
+            raise ValueError("blocked or abandoned plan node requires status_basis")
         return self
 
 
 class PlanState(StrictModel):
+    """Revisioned plan graph whose contents are selected by the model."""
+
     plan_id: str = Field(min_length=1, max_length=200)
     revision: StrictInt = Field(default=0, ge=0)
     nodes: list[PlanNode] = Field(default_factory=list, max_length=500)
@@ -194,37 +241,41 @@ class PlanState(StrictModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_graph(self) -> "PlanState":
-        node_ids = [item.node_id for item in self.nodes]
+    def validate_graph_references(self) -> "PlanState":
+        node_ids = [node.node_id for node in self.nodes]
         if len(node_ids) != len(set(node_ids)):
-            raise ValueError("plan node ids must be unique")
+            raise ValueError("plan node_id values must be unique")
         known = set(node_ids)
-        if any(item not in known for item in self.focus_node_ids):
-            raise ValueError("focus nodes must reference known plan nodes")
-        graph = {item.node_id: set(item.depends_on) for item in self.nodes}
-        for node_id, dependencies in graph.items():
-            if node_id in dependencies or not dependencies.issubset(known):
-                raise ValueError("plan dependencies must reference other known nodes")
+        if any(node_id not in known for node_id in self.focus_node_ids):
+            raise ValueError("focus_node_ids must reference known plan nodes")
+        for node in self.nodes:
+            if node.node_id in node.depends_on:
+                raise ValueError("plan node cannot depend on itself")
+            if any(dependency not in known for dependency in node.depends_on):
+                raise ValueError("plan dependencies must reference known plan nodes")
+        dependencies = {node.node_id: set(node.depends_on) for node in self.nodes}
         visiting: set[str] = set()
         visited: set[str] = set()
 
         def visit(node_id: str) -> None:
             if node_id in visiting:
-                raise ValueError("plan dependencies must be acyclic")
+                raise ValueError("plan dependencies must form an acyclic graph")
             if node_id in visited:
                 return
             visiting.add(node_id)
-            for dependency in graph[node_id]:
+            for dependency in dependencies[node_id]:
                 visit(dependency)
             visiting.remove(node_id)
             visited.add(node_id)
 
-        for node_id in graph:
+        for node_id in dependencies:
             visit(node_id)
         return self
 
 
 class PlanDelta(StrictModel):
+    """A model-proposed, revision-checked change to ``PlanState``."""
+
     expected_revision: StrictInt | None = Field(default=None, ge=0)
     rationale: str = Field(min_length=1, max_length=4_000)
     upsert_nodes: list[PlanNode] = Field(default_factory=list, max_length=100)
@@ -256,8 +307,8 @@ class TeamPlan(StrictModel):
     stop_when: str | None = Field(default=None, max_length=1_000)
 
     @model_validator(mode="after")
-    def validate_roles(self) -> "TeamPlan":
-        names = [item.name for item in self.roles]
+    def require_unique_roles(self) -> "TeamPlan":
+        names = [role.name for role in self.roles]
         if len(names) != len(set(names)):
             raise ValueError("team role names must be unique")
         return self
@@ -274,6 +325,23 @@ class ExperienceDraft(StrictModel):
     @classmethod
     def require_exact_confidence(cls, value: Any) -> Any:
         return _require_json_number(value, field="confidence")
+
+
+class CommitmentResolution(StrictModel):
+    """Evidence-grounded request to remove one durable open commitment."""
+
+    commitment: str = Field(min_length=1, max_length=4_000)
+    resolution_summary: str = Field(min_length=1, max_length=4_000)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=100)
+    observation_action_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def require_resolution_source(self) -> "CommitmentResolution":
+        if not self.evidence_refs and self.observation_action_id is None:
+            raise ValueError(
+                "commitment resolution requires evidence_refs or observation_action_id"
+            )
+        return self
 
 
 class ActionDraft(StrictModel):
@@ -298,29 +366,16 @@ class ActionDraft(StrictModel):
             if self.team_plan is None:
                 raise ValueError("cognitive.deliberate requires a model-selected team_plan")
             if self.kind != ActionKind.DELEGATE:
-                raise ValueError("cognitive.deliberate must use delegate")
+                raise ValueError("cognitive.deliberate must use kind='delegate'")
             if self.side_effect_class != SideEffectClass.COGNITIVE:
-                raise ValueError("cognitive.deliberate must be cognitive")
+                raise ValueError("cognitive.deliberate must be side-effect-free cognition")
         elif self.team_plan is not None:
             raise ValueError("team_plan is valid only for cognitive.deliberate")
         if self.kind not in external:
             if self.capability is not None:
                 raise ValueError(f"{self.kind.value} must not select an external capability")
             if self.side_effect_class != SideEffectClass.COGNITIVE:
-                raise ValueError(f"{self.kind.value} must be cognitive")
-        return self
-
-
-class CommitmentResolution(StrictModel):
-    commitment: str = Field(min_length=1, max_length=4_000)
-    resolution_summary: str = Field(min_length=1, max_length=4_000)
-    evidence_refs: list[str] = Field(default_factory=list, max_length=100)
-    observation_action_id: str | None = Field(default=None, min_length=1, max_length=200)
-
-    @model_validator(mode="after")
-    def require_source(self) -> "CommitmentResolution":
-        if not self.evidence_refs and self.observation_action_id is None:
-            raise ValueError("commitment resolution requires evidence or observation")
+                raise ValueError(f"{self.kind.value} must use cognitive side_effect_class")
         return self
 
 
@@ -329,9 +384,14 @@ class ModelDecision(StrictModel):
 
     action: ActionDraft
     current_hypothesis: str | None = Field(default=None, max_length=4_000)
+    # Backward-compatible legacy field. Its values are additive only; omission
+    # or an empty list never clears checkpoint commitments.
     open_commitments: list[str] = Field(default_factory=list, max_length=50)
     commitments_to_add: list[str] = Field(default_factory=list, max_length=50)
-    resolved_commitments: list[CommitmentResolution] = Field(default_factory=list, max_length=50)
+    resolved_commitments: list[CommitmentResolution] = Field(
+        default_factory=list,
+        max_length=50,
+    )
     consumed_wake_event_ids: list[str] = Field(default_factory=list, max_length=500)
     experience_candidate: ExperienceDraft | None = None
     plan_delta: PlanDelta | None = None
@@ -354,6 +414,8 @@ class ModelCompletion(StrictModel):
 
 
 class CognitiveCallRecord(StrictModel):
+    """Host-persistable usage/provenance for one physical model or A2A call."""
+
     call_id: str = Field(min_length=1, max_length=300)
     purpose: Literal["cognitive", "role", "specialist", "synthesis", "compaction"]
     run_id: str = Field(min_length=1, max_length=200)
@@ -376,7 +438,7 @@ class CognitiveCallRecord(StrictModel):
 
     @model_validator(mode="before")
     @classmethod
-    def require_exact_cost(cls, value: Any) -> Any:
+    def require_exact_call_cost(cls, value: Any) -> Any:
         return _require_json_number(value, field="cost")
 
 
@@ -406,10 +468,137 @@ class Observation(StrictModel):
 
 
 class ContextEntry(StrictModel):
-    kind: Literal["decision", "observation", "group", "reflection", "revision", "compact"]
+    kind: Literal[
+        "decision",
+        "observation",
+        "group",
+        "reflection",
+        "revision",
+        "compact",
+        "episode",
+        "handoff",
+        "memory",
+    ]
     summary: str = Field(min_length=1, max_length=30_000)
     artifact_refs: list[str] = Field(default_factory=list, max_length=200)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ArtifactRecord(StrictModel):
+    """Host-resolved immutable artifact; content is bounded before model admission."""
+
+    artifact_ref: str = Field(min_length=1, max_length=1_000)
+    media_type: str | None = Field(default=None, max_length=200)
+    content: str | None = Field(default=None, max_length=1_000_000)
+    content_hash: str | None = Field(default=None, max_length=200)
+    byte_size: StrictInt | None = Field(default=None, ge=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def require_authorized_model_content(self) -> "ArtifactRecord":
+        """Fail closed before any resolved content can enter a model prompt."""
+
+        if self.content is None:
+            return self
+        classification = str(self.metadata.get("classification") or "").strip().lower()
+        destinations = {
+            str(item).strip().lower()
+            for item in self.metadata.get("destinations", [])
+            if isinstance(item, str)
+        }
+        if (
+            self.metadata.get("host_verified") is not True
+            or classification not in {"non_personal", "tenant_authorized"}
+            or not {"opc_conductor", "llm", "agent"}.issubset(destinations)
+            or not str(self.metadata.get("authorization_ref") or "").strip()
+            or self.metadata.get("pii_field_count") != 0
+            or self.metadata.get("contains_customer_transcript") is not False
+            or self.metadata.get("contains_payment_data") is not False
+            or self.metadata.get("contains_logistics_data") is not False
+            or self.metadata.get("contains_credentials") is not False
+        ):
+            raise ValueError("artifact content is not authorized for cognitive processing")
+
+        try:
+            inspected: Any = json.loads(self.content)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            inspected = self.content
+        forbidden_keys = {
+            "fullname", "personalname", "customername", "phone", "mobile",
+            "email", "address", "visitorid", "subjectref", "prospectid",
+            "customerid", "conversationid", "assessmentid", "orderid",
+            "paymentid", "bankcard", "trackingnumber", "openid", "unionid",
+            "wechatid", "password", "cookie", "credential", "accesstoken",
+            "refreshtoken", "secret",
+        }
+
+        def contains_forbidden_key(value: Any) -> bool:
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    normalized = "".join(
+                        character
+                        for character in str(key).casefold()
+                        if character.isalnum()
+                    )
+                    if normalized in forbidden_keys or contains_forbidden_key(item):
+                        return True
+            elif isinstance(value, list):
+                return any(contains_forbidden_key(item) for item in value)
+            return False
+
+        serialized = self.content
+        sensitive_patterns = (
+            re.compile(r"(?i)(?<![\w.+-])[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}(?![\w.-])"),
+            re.compile(r"(?<!\d)(?:\+?86[- ]?)?1[3-9]\d{9}(?!\d)"),
+            re.compile(r"(?<!\d)\d{17}[\dXx](?!\w)"),
+            re.compile(r"(?i)(?:微信|wechat|wxid)\s*[:：=]\s*[A-Za-z][A-Za-z0-9_-]{5,}"),
+            re.compile(r"(?i)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*\S+"),
+        )
+        if contains_forbidden_key(inspected) or any(
+            pattern.search(serialized) for pattern in sensitive_patterns
+        ):
+            raise ValueError("artifact content failed sensitive-data inspection")
+        return self
+
+
+class EpisodeOutcome(StrictModel):
+    """Attributable result observed after an action or experiment."""
+
+    outcome_id: str = Field(min_length=1, max_length=300)
+    action_id: str | None = Field(default=None, max_length=200)
+    status: Literal["succeeded", "failed", "rejected", "outcome_unknown"]
+    summary: str = Field(min_length=1, max_length=20_000)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    artifact_refs: list[str] = Field(default_factory=list, max_length=200)
+    cost: float = Field(default=0, ge=0)
+    observed_at: str | None = Field(default=None, max_length=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_cost(cls, value: Any) -> Any:
+        return _require_json_number(value, field="cost")
+
+
+class SkillManifest(StrictModel):
+    """Declarative promoted behavior; never arbitrary executable model code."""
+
+    skill_id: str = Field(min_length=1, max_length=300)
+    version: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=500)
+    instruction: str = Field(min_length=1, max_length=20_000)
+    applicability: str = Field(min_length=1, max_length=4_000)
+    exclusions: list[str] = Field(default_factory=list, max_length=100)
+    evidence_refs: list[str] = Field(min_length=1, max_length=300)
+    counter_evidence_refs: list[str] = Field(default_factory=list, max_length=300)
+    confidence: float = Field(ge=0, le=1)
+    source_experience_ids: list[str] = Field(min_length=1, max_length=200)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_exact_confidence(cls, value: Any) -> Any:
+        return _require_json_number(value, field="confidence")
 
 
 class ExperienceRecord(StrictModel):
@@ -449,23 +638,9 @@ class ActionIntent(StrictModel):
     team_plan: TeamPlan | None = None
 
 
-class EpisodeOutcome(StrictModel):
-    outcome_ref: str = Field(min_length=1, max_length=1_000)
-    status: str = Field(min_length=1, max_length=100)
-    metric: str | None = Field(default=None, max_length=200)
-    value: float | None = None
-    evidence_refs: list[str] = Field(default_factory=list, max_length=200)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="before")
-    @classmethod
-    def require_exact_value(cls, value: Any) -> Any:
-        if isinstance(value, dict) and value.get("value") is not None:
-            return _require_json_number(value, field="value")
-        return value
-
-
 class ExperienceEpisode(StrictModel):
+    """Declarative evidence package used for causal experience evaluation."""
+
     episode_id: str = Field(min_length=1, max_length=300)
     run_id: str = Field(min_length=1, max_length=200)
     plan_node_id: str | None = Field(default=None, max_length=200)
@@ -499,11 +674,14 @@ class HarnessCheckpoint(StrictModel):
     plan_state: PlanState | None = None
 
     @model_validator(mode="after")
-    def validate_state_machine(self) -> "HarnessCheckpoint":
-        if self.status == "awaiting_observation" and self.pending_action is None:
-            raise ValueError("awaiting_observation requires pending_action")
-        if self.status != "awaiting_observation" and self.pending_action is not None:
-            raise ValueError(f"{self.status} checkpoint cannot retain pending_action")
+    def validate_runtime_state(self) -> "HarnessCheckpoint":
+        awaiting = self.status == "awaiting_observation"
+        if awaiting != (self.pending_action is not None):
+            raise ValueError(
+                "awaiting_observation must contain exactly one pending action"
+            )
+        if self.status in {"completed", "failed"} and self.pending_action is not None:
+            raise ValueError("terminal checkpoint cannot retain a pending action")
         return self
 
 
@@ -524,6 +702,8 @@ class CycleResult(StrictModel):
 
 
 class HarnessMutationBatch(StrictModel):
+    """Durable-host mutations produced by one cognitive step."""
+
     experience_candidates: list[ExperienceRecord] = Field(default_factory=list, max_length=200)
     episodes: list[ExperienceEpisode] = Field(default_factory=list, max_length=200)
     cycle_handoff: CycleHandoff | None = None

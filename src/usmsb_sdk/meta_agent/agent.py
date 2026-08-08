@@ -457,6 +457,12 @@ class MetaAgent:
 
         # ========== OpenHarness 集成 ==========
         self.oh_integration: Any = None  # OpenHarnessIntegration
+        self.oh_integration_status: dict[str, Any] = {
+            "adapter_initialized": False,
+            "query_engine_bound": False,
+            "cognitive_ready": False,
+            "reason": "not_initialized",
+        }
         self._meta_agent_adapter: Any = None  # OH MetaAgentAdapter for spawning
 
         # ========== Platform 客户端 + Gene Capsule ==========
@@ -768,23 +774,39 @@ class MetaAgent:
     # ─────────────────────────────────────────────────────────────────
 
     async def _init_openharness(self) -> None:
-        """Initialize OpenHarness integration and inject tools into registry."""
+        """Initialize the verified adapter layer without claiming a bound runtime."""
         try:
             from usmsb_sdk.adapters.openharness import OpenHarnessIntegration
+            from usmsb_sdk.adapters.openharness.exceptions import OpenHarnessAdapterError
+        except ImportError as e:
+            logger.warning("OpenHarness adapter unavailable: %s", e)
+            self.oh_integration = None
+            self.oh_integration_status = {
+                "adapter_initialized": False,
+                "query_engine_bound": False,
+                "cognitive_ready": False,
+                "reason": str(e),
+            }
+            return
 
+        try:
             self.oh_integration = OpenHarnessIntegration.from_env(cwd=self.config.data_dir or ".")
             await self.oh_integration.initialize()
-            logger.info("OpenHarness initialized")
-
-            # Inject OH tools into USMSB tool registry
-            injected = self.oh_integration.inject_oh_tools_into_registry(
-                self.tool_registry,
-                capability_filter=None,
+            self.oh_integration_status = self.oh_integration.runtime_status()
+            logger.info(
+                "OpenHarness adapter initialized (query_engine_bound=%s, tool_bridge=%s)",
+                self.oh_integration_status["query_engine_bound"],
+                self.oh_integration_status["tool_bridge_mode"],
             )
-            logger.info("Injected %d OpenHarness tools into registry", injected)
-        except Exception as e:
-            logger.warning("OpenHarness initialization failed (OH may not be installed): %s", e)
+        except OpenHarnessAdapterError as e:
+            logger.warning("OpenHarness adapter unavailable: %s", e)
             self.oh_integration = None
+            self.oh_integration_status = {
+                "adapter_initialized": False,
+                "query_engine_bound": False,
+                "cognitive_ready": False,
+                "reason": str(e),
+            }
 
     async def _init_platform_client(self) -> None:
         """Initialize Platform client and Gene Capsule adapter."""
