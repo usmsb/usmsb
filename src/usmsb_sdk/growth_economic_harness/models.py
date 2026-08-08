@@ -23,12 +23,15 @@ class StrictModel(BaseModel):
     ) -> "StrictModel":
         """Copy through full validation; Pydantic's default skips validators."""
 
-        payload = self.model_dump(mode="python")
+        payload = self.model_dump(mode="python", by_alias=True)
         if deep:
             from copy import deepcopy
 
             payload = deepcopy(payload)
-        payload.update(update or {})
+        for key, value in (update or {}).items():
+            field = type(self).model_fields.get(key)
+            payload_key = field.alias if field is not None and field.alias else key
+            payload[payload_key] = value
         return type(self).model_validate(payload)
 
 
