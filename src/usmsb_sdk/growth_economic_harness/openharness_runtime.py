@@ -109,6 +109,14 @@ class CognitiveRoleAgentInvoker(Protocol):
 
 
 class PhysicalCallGovernor(Protocol):
+    async def preflight_physical_calls(
+        self,
+        *,
+        count: int,
+        purpose: str,
+    ) -> None:
+        """Atomically verify a whole bounded team can start without partial spend."""
+
     async def authorize_physical_call(
         self,
         session: QuerySessionRequest,
@@ -503,6 +511,7 @@ class GrowthRuntimeReadiness(StrictModel):
     openharness_swarm_bound: bool
     openharness_hooks_bound: bool
     openharness_memory_bound: bool
+    hosted_memory_manifest_bound: bool
     semantic_compaction_bound: bool
     persistent_context_repository: bool
     persistent_artifact_repository: bool
@@ -672,26 +681,49 @@ class _PhysicalCallRecorder:
     def end(self, token: contextvars.Token[list[CognitiveCallRecord] | None]) -> None:
         self._active.reset(token)
 
+    async def preflight_group(self, *, count: int, purpose: str) -> None:
+        if self.governor is None:
+            return
+        preflight = getattr(self.governor, "preflight_physical_calls", None)
+        if not callable(preflight):
+            raise OpenHarnessGrowthRuntimeError(
+                "production physical-call governor lacks atomic group preflight"
+            )
+        await preflight(count=max(1, int(count)), purpose=str(purpose))
+
     async def authorize(
         self,
         session: QuerySessionRequest,
         *,
         parent_call_id: str | None,
     ) -> str | None:
+        hook_payload = {
+            "tool_name": "growth.cognitive.physical_call",
+            "purpose": session.purpose,
+            "run_id": session.run_id,
+            "step_index": session.step_index,
+            "role": session.role,
+            "parent_call_id": parent_call_id,
+        }
         allowed, reason = await self.hooks.execute_pre_hooks(
             session.session_id,
             "growth.cognitive.physical_call",
-            {
-                "purpose": session.purpose,
-                "run_id": session.run_id,
-                "step_index": session.step_index,
-                "role": session.role,
-                "parent_call_id": parent_call_id,
-            },
+            hook_payload,
         )
         if not allowed:
             raise OpenHarnessGrowthRuntimeError(
                 "OpenHarness cognitive pre-hook blocked physical call: " + reason
+            )
+        from openharness.hooks.events import HookEvent
+
+        oh_result = await self.hooks.execute_oh_hook(
+            HookEvent.PRE_TOOL_USE,
+            hook_payload,
+        )
+        if not oh_result.success or oh_result.blocked:
+            raise OpenHarnessGrowthRuntimeError(
+                "OpenHarness HookExecutor blocked physical call: "
+                + (oh_result.reason or "unknown hook failure")
             )
         if self.governor is None:
             return None
@@ -801,6 +833,22 @@ class _PhysicalCallRecorder:
             record.model_dump(mode="json"),
             error=record.error,
         )
+        from openharness.hooks.events import HookEvent
+
+        # Post hooks are observational. A failure after a paid Provider call is
+        # retained in telemetry and must never turn into a replay trigger.
+        oh_result = await self.hooks.execute_oh_hook(
+            HookEvent.POST_TOOL_USE,
+            {
+                "tool_name": "growth.cognitive.physical_call",
+                "call": record.model_dump(mode="json"),
+            },
+        )
+        if not oh_result.success:
+            await self.telemetry.event(
+                "growth.openharness.post_hook_failed",
+                {"call_id": record.call_id, "reason": oh_result.reason[:1_000]},
+            )
 
 
 def _model_completion(
@@ -934,6 +982,30 @@ async def _bounded_structured_query(
                 physical_attempt_ref
             ),
         )
+        normalized_stop = str(result.stop_reason or "").strip().lower()
+        if normalized_stop in {
+            "length",
+            "max_tokens",
+            "max_output_tokens",
+            "content_filter",
+            "refusal",
+            "rejected",
+            "incomplete",
+        }:
+            error = OpenHarnessGrowthRuntimeError(
+                "Provider terminal stop reason is not repairable: " + normalized_stop
+            )
+            await call_recorder.failed(
+                session,
+                error,
+                duration_ms=int((time.monotonic() - started) * 1_000),
+                parent_call_id=parent_call_id,
+                provider="openharness",
+                model=adapter.model,
+                completion=completion,
+                governor_reservation_id=reservation_id,
+            )
+            raise error
         try:
             decoded = decode_strict_model(result.message, schema_model)
             if validate_result is not None:
@@ -1396,6 +1468,14 @@ class OpenHarnessGroupReasoner(GroupReasoner):
             raise OpenHarnessGrowthRuntimeError(
                 f"model selected {len(roles)} roles; allowed 1..{self.max_parallel_roles}"
             )
+        # Reserve admission for the complete worst-case team before launching
+        # any concurrent role.  Each role may use one specialist call and one
+        # primary + two bounded repairs; synthesis has the same three-call
+        # bound.  Individual calls still consume their own reservations.
+        await self.role_reasoner.call_recorder.preflight_group(
+            count=(len(roles) * 4) + 3,
+            purpose=f"group:{request.run_id}:{request.step_index}",
+        )
         swarm_session: OpenHarnessSwarmSession | None = None
         try:
             swarm_session = (
@@ -1634,6 +1714,7 @@ class OpenHarnessGrowthRuntime:
     ) -> "OpenHarnessGrowthRuntime":
         """Build the only production-ready assembly and fail closed on any empty binding."""
 
+        selected_harness_config = harness_config or HarnessConfig()
         runtime = await cls.create(
             query_adapter_factory=bindings.query_adapter_factory,
             experience_repository=bindings.experience_repository,
@@ -1646,10 +1727,12 @@ class OpenHarnessGrowthRuntime:
             physical_call_governor=bindings.physical_call_governor,
             context_budget=context_budget,
             experience_loop=experience_loop,
-            harness_config=harness_config,
+            harness_config=selected_harness_config,
             trace_context_factory=bindings.trace_context_factory,
             billing_context_factory=bindings.billing_context_factory,
-            enable_semantic_compaction=True,
+            enable_semantic_compaction=(
+                selected_harness_config.runtime_profile.semantic_compaction_enabled
+            ),
             max_parallel_roles=max_parallel_roles,
         )
         runtime.require_production_ready()
@@ -1667,6 +1750,7 @@ class OpenHarnessGrowthRuntime:
     ) -> "OpenHarnessGrowthRuntime":
         """Build the stateless A2A Conductor; OPC Host owns every durable write."""
 
+        selected_harness_config = harness_config or HarnessConfig()
         runtime = await cls.create(
             query_adapter_factory=bindings.query_adapter_factory,
             role_agent_invoker=bindings.role_agent_invoker,
@@ -1675,10 +1759,12 @@ class OpenHarnessGrowthRuntime:
             physical_call_governor=bindings.physical_call_governor,
             context_budget=context_budget,
             experience_loop=experience_loop,
-            harness_config=harness_config,
+            harness_config=selected_harness_config,
             trace_context_factory=bindings.trace_context_factory,
             billing_context_factory=bindings.billing_context_factory,
-            enable_semantic_compaction=True,
+            enable_semantic_compaction=(
+                selected_harness_config.runtime_profile.semantic_compaction_enabled
+            ),
             max_parallel_roles=max_parallel_roles,
             durability_mode="external_durable_host",
             external_durable_host_verifier=bindings.host_verifier,
@@ -1712,6 +1798,7 @@ class OpenHarnessGrowthRuntime:
         external_durable_host_verifier: ExternalDurableHostVerifier | None = None,
     ) -> "OpenHarnessGrowthRuntime":
         require_openharness_019()
+        selected_harness_config = harness_config or HarnessConfig()
         if (
             isinstance(max_parallel_roles, bool)
             or not isinstance(max_parallel_roles, int)
@@ -1733,13 +1820,6 @@ class OpenHarnessGrowthRuntime:
             )
         runtime_budget = context_budget or ContextBudget()
         telemetry_sink = telemetry or NullTelemetry()
-        hook_adapter = HookAdapter(max_action_log_entries=1_000)
-        openharness_hooks_ready = hook_adapter.executor is not None
-        call_recorder = _PhysicalCallRecorder(
-            telemetry_sink,
-            physical_call_governor,
-            hook_adapter,
-        )
         bootstrap = QuerySessionRequest(
             purpose="cognitive",
             run_id="runtime-bootstrap",
@@ -1747,6 +1827,28 @@ class OpenHarnessGrowthRuntime:
             session_id="growth:runtime-bootstrap:cognitive",
         )
         cognitive_adapter = await _make_adapter(query_adapter_factory, bootstrap)
+        from openharness.hooks.executor import HookExecutionContext, HookExecutor
+        from openharness.hooks.loader import HookRegistry
+
+        hook_executor = HookExecutor(
+            HookRegistry(),
+            HookExecutionContext(
+                cwd=Path(getattr(cognitive_adapter, "_cwd", Path.cwd())),
+                api_client=cognitive_adapter.engine.api_client,
+                default_model=cognitive_adapter.model,
+            ),
+        )
+        hook_adapter = HookAdapter(
+            executor=hook_executor,
+            cwd=Path(getattr(cognitive_adapter, "_cwd", Path.cwd())),
+            max_action_log_entries=1_000,
+        )
+        openharness_hooks_ready = hook_adapter.executor is hook_executor
+        call_recorder = _PhysicalCallRecorder(
+            telemetry_sink,
+            physical_call_governor,
+            hook_adapter,
+        )
         isolation = _SessionIsolation()
         model = OpenHarnessCognitiveModel(
             query_adapter_factory,
@@ -1850,7 +1952,7 @@ class OpenHarnessGrowthRuntime:
             artifact_repository=artifacts,
             checkpoint_repository=checkpoints,
             telemetry=telemetry_sink,
-            config=harness_config,
+            config=selected_harness_config,
         )
         external_host_ready = (
             durability_mode == "external_durable_host"
@@ -1875,17 +1977,34 @@ class OpenHarnessGrowthRuntime:
                 missing.append("persistent_checkpoint_repository")
         elif not external_host_ready:
             missing.append("external_durable_host_binding")
-        if not role_invoker_ready:
+        if (
+            selected_harness_config.runtime_profile.group_loop_enabled
+            and not role_invoker_ready
+        ):
             missing.append("opc_role_agent_invoker")
-        if not swarm_ready:
+        if (
+            selected_harness_config.runtime_profile.group_loop_enabled
+            and not swarm_ready
+        ):
             missing.append("openharness_swarm_binding")
-        if semantic_compactor is None:
+        if (
+            selected_harness_config.runtime_profile.semantic_compaction_enabled
+            and semantic_compactor is None
+        ):
             missing.append("semantic_compaction_binding")
+        if not openharness_hooks_ready:
+            missing.append("openharness_hook_executor")
         if isinstance(telemetry_sink, NullTelemetry):
             missing.append("physical_call_telemetry")
+        required_governor_methods = [
+            "authorize_physical_call",
+            "settle_physical_call",
+        ]
+        if selected_harness_config.runtime_profile.group_loop_enabled:
+            required_governor_methods.append("preflight_physical_calls")
         if physical_call_governor is None or not _implements_methods(
             physical_call_governor,
-            ("authorize_physical_call", "settle_physical_call"),
+            tuple(required_governor_methods),
         ):
             missing.append("physical_call_governor")
         readiness = _readiness(
@@ -1894,8 +2013,14 @@ class OpenHarnessGrowthRuntime:
             cognitive_query_engine_bound=True,
             stateless_cognitive_sessions=True,
             external_actions_hosted=True,
-            dynamic_group_bound=True,
-            openharness_swarm_bound=swarm_ready,
+            dynamic_group_bound=(
+                not selected_harness_config.runtime_profile.group_loop_enabled
+                or role_invoker_ready
+            ),
+            openharness_swarm_bound=(
+                not selected_harness_config.runtime_profile.group_loop_enabled
+                or swarm_ready
+            ),
             # The built-in Python lifecycle recorder is useful but is not an
             # OpenHarness HookExecutor. Report the physical binding honestly;
             # enabling executable command/HTTP hooks requires separate host
@@ -1904,6 +2029,7 @@ class OpenHarnessGrowthRuntime:
             # A signed external MemoryManifest is durable continuity, not a
             # physical OpenHarness file-memory adapter.
             openharness_memory_bound=openharness_memory_ready,
+            hosted_memory_manifest_bound=external_host_ready,
             semantic_compaction_bound=semantic_compactor is not None,
             persistent_context_repository=context_ready
             and not isinstance(contexts, EmptyContextRepository),
@@ -1963,10 +2089,18 @@ class OpenHarnessGrowthRuntime:
             )
         finally:
             self._call_recorder.end(token)
-        mutations = result.mutations.model_copy(
-            update={"cognitive_calls": list(physical_calls)}
+        mutations = type(result.mutations).model_validate(
+            {
+                **result.mutations.model_dump(mode="python"),
+                "cognitive_calls": list(physical_calls),
+            }
         )
-        return result.model_copy(update={"mutations": mutations})
+        return type(result).model_validate(
+            {
+                **result.model_dump(mode="python"),
+                "mutations": mutations,
+            }
+        )
 
     async def step(
         self,

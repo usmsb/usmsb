@@ -37,6 +37,14 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text.encode("utf-8")))
 
 
+def _validated_copy(value: Any, update: dict[str, Any]) -> Any:
+    """Apply an update through Pydantic validation instead of unsafe model_copy."""
+
+    return type(value).model_validate(
+        {**value.model_dump(mode="python"), **update}
+    )
+
+
 @dataclass(frozen=True)
 class ContextBudget:
     max_input_tokens: int = 48_000
@@ -178,8 +186,9 @@ class ContextLoop:
                 current_candidates[experience.experience_id] = experience
                 continue
             filtered_experiences.append(experience)
-        candidate = candidate.model_copy(
-            update={"experience_candidates": list(current_candidates.values())}
+        candidate = _validated_copy(
+            candidate,
+            {"experience_candidates": list(current_candidates.values())},
         )
         experiences = filtered_experiences
         artifacts = self._unique_artifacts(resolved_artifacts or [])
@@ -275,11 +284,12 @@ class ContextLoop:
                 )
             compact_entries.append(compact_entry)
 
-        return checkpoint.model_copy(
-            update={
+        return _validated_copy(
+            checkpoint,
+            {
                 "context": [*compact_entries, *recent],
                 "compacted_entries": checkpoint.compacted_entries + len(older),
-            }
+            },
         )
 
     def _compaction_chunks(
@@ -335,11 +345,12 @@ class ContextLoop:
                 checkpoint.metadata.get("cognitive_data_authorization", {})
             ),
         )
-        return checkpoint.model_copy(
-            update={
+        return _validated_copy(
+            checkpoint,
+            {
                 "context": [self._deterministic_entry(request), *context[-preserve:]],
                 "compacted_entries": checkpoint.compacted_entries + len(older),
-            }
+            },
         )
 
     @staticmethod
@@ -413,8 +424,9 @@ class ContextLoop:
             "required_artifact_refs": list(request.required_artifact_refs),
             "semantic": True,
         }
-        grounded = compact_entry.model_copy(
-            update={"kind": "compact", "artifact_refs": artifact_refs, "metadata": metadata}
+        grounded = _validated_copy(
+            compact_entry,
+            {"kind": "compact", "artifact_refs": artifact_refs, "metadata": metadata},
         )
         if estimate_tokens(grounded.model_dump_json()) > request.target_tokens:
             raise ContextBudgetExceeded(
@@ -432,6 +444,74 @@ class ContextLoop:
         last_validation_error: str | None,
     ) -> ModelTurnRequest:
         continuity = checkpoint.continuity
+        # Separate runs can derive the same lesson/evidence under different
+        # IDs. Keep every durable record in its repository/checkpoint, but
+        # project only one best copy into this physical model envelope.
+        projected_candidates = ContextLoop._unique_experience_projection(
+            checkpoint.experience_candidates
+        )
+        projected_experiences = ContextLoop._unique_experience_projection(
+            experiences
+        )
+        candidate_by_fingerprint = {
+            ContextLoop._experience_semantic_fingerprint(item): item
+            for item in projected_candidates
+        }
+        recalled_by_fingerprint = {
+            ContextLoop._experience_semantic_fingerprint(item): item
+            for item in projected_experiences
+        }
+        suppress_candidates: set[str] = set()
+        suppress_recalled: set[str] = set()
+        for fingerprint in candidate_by_fingerprint.keys() & recalled_by_fingerprint.keys():
+            if ContextLoop._experience_projection_rank(
+                recalled_by_fingerprint[fingerprint]
+            ) > ContextLoop._experience_projection_rank(
+                candidate_by_fingerprint[fingerprint]
+            ):
+                suppress_candidates.add(fingerprint)
+            else:
+                suppress_recalled.add(fingerprint)
+        projected_candidates = [
+            item
+            for item in projected_candidates
+            if ContextLoop._experience_semantic_fingerprint(item)
+            not in suppress_candidates
+        ]
+        projected_experiences = [
+            item
+            for item in projected_experiences
+            if ContextLoop._experience_semantic_fingerprint(item)
+            not in suppress_recalled
+        ]
+        memory_manifest = continuity.memory_manifest if continuity else None
+        if memory_manifest is not None and experiences:
+            # Filter against the complete recalled channel, including records
+            # later suppressed from the model projection as semantic clones.
+            recalled_ids = {item.experience_id for item in experiences}
+            filtered_memories = [
+                memory
+                for memory in memory_manifest.memories
+                if str(memory.metadata.get("experience_id") or "") not in recalled_ids
+                and not any(
+                    memory.memory_id.startswith(f"experience://{experience_id}/")
+                    for experience_id in recalled_ids
+                )
+            ]
+            if len(filtered_memories) != len(memory_manifest.memories):
+                memory_manifest = _validated_copy(
+                    memory_manifest,
+                    {
+                        "memories": filtered_memories,
+                        "metadata": {
+                            **memory_manifest.metadata,
+                            "experience_duplicates_removed": (
+                                len(memory_manifest.memories) - len(filtered_memories)
+                            ),
+                            "experience_channel": "recalled_experiences",
+                        },
+                    },
+                )
         return ModelTurnRequest(
             run_id=checkpoint.run_id,
             step_index=checkpoint.step_index,
@@ -440,15 +520,15 @@ class ContextLoop:
             open_commitments=list(dict.fromkeys(checkpoint.open_commitments)),
             context=[entry.model_dump(mode="json") for entry in checkpoint.context],
             tools=tools,
-            recalled_experiences=experiences,
+            recalled_experiences=projected_experiences,
             checkpoint_metadata=ContextLoop._project_checkpoint_metadata(
                 checkpoint.metadata
             ),
             wake_events=continuity.wake_events if continuity else [],
             cycle_handoff=continuity.cycle_handoff if continuity else None,
-            memory_manifest=continuity.memory_manifest if continuity else None,
+            memory_manifest=memory_manifest,
             budget_context=continuity.budget_context if continuity else None,
-            current_experience_candidates=checkpoint.experience_candidates,
+            current_experience_candidates=projected_candidates,
             plan_state=checkpoint.plan_state,
             resolved_artifacts=artifacts,
             last_validation_error=last_validation_error,
@@ -592,13 +672,14 @@ class ContextLoop:
                 context.append(entry)
         candidates = ContextLoop._unique_experiences(checkpoint.experience_candidates)
         continuity = ContextLoop._deduplicate_continuity(checkpoint.continuity)
-        return checkpoint.model_copy(
-            update={
+        return _validated_copy(
+            checkpoint,
+            {
                 "context": context,
                 "experience_candidates": candidates,
                 "open_commitments": list(dict.fromkeys(checkpoint.open_commitments)),
                 "continuity": continuity,
-            }
+            },
         )
 
     @staticmethod
@@ -637,23 +718,25 @@ class ContextLoop:
             )
         handoff = continuity.cycle_handoff
         if handoff is not None:
-            handoff = handoff.model_copy(
-                update={
+            handoff = _validated_copy(
+                handoff,
+                {
                     "open_commitments": list(dict.fromkeys(handoff.open_commitments)),
                     "unresolved": list(dict.fromkeys(handoff.unresolved)),
                     "failed_approaches": list(dict.fromkeys(handoff.failed_approaches)),
                     "wake_conditions": list(dict.fromkeys(handoff.wake_conditions)),
                     "artifact_refs": list(dict.fromkeys(handoff.artifact_refs)),
                     "experience_refs": list(dict.fromkeys(handoff.experience_refs)),
-                }
+                },
             )
-        return continuity.model_copy(
-            update={
+        return _validated_copy(
+            continuity,
+            {
                 "wake_events": list(events.values()),
                 "cycle_handoff": handoff,
                 "memory_manifest": manifest,
                 "consumed_wake_event_ids": consumed,
-            }
+            },
         )
 
     @staticmethod
@@ -667,6 +750,60 @@ class ContextLoop:
                 )
             values.setdefault(record.experience_id, record)
         return list(values.values())
+
+    @staticmethod
+    def _experience_semantic_fingerprint(record: ExperienceRecord) -> str:
+        payload = {
+            "lesson": " ".join(record.lesson.split()).casefold(),
+            "applicability": " ".join(record.applicability.split()).casefold(),
+            "evidence_refs": sorted(set(record.evidence_refs)),
+            "counter_evidence_refs": sorted(set(record.counter_evidence_refs)),
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+
+    @classmethod
+    def _unique_experience_projection(
+        cls,
+        records: list[ExperienceRecord],
+    ) -> list[ExperienceRecord]:
+        selected: dict[str, ExperienceRecord] = {}
+        order: list[str] = []
+        for record in cls._unique_experiences(records):
+            fingerprint = cls._experience_semantic_fingerprint(record)
+            existing = selected.get(fingerprint)
+            if existing is None:
+                selected[fingerprint] = record
+                order.append(fingerprint)
+                continue
+            if cls._experience_projection_rank(record) > cls._experience_projection_rank(
+                existing
+            ):
+                selected[fingerprint] = record
+        return [selected[fingerprint] for fingerprint in order]
+
+    @staticmethod
+    def _experience_projection_rank(record: ExperienceRecord) -> tuple[int, float, str]:
+        state_rank = {
+            "raw_episode": 0,
+            "candidate": 1,
+            "probation": 2,
+            "validated": 3,
+            "promoted_skill": 4,
+            "deprecated": -1,
+            "revoked": -2,
+        }
+        return (
+            state_rank.get(record.state.value, -3),
+            float(record.confidence),
+            record.experience_id,
+        )
 
     def _unique_artifacts(self, records: list[ArtifactRecord]) -> list[ArtifactRecord]:
         values: dict[str, ArtifactRecord] = {}

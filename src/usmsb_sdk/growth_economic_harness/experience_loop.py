@@ -259,7 +259,13 @@ class ExperienceLoop:
             "promotion_evidence": self._evidence_dict(evidence),
             "transition_history": history,
         }
-        return record.model_copy(update={"state": target, "metadata": metadata})
+        return ExperienceRecord.model_validate(
+            {
+                **record.model_dump(mode="python"),
+                "state": target,
+                "metadata": metadata,
+            }
+        )
 
     @staticmethod
     def declarative_skill_from(

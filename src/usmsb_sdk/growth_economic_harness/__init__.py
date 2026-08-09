@@ -35,6 +35,7 @@ from usmsb_sdk.growth_economic_harness.harness import (
     HarnessConfig,
     HarnessDecisionError,
     HarnessProtocolError,
+    HarnessRuntimeProfile,
 )
 from usmsb_sdk.growth_economic_harness.models import (
     ActionDraft,
@@ -164,6 +165,7 @@ __all__ = [
     "HarnessDecisionError",
     "HarnessObjective",
     "HarnessProtocolError",
+    "HarnessRuntimeProfile",
     "HarnessStepResult",
     "IntelligenceEvaluationReport",
     "IntelligenceGateEvaluator",

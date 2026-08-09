@@ -10,8 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Literal
 from uuid import uuid4
 
 from usmsb_sdk.growth_economic_harness.context_loop import ContextLoop
@@ -74,6 +74,93 @@ class HarnessDecisionError(RuntimeError):
         self.checkpoint = checkpoint
 
 
+def _validated_copy(value: Any, update: dict[str, Any]) -> Any:
+    """Never bypass checkpoint/list/state validators during transitions."""
+
+    return type(value).model_validate(
+        {**value.model_dump(mode="python"), **update}
+    )
+
+
+@dataclass(frozen=True)
+class HarnessRuntimeProfile:
+    """Latency and autonomy policy shared by every Growth Harness surface.
+
+    The interactive and autonomous runtimes deliberately share the same
+    transition, context, experience, evidence and repair contracts.  A profile
+    only bounds how much cognition may happen before the durable host must
+    yield; it must never replace model reasoning with a channel workflow.
+    """
+
+    profile_id: Literal["interactive", "autonomous"]
+    max_internal_decisions_per_step: int
+    max_structured_output_repairs: int
+    max_logical_model_calls_per_turn: int
+    group_loop_enabled: bool
+    semantic_compaction_enabled: bool
+    target_latency_seconds: float | None
+
+    @classmethod
+    def interactive(cls) -> "HarnessRuntimeProfile":
+        return cls(
+            profile_id="interactive",
+            max_internal_decisions_per_step=1,
+            max_structured_output_repairs=1,
+            max_logical_model_calls_per_turn=2,
+            group_loop_enabled=False,
+            semantic_compaction_enabled=False,
+            target_latency_seconds=25.0,
+        )
+
+    @classmethod
+    def autonomous(cls) -> "HarnessRuntimeProfile":
+        return cls(
+            profile_id="autonomous",
+            max_internal_decisions_per_step=20,
+            max_structured_output_repairs=2,
+            max_logical_model_calls_per_turn=100,
+            group_loop_enabled=True,
+            semantic_compaction_enabled=True,
+            target_latency_seconds=None,
+        )
+
+    def __post_init__(self) -> None:
+        integer_bounds = {
+            "max_internal_decisions_per_step": (
+                self.max_internal_decisions_per_step,
+                1,
+                100,
+            ),
+            "max_structured_output_repairs": (
+                self.max_structured_output_repairs,
+                0,
+                10,
+            ),
+            "max_logical_model_calls_per_turn": (
+                self.max_logical_model_calls_per_turn,
+                1,
+                1_000,
+            ),
+        }
+        for name, (value, minimum, maximum) in integer_bounds.items():
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not minimum <= value <= maximum
+            ):
+                raise ValueError(f"{name} must be an integer from {minimum} to {maximum}")
+        if type(self.group_loop_enabled) is not bool:
+            raise ValueError("group_loop_enabled must be a boolean")
+        if type(self.semantic_compaction_enabled) is not bool:
+            raise ValueError("semantic_compaction_enabled must be a boolean")
+        if self.target_latency_seconds is not None and (
+            isinstance(self.target_latency_seconds, bool)
+            or not isinstance(self.target_latency_seconds, (int, float))
+            or not 1 <= float(self.target_latency_seconds) <= 3_600
+        ):
+            raise ValueError("target_latency_seconds must be between 1 and 3600")
+
+
 @dataclass(frozen=True)
 class HarnessConfig:
     max_internal_decisions_per_step: int = 6
@@ -81,6 +168,9 @@ class HarnessConfig:
     max_model_output_bytes: int = 256_000
     experience_recall_limit: int = 20
     context_recall_limit: int = 50
+    runtime_profile: HarnessRuntimeProfile = field(
+        default_factory=HarnessRuntimeProfile.autonomous
+    )
 
     def __post_init__(self) -> None:
         bounds = {
@@ -97,6 +187,18 @@ class HarnessConfig:
                 or not minimum <= value <= maximum
             ):
                 raise ValueError(f"{name} must be an integer from {minimum} to {maximum}")
+        if self.max_internal_decisions_per_step > (
+            self.runtime_profile.max_internal_decisions_per_step
+        ):
+            raise ValueError(
+                "max_internal_decisions_per_step exceeds the selected runtime profile"
+            )
+        if self.max_structured_output_repairs > (
+            self.runtime_profile.max_structured_output_repairs
+        ):
+            raise ValueError(
+                "max_structured_output_repairs exceeds the selected runtime profile"
+            )
 
 
 class GrowthEconomicHarness:
@@ -207,6 +309,11 @@ class GrowthEconomicHarness:
             draft = decision.action
 
             if draft.capability == "cognitive.deliberate":
+                if not self.config.runtime_profile.group_loop_enabled:
+                    raise HarnessDecisionError(
+                        "runtime profile does not permit cognitive.deliberate",
+                        checkpoint,
+                    )
                 if self.group_reasoner is None or draft.team_plan is None:
                     raise HarnessDecisionError(
                         "model requested cognitive.deliberate but no GroupReasoner is configured",
@@ -250,8 +357,9 @@ class GrowthEconomicHarness:
                         f"{unknown_group_refs}",
                         checkpoint,
                     )
-                checkpoint = checkpoint.model_copy(
-                    update={
+                checkpoint = _validated_copy(
+                    checkpoint,
+                    {
                         "selected_team": draft.team_plan,
                         "context": [
                             *checkpoint.context,
@@ -270,7 +378,7 @@ class GrowthEconomicHarness:
                                 },
                             ),
                         ],
-                    }
+                    },
                 )
                 await self.telemetry.event(
                     "growth.group.completed",
@@ -289,8 +397,9 @@ class GrowthEconomicHarness:
                         "revise requires current_hypothesis",
                         checkpoint,
                     )
-                checkpoint = checkpoint.model_copy(
-                    update={
+                checkpoint = _validated_copy(
+                    checkpoint,
+                    {
                         "context": [
                             *checkpoint.context,
                             ContextEntry(
@@ -299,7 +408,7 @@ class GrowthEconomicHarness:
                                 metadata={"rationale": draft.rationale},
                             ),
                         ]
-                    }
+                    },
                 )
                 continue
 
@@ -327,8 +436,9 @@ class GrowthEconomicHarness:
                         "reflect candidate is absent from the canonical checkpoint",
                         checkpoint,
                     )
-                checkpoint = checkpoint.model_copy(
-                    update={
+                checkpoint = _validated_copy(
+                    checkpoint,
+                    {
                         "context": [
                             *checkpoint.context,
                             ContextEntry(
@@ -345,7 +455,7 @@ class GrowthEconomicHarness:
                                 },
                             ),
                         ]
-                    }
+                    },
                 )
                 continue
 
@@ -371,7 +481,7 @@ class GrowthEconomicHarness:
                         "wake_after_seconds must be an integer from 1 to 2592000",
                         checkpoint,
                     )
-                waiting = checkpoint.model_copy(update={"status": "waiting"})
+                waiting = _validated_copy(checkpoint, {"status": "waiting"})
                 return HarnessStepResult(
                     kind="wait",
                     checkpoint=waiting,
@@ -389,7 +499,7 @@ class GrowthEconomicHarness:
 
             if draft.kind == ActionKind.COMPLETE:
                 result = self._cycle_result(checkpoint, draft.arguments, draft.rationale)
-                completed = checkpoint.model_copy(update={"status": "completed"})
+                completed = _validated_copy(checkpoint, {"status": "completed"})
                 return HarnessStepResult(
                     kind="complete",
                     checkpoint=completed,
@@ -402,12 +512,13 @@ class GrowthEconomicHarness:
                 )
 
             intent = self._external_intent(checkpoint, decision, tool_catalog)
-            awaiting = checkpoint.model_copy(
-                update={
+            awaiting = _validated_copy(
+                checkpoint,
+                {
                     "step_index": checkpoint.step_index + 1,
                     "status": "awaiting_observation",
                     "pending_action": intent,
-                }
+                },
             )
             return HarnessStepResult(
                 kind="action",
@@ -416,7 +527,7 @@ class GrowthEconomicHarness:
                 mutations=self._mutation_batch(mutation_candidates, mutation_episodes),
             )
 
-        waiting = checkpoint.model_copy(update={"status": "waiting"})
+        waiting = _validated_copy(checkpoint, {"status": "waiting"})
         return HarnessStepResult(
             kind="wait",
             checkpoint=waiting,
@@ -452,8 +563,14 @@ class GrowthEconomicHarness:
         if manifest is None:
             return checkpoint
         continuity = checkpoint.continuity or ContinuityState()
-        return checkpoint.model_copy(
-            update={"continuity": continuity.model_copy(update={"memory_manifest": manifest})}
+        return _validated_copy(
+            checkpoint,
+            {
+                "continuity": _validated_copy(
+                    continuity,
+                    {"memory_manifest": manifest},
+                )
+            },
         )
 
     async def _resolve_relevant_artifacts(
@@ -579,7 +696,7 @@ class GrowthEconomicHarness:
         if pending is None and observation is not None:
             raise HarnessProtocolError("observation supplied but checkpoint has no pending action")
         if pending is None:
-            return checkpoint.model_copy(update={"status": "running"})
+            return _validated_copy(checkpoint, {"status": "running"})
         if observation is None or observation.action_id != pending.action_id:
             raise HarnessProtocolError(
                 f"observation action_id must equal pending action {pending.action_id}"
@@ -598,12 +715,13 @@ class GrowthEconomicHarness:
                 "observation_metadata": observation.metadata,
             },
         )
-        return checkpoint.model_copy(
-            update={
+        return _validated_copy(
+            checkpoint,
+            {
                 "status": "running",
                 "pending_action": None,
                 "context": [*checkpoint.context, entry],
-            }
+            },
         )
 
     async def _decide(
@@ -681,6 +799,11 @@ class GrowthEconomicHarness:
         )
         draft = decision.action
         if draft.capability == "cognitive.deliberate":
+            if not self.config.runtime_profile.group_loop_enabled:
+                raise HarnessDecisionError(
+                    "runtime profile does not permit cognitive.deliberate",
+                    checkpoint,
+                )
             if self.group_reasoner is None or draft.team_plan is None:
                 raise HarnessDecisionError(
                     "cognitive.deliberate requires an available GroupReasoner and team_plan",
@@ -810,15 +933,16 @@ class GrowthEconomicHarness:
             consumed_all = list(
                 dict.fromkeys([*continuity.consumed_wake_event_ids, *consumed_now])
             )
-            continuity = continuity.model_copy(
-                update={
+            continuity = _validated_copy(
+                continuity,
+                {
                     "wake_events": [
                         event
                         for event in continuity.wake_events
                         if event.event_id not in set(consumed_now)
                     ],
                     "consumed_wake_event_ids": consumed_all,
-                }
+                },
             )
 
         candidates = list(checkpoint.experience_candidates)
@@ -875,8 +999,9 @@ class GrowthEconomicHarness:
                 "consumed_wake_event_ids": consumed_now,
             },
         )
-        updated = checkpoint.model_copy(
-            update={
+        updated = _validated_copy(
+            checkpoint,
+            {
                 "current_hypothesis": (
                     decision.current_hypothesis or checkpoint.current_hypothesis
                 ),
@@ -884,11 +1009,12 @@ class GrowthEconomicHarness:
                 "continuity": continuity,
                 "experience_candidates": candidates,
                 "context": [*checkpoint.context, entry],
-            }
+            },
         )
         if decision.plan_delta is not None:
-            updated = updated.model_copy(
-                update={"plan_state": self._apply_plan_delta(updated, decision.plan_delta)}
+            updated = _validated_copy(
+                updated,
+                {"plan_state": self._apply_plan_delta(updated, decision.plan_delta)},
             )
         if new_candidate is not None and persist:
             persist_candidate = getattr(self.experience_repository, "persist_candidate", None)

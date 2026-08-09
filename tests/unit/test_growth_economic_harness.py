@@ -11,9 +11,11 @@ from usmsb_sdk.growth_economic_harness import (
     ContextBudget,
     ContextEntry,
     ContextLoop,
+    ContinuityState,
     ExperienceDraft,
     ExperienceLoop,
     ExperiencePromotionPolicy,
+    ExperienceRecord,
     ExperienceState,
     ExperienceTransitionError,
     GroupContribution,
@@ -24,6 +26,8 @@ from usmsb_sdk.growth_economic_harness import (
     HarnessDecisionError,
     HarnessObjective,
     HarnessProtocolError,
+    MemoryManifest,
+    MemoryReference,
     ModelCompletion,
     Observation,
     PromotionEvidence,
@@ -366,6 +370,71 @@ def test_context_compaction_preserves_goal_commitments_and_artifact_refs(objecti
     assert compacted.context[0].kind == "compact"
     assert "artifact://0" in compacted.context[0].artifact_refs
     assert compacted.context[-1].artifact_refs == ["artifact://7"]
+
+
+def test_model_context_projects_one_best_experience_without_memory_duplication(
+    objective,
+    tools,
+) -> None:
+    harness = GrowthEconomicHarness(ScriptedModel([]))
+    candidate = ExperienceRecord(
+        experience_id="candidate-duplicate",
+        state=ExperienceState.CANDIDATE,
+        lesson="Evidence-first explanation improves qualified comparison.",
+        applicability="Comparison-stage demand.",
+        evidence_refs=["artifact://aggregate/1"],
+        confidence=0.6,
+        source_run_id="run-candidate",
+    )
+    recalled = ExperienceRecord(
+        experience_id="validated-duplicate",
+        state=ExperienceState.VALIDATED,
+        lesson="  evidence-first explanation improves qualified comparison. ",
+        applicability="comparison-stage demand.",
+        evidence_refs=["artifact://aggregate/1", "artifact://aggregate/1"],
+        confidence=0.9,
+        source_run_id="run-validated",
+    )
+    checkpoint = type(authorized_checkpoint(harness, objective)).model_validate(
+        {
+            **authorized_checkpoint(harness, objective).model_dump(mode="python"),
+            "experience_candidates": [candidate],
+            "continuity": ContinuityState(
+                memory_manifest=MemoryManifest(
+                    memories=[
+                        MemoryReference(
+                            memory_id="experience://validated-duplicate/preview",
+                            kind="semantic",
+                            summary=recalled.lesson,
+                            metadata={"experience_id": "validated-duplicate"},
+                        ),
+                        MemoryReference(
+                            memory_id="memory://independent/1",
+                            kind="semantic",
+                            summary="Independent market evidence remains current.",
+                        ),
+                    ]
+                )
+            ),
+        }
+    )
+
+    request = ContextLoop._request(
+        checkpoint,
+        tools=tools,
+        experiences=[recalled],
+        artifacts=[],
+        last_validation_error=None,
+    )
+
+    assert request.current_experience_candidates == []
+    assert [item.experience_id for item in request.recalled_experiences] == [
+        "validated-duplicate"
+    ]
+    assert [item.memory_id for item in request.memory_manifest.memories] == [
+        "memory://independent/1"
+    ]
+    assert request.memory_manifest.metadata["experience_duplicates_removed"] == 1
 
 
 def test_one_outcome_cannot_be_promoted_directly_to_skill() -> None:

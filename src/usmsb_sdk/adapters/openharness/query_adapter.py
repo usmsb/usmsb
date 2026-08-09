@@ -487,6 +487,7 @@ class QueryAdapter:
         total_turns = 0
         final_message = None
         usage = None
+        stop_reason = None
         
         async for event in self.query(
             prompt=prompt,
@@ -505,14 +506,13 @@ class QueryAdapter:
             elif event.event_type == "message_complete":
                 final_message = event.data
                 usage = event.metadata.get("usage")
+                stop_reason = event.metadata.get("stop_reason")
                 total_turns += 1
         
         return QueryResult(
             message="".join(message_parts),
             usage=usage,
-            stop_reason=final_message.stop_reason
-            if hasattr(final_message, "stop_reason")
-            else None,
+            stop_reason=stop_reason,
             tool_calls=tool_calls,
             total_turns=total_turns,
         )
@@ -537,6 +537,7 @@ class QueryAdapter:
                 metadata={
                     "usage": self._to_cost_summary(event.usage),
                     "turn": current_turn + 1,
+                    "stop_reason": event.stop_reason,
                 },
             )
 
