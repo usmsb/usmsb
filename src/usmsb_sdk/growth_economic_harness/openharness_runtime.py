@@ -870,6 +870,12 @@ def _model_completion(
         metadata={
             "openharness_total_turns": result.total_turns,
             "openharness_stop_reason": result.stop_reason,
+            "provider_reported_model": result.metadata.get(
+                "provider_reported_model"
+            ),
+            "provider_model_mismatch": bool(
+                result.metadata.get("provider_model_mismatch", False)
+            ),
             "hidden_history_disabled": True,
             "external_tool_execution": False,
             "physical_prompt_hash": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),

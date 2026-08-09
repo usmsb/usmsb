@@ -488,6 +488,7 @@ class QueryAdapter:
         final_message = None
         usage = None
         stop_reason = None
+        completion_metadata: dict[str, Any] = {}
         
         async for event in self.query(
             prompt=prompt,
@@ -507,6 +508,7 @@ class QueryAdapter:
                 final_message = event.data
                 usage = event.metadata.get("usage")
                 stop_reason = event.metadata.get("stop_reason")
+                completion_metadata = dict(event.metadata)
                 total_turns += 1
         
         return QueryResult(
@@ -515,6 +517,7 @@ class QueryAdapter:
             stop_reason=stop_reason,
             tool_calls=tool_calls,
             total_turns=total_turns,
+            metadata=completion_metadata,
         )
 
     def _convert_event(
@@ -537,7 +540,15 @@ class QueryAdapter:
                 metadata={
                     "usage": self._to_cost_summary(event.usage),
                     "turn": current_turn + 1,
-                    "stop_reason": event.stop_reason,
+                    # OpenHarness 0.1.9 deliberately narrows
+                    # ``AssistantTurnComplete`` to ``message`` and ``usage``.
+                    # Provider clients may retain the terminal reason on the
+                    # audited client boundary, but the engine event itself no
+                    # longer exposes ``stop_reason``.  Reading the old 0.1.8
+                    # attribute made every otherwise-successful 0.1.9 turn
+                    # fail after the paid Provider response had arrived.
+                    "stop_reason": self._assistant_stop_reason(event),
+                    **self._provider_completion_metadata(),
                 },
             )
 
@@ -580,6 +591,43 @@ class QueryAdapter:
             )
 
         return None
+
+    def _assistant_stop_reason(self, event: Any) -> str | None:
+        """Read an optional terminal reason across OpenHarness 0.1.x.
+
+        The 0.1.9 engine drops ``ApiMessageCompleteEvent.stop_reason`` while
+        projecting ``AssistantTurnComplete``.  A single-shot audited client can
+        preserve that value as ``last_stop_reason``; otherwise absence is an
+        honest ``None`` and must not turn a completed model call into a retry.
+        """
+
+        value = getattr(event, "stop_reason", None)
+        if value is None:
+            client = self._physical_telemetry_client
+            if client is None and self._engine is not None:
+                client = getattr(self._engine, "api_client", None)
+            value = getattr(client, "last_stop_reason", None)
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
+
+    def _provider_completion_metadata(self) -> dict[str, Any]:
+        """Expose requested-vs-reported model identity without changing it."""
+
+        client = self._physical_telemetry_client
+        if client is None and self._engine is not None:
+            client = getattr(self._engine, "api_client", None)
+        reported = str(
+            getattr(client, "last_provider_reported_model", None) or ""
+        ).strip()
+        mismatch = bool(
+            getattr(client, "last_provider_model_mismatch", False)
+        )
+        return {
+            "provider_reported_model": reported or None,
+            "provider_model_mismatch": mismatch,
+        }
 
     def _to_cost_summary(self, usage: UsageSnapshot | None) -> CostSummary | None:
         """Convert OH UsageSnapshot to CostSummary."""
