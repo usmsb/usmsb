@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib import metadata
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,6 +14,7 @@ from usmsb_sdk.adapters.openharness.compatibility import (
     probe_openharness,
     require_openharness_019,
 )
+from usmsb_sdk.adapters.openharness.query_adapter import QueryAdapter
 from usmsb_sdk.adapters.openharness.tool_adapter import ToolAdapter
 
 
@@ -22,6 +24,41 @@ def test_exact_openharness_release_and_all_required_subsystems_are_available() -
     probe = probe_openharness()
     assert probe.compatible, probe.to_dict()
     assert require_openharness_019() == probe
+
+
+def test_query_adapter_accepts_019_turn_complete_without_legacy_stop_reason() -> None:
+    from openharness.api.usage import UsageSnapshot
+    from openharness.engine.messages import ConversationMessage, TextBlock
+    from openharness.engine.stream_events import AssistantTurnComplete
+
+    adapter = QueryAdapter(engine=None)
+    event = AssistantTurnComplete(
+        message=ConversationMessage(
+            role="assistant",
+            content=[TextBlock(text="completed")],
+        ),
+        usage=UsageSnapshot(input_tokens=4, output_tokens=2),
+    )
+
+    converted = adapter._convert_event(event, current_turn=0)
+
+    assert converted is not None
+    assert converted.event_type == "message_complete"
+    assert converted.metadata["stop_reason"] is None
+
+    adapter._physical_telemetry_client = SimpleNamespace(
+        last_stop_reason="completed",
+        last_provider_reported_model="provider-routed-model",
+        last_provider_model_mismatch=True,
+    )
+    converted_with_boundary_reason = adapter._convert_event(event, current_turn=0)
+    assert converted_with_boundary_reason is not None
+    assert converted_with_boundary_reason.metadata["stop_reason"] == "completed"
+    assert (
+        converted_with_boundary_reason.metadata["provider_reported_model"]
+        == "provider-routed-model"
+    )
+    assert converted_with_boundary_reason.metadata["provider_model_mismatch"] is True
 
 
 @pytest.mark.asyncio

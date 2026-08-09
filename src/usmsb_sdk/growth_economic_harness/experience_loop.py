@@ -16,6 +16,7 @@ from usmsb_sdk.growth_economic_harness.models import (
     ExperienceDraft,
     ExperienceRecord,
     ExperienceState,
+    SkillManifest,
 )
 
 
@@ -48,6 +49,14 @@ _ALLOWED_TRANSITIONS: dict[ExperienceState, set[ExperienceState]] = {
 
 @dataclass(frozen=True)
 class PromotionEvidence:
+    """Host-attested evidence for one evolution transition.
+
+    ``observed_run_ids`` is retained for wire compatibility, but each value is
+    an independent observation-unit identity (cycle, experiment or episode),
+    not a Program id. A continuous Program can therefore accumulate distinct
+    real observations without fabricating new Programs or legacy run ids.
+    """
+
     evaluation_ref: str
     repeated_outcomes: int = 0
     independent_evidence_refs: tuple[str, ...] = ()
@@ -80,6 +89,13 @@ class PromotionEvidence:
                 or any(not isinstance(item, str) or not 1 <= len(item) <= 1_000 for item in values)
             ):
                 raise ValueError(f"promotion {name} is invalid")
+        if any(
+            item.lower().startswith(("legacy-", "synthetic-", "fixture-"))
+            for item in self.observed_run_ids
+        ):
+            raise ValueError(
+                "observed_run_ids must be host-attested real observation units"
+            )
         for name, value in (
             ("k_threshold_passed", self.k_threshold_passed),
             ("counter_evidence_resolved", self.counter_evidence_resolved),
@@ -121,10 +137,18 @@ class ExperiencePromotionPolicy:
         if any(
             isinstance(value, bool)
             or not isinstance(value, int)
-            or value < 0
+            or value < 1
             for value in values
         ):
-            raise ValueError("experience promotion thresholds must be non-negative")
+            raise ValueError("experience promotion thresholds must be positive integers")
+        if not (
+            self.probation_min_distinct_runs
+            <= self.validation_min_distinct_runs
+            <= self.promotion_min_distinct_runs
+        ):
+            raise ValueError(
+                "experience run thresholds must be monotonic from probation to promotion"
+            )
         if any(
             type(value) is not bool
             for value in (
@@ -142,9 +166,15 @@ class ExperienceLoop:
     def __init__(self, policy: ExperiencePromotionPolicy | None = None) -> None:
         self.policy = policy or ExperiencePromotionPolicy()
 
-    def candidate_from(self, draft: ExperienceDraft, *, run_id: str) -> ExperienceRecord:
+    def candidate_from(
+        self,
+        draft: ExperienceDraft,
+        *,
+        run_id: str,
+        experience_id: str | None = None,
+    ) -> ExperienceRecord:
         return ExperienceRecord(
-            experience_id=f"exp_{uuid4().hex}",
+            experience_id=experience_id or f"exp_{uuid4().hex}",
             state=ExperienceState.CANDIDATE,
             lesson=draft.lesson,
             applicability=draft.applicability,
@@ -169,24 +199,32 @@ class ExperienceLoop:
         if evidence.policy_version != self.policy.version:
             raise ExperienceTransitionError("promotion evidence policy version is not active")
 
-        distinct_runs = {item for item in evidence.observed_run_ids if item}
-        if (
-            target == ExperienceState.PROBATION
-            and evidence.repeated_outcomes
-            and not distinct_runs
-        ):
-            # Backwards compatible evidence can enter probation, but cannot be
-            # validated or promoted without independently attributable runs.
-            distinct_runs = {f"legacy-observation-{index}" for index in range(evidence.repeated_outcomes)}
+        distinct_observation_units = {
+            item for item in evidence.observed_run_ids if item
+        }
         if target == ExperienceState.PROBATION:
-            self._require_runs(distinct_runs, self.policy.probation_min_distinct_runs, target)
+            self._require_observation_units(
+                distinct_observation_units,
+                self.policy.probation_min_distinct_runs,
+                target,
+            )
+            attributable_outcomes = {item for item in evidence.outcome_refs if item}
+            if len(attributable_outcomes) < self.policy.probation_min_distinct_runs:
+                raise ExperienceTransitionError(
+                    "probation requires real attributable outcome refs; repeated_outcomes "
+                    "without lineage cannot change experience state"
+                )
         if target in {ExperienceState.VALIDATED, ExperienceState.PROMOTED_SKILL}:
             required_runs = (
                 self.policy.promotion_min_distinct_runs
                 if target == ExperienceState.PROMOTED_SKILL
                 else self.policy.validation_min_distinct_runs
             )
-            self._require_runs(distinct_runs, required_runs, target)
+            self._require_observation_units(
+                distinct_observation_units,
+                required_runs,
+                target,
+            )
             attributable_outcomes = {item for item in evidence.outcome_refs if item}
             if len(attributable_outcomes) < required_runs:
                 raise ExperienceTransitionError(
@@ -221,17 +259,56 @@ class ExperienceLoop:
             "promotion_evidence": self._evidence_dict(evidence),
             "transition_history": history,
         }
-        return record.model_copy(update={"state": target, "metadata": metadata})
+        return ExperienceRecord.model_validate(
+            {
+                **record.model_dump(mode="python"),
+                "state": target,
+                "metadata": metadata,
+            }
+        )
 
     @staticmethod
-    def _require_runs(
-        observed_run_ids: set[str],
+    def declarative_skill_from(
+        record: ExperienceRecord,
+        *,
+        skill_id: str,
+        version: str,
+        title: str,
+        instruction: str,
+        exclusions: list[str] | None = None,
+    ) -> SkillManifest:
+        """Materialize a promoted record as data, never executable model code."""
+
+        if record.state != ExperienceState.PROMOTED_SKILL:
+            raise ExperienceTransitionError(
+                "only a promoted_skill experience may become a SkillManifest"
+            )
+        if not record.evidence_refs:
+            raise ExperienceTransitionError("promoted skill requires canonical evidence refs")
+        return SkillManifest(
+            skill_id=skill_id,
+            version=version,
+            title=title,
+            instruction=instruction,
+            applicability=record.applicability,
+            exclusions=exclusions or [],
+            evidence_refs=record.evidence_refs,
+            counter_evidence_refs=record.counter_evidence_refs,
+            confidence=record.confidence,
+            source_experience_ids=[record.experience_id],
+            metadata={"source_run_id": record.source_run_id},
+        )
+
+    @staticmethod
+    def _require_observation_units(
+        observed_unit_ids: set[str],
         minimum: int,
         target: ExperienceState,
     ) -> None:
-        if len(observed_run_ids) < minimum:
+        if len(observed_unit_ids) < minimum:
             raise ExperienceTransitionError(
-                f"{target.value} requires at least {minimum} distinct attributable runs"
+                f"{target.value} requires at least {minimum} distinct host-attested "
+                "observation units (cycle, experiment or episode)"
             )
 
     @staticmethod

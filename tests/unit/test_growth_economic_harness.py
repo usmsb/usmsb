@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import pytest
+from pydantic import Field
 
 from usmsb_sdk.growth_economic_harness import (
     ContextBudget,
     ContextEntry,
     ContextLoop,
+    ContinuityState,
     ExperienceDraft,
     ExperienceLoop,
     ExperiencePromotionPolicy,
+    ExperienceRecord,
     ExperienceState,
     ExperienceTransitionError,
     GroupContribution,
@@ -23,12 +26,54 @@ from usmsb_sdk.growth_economic_harness import (
     HarnessDecisionError,
     HarnessObjective,
     HarnessProtocolError,
+    MemoryManifest,
+    MemoryReference,
     ModelCompletion,
     Observation,
     PromotionEvidence,
     SideEffectClass,
     ToolDescriptor,
 )
+from usmsb_sdk.growth_economic_harness.models import StrictModel
+
+
+COGNITIVE_DATA_AUTHORIZATION = {
+    "allowed": True,
+    "classifications": ["non_personal"],
+    "authorization_ref": "test://growth-harness/non-personal-fixture",
+    "destinations": ["opc_conductor", "llm", "agent"],
+    "pii_field_count": 0,
+    "contains_customer_transcript": False,
+    "contains_payment_data": False,
+    "contains_logistics_data": False,
+    "contains_credentials": False,
+}
+
+
+def test_strict_model_validated_copy_preserves_field_aliases() -> None:
+    class AliasedContract(StrictModel):
+        schema_version: Literal["contract.v1"] = Field(alias="schema")
+        status: Literal["queued", "running"]
+
+    contract = AliasedContract.model_validate(
+        {"schema": "contract.v1", "status": "queued"}
+    )
+    updated = contract.model_copy(update={"status": "running"})
+
+    assert updated.status == "running"
+    assert updated.model_dump(mode="json", by_alias=True)["schema"] == "contract.v1"
+
+
+def authorized_checkpoint(
+    harness: GrowthEconomicHarness,
+    objective: HarnessObjective,
+):
+    return harness.create_checkpoint(
+        objective,
+        metadata={
+            "cognitive_data_authorization": COGNITIVE_DATA_AUTHORIZATION,
+        },
+    )
 
 
 def decision(
@@ -107,6 +152,10 @@ class ScriptedGroup:
             conflicts=["Demand strength is disputed"],
             evidence_gaps=["independent source"],
             artifact_refs=["artifact://group/synthesis"],
+            host_verified_artifact_refs=[
+                *[f"artifact://{role.name}" for role in request.team_plan.roles],
+                "artifact://group/synthesis",
+            ],
         )
 
 
@@ -150,7 +199,10 @@ async def test_observation_changes_the_next_model_selected_action(objective, too
 
     model = ScriptedModel(choose)
     harness = GrowthEconomicHarness(model)
-    first = await harness.step(objective=objective, tools=tools)
+    first = await harness.step(
+        checkpoint=authorized_checkpoint(harness, objective),
+        tools=tools,
+    )
     assert first.action.capability == "market.scan"
 
     second = await harness.step(
@@ -207,7 +259,10 @@ async def test_model_selects_dynamic_group_then_uses_its_conflict(objective, too
     telemetry = RecordingTelemetry()
     harness = GrowthEconomicHarness(model, group_reasoner=group, telemetry=telemetry)
 
-    result = await harness.step(objective=objective, tools=tools)
+    result = await harness.step(
+        checkpoint=authorized_checkpoint(harness, objective),
+        tools=tools,
+    )
     assert result.action.capability == "evidence.verify"
     assert [role.name for role in group.requests[0].team_plan.roles] == [
         "market_scout",
@@ -230,7 +285,10 @@ async def test_strict_json_failure_is_bounded_repaired_and_traced(objective, too
         telemetry=telemetry,
         config=HarnessConfig(max_structured_output_repairs=1),
     )
-    result = await harness.step(objective=objective, tools=tools)
+    result = await harness.step(
+        checkpoint=authorized_checkpoint(harness, objective),
+        tools=tools,
+    )
     assert result.kind == "action"
     assert len(telemetry.attempts) == 2
     assert "duplicate JSON key" in telemetry.attempts[0]["validation_error"]
@@ -240,16 +298,24 @@ async def test_strict_json_failure_is_bounded_repaired_and_traced(objective, too
 @pytest.mark.asyncio
 async def test_hallucinated_or_misclassified_tool_fails_closed(objective, tools) -> None:
     hallucinated = GrowthEconomicHarness(
-        ScriptedModel([decision("observe", capability="invented.tool", side_effect="read_only")])
+        ScriptedModel([decision("observe", capability="invented.tool", side_effect="read_only")]),
+        config=HarnessConfig(max_structured_output_repairs=0),
     )
     with pytest.raises(HarnessDecisionError, match="unavailable capability"):
-        await hallucinated.step(objective=objective, tools=tools)
+        await hallucinated.step(
+            checkpoint=authorized_checkpoint(hallucinated, objective),
+            tools=tools,
+        )
 
     misclassified = GrowthEconomicHarness(
-        ScriptedModel([decision("observe", capability="market.scan", side_effect="financial")])
+        ScriptedModel([decision("observe", capability="market.scan", side_effect="financial")]),
+        config=HarnessConfig(max_structured_output_repairs=0),
     )
     with pytest.raises(HarnessDecisionError, match="side_effect_class"):
-        await misclassified.step(objective=objective, tools=tools)
+        await misclassified.step(
+            checkpoint=authorized_checkpoint(misclassified, objective),
+            tools=tools,
+        )
 
 
 @pytest.mark.asyncio
@@ -257,7 +323,10 @@ async def test_checkpoint_requires_matching_observation_before_resuming(objectiv
     harness = GrowthEconomicHarness(
         ScriptedModel([decision("observe", capability="market.scan", side_effect="read_only")])
     )
-    first = await harness.step(objective=objective, tools=tools)
+    first = await harness.step(
+        checkpoint=authorized_checkpoint(harness, objective),
+        tools=tools,
+    )
     with pytest.raises(HarnessProtocolError, match="awaits observation"):
         await harness.step(checkpoint=first.checkpoint, tools=tools)
     with pytest.raises(HarnessProtocolError, match="must equal pending action"):
@@ -274,10 +343,15 @@ async def test_checkpoint_requires_matching_observation_before_resuming(objectiv
 
 def test_context_compaction_preserves_goal_commitments_and_artifact_refs(objective) -> None:
     loop = ContextLoop(
-        ContextBudget(max_input_tokens=500, reserved_output_tokens=100, preserve_recent_entries=2)
+        ContextBudget(
+            max_input_tokens=5_000,
+            reserved_output_tokens=100,
+            model_envelope_reserve_tokens=100,
+            preserve_recent_entries=2,
+        )
     )
     harness = GrowthEconomicHarness(ScriptedModel([]), context_loop=loop)
-    checkpoint = harness.create_checkpoint(objective).model_copy(
+    checkpoint = authorized_checkpoint(harness, objective).model_copy(
         update={
             "open_commitments": ["verify evidence independence"],
             "context": [
@@ -296,6 +370,71 @@ def test_context_compaction_preserves_goal_commitments_and_artifact_refs(objecti
     assert compacted.context[0].kind == "compact"
     assert "artifact://0" in compacted.context[0].artifact_refs
     assert compacted.context[-1].artifact_refs == ["artifact://7"]
+
+
+def test_model_context_projects_one_best_experience_without_memory_duplication(
+    objective,
+    tools,
+) -> None:
+    harness = GrowthEconomicHarness(ScriptedModel([]))
+    candidate = ExperienceRecord(
+        experience_id="candidate-duplicate",
+        state=ExperienceState.CANDIDATE,
+        lesson="Evidence-first explanation improves qualified comparison.",
+        applicability="Comparison-stage demand.",
+        evidence_refs=["artifact://aggregate/1"],
+        confidence=0.6,
+        source_run_id="run-candidate",
+    )
+    recalled = ExperienceRecord(
+        experience_id="validated-duplicate",
+        state=ExperienceState.VALIDATED,
+        lesson="  evidence-first explanation improves qualified comparison. ",
+        applicability="comparison-stage demand.",
+        evidence_refs=["artifact://aggregate/1", "artifact://aggregate/1"],
+        confidence=0.9,
+        source_run_id="run-validated",
+    )
+    checkpoint = type(authorized_checkpoint(harness, objective)).model_validate(
+        {
+            **authorized_checkpoint(harness, objective).model_dump(mode="python"),
+            "experience_candidates": [candidate],
+            "continuity": ContinuityState(
+                memory_manifest=MemoryManifest(
+                    memories=[
+                        MemoryReference(
+                            memory_id="experience://validated-duplicate/preview",
+                            kind="semantic",
+                            summary=recalled.lesson,
+                            metadata={"experience_id": "validated-duplicate"},
+                        ),
+                        MemoryReference(
+                            memory_id="memory://independent/1",
+                            kind="semantic",
+                            summary="Independent market evidence remains current.",
+                        ),
+                    ]
+                )
+            ),
+        }
+    )
+
+    request = ContextLoop._request(
+        checkpoint,
+        tools=tools,
+        experiences=[recalled],
+        artifacts=[],
+        last_validation_error=None,
+    )
+
+    assert request.current_experience_candidates == []
+    assert [item.experience_id for item in request.recalled_experiences] == [
+        "validated-duplicate"
+    ]
+    assert [item.memory_id for item in request.memory_manifest.memories] == [
+        "memory://independent/1"
+    ]
+    assert request.memory_manifest.metadata["experience_duplicates_removed"] == 1
 
 
 def test_one_outcome_cannot_be_promoted_directly_to_skill() -> None:
@@ -337,6 +476,7 @@ def test_experience_promotion_is_attributable_audited_and_reversible() -> None:
             evaluation_ref="eval-1",
             policy_version="policy-1",
             observed_run_ids=("run-1",),
+            outcome_refs=("artifact://outcome/1",),
         ),
     )
     validated = loop.transition(
@@ -433,7 +573,9 @@ async def test_model_selected_wait_exposes_a_durable_wake_deadline(objective) ->
             ]
         )
     )
-    result = await harness.step(objective=objective)
+    result = await harness.step(
+        checkpoint=authorized_checkpoint(harness, objective),
+    )
     assert result.kind == "wait"
     assert result.wait.wake_conditions == ["new_market_signal"]
     assert result.wait.wake_after_seconds == 900

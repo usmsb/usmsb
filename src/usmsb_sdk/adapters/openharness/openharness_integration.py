@@ -124,6 +124,18 @@ class OpenHarnessIntegration:
     def is_initialized(self) -> bool:
         return self._initialized
 
+    def runtime_status(self) -> dict[str, Any]:
+        """Report physical readiness without equating adapters with a bound model."""
+
+        query_engine_bound = self._query_engine is not None
+        return {
+            "adapter_initialized": self._initialized,
+            "query_engine_bound": query_engine_bound,
+            "cognitive_ready": self._initialized and query_engine_bound,
+            "tool_bridge_mode": "explicit_adapter_only",
+            "openharness_version": OPENHARNESS_VERSION,
+        }
+
     @property
     def capabilities(self) -> OpenHarnessCapabilities:
         if self._capabilities is None:
