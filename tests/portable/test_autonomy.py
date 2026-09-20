@@ -25,6 +25,30 @@ def test_goal_reuses_existing_element(contracts):
     assert goal.associated_agent_id == "a" and goal.status == "in_progress"
 
 
+def test_specialization_preserves_units_unknown_fields_and_original(contracts):
+    base = contracts.model_definition("timed object", "Object", [], {"duration": {"type": "number", "unit": "seconds", "required": True}})
+    child = contracts.model_definition("film", "Object", [base], {"caption": {"type": "string"}})
+    raw = {"duration": 1.5, "caption": "a", "future_extension": {"x": [1]}}
+    parsed = contracts.model_properties(child, raw)
+    parsed["future_extension"]["x"].append(2)
+    assert raw["future_extension"]["x"] == [1]
+    for fields in ({"duration": {"type": "number", "unit": "minutes", "required": True}}, {"duration": {"type": "string"}}):
+        with pytest.raises(contracts.ContractError):
+            contracts.model_definition("invalid", "Object", [base], fields)
+    for props in ({}, {"duration": True}, {"duration": float("nan")}):
+        with pytest.raises(contracts.ContractError):
+            contracts.model_properties(child, props)
+
+
+def test_relation_is_only_an_attributed_statement(contracts):
+    relation = contracts.attributed_relation("a", {"kind": "goal", "id": "one"}, {"kind": "object", "id": "two"}, "supports", "my reason")
+    assert relation["effect"] == "statement_only"
+    with pytest.raises(contracts.ContractError):
+        contracts.attributed_relation("a", relation["source"], relation["target"], "grants_access", "no authority")
+    ref = contracts.object_reference({"id": "version2", "logical_id": "original", "content": "unchanged"})
+    assert ref["object_id"] == "original" and ref["version_id"] == "version2"
+
+
 def test_dependency_graph_rejects_cycles_and_missing_steps(contracts):
     for steps in ([dict(id="a", title="a", depends_on=["a"])],
                   [dict(id="a", title="a", depends_on=["b"])],

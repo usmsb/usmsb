@@ -12,7 +12,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 FILES = {"core/elements.py": "src/usmsb_sdk/core/elements.py",
          "autonomy/__init__.py": "src/usmsb_sdk/autonomy/__init__.py",
-         "autonomy/contracts.py": "src/usmsb_sdk/autonomy/contracts.py", "LICENSE": "LICENSE"}
+         "autonomy/contracts.py": "src/usmsb_sdk/autonomy/contracts.py",
+         "autonomy/world_model.py": "src/usmsb_sdk/autonomy/world_model.py", "LICENSE": "LICENSE"}
 
 
 def export(destination, check=False):
