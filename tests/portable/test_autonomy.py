@@ -1,0 +1,47 @@
+"""No optional SDK dependencies or model calls; use the supported export path."""
+import importlib
+import importlib.util
+from pathlib import Path
+import sys
+import pytest
+
+
+@pytest.fixture(scope="module")
+def contracts(tmp_path_factory):
+    script = Path(__file__).resolve().parents[2] / "scripts/export_autonomy.py"
+    spec = importlib.util.spec_from_file_location("export_autonomy", script)
+    exporter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(exporter)
+    root = tmp_path_factory.mktemp("portable")
+    exporter.export(root / "portable_usmsb")
+    exporter.export(root / "portable_usmsb", check=True)
+    sys.path.insert(0, str(root))
+    yield importlib.import_module("portable_usmsb.autonomy")
+    sys.path.remove(str(root))
+
+
+def test_goal_reuses_existing_element(contracts):
+    goal = contracts.goal_element(dict(id="g", title="open", description="real gap", status="active", owner_id="a"))
+    assert goal.associated_agent_id == "a" and goal.status == "in_progress"
+
+
+def test_dependency_graph_rejects_cycles_and_missing_steps(contracts):
+    for steps in ([dict(id="a", title="a", depends_on=["a"])],
+                  [dict(id="a", title="a", depends_on=["b"])],
+                  [dict(id="a", title="a"), dict(id="a", title="again")]):
+        with pytest.raises(contracts.ContractError):
+            contracts.plan_steps(steps)
+    assert len(contracts.plan_steps([dict(id="a", title="a"), dict(id="b", title="b", depends_on=["a"])])) == 2
+
+
+def test_every_criterion_needs_attributed_evidence(contracts):
+    contract = contracts.goal_contract([dict(id="c", description="real validation", evidence_kind="execution")], ["peer"])
+    with pytest.raises(contracts.ContractError):
+        contracts.review_checks(contract, [dict(criterion_id="c", status="pass", reason="looks good")])
+    assert contracts.review_checks(contract, [dict(criterion_id="c", status="unknown", reason="await provider")])[0]["status"] == "unknown"
+
+
+def test_remote_acceptance_cannot_fake_success(contracts):
+    assert contracts.remote_status(dict(state="accepted", run_ref="provider:123"))["state"] == "accepted"
+    with pytest.raises(contracts.ContractError):
+        contracts.remote_status(dict(state="completed", run_ref="provider:123"))
