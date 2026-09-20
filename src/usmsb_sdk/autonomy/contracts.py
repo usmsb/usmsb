@@ -49,7 +49,7 @@ def goal_contract(criteria, verifier_ids):
     for item in criteria:
         _check(isinstance(item, dict), "Invalid criterion")
         mode = item.get("evidence_kind", "artifact")
-        _check(mode in {"artifact", "execution", "observation"}, "Unknown evidence kind")
+        _check(isinstance(mode, str) and mode in {"artifact", "execution", "observation"}, "Unknown evidence kind")
         normalized.append({"id": _text(item.get("id"), 80), "description": _text(item.get("description")),
                            "evidence_kind": mode})
     _check(len({c["id"] for c in normalized}) == len(normalized), "Duplicate criterion")
@@ -87,9 +87,10 @@ def review_checks(contract, checks):
     expected = {c["id"] for c in contract["criteria"]}
     normalized = []
     for item in checks:
-        _check(isinstance(item, dict) and item.get("criterion_id") in expected, "Unknown criterion")
+        _check(isinstance(item, dict), "Invalid assessment")
+        _check(_text(item.get("criterion_id"), 80) in expected, "Unknown criterion")
         status = item.get("status")
-        _check(status in {"pass", "fail", "unknown"}, "Unknown assessment")
+        _check(isinstance(status, str) and status in {"pass", "fail", "unknown"}, "Unknown assessment")
         refs = _ids(item.get("evidence_ids", []), 12)
         _check(status != "pass" or bool(refs), "Passing assessment requires evidence")
         normalized.append({"criterion_id": item["criterion_id"], "status": status,
@@ -106,7 +107,7 @@ def remote_status(value):
     """
     _check(isinstance(value, dict), "Invalid remote result")
     state = value.get("state")
-    _check(state in {"accepted", "running", "completed", "failed", "unknown"}, "Unknown remote state")
+    _check(isinstance(state, str) and state in {"accepted", "running", "completed", "failed", "unknown"}, "Unknown remote state")
     result = {"state": state, "run_ref": _text(value.get("run_ref"), 500)}
     if state == "completed":
         output = value.get("output")

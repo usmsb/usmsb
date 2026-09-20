@@ -45,3 +45,13 @@ def test_remote_acceptance_cannot_fake_success(contracts):
     assert contracts.remote_status(dict(state="accepted", run_ref="provider:123"))["state"] == "accepted"
     with pytest.raises(contracts.ContractError):
         contracts.remote_status(dict(state="completed", run_ref="provider:123"))
+
+
+def test_malformed_json_is_a_contract_error(contracts):
+    with pytest.raises(contracts.ContractError):
+        contracts.goal_contract([dict(id="c", description="a", evidence_kind=[])], ["v"])
+    with pytest.raises(contracts.ContractError):
+        contracts.remote_status(dict(state=[], run_ref="r"))
+    spec = contracts.goal_contract([dict(id="c", description="a")], ["v"])
+    with pytest.raises(contracts.ContractError):
+        contracts.review_checks(spec, [dict(criterion_id={}, status="unknown", reason="a")])
