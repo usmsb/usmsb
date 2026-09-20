@@ -72,7 +72,7 @@ def object_reference(record):
 
 def attributed_relation(actor_id, source, target, relationship, reason):
     """A statement about a relationship cannot create consent, rights or revenue."""
-    _check(relationship in {"supports", "depends_on", "references", "motivated_by", "questions"}, "Unsupported statement relation")
+    _check(isinstance(relationship, str) and relationship in {"supports", "depends_on", "references", "motivated_by", "questions"}, "Unsupported statement relation")
     _check(isinstance(source, dict) and isinstance(target, dict), "Invalid relation endpoints")
     for ref in (source, target):
         _text(ref.get("id"), 180)
