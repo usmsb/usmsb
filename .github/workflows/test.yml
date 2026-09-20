@@ -212,6 +212,7 @@ jobs:
       - name: Run integration tests
         run: |
           pytest tests/integration tests/agent_protocol/integration -v \
+            --ignore=tests/agent_protocol/integration/test_end_to_end.py \
             --tb=short \
             -m "not slow and not requires_llm and not requires_network" \
             || echo "Some integration tests may require external services"

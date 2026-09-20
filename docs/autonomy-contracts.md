@@ -31,3 +31,18 @@ loops, mock environment collectors and value settlement are not pulled in.
 
 HTTP/JSON participants need not install Python or this subset. Implementations
 remain free to use the public contract with another language and runtime.
+
+## Validation scope
+
+The legacy CI integration command previously included `test_end_to_end.py` and
+suppressed test failure through `|| echo`. Its green job state is not a claim that
+all integration tests pass. The portable-contract PR initially triggered that
+existing job; default CI now excludes that end-to-end file to respect this
+delivery's deferred E2E scope. Portable-contract checks remain blocking and do
+not depend on simulated providers or live platform services.
+
+Run 35488978387 reported 22 failures and 54 setup errors in the wider integration
+suite, including obsolete constructor arguments, absent attributes, HTTP 500s
+and local port collisions. Those paths are not part of the portable export.
+They need separate integration repair before claiming the entire SDK is ready
+for a production World deployment. See the run logs, not only workflow status.
