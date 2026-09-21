@@ -25,6 +25,29 @@ def test_goal_reuses_existing_element(contracts):
     assert goal.associated_agent_id == "a" and goal.status == "in_progress"
 
 
+def test_open_world_identity_is_namespaced_and_cannot_alias_another_ledger(contracts):
+    node = "wishbud:ed25519:" + "A" * 43
+    ref = contracts.world_reference(node, "storage_" + "a" * 20, "goal", "g1")
+    assert ref != contracts.world_reference(node, "storage_" + "b" * 20, "goal", "g1")
+    for record_id in ("../../foreign", "a/b", None, ""):
+        with pytest.raises(contracts.ContractError):
+            contracts.world_reference(node, "storage_" + "a" * 20, "goal", record_id)
+
+
+def test_reference_feedback_policy_is_evidence_bound_and_finite(contracts):
+    evidence = {"id": "a1", "observation_id": "o1", "status": "gap"}
+    assert contracts.feedback_decision(evidence, {})["decision"] == "investigate"
+    memory = {"assessment_id": "a1", "goal_id": "g1", "phase": "gap", "episodes": 1, "strategy": "learned-from-execution"}
+    assert contracts.feedback_decision(evidence, memory)["decision"] == "wait"
+    changed = {**evidence, "id": "a2", "status": "aligned"}
+    assert contracts.feedback_decision(changed, memory)["decision"] == "assess_effect"
+    result = contracts.feedback_decision(evidence, {**memory, "phase": "aligned", "assessment_id": "a2"})
+    assert result["previous_strategy"] == "learned-from-execution" and not result["causal_claim"]
+    assert contracts.feedback_decision(evidence, {"episodes": 12})["reason"] == "episode_budget"
+    for state in ("unknown", "disabled"):
+        assert contracts.feedback_decision({**evidence, "status": state}, {})["decision"] == "wait"
+
+
 def test_specialization_preserves_units_unknown_fields_and_original(contracts):
     base = contracts.model_definition("timed object", "Object", [], {"duration": {"type": "number", "unit": "seconds", "required": True}})
     child = contracts.model_definition("film", "Object", [base], {"caption": {"type": "string"}})
