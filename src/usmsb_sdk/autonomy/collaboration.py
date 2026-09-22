@@ -12,7 +12,7 @@ from .evolution import ReferenceDecisionPolicy, clone, fingerprint
 
 
 EFFECTS = {"join_goal", "request_execution", "accept_execution", "set_goal_contract", "request_goal_review",
-           "review_goal_result", "adopt_execution", "record_learning", "record_goal_gap", "resolve_goal_gap"}
+           "review_goal_result", "adopt_execution", "record_learning", "record_goal_gap", "resolve_goal_gap", "set_concern"}
 TERMINAL = {"completed", "failed", "declined", "cancelled", "closed_uncertain"}
 
 
@@ -39,7 +39,7 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
         _check(config.get("execution_scope") == "owner_authorized_local_programs", "Explicit local program authorization required")
         _check(type(config.get("max_requests")) is int and 1 <= config["max_requests"] <= 100, "Persistent request budget required")
         _check(type(config.get("max_accepts")) is int and 0 <= config["max_accepts"] <= 100, "Persistent acceptance budget required")
-        for key in ("provider_ids", "requester_ids", "accept_operations", "work", "verify"):
+        for key in ("provider_ids", "requester_ids", "accept_operations", "work", "verify", "discover_conditions"):
             _check(isinstance(config.get(key, []), list) and len(config.get(key, [])) <= 30, "Bounded " + key + " required")
         _check(config.get("provider_ids") or not config.get("work"), "Owner must authorize a partner set, not arbitrary remote side effects")
         for item in config.get("work", []):
@@ -50,6 +50,12 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
         for item in config.get("verify", []):
             for key in ("operation", "candidate_format", "result_format", "pass_field", "criterion"):
                 _text(item.get(key), 180)
+        for item in config.get("discover_conditions", []):
+            for key in ("id", "source_id", "external_id", "title", "reason_for_caring", "unit"):
+                _text(item.get(key), 180)
+            _check(isinstance(item.get("path"), str) and item["path"].startswith("/") and len(item["path"]) <= 500, "Explicit source field required")
+            _check(type(item.get("desired")) in {str, bool, int, float} and item["desired"] != "", "Desired source condition required")
+            _check(type(item.get("max_age_seconds")) is int and 30 <= item["max_age_seconds"] <= 86400, "Bounded observation freshness required")
         self.version = "usmsb.local-collaboration.v1:" + fingerprint(config)
 
     @staticmethod
@@ -64,7 +70,7 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
         applied = context["memory"].get("actions", [])
         if operation in {"request_execution", "accept_execution"}:
             limit = self.config["max_requests" if operation == "request_execution" else "max_accepts"]
-            if sum(a.get("intent", {}).get("operation") == operation for a in applied) >= limit:
+            if sum((a.get("intent") or {}).get("operation") == operation for a in applied) >= limit:
                 return {"decision": "wait", "reason": "persistent_" + operation + "_budget"}
         return {"decision": "propose_action", "action_key": key, "intent": {"operation": operation, "parameters": parameters}, "reason": reason}
 
@@ -87,6 +93,30 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
         objects = {o["id"]: o for o in env.get("objects", [])}
         goals = {g["id"]: g for g in env.get("goals", [])}
         prior = self.actions(context)
+        # Standing attention rules can discover a previously absent condition
+        # from a NEW real source record. They do not pre-create a task list.
+        # The ordinary concern assessment forms a goal on the next cycle.
+        for rule in self.config.get("discover_conditions", []):
+            key = "discover-condition:" + rule["id"]
+            if key in prior:
+                continue
+            for observed in sorted(context["observations"], key=lambda o: o.get("observed_at", 0), reverse=True):
+                meta = env.get("observation_metadata", {}).get(observed["id"], {})
+                if (observed.get("source_id") != rule["source_id"] or observed.get("effective_validity") != "valid"
+                        or meta.get("external_id") != rule["external_id"] or meta.get("superseded")):
+                    continue
+                try:
+                    actual = observed["payload"]["raw_record"]
+                    for part in rule["path"].split("/")[1:]:
+                        actual = actual[part.replace("~1", "/").replace("~0", "~")]
+                except (KeyError, TypeError, IndexError):
+                    continue
+                if type(actual) != type(rule["desired"]) or actual == rule["desired"]:
+                    continue  # Unknown/absent/type-mismatched data is not a gap.
+                return self.propose(context, key, "set_concern", {"title": rule["title"], "reason_for_caring": rule["reason_for_caring"],
+                    "basis_observation_id": observed["id"], "selector": {"source_id": rule["source_id"], "external_id": rule["external_id"],
+                        "root": "raw_record", "path": rule["path"], "match": []}, "comparison": "eq", "desired": rule["desired"],
+                    "unit": rule["unit"], "max_age_seconds": rule["max_age_seconds"]}, "new_observed_condition_enters_own_attention") or base
         # Requests are commitments only after this provider's own choice.
         for run in sorted(runs.values(), key=lambda r: r["id"]):
             if (run.get("provider_id") == aid and run["status"] == "requested"
