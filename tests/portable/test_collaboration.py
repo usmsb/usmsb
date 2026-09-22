@@ -55,6 +55,19 @@ def test_discovery_uses_available_authorized_offers_and_preserves_unknown_resour
     assert collaboration.CollaborationPolicy(config()).decide(c)["intent"]["operation"] == "record_goal_gap"
 
 
+def test_source_notice_prevents_new_requests_and_repeated_gap_creation(collaboration):
+    c = context()
+    c["environment"]["objects"] = [{"id": "withdrawn-input"}]
+    c["environment"]["evidence_impacts"] = {"objects": {"withdrawn-input": ["notice-1"]}}
+    cfg = config()
+    cfg["work"][0]["input_object_ids"] = ["withdrawn-input"]
+    policy = collaboration.CollaborationPolicy(cfg)
+    result = policy.decide(c)
+    assert result["intent"]["operation"] == "record_goal_gap" and result["intent"]["parameters"]["kind"] == "evidence"
+    c["memory"]["actions"].append({"action_key": result["action_key"], "receipt": {"id": "gap"}, "intent": result["intent"]})
+    assert policy.decide(c)["decision"] == "wait"
+
+
 @pytest.mark.parametrize("state", ["uncertain", "leased", "accepted", "requested", "closed_uncertain", "failed"])
 def test_unknown_and_non_authorized_failure_never_replay(collaboration, state):
     c = context()

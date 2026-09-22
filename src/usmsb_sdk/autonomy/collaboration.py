@@ -93,6 +93,7 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
         objects = {o["id"]: o for o in env.get("objects", [])}
         goals = {g["id"]: g for g in env.get("goals", [])}
         prior = self.actions(context)
+        affected = env.get("evidence_impacts", {}).get("objects", {})
         # Standing attention rules can discover a previously absent condition
         # from a NEW real source record. They do not pre-create a task list.
         # The ordinary concern assessment forms a goal on the next cycle.
@@ -123,7 +124,7 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
                 and run.get("requester_id") in self.config.get("requester_ids", [])
                 and run.get("operation") in self.config.get("accept_operations", [])):
                 cap = self.choose(context, run["operation"], own=True)
-                if cap and cap["id"] == run["capability_id"]:
+                if cap and cap["id"] == run["capability_id"] and not any(oid in affected for oid in run.get("input_object_ids", [])):
                     proposal = self.propose(context, "accept:" + run["id"], "accept_execution", {"execution_id": run["id"]}, "provider_independently_accepts_within_owner_scope")
                     if proposal:
                         return proposal
@@ -132,6 +133,8 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
             if review.get("status") != "awaiting_review" or aid not in review.get("verifier_ids", []):
                 continue
             goal, candidate = goals.get(review["goal_id"]), objects.get(review["candidate_id"])
+            if candidate and candidate["id"] in affected:
+                continue
             if not goal or not candidate or goal.get("acceptance_contract_id") != review["contract_id"] or candidate.get("owner_id") == aid:
                 continue
             rule = next((r for r in self.config.get("verify", []) if r["candidate_format"] == content(candidate).get("format")), None)
@@ -172,6 +175,11 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
             if not goal or goal["status"] != "active" or goal.get("owner_id") != aid:
                 continue
             key = "work:" + goal["id"]
+            blocked_inputs = [oid for oid in spec.get("input_object_ids", []) if oid in affected]
+            if blocked_inputs:
+                issue = fingerprint({oid: affected[oid] for oid in blocked_inputs})
+                return self.propose(context, key + ":evidence:" + issue, "record_goal_gap", {"goal_id": goal["id"], "kind": "evidence",
+                    "description": "Input use was withdrawn or disputed; review source authority and obtain a new authorized version before proceeding"}, "source_notice_changes_next_action") or base
             # A consumption that already happened still needs its real adoption
             # record if its effect made the measured condition align first.
             # Do not start new work just because an old episode once had a gap.
@@ -206,6 +214,10 @@ class CollaborationPolicy(ReferenceDecisionPolicy):
             candidate = objects.get(run.get("output_id"))
             if not candidate or content(candidate).get("format") != spec["candidate_format"]:
                 continue
+            if candidate["id"] in affected:
+                return self.propose(context, key + ":evidence:" + fingerprint(affected[candidate["id"]]), "record_goal_gap", {
+                    "goal_id": goal["id"], "kind": "evidence", "description": "The candidate or its source has a withdrawal or counterevidence notice; previous acceptance is not current authorization"},
+                    "candidate_notice_prevents_further_consumption") or base
             for gap_key, gap_action in prior.items():
                 if gap_key.startswith(key + ":gap:") and gap_action["intent"]["operation"] == "record_goal_gap":
                     resolved = self.propose(context, gap_key + ":resolved", "resolve_goal_gap", {"goal_id": goal["id"],
