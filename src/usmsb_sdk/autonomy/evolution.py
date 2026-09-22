@@ -223,7 +223,7 @@ class SQLiteEvolutionStore:
             return json.loads(row[0]) if row else None
 
     def memory(self, db):
-        concerns, feedback, handled_invalidations = {}, [], set()
+        concerns, feedback, handled_invalidations, actions = {}, [], set(), []
         for row in db.execute("SELECT payload FROM evolution_journal ORDER BY seq"):
             event = json.loads(row[0])
             if event["type"] == "feedback":
@@ -234,11 +234,13 @@ class SQLiteEvolutionStore:
                 state["episodes"] += int(event["decision"] == "create_goal")
             if event["type"] == "decision_applied":
                 handled_invalidations.update(event.get("invalidation_ids", []))
+                if event.get("action_key"):
+                    actions.append(event)
         experiences, invalidations = [], []
         if db.execute("SELECT 1 FROM sqlite_master WHERE name='learning_experiences'").fetchone():
             experiences = [json.loads(r[0]) for r in db.execute("SELECT record FROM learning_experiences ORDER BY id")]
             invalidations = [json.loads(r[0]) for r in db.execute("SELECT event FROM learning_invalidations ORDER BY rowid")]
-        return {"concerns": concerns, "feedback": feedback, "experiences": experiences,
+        return {"concerns": concerns, "feedback": feedback, "experiences": experiences, "actions": actions,
                 "experience_invalidations": invalidations, "handled_invalidations": sorted(handled_invalidations),
                 "applicable_experiences": [r for r in experiences if r["state"] in {"validated", "promoted_skill"} and not r["metadata"].get("review_required")],
                 "remotes": [json.loads(r[0]) for r in db.execute("SELECT payload FROM evolution_remote_state ORDER BY run_ref")]}
@@ -329,6 +331,7 @@ class EvolutionEngine:
             decision, context = json.loads(row[1]), json.loads(row[3])
             event = {"type": "decision_applied", "decision_id": decision_id, "decision": decision["decision"],
                      "receipt": clone(receipt), "concern_id": decision.get("concern_id"), "state": {},
+                     "action_key": decision.get("action_key"), "intent": decision.get("intent"),
                      "invalidation_ids": decision.get("invalidation_ids", [])}
             assessment = next((a for a in context["environment"].get("assessments", []) if a["id"] == decision.get("assessment_id")), None)
             if assessment:
