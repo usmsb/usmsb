@@ -18,7 +18,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: python -m pip install pytest
+      # The portable learning adapter imports the existing Pydantic-backed
+      # ExperienceLoop; keep this focused gate's runtime dependency explicit.
+      - run: python -m pip install pytest 'pydantic>=2.0'
       - run: python -m pytest tests/portable --confcutdir=tests/portable -q
 
   lint:
