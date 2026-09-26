@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = {"core/elements.py": "src/usmsb_sdk/core/elements.py",
          "autonomy/__init__.py": "src/usmsb_sdk/autonomy/__init__.py",
          "autonomy/contracts.py": "src/usmsb_sdk/autonomy/contracts.py",
+         "autonomy/goal_revision.py": "src/usmsb_sdk/autonomy/goal_revision.py",
          "autonomy/evolution.py": "src/usmsb_sdk/autonomy/evolution.py",
          "autonomy/authorization.py": "src/usmsb_sdk/autonomy/authorization.py",
          "autonomy/learning.py": "src/usmsb_sdk/autonomy/learning.py",
