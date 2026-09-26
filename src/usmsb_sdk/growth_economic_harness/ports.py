@@ -34,6 +34,11 @@ _SENSITIVE_COGNITIVE_PATTERNS = (
     re.compile(r"(?i)(?:微信|wechat|wxid)\s*[:：=]\s*[A-Za-z][A-Za-z0-9_-]{5,}"),
     re.compile(r"(?i)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*\S+"),
 )
+# Exact canonical integrity digests are opaque identifiers, not phone numbers.
+# An incidental decimal run in a SHA-256 must not randomly reject a legitimate
+# Host receipt. Do not exempt strings containing a digest plus other content;
+# sensitive field names and authorization checks still run normally.
+_CANONICAL_SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _FORBIDDEN_COGNITIVE_KEYS = {
     "fullname",
     "personalname",
@@ -110,10 +115,11 @@ def enforce_cognitive_request_policy(
         elif isinstance(value, (list, tuple)):
             for item in value:
                 inspect(item)
-        elif isinstance(value, str) and any(
-            pattern.search(value) for pattern in _SENSITIVE_COGNITIVE_PATTERNS
-        ):
-            raise ValueError("cognitive request failed sensitive-data inspection")
+        elif isinstance(value, str):
+            if _CANONICAL_SHA256.fullmatch(value):
+                return
+            if any(pattern.search(value) for pattern in _SENSITIVE_COGNITIVE_PATTERNS):
+                raise ValueError("cognitive request failed sensitive-data inspection")
 
     inspect(payload)
 
