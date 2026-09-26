@@ -25,6 +25,23 @@ def test_goal_reuses_existing_element(contracts):
     assert goal.associated_agent_id == "a" and goal.status == "in_progress"
 
 
+def test_feedback_can_revise_intent_without_rewriting_identity_or_obligations(contracts):
+    revision = importlib.import_module("portable_usmsb.autonomy.goal_revision")
+    source = dict(id="g", title="原目标", description="初始假设", domain="research", success_criteria="原判断")
+    original = revision.goal_version(source)
+    patch = revision.revision_patch({"description": "根据新证据修订的目标"})
+    updated = revision.goal_version({**source, **patch, "revision": 2})
+    assert original["revision"] == 1 and updated["revision"] == 2
+    assert original["goal_id"] == updated["goal_id"]
+    assert source["description"] == original["intent"]["description"] == "初始假设"
+    for invalid in ({"owner_id": "another"}, {"status": "completed"}, {}, {"description": ""}):
+        with pytest.raises(contracts.ContractError):
+            revision.revision_patch(invalid)
+    for invalid in (True, 0, -1, "2"):
+        with pytest.raises(contracts.ContractError):
+            revision.revision_basis(invalid)
+
+
 def test_open_world_identity_is_namespaced_and_cannot_alias_another_ledger(contracts):
     node = "wishbud:ed25519:" + "A" * 43
     ref = contracts.world_reference(node, "storage_" + "a" * 20, "goal", "g1")
