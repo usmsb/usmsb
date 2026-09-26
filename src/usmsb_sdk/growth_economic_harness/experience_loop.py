@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 from uuid import uuid4
 
-from usmsb_sdk.growth_economic_harness.models import (
+from .models import (
     ExperienceDraft,
     ExperienceRecord,
     ExperienceState,

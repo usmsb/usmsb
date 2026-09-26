@@ -58,6 +58,108 @@ DEFAULT_LLM_ARTIFACT_SPOOL_CLEANUP_INTERVAL_SECONDS = 60 * 60
 # GIL while a burst of requested/completed hooks is still returning.
 LLM_ARTIFACT_WORKER_HANDOFF_GRACE_SECONDS = 0.05
 
+
+def _refresh_mtime_windows_nofollow(path: os.PathLike[str] | str) -> None:
+    """Refresh ``path`` through a Windows handle without following reparse points."""
+
+    import ctypes
+    import errno
+    from ctypes import wintypes
+
+    file_write_attributes = 0x0100
+    file_share_read = 0x0001
+    file_share_write = 0x0002
+    file_share_delete = 0x0004
+    open_existing = 3
+    file_flag_open_reparse_point = 0x00200000
+    file_attribute_reparse_point = 0x0400
+    file_attribute_tag_info_class = 9
+    invalid_handle_value = ctypes.c_void_p(-1).value
+
+    class FileAttributeTagInfo(ctypes.Structure):
+        _fields_ = [
+            ("file_attributes", wintypes.DWORD),
+            ("reparse_tag", wintypes.DWORD),
+        ]
+
+    path_text = os.fsdecode(os.fspath(path))
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    kernel32.GetFileInformationByHandleEx.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    ]
+    kernel32.GetFileInformationByHandleEx.restype = wintypes.BOOL
+    kernel32.GetSystemTimeAsFileTime.argtypes = [ctypes.POINTER(wintypes.FILETIME)]
+    kernel32.GetSystemTimeAsFileTime.restype = None
+    kernel32.SetFileTime.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    ]
+    kernel32.SetFileTime.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    handle = kernel32.CreateFileW(
+        path_text,
+        file_write_attributes,
+        file_share_read | file_share_write | file_share_delete,
+        None,
+        open_existing,
+        file_flag_open_reparse_point,
+        None,
+    )
+    if handle in (None, invalid_handle_value):
+        code = ctypes.get_last_error()
+        raise OSError(code, ctypes.FormatError(code), path_text)
+    try:
+        tag_info = FileAttributeTagInfo()
+        if not kernel32.GetFileInformationByHandleEx(
+            handle,
+            file_attribute_tag_info_class,
+            ctypes.byref(tag_info),
+            ctypes.sizeof(tag_info),
+        ):
+            code = ctypes.get_last_error()
+            raise OSError(code, ctypes.FormatError(code), path_text)
+        if tag_info.file_attributes & file_attribute_reparse_point:
+            raise OSError(
+                errno.ELOOP,
+                "artifact target cannot be a reparse point",
+                path_text,
+            )
+        now = wintypes.FILETIME()
+        kernel32.GetSystemTimeAsFileTime(ctypes.byref(now))
+        if not kernel32.SetFileTime(handle, None, None, ctypes.byref(now)):
+            code = ctypes.get_last_error()
+            raise OSError(code, ctypes.FormatError(code), path_text)
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _refresh_mtime_nofollow(path: os.PathLike[str] | str) -> None:
+    """Refresh retention time with the same no-link guarantee on every OS."""
+
+    try:
+        os.utime(path, None, follow_symlinks=False)
+    except NotImplementedError:
+        if os.name != "nt":
+            raise
+        _refresh_mtime_windows_nofollow(path)
+
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -1035,7 +1137,7 @@ class LLMArtifactSpool:
                 # Retention is based on last reference time, not first creation.
                 # Refreshing mtime prevents a frequently reused content-addressed
                 # artifact from being deleted while new trace rows still point to it.
-                os.utime(target, None, follow_symlinks=False)
+                _refresh_mtime_nofollow(target)
                 self._fsync_directory(resolved_parent)
                 return True
 

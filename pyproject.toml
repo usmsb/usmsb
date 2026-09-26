@@ -37,7 +37,8 @@ dependencies = [
     "langchain-openai>=0.0.5",
     "fastapi>=0.109",
     "uvicorn>=0.27",
-    "sqlalchemy>=2.0",
+    # SQLite storage eagerly imports the asyncio extension, which needs greenlet.
+    "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.19",
     "redis>=5.0",
     # The top-level SDK imports blockchain-backed Agent services eagerly, so
