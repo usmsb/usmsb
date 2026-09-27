@@ -10,6 +10,27 @@ env:
   PYTHON_VERSION: "3.14"
 
 jobs:
+  economic-safety:
+    name: Economic fail-closed contracts (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: python -m pip install -e ".[test]"
+      - name: Verify uncertain reviews, persistent settlement and disabled placeholder ZK
+        run: >-
+          python -m pytest
+          tests/unit/test_economic_fail_closed.py
+          tests/unit/test_pea_market.py
+          tests/unit/test_joint_order.py
+          tests/unit/test_team_leader_pea.py
+          tests/unit/test_vibe_settlement.py
+          tests/unit/test_a2a_runtime.py
+          tests/creative_economy/test_services.py -q
+
   portable-autonomy:
     name: Portable autonomy contracts
     runs-on: ubuntu-latest
@@ -278,6 +299,7 @@ jobs:
     name: Test Summary
     runs-on: ubuntu-latest
     needs:
+      - economic-safety
       - lint
       - llm-telemetry-contract
       - dist-inference-contract
@@ -303,6 +325,7 @@ jobs:
 
       - name: Fail if critical jobs failed
         if: >-
+          needs['economic-safety'].result != 'success' ||
           needs.lint.result != 'success' ||
           needs['llm-telemetry-contract'].result != 'success' ||
           needs['dist-inference-contract'].result != 'success' ||

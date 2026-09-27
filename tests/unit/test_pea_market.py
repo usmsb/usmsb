@@ -66,9 +66,9 @@ async def test_quality_gate_llm_verdict():
     assert v.verdict == "failed" and "糊" in v.reason
 
 
-async def test_quality_gate_fallback_passed():
+async def test_quality_gate_unavailable_requires_review():
     qg = LLMQualityGate(None)
-    assert (await qg.judge("t", "有内容的交付")).verdict == "passed"
+    assert (await qg.judge("t", "有内容的交付")).verdict == "unknown"
     assert (await qg.judge("t", "   ")).verdict == "failed"  # 空交付
 
 
@@ -96,7 +96,7 @@ async def test_recursive_delegation_settles_across_three_peas(tmp_path):
     rel0_design = rep.get_score("pea_design").dimensions["reliability"]
     rel0_copy = rep.get_score("pea_copy").dimensions["reliability"]
     trust = TrustBridge(rep)
-    qg = LLMQualityGate(None)  # 交付非空→passed（质量门 LLM 路径另有单测）
+    qg = LLMQualityGate(ScriptedChat(['{"verdict":"passed"}'] * 2))
 
     # 文案 PEA（叶子供应商）：write_copy → say
     copy_pea = _pea("pea_copy", ledger, balance=0.0)

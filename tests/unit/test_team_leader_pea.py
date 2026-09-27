@@ -65,7 +65,7 @@ async def test_team_project_decompose_assemble_split(tmp_path):
     # 子任务1"做主视觉"：design 0.9 / copy 0.1；子任务2"写文案"：design 0.1 / copy 0.9
     discovery = CapabilityDiscovery(LLMCapabilityFit(SeqFit([0.9, 0.1, 0.1, 0.9])))
     market = PeaMarket(ledger=ledger, matcher=LLMCapabilityMatcher(None), discovery=discovery)
-    qg = LLMQualityGate(None)
+    qg = LLMQualityGate(ScriptedChat(['{"verdict":"passed"}'] * 2))
 
     for aid, reply in [("design", "主视觉完成"), ("copy", "文案完成")]:
         h = _member(market, aid, ledger, reply)

@@ -87,7 +87,7 @@ def _member(agent_id, ledger, market, reply):
 async def test_joint_order_settles_by_shapley(tmp_path):
     ledger: dict[str, float] = {"coord": 1000.0}
     market = PeaMarket(ledger=ledger, matcher=LLMCapabilityMatcher(None))
-    qg = LLMQualityGate(None)  # 交付非空→passed
+    qg = LLMQualityGate(ScriptedChat(['{"verdict":"passed"}'] * 2))
 
     for mid, rep in [("m1", "主视觉部分完成"), ("m2", "文案部分完成")]:
         h = _member(mid, ledger, market, rep)
@@ -116,7 +116,7 @@ async def test_joint_order_refunds_on_quality_fail(tmp_path):
     market = PeaMarket(ledger=ledger, matcher=LLMCapabilityMatcher(None))
 
     # m1 质量门通过；m2 质量门失败（QG 判 failed）
-    qg_pass = LLMQualityGate(None)
+    qg_pass = LLMQualityGate(ScriptedChat(['{"verdict":"passed"}']))
     qg_fail = LLMQualityGate(ScriptedChat(['{"verdict":"failed","reason":"没做"}']))
 
     h1 = _member("m1", ledger, market, "做好了")

@@ -14,7 +14,6 @@ PEA 参考实现（Task 3）会提供 VIBE 钱包驱动的后端。
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Protocol, runtime_checkable
 
 from .store import (
@@ -71,7 +70,8 @@ class EscrowSettlementHook:
     async def on_escrow(self, job: JobRecord, payee: str | None = None) -> dict:
         if job.vibe_amount <= 0:
             return {}
-        escrow_id = job.escrow_id or f"esc_{uuid.uuid4().hex[:16]}"
+        # Stable before the first side effect, including ambiguous open failures.
+        escrow_id = job.escrow_id or f"esc_job_{job.id}"
         ok = await self.backend.open_escrow(
             escrow_id=escrow_id,
             payer=job.caller_id,
