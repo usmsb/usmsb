@@ -1,14 +1,15 @@
 """
 ZK Credential Service for AI Civilization Platform
 
-Implements zero-knowledge proof generation and verification for privacy-preserving credentials.
+Reserved API for privacy-preserving credentials. Proof operations are disabled
+until a reviewed circuit, trusted verification key and persistent replay
+protection are integrated. Identity signatures are not ZK proofs.
 """
 
 import asyncio
 import hashlib
 import logging
 import time
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -150,30 +151,9 @@ class ZKCredentialService:
         private_inputs: PrivateInputs,
         thresholds: dict[str, float],
     ) -> ZKProof | None:
-        """
-        Generate a zero-knowledge proof.
-
-        This is a simplified implementation. In production, use a proper
-        zk-SNARK library like snarkjs or circom.
-        """
-        commitment = self._calculate_commitment(private_inputs)
-        nullifier_hash = self._calculate_nullifier(private_inputs.secret)
-
-        proof = ZKProof(
-            a=(123456789, 987654321),
-            b=((111111111, 222222222), (333333333, 444444444)),
-            c=(555555555, 666666666),
-            public_inputs=[
-                int(commitment, 16) % (10**18),
-                int(nullifier_hash, 16) % (10**18),
-                int(private_inputs.reputation * 100),
-                int(private_inputs.stake),
-            ],
-        )
-
-        logger.info(f"Generated ZK proof for credential type: {credential_type}")
-
-        return proof
+        """No placeholder points or exposed private reputation may masquerade as proof."""
+        logger.warning("ZK proof generation unavailable: no verified proof backend")
+        return None
 
     def _calculate_commitment(self, inputs: PrivateInputs) -> str:
         """Calculate commitment from private inputs."""
@@ -194,50 +174,9 @@ class ZKCredentialService:
         score: float,
         metadata: dict[str, Any] | None = None,
     ) -> Credential | None:
-        """Issue a credential based on verified proof."""
-        if valid_duration < self.MIN_CREDENTIAL_DURATION:
-            return None
-
-        if valid_duration > self.MAX_CREDENTIAL_DURATION:
-            return None
-
-        commitment = hex(proof.public_inputs[0])
-        nullifier_hash = hex(proof.public_inputs[1])
-
-        if self._nullifiers.get(nullifier_hash, False):
-            logger.warning(f"Nullifier already used: {nullifier_hash}")
-            return None
-
-        credential_id = f"cred-{uuid.uuid4().hex[:8]}"
-        now = time.time()
-
-        credential = Credential(
-            credential_id=credential_id,
-            holder=holder,
-            cred_type=credential_type,
-            valid_from=now,
-            valid_until=now + valid_duration,
-            commitment=commitment,
-            nullifier_hash=nullifier_hash,
-            status=CredentialStatus.ACTIVE,
-            score=score,
-            metadata=metadata or {},
-            created_at=now,
-        )
-
-        self._credentials[credential_id] = credential
-        self._nullifiers[nullifier_hash] = True
-
-        if holder not in self._holder_credentials:
-            self._holder_credentials[holder] = []
-        self._holder_credentials[holder].append(credential_id)
-
-        if self.on_credential_issued:
-            self.on_credential_issued(credential)
-
-        logger.info(f"Issued credential: {credential_id}")
-
-        return credential
+        """Fail closed: stored metadata and caller-supplied curve points are not proofs."""
+        logger.warning("ZK credential issuance unavailable: no verified proof backend")
+        return None
 
     async def verify_credential(
         self,
@@ -245,30 +184,14 @@ class ZKCredentialService:
         proof: ZKProof,
         purpose: str = "verification",
     ) -> bool:
-        """Verify a credential."""
-        credential = self._credentials.get(credential_id)
-        if not credential:
-            return False
-
-        is_valid = self._check_validity(credential)
-
+        """Never promote a timestamp/status check to cryptographic verification."""
         if self.on_credential_verified:
-            self.on_credential_verified(credential_id, is_valid)
-
-        logger.info(f"Verified credential {credential_id}: {is_valid}")
-
-        return is_valid
+            self.on_credential_verified(credential_id, False)
+        return False
 
     def _check_validity(self, credential: Credential) -> bool:
-        """Check if credential is valid."""
-        if credential.status != CredentialStatus.ACTIVE:
-            return False
-
-        now = time.time()
-        if now < credential.valid_from or now > credential.valid_until:
-            return False
-
-        return True
+        """Old in-memory placeholder credentials cannot confer any authority."""
+        return False
 
     async def revoke_credential(
         self,

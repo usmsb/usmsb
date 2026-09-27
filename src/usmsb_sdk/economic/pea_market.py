@@ -5,7 +5,7 @@
 
 **LLM-first 原则**（凡需要"判断/智能"的地方一律走 LLM，护栏才用代码）：
 - 选供应商（语义能力匹配）→ LLMCapabilityMatcher（LLM；非关键词 fallback=按声誉）。
-- 判交付合格与否（质量门）→ LLMQualityGate（LLM；fallback=passed）。
+- 判交付合格与否（质量门）→ LLMQualityGate（LLM；不可用时待复核，不结算）。
 - 拆解目标/决定外包什么 → 由协调者 PEA 的 harness 主循环 LLM 决定。
 - 预算/限额/幂等/托管/结算 → 代码护栏（guard + a2a_runtime + settlement）。
 """
@@ -164,12 +164,12 @@ class CapabilityDiscovery:
 # ── LLM 质量门（判交付是否达标，非硬编码 passed）──────────────────────────
 @dataclass
 class QualityVerdict:
-    verdict: str   # passed | failed
+    verdict: str   # passed | failed | unknown
     reason: str = ""
 
 
 class LLMQualityGate:
-    """用 LLM 判断交付物是否达标。fallback（无 LLM）：passed（保守由人工闸门兜底）。"""
+    """用 LLM 判断交付物是否达标；缺失、异常或非法结论不构成验收。"""
 
     _SYS = (
         "你是交付质量评审。判断【交付物】是否真的完成了【任务】要求（语义判断，看实质）。"
@@ -180,8 +180,10 @@ class LLMQualityGate:
         self.chat = chat
 
     async def judge(self, task: str, delivery: str) -> QualityVerdict:
-        if self.chat is None or not delivery.strip():
-            return QualityVerdict("passed" if delivery.strip() else "failed", "no-llm-fallback")
+        if not delivery.strip():
+            return QualityVerdict("failed", "empty-delivery")
+        if self.chat is None:
+            return QualityVerdict("unknown", "reviewer-unavailable")
         try:
             raw = await self.chat.complete([
                 {"role": "system", "content": self._SYS},
@@ -189,21 +191,21 @@ class LLMQualityGate:
             ])
             return self._parse(raw)
         except Exception as e:  # noqa: BLE001
-            logger.warning("[quality_gate] LLM 评审失败：%s，默认 passed", e)
-            return QualityVerdict("passed", "llm-error-fallback")
+            logger.warning("[quality_gate] LLM 评审失败，等待复核: %s", type(e).__name__)
+            return QualityVerdict("unknown", "reviewer-error")
 
     @staticmethod
     def _parse(raw: str) -> QualityVerdict:
-        s = (raw or "").strip()
+        s = raw.strip() if isinstance(raw, str) else ""
         st, en = s.find("{"), s.rfind("}")
         if st >= 0 and en > st:
             try:
                 obj = json.loads(s[st:en + 1])
-                v = str(obj.get("verdict", "passed")).lower()
-                return QualityVerdict("failed" if v == "failed" else "passed", str(obj.get("reason", "")))
+                if isinstance(obj, dict) and obj.get("verdict") in ("passed", "failed"):
+                    return QualityVerdict(obj["verdict"], str(obj.get("reason", "")))
             except json.JSONDecodeError:
                 pass
-        return QualityVerdict("passed", "unparsed")
+        return QualityVerdict("unknown", "invalid-review")
 
 
 # ── PEA harness → A2A handler ──────────────────────────────────────────────
@@ -232,7 +234,7 @@ class PeaA2AHandler:
             v = await self.quality_gate.judge(context.input_text, delivery)
             return {"output": delivery, "quality_gate": v.verdict,
                     "reason": v.reason, "evidence_uri": f"local://{context.job.id}"}
-        return {"output": delivery, "quality_gate": "passed",
+        return {"output": delivery, "quality_gate": "unknown", "reason": "reviewer-unavailable",
                 "evidence_uri": f"local://{context.job.id}"}
 
     @staticmethod
@@ -483,28 +485,43 @@ class PeaMarket:
         members = [m for m in assignments if m in self.suppliers]
         if not members:
             return {"status": "no_members"}
+        if len(members) != len(assignments):
+            return {"status": "unknown_members", "members": sorted(set(assignments) - set(members))}
 
         escrow_id = f"jo_{uuid.uuid4().hex[:16]}"
         if not await self.settlement.open_escrow(
             escrow_id=escrow_id, payer=from_id, payee="(pool)", amount=total_reward
         ):
-            return {"status": "escrow_failed"}
+            return {"status": "escrow_failed", "escrow_id": escrow_id,
+                    "escrow_state": self.settlement.escrow_state(escrow_id)}
 
         # 各成员交付（vibe_amount=0：仅执行，结算走联合分账；声誉仍按质量门更新）
         deliveries: dict[str, str] = {}
         quality: dict[str, str] = {}
         for m in members:
-            res = await self._submit(self.suppliers[m], {
-                "message": {"parts": [{"kind": "text", "text": assignments[m]}]},
-                "metadata": {"vibe_amount": 0, "usmsb": {"caller_id": from_id}},
-            })
-            deliveries[m] = res.get("status", {}).get("message", {}).get("parts", [{}])[0].get("text", "")
-            quality[m] = res["metadata"].get("quality_gate", "passed")
+            try:
+                res = await self._submit(self.suppliers[m], {
+                    "message": {"parts": [{"kind": "text", "text": assignments[m]}]},
+                    "metadata": {"vibe_amount": 0, "usmsb": {"caller_id": from_id}},
+                })
+                parts = res.get("status", {}).get("message", {}).get("parts") or [{}]
+                deliveries[m] = parts[0].get("text", "")
+                quality[m] = (res.get("metadata", {}).get("quality_gate", "unknown")
+                              if res.get("status", {}).get("state") == "completed" else "unknown")
+            except Exception:
+                # A timeout does not prove that the supplier did not execute.
+                quality[m] = "unknown"
+                break
+
+        context = {"escrow_id": escrow_id, "quality": quality, "deliveries": deliveries}
+        if len(quality) != len(members) or any(q not in ("passed", "failed") for q in quality.values()):
+            return {**context, "status": "review_required"}
 
         # 任一质量门未过 → 整单退款，不分账
         if any(q == "failed" for q in quality.values()):
-            await self.settlement.refund_escrow(escrow_id=escrow_id)
-            return {"status": "quality_failed", "quality": quality}
+            refunded = await self.settlement.refund_escrow(escrow_id=escrow_id)
+            return {**context, "status": "quality_failed" if refunded else "refund_unconfirmed",
+                    "escrow_state": self.settlement.escrow_state(escrow_id)}
 
         # LLM 评各成员贡献基值（智能）→ Shapley 公平分账（数学）
         assessor = contribution_assessor or LLMContributionAssessor(None)
@@ -513,9 +530,11 @@ class PeaMarket:
         shap = shapley_values(members, v)
         payouts = distribute(total_reward, shap)
 
-        await self.settlement.settle_split(escrow_id=escrow_id, splits=payouts)
+        settled = await self.settlement.settle_split(escrow_id=escrow_id, splits=payouts)
         return {
-            "status": "settled",
+            **context,
+            "status": "settled" if settled else "settlement_unconfirmed",
+            "escrow_state": self.settlement.escrow_state(escrow_id),
             "members": members,
             "contribution_base": base,
             "shapley": shap,

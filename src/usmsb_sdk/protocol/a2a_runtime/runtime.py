@@ -267,7 +267,7 @@ class LocalA2ARuntime:
             await self.trust.on_manual_intervention(manual or job, self.config.agent_id)
             return manual
 
-        quality_gate = str(result.get("quality_gate") or "passed")
+        quality_gate = str(result.get("quality_gate") or "unknown")
         evidence_uri = str(result.get("evidence_uri") or "")
         done = self.store.mark_succeeded(
             job.id, result=result, quality_gate=quality_gate, evidence_uri=evidence_uri,

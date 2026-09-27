@@ -296,164 +296,43 @@ class TestAssetFractionalizationService:
 
 
 class TestZKCredentialService:
-    """Tests for ZKCredentialService."""
+    """No configured verifier means no generated/issued/verified credential."""
 
     @pytest.fixture
     async def service(self):
-        """Create service instance."""
         service = ZKCredentialService()
         await service.start()
         yield service
         await service.stop()
 
-    @pytest.mark.asyncio
-    async def test_generate_proof(self, service):
-        """Test proof generation."""
-        private_inputs = PrivateInputs(
-            reputation=0.85,
-            stake=10000.0,
-            no_slash=True,
-            secret=12345,
-        )
-
+    async def test_generate_proof_unavailable(self, service):
         proof = await service.generate_proof(
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            private_inputs=private_inputs,
-            thresholds={"reputation": 0.7, "stake": 5000},
-        )
+            CredentialType.SERVICE_PROVIDER, PrivateInputs(0.85, 10000, True, 12345),
+            {"reputation": 0.7, "stake": 5000})
+        assert proof is None
 
-        assert proof is not None
-        assert proof.a is not None
-        assert len(proof.public_inputs) == 4
+    async def test_issue_without_verified_backend_is_rejected(self, service):
+        assert await service.issue_credential(
+            "user-001", CredentialType.SERVICE_PROVIDER, 86400, None, 0.85) is None
+        assert not service.has_credential_type("user-001", CredentialType.SERVICE_PROVIDER)
 
-    @pytest.mark.asyncio
-    async def test_issue_credential(self, service):
-        """Test credential issuance."""
-        private_inputs = PrivateInputs(
-            reputation=0.85,
-            stake=10000.0,
-            no_slash=True,
-            secret=12345,
-        )
+    async def test_arbitrary_curve_points_are_not_verified(self, service):
+        from usmsb_sdk.services.zk_credential_service import ZKProof
+        forged = ZKProof((1, 2), ((3, 4), (5, 6)), (7, 8), [100, 200])
+        assert await service.issue_credential(
+            "user-001", CredentialType.SERVICE_PROVIDER, 86400, forged, 0.85) is None
+        assert not await service.verify_credential("arbitrary", forged)
 
-        proof = await service.generate_proof(
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            private_inputs=private_inputs,
-            thresholds={},
-        )
+    async def test_verification_callback_reports_failure(self, service):
+        results = []
+        service.on_credential_verified = lambda cid, valid: results.append((cid, valid))
+        assert not await service.verify_credential("missing", None)
+        assert results == [("missing", False)]
 
-        credential = await service.issue_credential(
-            holder="user-001",
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            valid_duration=30 * 86400,
-            proof=proof,
-            score=0.85,
-        )
-
-        assert credential is not None
-        assert credential.holder == "user-001"
-        assert credential.status == CredentialStatus.ACTIVE
-
-    @pytest.mark.asyncio
-    async def test_verify_credential(self, service):
-        """Test credential verification."""
-        private_inputs = PrivateInputs(
-            reputation=0.85,
-            stake=10000.0,
-            no_slash=True,
-            secret=12345,
-        )
-
-        proof = await service.generate_proof(
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            private_inputs=private_inputs,
-            thresholds={},
-        )
-
-        credential = await service.issue_credential(
-            holder="user-001",
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            valid_duration=30 * 86400,
-            proof=proof,
-            score=0.85,
-        )
-
-        is_valid = await service.verify_credential(
-            credential_id=credential.credential_id,
-            proof=proof,
-        )
-
-        assert is_valid is True
-
-    @pytest.mark.asyncio
-    async def test_revoke_credential(self, service):
-        """Test credential revocation."""
-        private_inputs = PrivateInputs(
-            reputation=0.85,
-            stake=10000.0,
-            no_slash=True,
-            secret=12345,
-        )
-
-        proof = await service.generate_proof(
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            private_inputs=private_inputs,
-            thresholds={},
-        )
-
-        credential = await service.issue_credential(
-            holder="user-001",
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            valid_duration=30 * 86400,
-            proof=proof,
-            score=0.85,
-        )
-
-        result = await service.revoke_credential(
-            credential_id=credential.credential_id,
-            reason="Policy violation",
-        )
-
-        assert result is True
-        assert credential.status == CredentialStatus.REVOKED
-
-    @pytest.mark.asyncio
-    async def test_has_credential_type(self, service):
-        """Test checking credential type."""
-        private_inputs = PrivateInputs(
-            reputation=0.85,
-            stake=10000.0,
-            no_slash=True,
-            secret=12345,
-        )
-
-        proof = await service.generate_proof(
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            private_inputs=private_inputs,
-            thresholds={},
-        )
-
-        await service.issue_credential(
-            holder="user-001",
-            credential_type=CredentialType.SERVICE_PROVIDER,
-            valid_duration=30 * 86400,
-            proof=proof,
-            score=0.85,
-        )
-
-        has_cred = service.has_credential_type(
-            holder="user-001",
-            credential_type=CredentialType.SERVICE_PROVIDER,
-        )
-
-        assert has_cred is True
-
-        has_other = service.has_credential_type(
-            holder="user-001",
-            credential_type=CredentialType.GOVERNANCE,
-        )
-
-        assert has_other is False
+    async def test_missing_credentials_do_not_grant_roles(self, service):
+        assert not service.is_credential_valid("missing")
+        assert not service.has_credential_type("user-001", CredentialType.GOVERNANCE)
+        assert not await service.revoke_credential("missing", "not issued")
 
 
 if __name__ == "__main__":
