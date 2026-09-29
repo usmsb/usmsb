@@ -138,11 +138,6 @@ from usmsb_sdk.agent_sdk.negotiation import (
     NegotiationTerms,
     ProposalResult,
 )
-from usmsb_sdk.agent_sdk.negotiated_order_manager import (
-    NegotiatedOrderManager,
-    OrderCreationResult,
-    NegotiationToOrderConfig,
-)
 from usmsb_sdk.agent_sdk.p2p_server import (
     DHT,
     P2PServer,
@@ -178,6 +173,22 @@ from usmsb_sdk.agent_sdk.workflow import (
 
 # Alias for backward compatibility
 AgentCapability = CapabilityDefinition
+
+
+def __getattr__(name):
+    # order_service imports negotiation types. Loading the order adapter during
+    # that import would cycle back into a partially initialized order_service.
+    if name in {"NegotiatedOrderManager", "OrderCreationResult", "NegotiationToOrderConfig"}:
+        from importlib import import_module
+
+        value = getattr(import_module("usmsb_sdk.agent_sdk.negotiated_order_manager"), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
 
 
 def create_agent(

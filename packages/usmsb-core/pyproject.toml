@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "usmsb-core"
+version = "0.9.0a1"
+description = "Portable USMSB contracts and local collaboration mechanisms"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Felix Gu", email = "felix@usmsb.ai"}]
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.optional-dependencies]
+learning = ["pydantic>=2,<3"]
+
+[project.urls]
+Source = "https://github.com/usmsb/usmsb"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["usmsb_core", "usmsb_core.*"]
+
+[tool.setuptools.package-data]
+usmsb_core = ["MANIFEST.json", "LICENSE"]
