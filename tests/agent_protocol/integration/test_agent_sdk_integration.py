@@ -249,6 +249,63 @@ class TestAgentCommunication:
     """Tests for agent communication."""
 
     @pytest.mark.asyncio
+    async def test_two_managers_get_distinct_listeners_and_release_them(self, basic_agent_config):
+        """Auto-assigned WebSocket/P2P ports support collocated agents."""
+        config_b = AgentConfig.from_dict(basic_agent_config.to_dict())
+        config_b.agent_id = "second-agent"
+
+        async def handler(message, session):
+            return None
+
+        managers = [
+            CommunicationManager(config.agent_id, config, handler)
+            for config in (basic_agent_config, config_b)
+        ]
+        try:
+            for manager in managers:
+                await manager.initialize(skip_http_start=True)
+            sockets = [
+                server.sockets[0].getsockname()[1]
+                for manager in managers
+                for server in (manager._websocket_server, manager._p2p_server)
+            ]
+            assert len(sockets) == 4
+            assert len(set(sockets)) == 4
+        finally:
+            for manager in managers:
+                await manager.close()
+        assert all(
+            manager._websocket_server is None and manager._p2p_server is None
+            for manager in managers
+        )
+
+    @pytest.mark.asyncio
+    async def test_failed_listener_start_rolls_back_open_channels(self, basic_agent_config):
+        """A failed bind must not strand the session or previously opened server."""
+        import socket
+
+        occupied = socket.socket()
+        occupied.bind(("127.0.0.1", 0))
+        occupied.listen()
+        basic_agent_config.protocols[ProtocolType.WEBSOCKET].host = "127.0.0.1"
+        basic_agent_config.protocols[ProtocolType.WEBSOCKET].port = occupied.getsockname()[1]
+
+        async def handler(message, session):
+            return None
+
+        manager = CommunicationManager(basic_agent_config.agent_id, basic_agent_config, handler)
+        try:
+            with pytest.raises(OSError):
+                await manager.initialize(skip_http_start=True)
+            assert manager._http_session is None
+            assert manager._websocket_server is None
+            assert manager._p2p_server is None
+            assert not manager._initialized
+        finally:
+            await manager.close()
+            occupied.close()
+
+    @pytest.mark.asyncio
     async def test_communication_manager_initialize(self, communication_manager):
         """Test communication manager initialization."""
         assert communication_manager._initialized

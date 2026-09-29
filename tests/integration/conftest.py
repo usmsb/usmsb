@@ -173,9 +173,13 @@ def integration_db(tmp_path, monkeypatch):
     worker threads, and hides commit/rollback bugs in the production factory.
     """
     import usmsb_sdk.api.database as db_mod
+    import usmsb_sdk.services.schema as service_schema
     from usmsb_sdk.api.cache import cache_manager
 
     monkeypatch.setattr(db_mod, "DATABASE_PATH", str(tmp_path / "integration.db"))
+    monkeypatch.setattr(
+        service_schema, "DEFAULT_DB_PATH", f"sqlite:///{tmp_path / 'platform.db'}"
+    )
     db_mod.init_db()  # Schema initialization failure must fail the test.
     for prefix in cache_manager.get_stats():
         cache_manager.invalidate_all(prefix)

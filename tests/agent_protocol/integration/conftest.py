@@ -99,7 +99,7 @@ def basic_agent_config():
         ],
         network=NetworkConfig(
             platform_endpoints=["http://localhost:8000"],
-            p2p_listen_port=9001,
+            p2p_listen_port=0,
         ),
         security=SecurityConfig(
             auth_enabled=False,
@@ -403,10 +403,13 @@ async def communication_manager(basic_agent_config):
         logger=test_logger,
     )
 
-    await manager.initialize()
-    yield manager
-
-    await manager.close()
+    # These tests exercise outbound HTTP against their own loopback fixture;
+    # do not start an unrelated agent HTTP listener or probe localhost:8000.
+    await manager.initialize(skip_http_start=True)
+    try:
+        yield manager
+    finally:
+        await manager.close()
 
 
 @pytest.fixture
