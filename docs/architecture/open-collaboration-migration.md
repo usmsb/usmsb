@@ -1,6 +1,6 @@
 # 开放协作内核：迁移、版本与回滚
 
-状态：2026-09-29 alpha 集成期迁移说明，不是发布公告或生产认证。以[架构与验收设计](./open-collaboration-v1.md)为边界；实际集成结果由该设计指向的交付报告记录。本文区分已有契约、本轮增量 API 和后续生产前提，不把设计要求当作已通过的结果。
+状态：2026-09-29 alpha 集成期迁移说明（更新至 core a2），不是发布公告或生产认证。以[架构与验收设计](./open-collaboration-v1.md)为边界；实际结果见[交付报告](./open-collaboration-delivery.md)。新增宿主认证/证据边界、精确版本协商和增量配置迁移详见[宿主接入与治理指南](./collaboration-host-integration.md)，不把工程机制当作真实多组织验收。
 
 ## 1. 哪些使用方式需要迁移
 
@@ -20,7 +20,7 @@ USMSB 的九要素是共同语义，World/宿主定义认证、权限、可见�
 | 版本对象 | 当前标识 / 例子 | 升级含义 |
 |---|---|---|
 | 完整包 | `usmsb-sdk`；`pyproject.toml` 当前为 `0.9.0-alpha`；导入 `usmsb_sdk` | Python 制品版本，继续要求 `>=3.14,<3.15`；不自动改变存量协议 |
-| 独立核心包 | 本轮新增 `usmsb-core`；当前元数据 `0.9.0a1`；导入 `usmsb_core` | 从同一份规范源码生成，同样要求 Python `>=3.14,<3.15`；不复制维护第二份内核或覆盖 `usmsb_sdk` 目录 |
+| 独立核心包 | `usmsb-core`；当前元数据 `0.9.0a2`；导入 `usmsb_core` | 从同一份规范源码生成，同样要求 Python `>=3.14,<3.15`；不复制维护第二份内核或覆盖 `usmsb_sdk` 目录 |
 | 协议 schema | 旧 `usmsb.goal-contract.v1`；显式中立 Profile 使用 `usmsb.goal-contract.v2` | 消费者必须理解实际结构和必需语义；不支持的必需 schema/major 应拒绝，不能删掉版本字段继续执行 |
 | Profile | `id`、`version`、复核方式、媒介和有界限制 | 参与方采用的协作规则；规则变化必须显式版本化和重新协商，不能通过包升级覆盖旧承诺 |
 | 目标与承诺 | `goal_revision`、不可变目标快照、`terms_hash`、`supersedes` | 表达当时接受的意图与条款；不等于包号或协议 major |
@@ -61,7 +61,7 @@ assert contract["review_mode"] == "independent"
 
 `OPEN_COLLABORATION_V1` 默认独立复核；`PEER_COLLABORATION_V1` 允许同伴复核。自评需显式安装 `CollaborationProfile(..., review_mode="self")`。账本对 independent 排除请求方和提供方的控制主体，对 peer 排除提供方控制主体；self 不增加这两类独立性约束，但仍需约定复核者及证据引用。构造 `goal_contract` 本身不会认证复核者，也不能证明不同字符串代表独立的人或组织。
 
-Profile 由可信宿主代码安装，不直接采纳客户端提交的任意规则对象。同一账本当前每个 Profile ID 只安装一个版本，并把完整配置绑定到数据库；改变配置后重开原数据库会被拒绝。它不是规则热更新或通用协议协商服务。规则演进须另行迁移或并行宿主配置，让新承诺绑定新规则并获得相关同意，旧承诺继续受旧版本约束。
+Profile 由可信宿主代码安装，不直接采纳客户端提交的任意规则对象。同一账本每个 Profile ID 只安装一个版本，并把完整配置绑定到数据库；直接改变配置后重开会被拒绝。a2 的 `autonomy.interop` 支持 exact schema/功能/Profile 内容协商；`autonomy.migration` 允许全体旧 controller 批准后追加新 ID 的规则和主体，原规则、身份和条款不能覆盖。备份、CAS、审计及旧配置实例围栏见[接入指南](./collaboration-host-integration.md)。不支持任意规则热更新、自动信任新组织或未知 major 降级转换。
 
 ## 4. `CollaborationJournal` 的当前 API 边界
 
@@ -121,7 +121,7 @@ Windows 使用 `.venv/Scripts/python.exe -E -B`。测试依赖与运行依赖分
 
 ```bash
 python -E -B scripts/build_core_distribution.py --out-dir /absolute/path/to/core-artifacts
-python -E -B -m pip install --no-index --no-deps /absolute/path/to/core-artifacts/usmsb_core-0.9.0a1-py3-none-any.whl
+python -E -B -m pip install --no-index --no-deps /absolute/path/to/core-artifacts/usmsb_core-0.9.0a2-py3-none-any.whl
 ```
 
 安装命令应在新的 Python 3.14 验证环境中执行，并使用实际构建的文件名；可选 `learning` 需另行满足 Pydantic 依赖。`packages/usmsb-core` 只保存打包元数据，直接 `pip install packages/usmsb-core` 不会生成规范源码。具体模块导入见[独立分发说明](../../packages/usmsb-core/README.md)；顶层 `usmsb_core` 是命名空间 shim，`Goal` 应从 `usmsb_core.core.elements` 导入。
@@ -138,7 +138,7 @@ python -E -B -m pip install --no-index --no-deps /absolute/path/to/core-artifact
 4. 切换前对账升级期间已接受的承诺、采用记录和外部效果。恢复旧备份不能撤销已经发生的交付、披露、支付或他人的权利义务；需要可追溯的业务处置和相关参与方同意。
 5. 若不能证明数据向后兼容，保留处理旧/新版本的并行服务或先停止相关写入，完成明确的迁移方案后再恢复。已有成功回执、版本历史和证据引用不得为了“回滚成功”而丢弃。
 
-权限收紧只能阻止后续访问，不能收回已经披露的数据副本。更换宿主身份、controller 关系、Profile 或授权配置需要明确迁移，不能通过重启覆盖原绑定。
+权限收紧只能阻止后续访问，不能收回已经披露的数据副本。a2 的增量迁移不允许更换宿主身份、旧 controller 关系、原 Profile 或原权限；这些变化需要单独治理方案，不能通过重启覆盖原绑定。迁移前必须停止不支持围栏的 a1/更老写入程序；a2 的应用层围栏不能阻止旧二进制或任意 SQL 改库。
 
 ## 7. 验证状态与后续生产前提
 

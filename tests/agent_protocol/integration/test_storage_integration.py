@@ -12,6 +12,7 @@ Tests for the three-layer storage system including:
 """
 
 import asyncio
+import hashlib
 import json
 import os
 import pytest
@@ -27,6 +28,7 @@ from usmsb_sdk.platform.external.storage.base_storage import (
     StorageError,
 )
 from usmsb_sdk.platform.external.storage.file_storage import FileStorage
+from usmsb_sdk.platform.external.storage.ipfs_storage import IPFSConnectionConfig, IPFSStorage
 from usmsb_sdk.platform.external.storage.sqlite_storage import SQLiteStorage
 from usmsb_sdk.platform.external.storage.storage_manager import (
     StorageManager,
@@ -95,7 +97,9 @@ class TestFileStorageIntegration:
 
         # Try to store again without overwrite
         result = await file_storage.store(key, {"value": 2}, overwrite=False)
-        assert not result.success or "exists" in result.error.lower() or result.success
+        assert not result.success
+        assert "exists" in result.error.lower()
+        assert (await file_storage.retrieve(key)).data == data
 
     @pytest.mark.asyncio
     async def test_file_delete(self, file_storage):
@@ -140,11 +144,57 @@ class TestFileStorageIntegration:
         # Store multiple items
         keys = ["test/list/1", "test/list/2", "test/list/3"]
         for key in keys:
-            await file_storage.store(key, {"key": key})
+            assert (await file_storage.store(key, {"key": key})).success
 
         # List keys
         listed = await file_storage.list_keys(prefix="test/list")
-        assert len(listed) >= 3
+        assert listed == keys
+
+    @pytest.mark.asyncio
+    async def test_file_list_keys_after_reopen(self, file_storage):
+        """Enumeration preserves original keys without relying on cached data."""
+        assert await file_storage.initialize()
+        keys = sorted([
+            "test/list/document.json",
+            "test/list/中文 空格",
+            "test/list/" + "long" * 60,
+        ])
+        for key in keys:
+            result = await file_storage.store(key, {"key": key}, {"key": "wrong-key"})
+            assert result.success
+        assert (await file_storage.store("unrelated/key", {})).success
+        await file_storage.close()
+
+        reopened = FileStorage(file_storage.base_path, cache_enabled=False)
+        try:
+            assert await reopened.initialize()
+            assert await reopened.list_keys(prefix="test/list/") == keys
+            assert await reopened.list_keys(prefix="test/list/", offset=1, limit=1) == keys[1:2]
+            assert await reopened.list_keys(prefix="missing/") == []
+            for key in keys:
+                result = await reopened.retrieve(key)
+                assert result.success
+                assert result.data == {"key": key}
+        finally:
+            await reopened.close()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("merge", [False, True])
+    async def test_metadata_update_preserves_listed_key(self, file_storage, merge):
+        key = "test/list/metadata.json"
+        assert await file_storage.initialize()
+        assert (await file_storage.store(key, {"value": 1})).success
+        assert (await file_storage.update_metadata(key, {"key": "wrong-key"}, merge=merge)).success
+        assert await file_storage.list_keys(prefix="test/list/") == [key]
+        assert (await file_storage.get_metadata(key))["key"] == key
+
+    @pytest.mark.asyncio
+    async def test_file_list_keys_without_sidecar(self, file_storage):
+        """Legacy files without metadata remain enumerable by their filename."""
+        assert await file_storage.initialize()
+        assert (await file_storage.store("legacy", {})).success
+        file_storage._get_metadata_path("legacy").unlink()
+        assert await file_storage.list_keys() == ["legacy"]
 
     @pytest.mark.asyncio
     async def test_file_get_metadata(self, file_storage):
@@ -171,7 +221,9 @@ class TestFileStorageIntegration:
         await file_storage.store("test/stats/2", {"b": 2})
 
         stats = await file_storage.get_stats()
-        assert "total_items" in stats or "items" in stats
+        assert stats["file_count"] == 2
+        assert stats["total_size_bytes"] > 0
+        assert stats["cache_stats"]["item_count"] == 2
 
 
 class TestSQLiteStorageIntegration:
@@ -288,31 +340,64 @@ class TestSQLiteStorageIntegration:
 class TestIPFSStorageIntegration:
     """Integration tests for IPFS Storage."""
 
-    @pytest.fixture
-    def ipfs_skip_condition(self):
-        """Check if IPFS tests should be skipped."""
-        # Skip if no IPFS connection available
-        return True  # Skip by default unless IPFS is configured
-
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Requires IPFS connection")
-    async def test_ipfs_store_and_retrieve(self, ipfs_storage_mock):
-        """Test storing and retrieving data from IPFS."""
-        await ipfs_storage_mock.initialize()
+    async def test_ipfs_store_and_retrieve(self):
+        """Exercise production IPFS HTTP transport against a loopback protocol server."""
+        from aiohttp import web
 
-        data = {"test": "ipfs_data"}
-        result = await ipfs_storage_mock.store("test_key", data)
+        blobs = {}
+        requests = []
 
-        if result.success:
-            retrieved = await ipfs_storage_mock.retrieve(result.location.key)
+        async def add(request):
+            reader = await request.multipart()
+            part = await reader.next()
+            assert part.name == "file"
+            payload = bytes(await part.read())
+            cid = hashlib.sha256(payload).hexdigest()
+            blobs[cid] = payload
+            requests.append("add")
+            return web.json_response({"Hash": cid})
+
+        async def download(request):
+            requests.append("download")
+            return web.Response(body=blobs[request.match_info["cid"]])
+
+        app = web.Application()
+        app.router.add_post("/api/v0/add", add)
+        app.router.add_get("/ipfs/{cid}", download)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        storage = None
+        try:
+            site = web.TCPSite(runner, "127.0.0.1", 0)
+            await site.start()
+            port = runner.addresses[0][1]
+            storage = IPFSStorage(IPFSConnectionConfig(
+                api_url=f"http://127.0.0.1:{port}",
+                gateway_url=f"http://127.0.0.1:{port}/ipfs/",
+                use_client=False,
+                timeout=2,
+            ))
+            assert await storage.initialize()
+            data = {"test": "ipfs_data", "unicode": "本地"}
+            result = await storage.store("test_key", data)
+            assert result.success, result.error
+            assert result.location.cid in blobs
+            retrieved = await storage.retrieve(result.location.key)
             assert retrieved.success
+            assert retrieved.data == data
+            assert requests == ["add", "download"]
+        finally:
+            if storage is not None:
+                await storage.close()
+            await runner.cleanup()
 
     @pytest.mark.asyncio
     async def test_ipfs_disabled_handling(self, ipfs_storage_mock):
         """Test handling when IPFS is disabled/unavailable."""
         # When IPFS is not connected, operations should handle gracefully
         stats = await ipfs_storage_mock.get_stats()
-        assert isinstance(stats, dict)
+        assert stats["connected"] is False
 
 
 class TestStorageManagerIntegration:
@@ -323,7 +408,8 @@ class TestStorageManagerIntegration:
         """Test storage manager initialization."""
         # storage_manager fixture already initializes
         assert storage_manager is not None
-        assert len(storage_manager.layers) > 0
+        assert set(storage_manager.layers) == {StorageType.FILE, StorageType.SQLITE}
+        assert all(layer.storage.is_connected for layer in storage_manager.layers.values())
 
     @pytest.mark.asyncio
     async def test_manager_store_to_all_layers(self, storage_manager, sample_storage_data):
@@ -335,6 +421,10 @@ class TestStorageManagerIntegration:
 
         assert result.success
         assert result.location is not None
+        for layer in storage_manager.layers.values():
+            retrieved = await layer.storage.retrieve(key)
+            assert retrieved.success
+            assert retrieved.data == data
 
     @pytest.mark.asyncio
     async def test_manager_retrieve_from_fastest_layer(self, storage_manager):
@@ -468,9 +558,20 @@ class TestCachingStrategies:
         assert result.success
 
         # Data should be in write buffer
-        assert key in manager._write_buffer or True  # May already be flushed
+        assert key in manager._write_buffer
+        assert (await file_storage.retrieve(key)).data == data
+        assert not await sqlite_storage.exists(key)
 
         await manager.close()
+
+        # Closing the manager must persist buffered writes to the database.
+        try:
+            assert await sqlite_storage.initialize()
+            retrieved = await sqlite_storage.retrieve(key)
+            assert retrieved.success
+            assert retrieved.data == data
+        finally:
+            await sqlite_storage.close()
 
     @pytest.mark.asyncio
     async def test_read_through_cache(self, temp_file_path, temp_db_path):
@@ -574,9 +675,10 @@ class TestConsistencyGuarantees:
         await storage_manager.store(key, data)
 
         # Verify checksum
-        if key in storage_manager._index:
-            index_entry = storage_manager._index[key]
-            assert index_entry.checksum is not None
+        index_entry = storage_manager._index[key]
+        assert index_entry.checksum == hashlib.sha256(
+            json.dumps(data, sort_keys=True).encode()
+        ).hexdigest()
 
     @pytest.mark.asyncio
     async def test_consistency_check(self, storage_manager):
@@ -588,7 +690,11 @@ class TestConsistencyGuarantees:
 
         is_consistent = await storage_manager.ensure_consistency(key)
         # Should be consistent after just storing
-        assert is_consistent or True  # May not be implemented
+        assert is_consistent is True
+        assert (await storage_manager.sqlite_storage.store(
+            key, {"consistent": "corrupted"}, overwrite=True
+        )).success
+        assert await storage_manager.ensure_consistency(key) is False
 
     @pytest.mark.asyncio
     async def test_data_migration(self, storage_manager):
@@ -625,8 +731,21 @@ class TestStorageErrorHandling:
         """Test deleting a key that doesn't exist."""
         result = await storage_manager.delete("nonexistent/delete/key")
 
-        # Should succeed (idempotent) or return appropriate status
-        assert result.success or "not found" in result.error.lower()
+        assert not result.success
+        assert "not found" in result.error.lower()
+        assert result.metadata["deleted_from"] == []
+        assert set(result.metadata["failed_in"]) == {"file", "sqlite"}
+
+    @pytest.mark.asyncio
+    async def test_delete_failure_preserves_backend_error(self, temp_db_path):
+        """An uninitialized backend reports its actual error through the manager."""
+        manager = StorageManager(sqlite_storage=SQLiteStorage(temp_db_path))
+        try:
+            result = await manager.delete("test/key")
+            assert not result.success
+            assert result.error == "sqlite: Storage not initialized"
+        finally:
+            await manager.close()
 
     @pytest.mark.asyncio
     async def test_invalid_key_handling(self, file_storage):

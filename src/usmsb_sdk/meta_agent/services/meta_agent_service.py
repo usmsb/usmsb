@@ -677,12 +677,12 @@ Agent 回复：
 }}
 """
             result = await self.meta_agent.llm_manager.generate(
-                messages=[{"role": "user", "content": extraction_prompt}],
+                prompt=extraction_prompt,
                 max_tokens=500,
             )
 
-            # 解析结果
-            content = result.get("content", "")
+            # LLMManager returns text; retain support for injected legacy adapters.
+            content = result if isinstance(result, str) else result.get("content", "")
             # 尝试提取 JSON
             import re
             json_match = re.search(r'\{[\s\S]*\}', content)
@@ -780,17 +780,15 @@ Agent 画像：
 
 请根据 Agent 的问题，提供专业、有建设性的建议。"""
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": agent_message},
-            ]
-
             result = await self.meta_agent.llm_manager.generate(
-                messages=messages,
+                prompt=agent_message,
+                system_prompt=system_prompt,
                 max_tokens=800,
             )
 
-            return result.get("content", "让我想想如何回答这个问题...")
+            return result if isinstance(result, str) else result.get(
+                "content", "让我想想如何回答这个问题..."
+            )
 
         except Exception as e:
             logger.error(f"Failed to generate consultation response: {e}")
@@ -885,11 +883,11 @@ Agent 画像：
 }}
 """
                 result = await self.meta_agent.llm_manager.generate(
-                    messages=[{"role": "user", "content": analysis_prompt}],
+                    prompt=analysis_prompt,
                     max_tokens=500,
                 )
 
-                content = result.get("content", "")
+                content = result if isinstance(result, str) else result.get("content", "")
                 import re
                 json_match = re.search(r'\{[\s\S]*\}', content)
                 if json_match:

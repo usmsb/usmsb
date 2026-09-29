@@ -61,7 +61,7 @@ PEA 组合 harness、应用身份/主人映射、钱包适配器和所有者策�
 
 ## 从可移植契约开始
 
-完整 `usmsb-sdk` 声明 Python **3.14**（`>=3.14,<3.15`），继续保留已有应用依赖。[源码导出器](./scripts/export_autonomy.py)已提供可移植子集；本轮新增的 [alpha 独立分发](./packages/usmsb-core/README.md)为 `usmsb-core`（`0.9.0a1`），导入名为 `usmsb_core`，通过当前源码构建，不代表已经发布 PyPI。API、打包、验收与回滚边界见[迁移指南](./docs/architecture/open-collaboration-migration.md)。
+完整 `usmsb-sdk` 声明 Python **3.14**（`>=3.14,<3.15`），继续保留已有应用依赖。[源码导出器](./scripts/export_autonomy.py)提供可移植子集；[alpha 独立分发](./packages/usmsb-core/README.md)为 `usmsb-core`（`0.9.0a2`），导入名为 `usmsb_core`，通过当前源码构建，不代表已经发布 PyPI。API、打包与回滚见[迁移指南](./docs/architecture/open-collaboration-migration.md)；新增认证/证据适配、版本协商和增量治理见[宿主接入指南](./docs/architecture/collaboration-host-integration.md)。
 
 安装本地测试依赖后，可运行隔离的契约测试：
 
@@ -116,7 +116,7 @@ src/usmsb_sdk/
 | 状态 | 范围与限制 |
 |---|---|
 | 已有实现与本地测试 | 九要素契约、目标修订辅助函数、可移植导出、授权、有界参考策略及学习/演化机制。经济应用有单独测试；测试夹具不是外部验收证据。 |
-| 本轮 alpha：本地核验 | 显式中立 Profile、制品引用、`CollaborationJournal`、独立 core 分发、SDK 惰性导入和外部 JSON 客户端示例。本地通过项及遗留集成失败见[交付报告](./docs/architecture/open-collaboration-delivery.md)，不代表生产认证。 |
+| 本轮 alpha：本地核验 | 中立 Profile、`CollaborationJournal`、独立 core、惰性导入与外部 JSON 客户端；a2 新增身份/证据适配、精确协商、获批准的增量迁移和有界故障恢复实验。本地集成升级为 CI 阻断项；通过/跳过证据与尚需真实外部条件的验收见[交付报告](./docs/architecture/open-collaboration-delivery.md)，不代表生产认证。 |
 | 后续生产前提 | 真实身份/控制主体核实、租户隔离、凭据、证据来源、存储与恢复运维、互操作参与方及负载测试。真实支付/争议轨道与 ZK 凭证另需实现和验收。 |
 
 [架构与验收设计](./docs/architecture/open-collaboration-v1.md)定义目标并指向集成交付报告，设计要求不等于已经通过的结果。本地脚本测试不能证明真实客户交易、多组织信任、学习带来的因果收益或社会/意识涌现。

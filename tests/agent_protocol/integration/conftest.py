@@ -165,7 +165,10 @@ async def file_storage(temp_file_path):
     from usmsb_sdk.platform.external.storage.file_storage import FileStorage
 
     storage = FileStorage(base_path=temp_file_path, cache_enabled=True)
-    yield storage
+    try:
+        yield storage
+    finally:
+        await storage.close()
 
 
 @pytest.fixture
@@ -174,12 +177,15 @@ async def sqlite_storage(temp_db_path):
     from usmsb_sdk.platform.external.storage.sqlite_storage import SQLiteStorage
 
     storage = SQLiteStorage(database_path=temp_db_path)
-    yield storage
+    try:
+        yield storage
+    finally:
+        await storage.close()
 
 
 @pytest.fixture
 def ipfs_storage_mock():
-    """Create a mocked IPFS storage instance."""
+    """Create an uninitialized IPFS instance with external access disabled."""
     from usmsb_sdk.platform.external.storage.ipfs_storage import (
         IPFSStorage,
         IPFSConnectionConfig,
@@ -187,20 +193,19 @@ def ipfs_storage_mock():
 
     # Create with disabled connection for testing
     config = IPFSConnectionConfig(
-        api_host=None,
-        gateway_url="https://ipfs.io",
+        api_url="http://127.0.0.1:1",
+        gateway_url="http://127.0.0.1:1/ipfs/",
+        use_client=False,
+        fallback_to_gateway=False,
     )
     storage = IPFSStorage(config=config)
-
-    # Mock the IPFS operations
-    storage._connected = False
 
     yield storage
 
 
 @pytest.fixture
-async def storage_manager(temp_file_path, temp_db_path, ipfs_storage_mock):
-    """Create a storage manager with all layers for testing."""
+async def storage_manager(temp_file_path, temp_db_path):
+    """Create a storage manager with real local file and SQLite layers."""
     from usmsb_sdk.platform.external.storage.file_storage import FileStorage
     from usmsb_sdk.platform.external.storage.sqlite_storage import SQLiteStorage
     from usmsb_sdk.platform.external.storage.storage_manager import (
@@ -215,16 +220,16 @@ async def storage_manager(temp_file_path, temp_db_path, ipfs_storage_mock):
     manager = StorageManager(
         file_storage=file_storage,
         sqlite_storage=sqlite_storage,
-        ipfs_storage=ipfs_storage_mock,
         cache_strategy=CacheStrategy.WRITE_THROUGH,
         sync_strategy=SyncStrategy.HYBRID,
         sync_interval_seconds=5,
     )
 
-    await manager.initialize()
-    yield manager
-
-    await manager.close()
+    try:
+        assert await manager.initialize()
+        yield manager
+    finally:
+        await manager.close()
 
 
 # ==================== Node Fixtures ====================
@@ -234,7 +239,7 @@ def node_config():
     """Create a P2P node configuration for testing."""
     return {
         "address": "127.0.0.1",
-        "port": 19000,
+        "port": 0,
         "bootstrap_peers": [],
         "capabilities": ["testing", "storage"],
         "metadata": {"test": True},
@@ -247,14 +252,11 @@ async def p2p_node(node_config):
     from usmsb_sdk.node.decentralized_node import P2PNode
 
     node = P2PNode(config=node_config)
-    started = await node.start()
-
-    if not started:
-        pytest.skip("Could not start P2P node")
-
-    yield node
-
-    await node.stop()
+    try:
+        assert await node.start()
+        yield node
+    finally:
+        await node.stop()
 
 
 @pytest.fixture

@@ -494,6 +494,7 @@ class StorageManager:
                 del self._index[key]
 
             results = []
+            errors = []
 
             for layer in self.layers.values():
                 if not all_layers and layer.priority > 1:
@@ -502,16 +503,22 @@ class StorageManager:
                 try:
                     result = await layer.storage.delete(key)
                     results.append((layer.storage.storage_type, result.success))
+                    if not result.success:
+                        errors.append(
+                            f"{layer.storage.storage_type.value}: {result.error or 'Delete failed'}"
+                        )
                 except Exception as e:
                     logger.warning(
                         f"Error deleting {key} from {layer.storage.storage_type.value}: {e}"
                     )
                     results.append((layer.storage.storage_type, False))
+                    errors.append(f"{layer.storage.storage_type.value}: {e}")
 
             success_count = sum(1 for _, s in results if s)
 
             return StorageResult(
                 success=success_count > 0,
+                error=None if success_count else "; ".join(errors) or "No storage layers available",
                 metadata={
                     "deleted_from": [t.value for t, s in results if s],
                     "failed_in": [t.value for t, s in results if not s],

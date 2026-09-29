@@ -118,7 +118,13 @@ def test_wheel_provenance_matches_canonical_sources_and_license(archives):
             name.removeprefix("usmsb_core/") for name in names if name.startswith("usmsb_core/")
         }
         assert package_files == set(manifest["sha256"]) | {"MANIFEST.json"}
-        assert {"autonomy/journal.py", "autonomy/profiles.py", "LICENSE"} <= package_files
+        assert {
+            "autonomy/journal.py",
+            "autonomy/profiles.py",
+            "autonomy/interop.py",
+            "autonomy/migration.py",
+            "LICENSE",
+        } <= package_files
         for name, expected in manifest["sha256"].items():
             content = wheel.read(f"usmsb_core/{name}")
             assert hashlib.sha256(content).hexdigest() == expected, name
