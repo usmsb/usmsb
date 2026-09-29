@@ -144,6 +144,15 @@ src/usmsb_sdk/api/rest/schemas/system.py
 src/usmsb_sdk/api/rest/schemas/workflow.py
 src/usmsb_sdk/api/rest/services/__init__.py
 src/usmsb_sdk/api/rest/services/utils.py
+src/usmsb_sdk/autonomy/__init__.py
+src/usmsb_sdk/autonomy/authorization.py
+src/usmsb_sdk/autonomy/collaboration.py
+src/usmsb_sdk/autonomy/contracts.py
+src/usmsb_sdk/autonomy/evolution.py
+src/usmsb_sdk/autonomy/goal_revision.py
+src/usmsb_sdk/autonomy/learning.py
+src/usmsb_sdk/autonomy/open_world.py
+src/usmsb_sdk/autonomy/world_model.py
 src/usmsb_sdk/blockchain/__init__.py
 src/usmsb_sdk/blockchain/agent_manager.py
 src/usmsb_sdk/blockchain/config.py
