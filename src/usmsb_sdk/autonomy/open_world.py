@@ -3,16 +3,14 @@
 No networking, identity provider, model, scheduler or fabricated reward. A host
 owns identity, evidence freshness, permissions, persistence and actual effects.
 """
-import re
 from .contracts import _check, _text
 
 
-def world_reference(node, ledger, kind, record_id):
-    _check(isinstance(node, str) and re.fullmatch(r"wishbud:ed25519:[A-Za-z0-9_-]{43}", node), "Invalid node identity")
-    _check(isinstance(ledger, str) and re.fullmatch(r"storage_[a-f0-9]{20}", ledger), "Invalid ledger identity")
-    for value in (kind, record_id):
-        _check(isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,120}", value), "Invalid record reference")
-    return f"{node}/{ledger}/{kind}/{record_id}"
+def world_reference(node, ledger, kind, record_id, *, profile=None):
+    """Legacy defaults stay stable; new hosts explicitly select a neutral profile."""
+    from .profiles import world_reference_for_profile
+
+    return world_reference_for_profile(node, ledger, kind, record_id, profile)
 
 
 def feedback_decision(assessment, memory, *, enabled=True, max_episodes=12):

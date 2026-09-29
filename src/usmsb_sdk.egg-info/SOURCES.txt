@@ -59,7 +59,6 @@ src/usmsb_sdk/agent_skill/skill_platform/registry/__init__.py
 src/usmsb_sdk/agent_skill/skill_platform/registry/skill_registry.py
 src/usmsb_sdk/agent_skill/skill_platform/router/__init__.py
 src/usmsb_sdk/agent_skill/skill_platform/router/skill_router.py
-src/usmsb_sdk/agent_skill/usmsb-agent-platform/node_modules/flatted/python/flatted.py
 src/usmsb_sdk/agent_skill/usmsb-agent-platform/src/usmsb_agent_platform/__init__.py
 src/usmsb_sdk/agent_skill/usmsb-agent-platform/src/usmsb_agent_platform/agent_platform.py
 src/usmsb_sdk/agent_skill/usmsb-agent-platform/src/usmsb_agent_platform/ai_agent_platform.py
@@ -145,6 +144,15 @@ src/usmsb_sdk/api/rest/schemas/system.py
 src/usmsb_sdk/api/rest/schemas/workflow.py
 src/usmsb_sdk/api/rest/services/__init__.py
 src/usmsb_sdk/api/rest/services/utils.py
+src/usmsb_sdk/autonomy/__init__.py
+src/usmsb_sdk/autonomy/authorization.py
+src/usmsb_sdk/autonomy/collaboration.py
+src/usmsb_sdk/autonomy/contracts.py
+src/usmsb_sdk/autonomy/evolution.py
+src/usmsb_sdk/autonomy/goal_revision.py
+src/usmsb_sdk/autonomy/learning.py
+src/usmsb_sdk/autonomy/open_world.py
+src/usmsb_sdk/autonomy/world_model.py
 src/usmsb_sdk/blockchain/__init__.py
 src/usmsb_sdk/blockchain/agent_manager.py
 src/usmsb_sdk/blockchain/config.py
@@ -225,7 +233,10 @@ src/usmsb_sdk/growth_economic_harness/context_loop.py
 src/usmsb_sdk/growth_economic_harness/experience_loop.py
 src/usmsb_sdk/growth_economic_harness/group_loop.py
 src/usmsb_sdk/growth_economic_harness/harness.py
+src/usmsb_sdk/growth_economic_harness/intelligence_evaluation.py
+src/usmsb_sdk/growth_economic_harness/json_schema.py
 src/usmsb_sdk/growth_economic_harness/models.py
+src/usmsb_sdk/growth_economic_harness/openharness_runtime.py
 src/usmsb_sdk/growth_economic_harness/ports.py
 src/usmsb_sdk/growth_economic_harness/structured_output.py
 src/usmsb_sdk/harness/__init__.py

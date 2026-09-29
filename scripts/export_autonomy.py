@@ -4,7 +4,7 @@ Core/autonomy needs stdlib only. The optional learning adapter reuses existing
 Harness contracts and requires Pydantic 2; no model, provider or chain SDK.
 
 Usage: python scripts/export_autonomy.py <destination-package> [--check]
-The package has namespace shims because the full SDK has eager optional imports.
+Namespace shims expose only the audited subset, not optional full-SDK modules.
 """
 import argparse
 import hashlib
@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = {"core/elements.py": "src/usmsb_sdk/core/elements.py",
          "autonomy/__init__.py": "src/usmsb_sdk/autonomy/__init__.py",
          "autonomy/contracts.py": "src/usmsb_sdk/autonomy/contracts.py",
+         "autonomy/profiles.py": "src/usmsb_sdk/autonomy/profiles.py",
+         "autonomy/journal.py": "src/usmsb_sdk/autonomy/journal.py",
          "autonomy/goal_revision.py": "src/usmsb_sdk/autonomy/goal_revision.py",
          "autonomy/evolution.py": "src/usmsb_sdk/autonomy/evolution.py",
          "autonomy/authorization.py": "src/usmsb_sdk/autonomy/authorization.py",

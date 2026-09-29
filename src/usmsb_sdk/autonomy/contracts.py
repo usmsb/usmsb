@@ -41,8 +41,11 @@ def goal_element(record):
                           "success_criteria": record.get("success_criteria"), "origin": record.get("origin")})
 
 
-def goal_contract(criteria, verifier_ids):
-    _check(isinstance(criteria, list) and 1 <= len(criteria) <= 16, "Require 1–16 acceptance criteria")
+def goal_contract(criteria, verifier_ids, *, profile=None):
+    from .profiles import checked_profile
+
+    profile = checked_profile(profile)
+    _check(isinstance(criteria, list) and 1 <= len(criteria) <= profile.max_criteria, "Invalid acceptance criteria count")
     verifiers = _ids(verifier_ids, 12)
     _check(bool(verifiers), "Require explicitly chosen verifiers")
     normalized = []
@@ -53,12 +56,18 @@ def goal_contract(criteria, verifier_ids):
         normalized.append({"id": _text(item.get("id"), 80), "description": _text(item.get("description")),
                            "evidence_kind": mode})
     _check(len({c["id"] for c in normalized}) == len(normalized), "Duplicate criterion")
-    return {"schema": "usmsb.goal-contract.v1", "criteria": normalized, "verifier_ids": verifiers,
-            "independent_review": True}
+    result = {"schema": "usmsb.goal-contract.v1", "criteria": normalized, "verifier_ids": verifiers,
+              "independent_review": profile.review_mode == "independent"}
+    if not profile.legacy:
+        result.update(schema="usmsb.goal-contract.v2", profile=profile.record(), review_mode=profile.review_mode)
+    return result
 
 
-def plan_steps(steps):
-    _check(isinstance(steps, list) and 1 <= len(steps) <= 32, "Require 1–32 plan steps")
+def plan_steps(steps, *, profile=None):
+    from .profiles import checked_profile
+
+    profile = checked_profile(profile)
+    _check(isinstance(steps, list) and 1 <= len(steps) <= profile.max_steps, "Invalid plan step count")
     normalized = []
     for step in steps:
         _check(isinstance(step, dict), "Invalid step")
@@ -99,22 +108,39 @@ def review_checks(contract, checks):
     return normalized
 
 
-def remote_status(value):
+def remote_status(value, *, profile=None):
     """Accepted is NOT completed; an opaque run ref permits read-only polling.
 
     A transport error after creation is unknown. The caller must never recreate
     the operation to obtain its status. Provider credentials stay host-private.
     """
+    from .profiles import artifact_reference, checked_profile
+
+    profile = checked_profile(profile)
     _check(isinstance(value, dict), "Invalid remote result")
+    # Validate and return the same detached snapshot, not a caller-owned object
+    # that can change between validating its descriptors and copying output.
+    value = deepcopy(value)
     state = value.get("state")
     _check(isinstance(state, str) and state in {"accepted", "running", "completed", "failed", "unknown"}, "Unknown remote state")
     result = {"state": state, "run_ref": _text(value.get("run_ref"), 500)}
     if state == "completed":
         output = value.get("output")
         _check(isinstance(output, dict), "Completed run requires full output")
-        _text(output.get("title"), 160)
-        _text(output.get("content"), 32000)
-        _check(output.get("content_type") in {"application/json", "text/markdown"}, "Invalid media type")
+        if not profile.legacy and "artifacts" in output:
+            artifacts = output["artifacts"]
+            _check(isinstance(artifacts, list) and 1 <= len(artifacts) <= 32, "Require bounded artifacts")
+            for artifact in artifacts:
+                _check(isinstance(artifact, dict), "Invalid artifact reference")
+                _check(artifact.get("schema", "usmsb.artifact-reference.v1") == "usmsb.artifact-reference.v1",
+                       "Unsupported artifact schema")
+                artifact_reference(artifact.get("id"), artifact.get("media_type"), artifact.get("sha256"),
+                                   artifact.get("uri"), artifact.get("size_bytes"), profile=profile)
+            _ids([artifact["id"] for artifact in artifacts])
+        else:
+            _text(output.get("title"), 160)
+            _text(output.get("content"), 32000)
+            _check(profile.accepts(output.get("content_type")), "Invalid media type")
         result["output"] = deepcopy(output)
     if state in {"failed", "unknown"}:
         result["error"] = _text(value.get("error", state), 2000)
