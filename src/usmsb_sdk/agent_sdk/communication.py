@@ -764,6 +764,8 @@ class CommunicationManager:
     async def _start_p2p_listener(self) -> None:
         """Start P2P listener server"""
         port = self.config.network.p2p_listen_port
+        protocol_config = self.config.protocols.get(ProtocolType.P2P)
+        host = protocol_config.host if protocol_config else "0.0.0.0"
 
         async def handle_connection(websocket):
             """Handle incoming P2P connection"""
@@ -805,7 +807,7 @@ class CommunicationManager:
 
         self._p2p_server = await websockets.serve(
             handle_connection,
-            "127.0.0.1" if port == 0 else "0.0.0.0",
+            host,
             port,
         )
         self.logger.info(f"P2P listener started on port {port}")

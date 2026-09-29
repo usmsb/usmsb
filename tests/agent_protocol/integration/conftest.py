@@ -70,7 +70,7 @@ def basic_agent_config():
         ProtocolType,
     )
 
-    return AgentConfig(
+    config = AgentConfig(
         name="TestAgent",
         description="A test agent for integration testing",
         version="1.0.0",
@@ -108,6 +108,9 @@ def basic_agent_config():
         auto_register=False,
         auto_discover=False,
     )
+    config.protocols[ProtocolType.P2P].host = "127.0.0.1"
+    config.protocols[ProtocolType.WEBSOCKET].host = "127.0.0.1"
+    return config
 
 
 @pytest.fixture
