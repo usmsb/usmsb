@@ -10,6 +10,7 @@ Implements the unified communication system for agents, including:
 """
 
 import asyncio
+import inspect
 import json
 import logging
 from collections.abc import Callable
@@ -649,11 +650,15 @@ class CommunicationManager:
                 self._p2p_connections[target_id] = conn
 
                 # Connect via WebSocket
+                # websockets 14+ renamed extra_headers to additional_headers.
+                header_option = (
+                    "additional_headers"
+                    if "additional_headers" in inspect.signature(websockets.connect).parameters
+                    else "extra_headers"
+                )
                 ws = await websockets.connect(
                     f"{endpoint}/p2p/{target_id}",
-                    extra_headers={
-                        "X-Agent-ID": self.agent_id,
-                    },
+                    **{header_option: {"X-Agent-ID": self.agent_id}},
                 )
                 conn.websocket = ws
                 conn.state = "connected"
@@ -760,11 +765,14 @@ class CommunicationManager:
         """Start P2P listener server"""
         port = self.config.network.p2p_listen_port
 
-        async def handle_connection(websocket, path):
+        async def handle_connection(websocket):
             """Handle incoming P2P connection"""
+            peer_id = "unknown"
             try:
                 # Get peer agent ID
-                peer_id = websocket.request_headers.get("X-Agent-ID", "unknown")
+                request = getattr(websocket, "request", None)
+                headers = request.headers if request is not None else websocket.request_headers
+                peer_id = headers.get("X-Agent-ID", "unknown")
 
                 # Create connection record
                 conn = P2PConnection(
@@ -810,7 +818,7 @@ class CommunicationManager:
         port = protocol_config.port if protocol_config else 8765
         host = protocol_config.host if protocol_config else "0.0.0.0"
 
-        async def handle_websocket(websocket, path):
+        async def handle_websocket(websocket):
             """Handle WebSocket connection"""
             peer_id = str(websocket.remote_address)
             self._active_websockets[peer_id] = websocket

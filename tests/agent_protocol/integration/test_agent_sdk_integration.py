@@ -306,6 +306,68 @@ class TestAgentCommunication:
             occupied.close()
 
     @pytest.mark.asyncio
+    async def test_p2p_transports_message_between_two_local_agents(self, basic_agent_config):
+        """The real WebSocket handshake and message path work across peers."""
+        config_b = AgentConfig.from_dict(basic_agent_config.to_dict())
+        config_b.agent_id = "second-agent"
+        received = asyncio.Event()
+
+        async def handler(message, session):
+            if message.content == {"probe": "connected"}:
+                received.set()
+            return None
+
+        first = CommunicationManager(basic_agent_config.agent_id, basic_agent_config, handler)
+        second = CommunicationManager(config_b.agent_id, config_b, handler)
+        try:
+            await first.initialize(skip_http_start=True)
+            await second.initialize(skip_http_start=True)
+            port = second._p2p_server.sockets[0].getsockname()[1]
+            assert await first.establish_p2p(second.agent_id, f"ws://127.0.0.1:{port}")
+            await first.send_p2p(
+                Message(
+                    type=MessageType.NOTIFICATION,
+                    sender_id=first.agent_id,
+                    receiver_id=second.agent_id,
+                    content={"probe": "connected"},
+                ),
+                second.agent_id,
+            )
+            await asyncio.wait_for(received.wait(), timeout=2)
+            assert first.agent_id in second.p2p_connections
+        finally:
+            await first.close()
+            await second.close()
+
+    @pytest.mark.asyncio
+    async def test_websocket_listener_accepts_a_real_message(self, basic_agent_config):
+        """The current websockets handler API reaches the agent callback."""
+        import websockets
+
+        received = asyncio.Event()
+
+        async def handler(message, session):
+            if message.content == {"probe": "websocket"}:
+                received.set()
+            return None
+
+        manager = CommunicationManager(basic_agent_config.agent_id, basic_agent_config, handler)
+        try:
+            await manager.initialize(skip_http_start=True)
+            port = manager._websocket_server.sockets[0].getsockname()[1]
+            async with websockets.connect(f"ws://127.0.0.1:{port}") as websocket:
+                await websocket.send(
+                    Message(
+                        type=MessageType.NOTIFICATION,
+                        sender_id="external-peer",
+                        content={"probe": "websocket"},
+                    ).to_json()
+                )
+                await asyncio.wait_for(received.wait(), timeout=2)
+        finally:
+            await manager.close()
+
+    @pytest.mark.asyncio
     async def test_communication_manager_initialize(self, communication_manager):
         """Test communication manager initialization."""
         assert communication_manager._initialized
