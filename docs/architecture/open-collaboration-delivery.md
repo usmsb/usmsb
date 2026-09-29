@@ -105,7 +105,7 @@
 | 范围 | 本次可核验结果 |
 |---|---|
 | portable 核心 | **309 passed，0 skipped**；含新宿主边界 32 项、增量迁移 96 项、故障实验 19 项，以及既有 162 项 |
-| 旧集成范围 | 最终完整重跑 **439 passed、27 skipped，0 failed/error**，包含真实 API key 正向与撤销回归；demands/wallet 专项 **24 passed**（是子集，不再累加） |
+| 旧集成范围 | 修复后的最终完整重跑 **444 passed、27 skipped，0 failed/error**，包含真实 API key 正向与撤销回归；demands/wallet 专项 **24 passed**（是子集，不再累加） |
 | unit + creative economy | **1261 passed、7 skipped、1 xfailed、13 deselected**；无失败。Windows OpenHarness 的既有预期失败不算通过 |
 | 制品与静态检查 | a2 sdist/wheel 构建及 `twine check` 通过；新增机制 Ruff、Python 3.14 基线、LLM provider bypass 检查通过 |
 | 独立故障样本 | 8 goals、3 worker、每 goal 4 次修订；**11 阶段通过、0 失败/跳过、1 次预期强杀**；约 **5.293 秒**，不是长期实验 |
@@ -127,3 +127,11 @@
 3. 若包含 IAP/收付款，另提供生产证明器与已存在商户轨道及对账/争议责任。暂无则此项保持阻塞，不伪造闭环。
 
 长期演化与生产切换须先确认观察方案/风险预算/切换授权。以上外部条件未满足前，本次完成的是可复现的工程整改，不是宣称该愿景已经在真实世界全部实现。
+
+### 6.3 PR 的 Linux 集成门禁闭环
+
+首次在干净 Linux runner 上执行新增阻断门禁，暴露了两类 Windows 开发机未复现的问题：服务层 SQLAlchemy 的默认 SQLite 父目录不存在，且其路径未随旧 API 数据库一起隔离；Agent 协议声明端口 `0` 自动分配，启动时却将其当作固定 `5001`/`8765`，P2P 与 WebSocket 还共用一个服务句柄。首次门禁 **13 failed、26 errors**，不能当作通过。
+
+后续修复使服务层数据库在干净机器上创建所需目录，并让 API 集成测试将两套数据库都绑定到各自的临时文件。协议监听改为尊重端口 `0` 和配置的绑定地址，分别持有与关闭 WebSocket/P2P 服务；部分启动失败会清理已开的连接与后台任务。集成 fixture 不再为只需出站 HTTP 的测试额外启动入站 HTTP 服务器。针对当前安装的 websockets 15，兼容了请求头参数和单参数服务回调，并增加了两个 Agent 实际建连、消息传递、端口互不冲突、关闭释放及启动失败回滚的回环回归。
+
+修复后本地完整集成范围 **444 passed、27 skipped、0 failed/error**；PR #15 的 GitHub Actions Linux 集成证据（运行 `36559897854`，JUnit 附件 `integration-contract-evidence`）为 **471 tests、0 failures、0 errors、27 skipped**，即 444 通过，耗时约 24.342 秒。该次运行的阻断集成、独立制品、单元测试、打包及最终汇总均成功；portable 核心本地仍为 **309 passed**。这确认的是离线/本地集成门禁跨平台通过，既不把旧跳过项改写为成功，也不构成真实多组织、真实支付或生产切换验收。后续文档提交如触发新运行，仍以对应提交的 Actions 记录为准。
