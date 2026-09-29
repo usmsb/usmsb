@@ -10,9 +10,11 @@ Implements the unified communication system for agents, including:
 """
 
 import asyncio
+import inspect
 import json
 import logging
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -247,6 +249,7 @@ class CommunicationManager:
         self._http_session: aiohttp.ClientSession | None = None
         self._http_server: Any | None = None  # HTTP REST server
         self._websocket_server: Any | None = None
+        self._p2p_server: Any | None = None
         self._active_websockets: dict[str, websockets.WebSocketClientProtocol] = {}
 
         # Message routing
@@ -257,6 +260,7 @@ class CommunicationManager:
         # State
         self._initialized = False
         self._running = False
+        self._message_task: asyncio.Task | None = None
 
     @property
     def p2p_connections(self) -> dict[str, P2PConnection]:
@@ -280,21 +284,25 @@ class CommunicationManager:
 
         self._http_session = aiohttp.ClientSession()
 
-        # Start protocols based on config
-        protocols = self.config.get_enabled_protocols()
+        try:
+            # Start protocols based on config. Roll back already-open listeners
+            # when a later bind fails, so a retry cannot inherit leaked ports.
+            protocols = self.config.get_enabled_protocols()
 
-        if ProtocolType.HTTP in protocols and not skip_http_start:
-            await self._start_http_server()
+            if ProtocolType.HTTP in protocols and not skip_http_start:
+                await self._start_http_server()
 
-        if ProtocolType.WEBSOCKET in protocols:
-            await self._start_websocket_server()
+            if ProtocolType.WEBSOCKET in protocols:
+                await self._start_websocket_server()
 
-        if ProtocolType.P2P in protocols:
-            await self._start_p2p_listener()
+            if ProtocolType.P2P in protocols:
+                await self._start_p2p_listener()
 
-        # Start message processing
-        self._running = True
-        asyncio.create_task(self._process_messages())
+            self._running = True
+            self._message_task = asyncio.create_task(self._process_messages())
+        except BaseException:
+            await self.close()
+            raise
 
         self._initialized = True
         self.logger.info(f"Communication manager initialized for agent {self.agent_id}")
@@ -302,6 +310,12 @@ class CommunicationManager:
     async def close(self) -> None:
         """Close all communication channels"""
         self._running = False
+
+        if self._message_task:
+            self._message_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._message_task
+            self._message_task = None
 
         # Close HTTP server
         if self._http_server:
@@ -316,6 +330,12 @@ class CommunicationManager:
         if self._websocket_server:
             self._websocket_server.close()
             await self._websocket_server.wait_closed()
+            self._websocket_server = None
+
+        if self._p2p_server:
+            self._p2p_server.close()
+            await self._p2p_server.wait_closed()
+            self._p2p_server = None
 
         # Close active WebSockets
         for ws in list(self._active_websockets.values()):
@@ -324,6 +344,9 @@ class CommunicationManager:
         # Close HTTP session
         if self._http_session:
             await self._http_session.close()
+            self._http_session = None
+
+        self._initialized = False
 
         self.logger.info(f"Communication manager closed for agent {self.agent_id}")
 
@@ -627,11 +650,15 @@ class CommunicationManager:
                 self._p2p_connections[target_id] = conn
 
                 # Connect via WebSocket
+                # websockets 14+ renamed extra_headers to additional_headers.
+                header_option = (
+                    "additional_headers"
+                    if "additional_headers" in inspect.signature(websockets.connect).parameters
+                    else "extra_headers"
+                )
                 ws = await websockets.connect(
                     f"{endpoint}/p2p/{target_id}",
-                    extra_headers={
-                        "X-Agent-ID": self.agent_id,
-                    },
+                    **{header_option: {"X-Agent-ID": self.agent_id}},
                 )
                 conn.websocket = ws
                 conn.state = "connected"
@@ -737,12 +764,17 @@ class CommunicationManager:
     async def _start_p2p_listener(self) -> None:
         """Start P2P listener server"""
         port = self.config.network.p2p_listen_port
+        protocol_config = self.config.protocols.get(ProtocolType.P2P)
+        host = protocol_config.host if protocol_config else "0.0.0.0"
 
-        async def handle_connection(websocket, path):
+        async def handle_connection(websocket):
             """Handle incoming P2P connection"""
+            peer_id = "unknown"
             try:
                 # Get peer agent ID
-                peer_id = websocket.request_headers.get("X-Agent-ID", "unknown")
+                request = getattr(websocket, "request", None)
+                headers = request.headers if request is not None else websocket.request_headers
+                peer_id = headers.get("X-Agent-ID", "unknown")
 
                 # Create connection record
                 conn = P2PConnection(
@@ -773,9 +805,9 @@ class CommunicationManager:
                 if peer_id in self._p2p_connections:
                     del self._p2p_connections[peer_id]
 
-        self._websocket_server = await websockets.serve(
+        self._p2p_server = await websockets.serve(
             handle_connection,
-            "0.0.0.0",
+            host,
             port,
         )
         self.logger.info(f"P2P listener started on port {port}")
@@ -785,9 +817,10 @@ class CommunicationManager:
     async def _start_websocket_server(self) -> None:
         """Start WebSocket server for agent communication"""
         protocol_config = self.config.protocols.get(ProtocolType.WEBSOCKET)
-        port = protocol_config.port if protocol_config and protocol_config.port else 8765
+        port = protocol_config.port if protocol_config else 8765
+        host = protocol_config.host if protocol_config else "0.0.0.0"
 
-        async def handle_websocket(websocket, path):
+        async def handle_websocket(websocket):
             """Handle WebSocket connection"""
             peer_id = str(websocket.remote_address)
             self._active_websockets[peer_id] = websocket
@@ -803,7 +836,7 @@ class CommunicationManager:
 
         self._websocket_server = await websockets.serve(
             handle_websocket,
-            "0.0.0.0",
+            host,
             port,
         )
         self.logger.info(f"WebSocket server started on port {port}")
@@ -922,7 +955,7 @@ class CommunicationManager:
         from usmsb_sdk.agent_sdk.http_server import HTTPServer
 
         protocol_config = self.config.protocols.get(ProtocolType.HTTP)
-        port = protocol_config.port if protocol_config and protocol_config.port else 5001
+        port = protocol_config.port if protocol_config else 5001
         host = protocol_config.host if protocol_config and protocol_config.host else "0.0.0.0"
 
         # Create a minimal agent-like object for the HTTP server

@@ -174,6 +174,8 @@ class DistributedServiceRegistry:
         self._running = False
         if self._gossip_task:
             self._gossip_task.cancel()
+            await asyncio.gather(self._gossip_task, return_exceptions=True)
+            self._gossip_task = None
 
     async def register_service(self, service: ServiceEndpoint) -> None:
         """Register a service."""
@@ -331,7 +333,7 @@ class P2PNode:
         self.identity = NodeIdentity(
             node_id=self.node_id,
             public_key=self._generate_public_key(),
-            address=self.config.get("address", self._get_local_ip()),
+            address=self.config["address"] if "address" in self.config else self._get_local_ip(),
             port=self.config.get("port", 8080),
             metadata=self.config.get("metadata", {}),
         )
@@ -352,6 +354,7 @@ class P2PNode:
 
         # Server
         self._server: asyncio.Server | None = None
+        self._background_tasks: list[asyncio.Task] = []
         self._running = False
 
     def _generate_node_id(self) -> str:
@@ -390,12 +393,15 @@ class P2PNode:
                 self.identity.address,
                 self.identity.port,
             )
+            self.identity.port = self._server.sockets[0].getsockname()[1]
 
             self._running = True
 
             # Start background tasks
-            asyncio.create_task(self._server_loop())
-            asyncio.create_task(self._heartbeat_loop())
+            self._background_tasks = [
+                asyncio.create_task(self._server_loop()),
+                asyncio.create_task(self._heartbeat_loop()),
+            ]
 
             # Connect to bootstrap peers
             await self._connect_to_bootstrap_peers()
@@ -410,7 +416,7 @@ class P2PNode:
 
         except Exception as e:
             logger.error(f"Failed to start P2P node: {e}")
-            self.status = NodeStatus.OFFLINE
+            await self.stop()
             return False
 
     async def stop(self) -> None:
@@ -420,6 +426,11 @@ class P2PNode:
         if self._server:
             self._server.close()
             await self._server.wait_closed()
+
+        for task in self._background_tasks:
+            task.cancel()
+        await asyncio.gather(*self._background_tasks, return_exceptions=True)
+        self._background_tasks.clear()
 
         await self.registry.stop()
         self.status = NodeStatus.OFFLINE

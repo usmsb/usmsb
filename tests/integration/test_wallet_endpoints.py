@@ -1,47 +1,76 @@
-"""
-Integration tests for missing Wallet router endpoints.
+"""Wallet read contracts; local records are not proof of real settlement."""
 
-Tests: get_balance, get_transactions, get_transaction.
-
-Requires: client fixture from conftest.
-"""
 import pytest
 
 
-class TestWalletEndpoints:
-    """Missing Wallet router endpoint tests."""
+@pytest.fixture
+def transactions(integration_db):
+    for tx_id, buyer, seller, kind, created in [
+        ("mine-1", "agent_bound", "seller", "service_payment", 1),
+        ("mine-2", "buyer", "agent_bound", "stake_deposit", 2),
+        ("private", "other-buyer", "other-seller", "service_payment", 3),
+    ]:
+        integration_db.execute(
+            "INSERT INTO transactions (id,buyer_id,seller_id,transaction_type,amount,status,"
+            "created_at) VALUES (?,?,?,?,?,?,?)",
+            (tx_id, buyer, seller, kind, 10, "pending", created),
+        )
+    integration_db.commit()
 
-    def test_get_balance_requires_auth(self, client):
-        """GET /api/wallet/balance → 401 or 200."""
-        r = client.get("/api/wallet/balance")
-        assert r.status_code in (200, 401, 404)
 
-    def test_get_balance_with_address(self, client):
-        """GET /api/wallet/balance?address=0x... → 200/401/404."""
-        r = client.get("/api/wallet/balance?address=0x" + "a" * 40)
-        assert r.status_code in (200, 400, 401, 404)
+@pytest.mark.parametrize("path", ["balance", "transactions", "transactions/nonexistent"])
+def test_wallet_requires_real_authentication(unauthenticated_client, path):
+    assert unauthenticated_client.get(f"/api/wallet/{path}").status_code == 401
 
-    def test_get_transactions_requires_auth(self, client):
-        """GET /api/wallet/transactions → 401 or 200."""
-        r = client.get("/api/wallet/transactions")
-        assert r.status_code in (200, 401, 404)
 
-    def test_get_transactions_with_filters(self, client):
-        """GET /api/wallet/transactions?type=stake → 200/401/404."""
-        r = client.get("/api/wallet/transactions?type=stake")
-        assert r.status_code in (200, 401, 404)
+def test_unbound_wallet_balance(client):
+    response = client.get("/api/wallet/balance")
+    assert response.status_code == 200, response.text
+    assert response.json()["balance"] == 0
+    assert response.json()["agent_id"] == "agent_bound"
 
-    def test_get_transactions_pagination(self, client):
-        """GET /api/wallet/transactions?limit=10&offset=0 → 200/401/404."""
-        r = client.get("/api/wallet/transactions?limit=10&offset=0")
-        assert r.status_code in (200, 401, 404)
 
-    def test_get_transaction_requires_auth(self, client):
-        """GET /api/wallet/transactions/{tx_id} → 401 or 200."""
-        r = client.get("/api/wallet/transactions/0x" + "a" * 64)
-        assert r.status_code in (200, 401, 404)
+def test_bound_balance_uses_authenticated_identity(client, sample_bound_agent):
+    response = client.get("/api/wallet/balance?address=someone-else")
+    assert response.status_code == 200, response.text
+    assert response.json()["balance"] == 5000
+    assert response.json()["agent_id"] == sample_bound_agent
 
-    def test_get_transaction_not_found(self, client):
-        """GET /api/wallet/transactions/nonexistent → 404."""
-        r = client.get("/api/wallet/transactions/nonexistent")
-        assert r.status_code in (200, 401, 404)
+
+def test_transactions_are_isolated_and_ordered(client, transactions):
+    response = client.get("/api/wallet/transactions")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total_count"] == 2
+    assert [tx["id"] for tx in body["transactions"]] == ["mine-2", "mine-1"]
+    assert [tx["counterparty_id"] for tx in body["transactions"]] == ["buyer", "seller"]
+
+
+def test_transactions_filter_and_pagination(client, transactions):
+    filtered = client.get("/api/wallet/transactions?type=stake_deposit")
+    assert filtered.status_code == 200
+    assert filtered.json()["total_count"] == 1
+    assert [tx["id"] for tx in filtered.json()["transactions"]] == ["mine-2"]
+    page = client.get("/api/wallet/transactions?limit=1&offset=1")
+    assert page.status_code == 200
+    assert page.json()["total_count"] == 2
+    assert page.json()["page"] == 2
+    assert [tx["id"] for tx in page.json()["transactions"]] == ["mine-1"]
+
+
+@pytest.mark.parametrize("tx_id", ["private", "nonexistent"])
+def test_transactions_do_not_disclose_others(client, transactions, tx_id):
+    response = client.get(f"/api/wallet/transactions/{tx_id}")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_transaction_details(client, transactions):
+    response = client.get("/api/wallet/transactions/mine-1")
+    assert response.status_code == 200
+    assert response.json()["counterparty_id"] == "seller"
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=201", "offset=-1"])
+def test_wallet_pagination_bounds(client, query):
+    assert client.get(f"/api/wallet/transactions?{query}").status_code == 422

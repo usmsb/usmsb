@@ -418,11 +418,11 @@ class FileStorage(StorageInterface[Union[dict, list, str, int, float, bool]]):
             try:
                 # Prepare metadata
                 full_metadata = {
-                    "key": key,
                     "created_at": datetime.utcnow().isoformat(),
                     "updated_at": datetime.utcnow().isoformat(),
                     "content_type": "application/json",
                     **(metadata or {}),
+                    "key": key,
                 }
 
                 # Write data
@@ -591,8 +591,15 @@ class FileStorage(StorageInterface[Union[dict, list, str, int, float, bool]]):
         keys = []
 
         for path in data_dir.glob("*.json"):
-            # Reverse sanitize to get original key (approximate)
+            # Filenames are lossy (slashes, long keys, and .json suffixes).
+            # The sidecar retains the original key across storage restarts.
             key = path.stem
+            meta_path = self.base_path / "metadata" / f"{path.stem}.meta.json"
+            if meta_path.exists():
+                with meta_path.open(encoding="utf-8") as metadata_file:
+                    metadata = json.load(metadata_file)
+                if isinstance(metadata.get("key"), str):
+                    key = metadata["key"]
             if prefix is None or key.startswith(prefix):
                 keys.append(key)
 
@@ -647,10 +654,10 @@ class FileStorage(StorageInterface[Union[dict, list, str, int, float, bool]]):
                     final_metadata = existing
                 else:
                     final_metadata = {
-                        "key": key,
                         "updated_at": datetime.utcnow().isoformat(),
                         **metadata,
                     }
+                final_metadata["key"] = key
 
                 # Write updated metadata
                 with open(meta_path, "w", encoding="utf-8") as f:

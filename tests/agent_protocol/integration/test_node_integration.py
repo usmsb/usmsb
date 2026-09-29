@@ -11,6 +11,7 @@ Tests for P2P node management including:
 
 import asyncio
 import json
+import time
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -249,8 +250,6 @@ class TestDistributedServiceRegistry:
     async def test_cleanup_stale_services(self, registry):
         """Test cleaning up stale services."""
         # Register a service with old heartbeat
-        import time
-
         stale_service = ServiceEndpoint(
             service_id="stale-service",
             service_type=ServiceType.SKILL_PROVIDER,
@@ -298,6 +297,14 @@ class TestDistributedServiceRegistry:
 
         await registry.merge_registry_state(other_state)
         assert "remote-service" in registry._services
+        services = await registry.discover_services(ServiceType.GATEWAY)
+        assert [service.service_id for service in services] == ["remote-service"]
+
+        # Older gossip must not replace the latest endpoint.
+        other_state["services"]["remote-service"]["last_heartbeat"] -= 1
+        other_state["services"]["remote-service"]["endpoint"] = "http://stale:8080/gateway"
+        await registry.merge_registry_state(other_state)
+        assert registry._services["remote-service"].endpoint == "http://remote:8080/gateway"
 
 
 class TestP2PNode:
@@ -308,7 +315,7 @@ class TestP2PNode:
         """Create node configuration."""
         return {
             "address": "127.0.0.1",
-            "port": 19001,
+            "port": 0,
             "bootstrap_peers": [],
             "capabilities": ["testing"],
             "metadata": {"test": True},
@@ -316,7 +323,8 @@ class TestP2PNode:
 
     def test_node_creation(self, node_config):
         """Test creating a P2P node."""
-        node = P2PNode(config=node_config)
+        with patch.object(P2PNode, "_get_local_ip", side_effect=AssertionError("external probe")):
+            node = P2PNode(config=node_config)
 
         assert node.node_id is not None
         assert node.identity is not None
@@ -329,12 +337,34 @@ class TestP2PNode:
 
         # Start
         started = await node.start()
-        assert started
-        assert node.status == NodeStatus.ACTIVE
-
-        # Stop
-        await node.stop()
+        tasks = list(node._background_tasks)
+        gossip_task = node.registry._gossip_task
+        try:
+            assert started
+            assert node.status == NodeStatus.ACTIVE
+            assert node.identity.port > 0
+            assert node._server.sockets[0].getsockname()[1] == node.identity.port
+        finally:
+            await node.stop()
         assert node.status == NodeStatus.OFFLINE
+        assert all(task.done() for task in tasks)
+        assert gossip_task.done()
+        assert not node._server.is_serving()
+
+    @pytest.mark.asyncio
+    async def test_node_failed_start_cleans_registry(self, node_config):
+        occupied = await asyncio.start_server(lambda reader, writer: writer.close(), "127.0.0.1", 0)
+        node = P2PNode(config={**node_config, "port": occupied.sockets[0].getsockname()[1]})
+        try:
+            assert await node.start() is False
+            assert node.status == NodeStatus.OFFLINE
+            assert node.registry._running is False
+            assert node.registry._gossip_task is None
+            assert node._background_tasks == []
+        finally:
+            await node.stop()
+            occupied.close()
+            await occupied.wait_closed()
 
     @pytest.mark.asyncio
     async def test_node_info(self, node_config):
@@ -665,34 +695,69 @@ class TestMultiNodeInteraction:
 
     @pytest.mark.asyncio
     async def test_two_node_communication(self):
-        """Test communication between two nodes."""
+        """Bootstrap, gossip, discover, and execute a local service over real TCP."""
         config1 = {
             "address": "127.0.0.1",
-            "port": 19002,
+            "port": 0,
             "bootstrap_peers": [],
             "capabilities": ["test1"],
         }
-        config2 = {
-            "address": "127.0.0.1",
-            "port": 19003,
-            "bootstrap_peers": ["127.0.0.1:19002"],
-            "capabilities": ["test2"],
-        }
-
         node1 = P2PNode(config=config1)
-        node2 = P2PNode(config=config2)
+        node2 = None
+
+        async def exchange(node, message):
+            async with asyncio.timeout(5):
+                reader, writer = await asyncio.open_connection("127.0.0.1", node.identity.port)
+                try:
+                    writer.write(json.dumps(message).encode())
+                    await writer.drain()
+                    return json.loads(await reader.read())
+                finally:
+                    writer.close()
+                    await writer.wait_closed()
 
         try:
-            await node1.start()
-            await node2.start()
+            assert await node1.start()
+            node2 = P2PNode(config={
+                "address": "127.0.0.1",
+                "port": 0,
+                "bootstrap_peers": [f"127.0.0.1:{node1.identity.port}"],
+                "capabilities": ["test2"],
+            })
+            async with asyncio.timeout(5):
+                assert await node2.start()
 
-            # Both nodes should be active
             assert node1.status == NodeStatus.ACTIVE
             assert node2.status == NodeStatus.ACTIVE
+            assert node1.node_id in node2._peers
+            assert (await exchange(node2, {"type": "ping"}))["node_id"] == node2.node_id
+
+            async def compute(payload):
+                return {"total": sum(payload["values"])}
+
+            service = await node1.register_service(
+                ServiceType.COMPUTE,
+                ["sum"],
+                f"tcp://127.0.0.1:{node1.identity.port}/compute",
+                handler=compute,
+            )
+            ack = await exchange(node2, {
+                "type": "registry_gossip",
+                "registry": await node1.registry.get_registry_state(),
+            })
+            assert ack == {"type": "gossip_ack", "node_id": node2.node_id}
+            discovered = await exchange(node2, {"type": "discover", "service_type": "compute"})
+            assert discovered["type"] == "discover_response"
+            assert [s["service_id"] for s in discovered["services"]] == [service.service_id]
+            result = await node2.request_service(ServiceType.COMPUTE, {"values": [2, 3, 5]}, timeout=5)
+            assert result.success, result.error
+            assert result.provider_node == node1.node_id
+            assert result.result == {"total": 10}
 
         finally:
+            if node2 is not None:
+                await node2.stop()
             await node1.stop()
-            await node2.stop()
 
 
 if __name__ == "__main__":

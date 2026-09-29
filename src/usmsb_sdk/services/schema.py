@@ -10,7 +10,9 @@ Defines SQLite database tables for:
 Uses SQLAlchemy ORM models.
 """
 
+import os
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import (
     JSON,
@@ -25,13 +27,13 @@ from sqlalchemy import (
     Text,
     create_engine,
 )
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 
 Base = declarative_base()
 
 # Database path (configurable via environment)
-import os
 _default = os.environ.get("USMSB_PLATFORM_DB", "sqlite:///./data/db/usmsb_platform.db")
 DEFAULT_DB_PATH = _default if _default.startswith("sqlite:///") else f"sqlite:///{_default}"
 
@@ -309,6 +311,12 @@ class BroadcastResponseDB(Base):
 def create_db(db_url: str | None = None) -> "Engine":
     """Create database engine and tables."""
     db_path = db_url or DEFAULT_DB_PATH
+    url = make_url(db_path)
+    if url.get_backend_name() == "sqlite" and url.database not in (None, ":memory:"):
+        # A clean installation does not necessarily include the default data/db
+        # directory. SQLite creates the file, but not its parent directory.
+        if not url.database.startswith("file:"):
+            Path(url.database).parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(db_path, echo=False)
     Base.metadata.create_all(engine)
     return engine

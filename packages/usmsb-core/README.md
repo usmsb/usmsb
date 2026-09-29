@@ -13,7 +13,7 @@ replace `python` with `.venv/Scripts/python.exe`):
 ```sh
 python -E -B -m pip install 'setuptools>=77' build wheel
 python -E -B scripts/build_core_distribution.py
-python -E -B -m pip install --no-deps dist/core/usmsb_core-0.9.0a1-py3-none-any.whl
+python -E -B -m pip install --no-deps dist/core/usmsb_core-0.9.0a2-py3-none-any.whl
 ```
 
 `--out-dir PATH` overrides the default `dist/core/` destination. All export, build,
@@ -50,13 +50,21 @@ The optional existing experience adapter needs `pydantic>=2,<3`. To use it,
 install the wheel with its extra (allowing pip to resolve Pydantic):
 
 ```sh
-python -E -B -m pip install './dist/core/usmsb_core-0.9.0a1-py3-none-any.whl[learning]'
+python -E -B -m pip install './dist/core/usmsb_core-0.9.0a2-py3-none-any.whl[learning]'
 ```
 
 Then import `usmsb_core.autonomy.learning`. Core imports never import that
 adapter. The distribution has no LLM provider, wallet, web server, model calls,
 external service requirement, or background scheduler. Host authentication,
 execution, and evidence verification remain the host's responsibility.
+
+The a2 modules `usmsb_core.autonomy.interop` and `usmsb_core.autonomy.migration`
+add explicit protocol negotiation, a host-installed authentication/evidence
+boundary, byte verification and approved additive configuration migration with
+backup/CAS/audit. See the [host integration guide](../../docs/architecture/collaboration-host-integration.md)
+and [bounded resilience experiments](../../docs/architecture/collaboration-experiments.md).
+These are not automatic enrollment, production hosting, funds custody or proof
+that multiple independently controlled organizations have passed acceptance.
 
 `usmsb-core` can coexist with the full `usmsb-sdk`: it owns only the
 `usmsb_core` namespace. Existing SDK consumers can keep using `usmsb_sdk`;

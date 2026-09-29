@@ -61,7 +61,7 @@ The historical PEA/OPC design uses two coordinates. These are application termin
 
 ## Start with the portable contracts
 
-The full `usmsb-sdk` declares Python **3.14** (`>=3.14,<3.15`) and retains its existing application dependencies. The existing [source exporter](./scripts/export_autonomy.py) provides a portable subset; the new alpha [standalone distribution](./packages/usmsb-core/README.md) is `usmsb-core` (`0.9.0a1`), importing as `usmsb_core`. Build it from this checkout; this is not a PyPI publication claim. See the [migration guide](./docs/architecture/open-collaboration-migration.md) for API, packaging, validation, and rollback boundaries.
+The full `usmsb-sdk` declares Python **3.14** (`>=3.14,<3.15`) and retains its existing application dependencies. The [source exporter](./scripts/export_autonomy.py) provides a portable subset; the alpha [standalone distribution](./packages/usmsb-core/README.md) is `usmsb-core` (`0.9.0a2`), importing as `usmsb_core`. Build it from this checkout; this is not a PyPI publication claim. See the [migration guide](./docs/architecture/open-collaboration-migration.md) and [host integration guide](./docs/architecture/collaboration-host-integration.md) for API, exact negotiation, authentication/evidence adapters, and additive governance boundaries.
 
 With the local test dependencies installed, run the isolated contract suite:
 
@@ -136,7 +136,7 @@ src/usmsb_sdk/
 | Status | Scope and limits |
 |---|---|
 | Existing implementation with local tests | Nine-element contracts, goal revision helpers, portable export, authorization, bounded reference policies, and learning/evolution mechanisms. Economic applications have separate tests; fixtures are not external acceptance evidence. |
-| This alpha iteration: local validation | Explicit neutral profiles, artifact references, `CollaborationJournal`, standalone core packaging, lazy SDK imports, and an external JSON client example. Passed local checks and remaining legacy integration failures are recorded in the [delivery report](./docs/architecture/open-collaboration-delivery.md); this is not production certification. |
+| This alpha iteration: local validation | Neutral profiles, `CollaborationJournal`, standalone core, lazy imports and external JSON clients; a2 adds authenticated/evidence-gated host adapters, exact negotiation, approved additive migration and bounded crash/recovery experiments. Local integration now blocks CI. Actual pass/skip evidence and unfinished real-world acceptance are in the [delivery report](./docs/architecture/open-collaboration-delivery.md); this is not production certification. |
 | Later production prerequisites | Real identity/controller verification, tenant isolation, credentials, evidence provenance, storage/recovery operations, interoperable peers, and load testing. Real payment/dispute rails and ZK credentials require separate implementation and validation. |
 
 The [architecture and acceptance design](./docs/architecture/open-collaboration-v1.md) defines the target and points to the integration delivery report. Design requirements are not passing test results. Local scripted tests do not establish customer transactions, multi-organization trust, causal learning gains, or emergent society/consciousness.

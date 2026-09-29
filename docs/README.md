@@ -10,6 +10,9 @@ USMSB's common core describes Agent, Object, Goal, Resource, Rule, Information, 
 
 - [Current architecture and acceptance design](./architecture/open-collaboration-v1.md) — intended boundaries, threat model, and validation gates; requirements are not evidence of completion.
 - [Migration, versioning, and rollback](./architecture/open-collaboration-migration.md) — existing compatibility defaults, alpha profiles/journal, package choices, and host responsibilities.
+- [Host integration and additive governance](./architecture/collaboration-host-integration.md) — a2 authentication/evidence boundary, exact protocol agreement, backup and migration fencing.
+- [Bounded resilience experiments](./architecture/collaboration-experiments.md) — multi-process CAS/replay, killed-writer recovery and controlled revision rounds; not long-term emergence.
+- [Delivery evidence and external prerequisites](./architecture/open-collaboration-delivery.md) — actual pass/skip results and unfinished real-world acceptance.
 - [English README](../README.md) · [中文 README](../README_CN.md) — current positioning, runnable test entry points, and retained economic examples.
 
 Existing portable contracts have local regression tests. Neutral profiles, the collaboration journal, standalone core distribution, lazy imports, and external-client integration belong to the current alpha iteration; consult the delivery report referenced by the design for actual results. Production identity, evidence provenance, payment, scale, and cross-World trust require separate validation. Scripted demos and local accounting do not prove autonomous behavior or real settlement.

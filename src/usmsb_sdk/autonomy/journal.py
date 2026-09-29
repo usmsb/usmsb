@@ -9,7 +9,7 @@ import hashlib
 import json
 
 from .contracts import ContractError, _check, _ids, _text, goal_contract, review_checks
-from .evolution import SQLiteEvolutionStore
+from .evolution import SQLiteEvolutionStore, _json
 from .goal_revision import REVISION_FIELDS, revision_basis, revision_patch
 from .profiles import OPEN_COLLABORATION_V1, artifact_reference, checked_profile
 
@@ -24,6 +24,7 @@ OPERATIONS = frozenset(
         "adoption.record",
     }
 )
+JOURNAL_SCOPE = "usmsb.collaboration-journal.v1"
 
 
 def canonical(value):
@@ -68,57 +69,65 @@ def fields(payload, required, optional=()):
     )
 
 
+def _installed_configuration(host_id, principals, profiles, max_commands):
+    """Shared constructor/migration validation; contains no storage effects."""
+    _text(host_id, 180)
+    _check(type(principals) is dict and 1 <= len(principals) <= 10000, "Install bounded principals")
+    installed = {}
+    for actor, grant in principals.items():
+        _check(_text(actor, 180) == actor, "Actor must be canonical")
+        fields(grant, ("controller", "operations"))
+        operations = _ids(grant["operations"], len(OPERATIONS))
+        _check(set(operations) <= OPERATIONS, "Unknown capability")
+        installed[actor] = {
+            "controller": _text(grant["controller"], 180),
+            "operations": sorted(operations),
+        }
+    _check(
+        isinstance(profiles, (tuple, list)) and 1 <= len(profiles) <= 32,
+        "Install bounded profiles",
+    )
+    by_id = {}
+    for profile in profiles:
+        profile = checked_profile(profile)
+        _check(profile.id not in by_id, "Duplicate profile id")
+        by_id[profile.id] = profile
+    _check(type(max_commands) is int and 1 <= max_commands <= 1000000, "Invalid command budget")
+    return {
+        "host_id": host_id,
+        "principals": installed,
+        "max_commands": max_commands,
+        "profiles": {key: value.record() for key, value in sorted(by_id.items())},
+    }, by_id
+
+
 class CollaborationJournal:
     """Transactional reference mechanism, for a single host and SQLite file.
 
     ``principals`` is {actor: {controller: identity, operations: [allowlist]}}.
     This is trusted host configuration, NOT an enrollment endpoint. Changes to
-    installed principals/profiles require explicit migration to a new ledger.
-    ``get``/``events`` are host-only reads; apply a visibility policy at transport.
+    installed principals/profiles require explicit host governance migration.
+    A migrated instance is fenced; reopen with the approved configuration.
+    All reads are host-only; apply a visibility policy at transport. In particular,
+    configuration() is not public discovery and receipt() needs a host-authenticated actor.
     """
 
     def __init__(
         self, path, *, host_id, principals, profiles=(OPEN_COLLABORATION_V1,), max_commands=100000
     ):
         _check(str(path) != ":memory:", "Use a durable SQLite file")
-        _text(host_id, 180)
-        _check(
-            type(principals) is dict and 1 <= len(principals) <= 10000, "Install bounded principals"
+        configuration, self._profiles = _installed_configuration(
+            host_id, principals, profiles, max_commands
         )
-        installed = {}
-        for actor, grant in principals.items():
-            _check(_text(actor, 180) == actor, "Actor must be canonical")
-            fields(grant, ("controller", "operations"))
-            operations = _ids(grant["operations"], len(OPERATIONS))
-            _check(set(operations) <= OPERATIONS, "Unknown capability")
-            installed[actor] = {
-                "controller": _text(grant["controller"], 180),
-                "operations": sorted(operations),
-            }
-        _check(
-            isinstance(profiles, (tuple, list)) and 1 <= len(profiles) <= 32,
-            "Install bounded profiles",
-        )
-        self._profiles = {}
-        for profile in profiles:
-            profile = checked_profile(profile)
-            _check(profile.id not in self._profiles, "Duplicate profile id")
-            self._profiles[profile.id] = profile
-        _check(type(max_commands) is int and 1 <= max_commands <= 1000000, "Invalid command budget")
-        self._principals = installed
+        # Use the store's exact encoding (including Unicode), not command canonical().
+        self._binding = _json(configuration)
+        self._principals = configuration["principals"]
         self._max_commands = max_commands
         self.host_id = host_id
         self._store = SQLiteEvolutionStore(path)
-        self._store.bind_scope(
-            "usmsb.collaboration-journal.v1",
-            {
-                "host_id": host_id,
-                "principals": installed,
-                "max_commands": max_commands,
-                "profiles": {key: value.record() for key, value in sorted(self._profiles.items())},
-            },
-        )
+        self._store.bind_scope(JOURNAL_SCOPE, configuration)
         with self._store.transaction() as db:
+            self._check_scope(db)
             db.execute(
                 "CREATE TABLE IF NOT EXISTS collaboration_records ("
                 "kind TEXT NOT NULL, id TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(kind,id))"
@@ -133,6 +142,21 @@ class CollaborationJournal:
                 "goal_id TEXT NOT NULL, revision INTEGER NOT NULL, commitment_id TEXT NOT NULL, "
                 "PRIMARY KEY(goal_id,revision,commitment_id))"
             )
+
+    def _check_scope(self, db):
+        row = db.execute(
+            "SELECT binding FROM evolution_scopes WHERE name=?", (JOURNAL_SCOPE,)
+        ).fetchone()
+        _check(
+            row is not None and row[0] == self._binding,
+            "Journal configuration fence: scope changed; reopen with approved configuration",
+        )
+
+    def configuration(self):
+        """Host-only detached effective configuration; reject a fenced instance."""
+        with self._store.transaction() as db:
+            self._check_scope(db)
+            return json.loads(self._binding)
 
     @staticmethod
     def _read(db, kind, record_id):
@@ -182,8 +206,7 @@ class CollaborationJournal:
                 )
             ]
 
-    def apply(self, actor, command_id, operation, payload):
-        """Actor is injected by trusted transport, not deserialized from payload."""
+    def _command_input(self, actor, command_id, operation, payload):
         _check(isinstance(actor, str) and actor in self._principals, "Unknown authenticated actor")
         _check(
             isinstance(operation, str) and operation in self._principals[actor]["operations"],
@@ -193,6 +216,40 @@ class CollaborationJournal:
         # Freeze caller-owned mutable data before hashing, validation or writes.
         payload = json.loads(canonical(payload))
         input_hash = digest({"actor": actor, "operation": operation, "payload": payload})
+        return command_id, payload, input_hash
+
+    @staticmethod
+    def _receipt(db, actor, command_id, input_hash):
+        prior = db.execute(
+            "SELECT input_hash,receipt FROM collaboration_commands WHERE id=?", (command_id,)
+        ).fetchone()
+        if prior is None:
+            return None
+        _check(prior[0] == input_hash, "Command id conflict")
+        receipt = json.loads(prior[1])
+        _check(
+            receipt.get("actor") == actor
+            and receipt.get("input_hash") == input_hash
+            and receipt.get("command_id") == command_id,
+            "Command id conflict",
+        )
+        return receipt
+
+    def receipt(self, actor, command_id, operation, payload):
+        """Host-only authorized exact replay lookup; missing commands return None.
+
+        Check this before revalidating expiring evidence for a *new* operation.
+        This never runs a handler, spends budget, or grants access to another actor.
+        Actor must be injected by trusted host authentication, as for apply().
+        """
+        command_id, _, input_hash = self._command_input(actor, command_id, operation, payload)
+        with self._store.transaction() as db:
+            self._check_scope(db)
+            return self._receipt(db, actor, command_id, input_hash)
+
+    def apply(self, actor, command_id, operation, payload):
+        """Actor is injected by trusted transport, not deserialized from payload."""
+        command_id, payload, input_hash = self._command_input(actor, command_id, operation, payload)
         handlers = {
             "goal.create": self._goal_create,
             "goal.revise": self._goal_revise,
@@ -203,12 +260,10 @@ class CollaborationJournal:
             "adoption.record": self._adopt,
         }
         with self._store.transaction() as db:
-            prior = db.execute(
-                "SELECT input_hash,receipt FROM collaboration_commands WHERE id=?", (command_id,)
-            ).fetchone()
-            if prior:
-                _check(prior[0] == input_hash, "Command id conflict")
-                return json.loads(prior[1])
+            self._check_scope(db)
+            prior = self._receipt(db, actor, command_id, input_hash)
+            if prior is not None:
+                return prior
             _check(
                 db.execute("SELECT COUNT(*) FROM collaboration_commands").fetchone()[0]
                 < self._max_commands,

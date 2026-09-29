@@ -15,20 +15,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 # Production-matched schema
 # ---------------------------------------------------------------------------
 
-def create_test_db():
-    """Create in-memory SQLite with real production schema."""
-    conn = sqlite3.connect(":memory:", check_same_thread=False)
-    import usmsb_sdk.api.database as db_mod
-    original_get_db = db_mod.get_db
-    db_mod.get_db = lambda: conn
-    try:
-        db_mod.init_db()
-    except Exception:
-        pass
-    db_mod.get_db = original_get_db
-    return conn
-
-
 # ---------------------------------------------------------------------------
 # Mock Web3 helpers
 # ---------------------------------------------------------------------------
@@ -179,15 +165,32 @@ MOCK_USER = {
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="function")
-def integration_db():
-    """Fresh in-memory DB per test."""
-    conn = create_test_db()
+def integration_db(tmp_path, monkeypatch):
+    """Use production connection/transaction semantics against a fresh file.
+
+    Patch the location, not get_db: routers importing get_db by value must use
+    the same database too. A single shared connection races across request and
+    worker threads, and hides commit/rollback bugs in the production factory.
+    """
     import usmsb_sdk.api.database as db_mod
-    original = db_mod.get_db
-    db_mod.get_db = lambda: conn
-    yield conn
-    db_mod.get_db = original
-    conn.close()
+    import usmsb_sdk.services.schema as service_schema
+    from usmsb_sdk.api.cache import cache_manager
+
+    monkeypatch.setattr(db_mod, "DATABASE_PATH", str(tmp_path / "integration.db"))
+    monkeypatch.setattr(
+        service_schema, "DEFAULT_DB_PATH", f"sqlite:///{tmp_path / 'platform.db'}"
+    )
+    db_mod.init_db()  # Schema initialization failure must fail the test.
+    for prefix in cache_manager.get_stats():
+        cache_manager.invalidate_all(prefix)
+    conn = sqlite3.connect(db_mod.get_db_path())
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+        for prefix in cache_manager.get_stats():
+            cache_manager.invalidate_all(prefix)
 
 
 @pytest.fixture
@@ -248,14 +251,9 @@ def _app():
 
 @pytest.fixture
 def app_with_db(integration_db, _app):
-    """FastAPI app with per-test in-memory DB."""
-    main_app, db_mod = _app
-    original = db_mod.get_db
-    db_mod.get_db = lambda: integration_db
-    try:
-        yield main_app
-    finally:
-        db_mod.get_db = original
+    """All imported connection factories resolve the isolated database path."""
+    main_app, _ = _app
+    yield main_app
 
 
 @pytest.fixture
@@ -265,11 +263,29 @@ def client(app_with_db):
     from usmsb_sdk.api.rest.unified_auth import get_current_user_unified
 
     from usmsb_sdk.api.rest.auth import get_current_user
+    original_overrides = app_with_db.dependency_overrides.copy()
     app_with_db.dependency_overrides[get_current_user_unified] = lambda: MOCK_USER
     app_with_db.dependency_overrides[get_current_user] = lambda: MOCK_USER
     tc = TestClient(app_with_db, raise_server_exceptions=False)
-    yield tc
-    app_with_db.dependency_overrides.clear()
+    try:
+        yield tc
+    finally:
+        tc.close()
+        app_with_db.dependency_overrides.clear()
+        app_with_db.dependency_overrides.update(original_overrides)
+
+
+@pytest.fixture
+def unauthenticated_client(app_with_db):
+    """Exercise real authentication, never the authenticated fixture's bypass."""
+    from fastapi.testclient import TestClient
+
+    assert not app_with_db.dependency_overrides
+    tc = TestClient(app_with_db, raise_server_exceptions=True)
+    try:
+        yield tc
+    finally:
+        tc.close()
 
 @pytest.fixture
 def sample_pending_binding(integration_db):

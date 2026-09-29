@@ -51,10 +51,16 @@ jobs:
           python -m ruff check --no-cache
           src/usmsb_sdk/autonomy/journal.py
           src/usmsb_sdk/autonomy/profiles.py
+          src/usmsb_sdk/autonomy/interop.py
+          src/usmsb_sdk/autonomy/migration.py
           scripts/build_core_distribution.py
+          scripts/check_collaboration_resilience.py
           tests/portable/test_open_core.py
           tests/portable/test_journal_adversarial.py
           tests/portable/test_core_distribution.py
+          tests/portable/test_host_interop.py
+          tests/portable/test_journal_migration.py
+          tests/portable/test_collaboration_resilience.py
           examples/open_collaboration/host.py
 
   core-distribution:
@@ -248,7 +254,7 @@ jobs:
           fail_ci_if_error: false
 
   integration-tests:
-    name: Integration Tests
+    name: Integration Tests (blocking)
     runs-on: ubuntu-latest
     needs: unit-tests
     steps:
@@ -265,27 +271,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,test,openharness]"
 
-      # Existing integration-fixture debt is advisory, but must remain visible
-      # as a failed step and JUnit evidence instead of being swallowed by echo.
-      - name: Run legacy integration tests (advisory)
-        id: legacy-integration
-        continue-on-error: true
+      # Offline/local integrations now block. Excluded external prerequisites
+      # remain explicit; a green gate is not real multi-party certification.
+      - name: Run local integration contracts (blocking)
+        id: integration-contracts
         run: |
           pytest tests/integration tests/agent_protocol/integration -v \
             --ignore=tests/agent_protocol/integration/test_end_to_end.py \
             --tb=short \
+            --timeout=60 \
             -m "not slow and not requires_llm and not requires_network" \
-            --junitxml=legacy-integration.xml
+            --junitxml=integration-contracts.xml
 
-      - name: Report legacy integration debt
+      - name: Report integration evidence
         if: always()
         run: |
-          echo "Legacy integration outcome: ${{ steps.legacy-integration.outcome }} (advisory, not production certification)" >> $GITHUB_STEP_SUMMARY
+          echo "Integration outcome: ${{ steps.integration-contracts.outcome }} (blocking; inspect JUnit for skipped external prerequisites)" >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: legacy-integration-evidence
-          path: legacy-integration.xml
+          name: integration-contract-evidence
+          path: integration-contracts.xml
           if-no-files-found: warn
 
   type-check:
@@ -372,7 +378,7 @@ jobs:
           echo "| LLM Telemetry Contract | ${{ needs['llm-telemetry-contract'].result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dist Inference Contract | ${{ needs['dist-inference-contract'].result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Legacy Integration (advisory; inspect JUnit) | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration (blocking; inspect JUnit) | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Type Check | ${{ needs.type-check.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
 
@@ -384,5 +390,7 @@ jobs:
           needs.lint.result != 'success' ||
           needs['llm-telemetry-contract'].result != 'success' ||
           needs['dist-inference-contract'].result != 'success' ||
-          needs.unit-tests.result != 'success'
+          needs.unit-tests.result != 'success' ||
+          needs['integration-tests'].result != 'success' ||
+          needs.build.result != 'success'
         run: exit 1

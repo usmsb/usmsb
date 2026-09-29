@@ -6,6 +6,7 @@ Note: SQLite has limited concurrency support, so some tests verify
 that concurrent operations are serialized safely rather than truly parallel.
 """
 import pytest
+import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -44,11 +45,14 @@ class TestConcurrentOrderCreation:
 
         results = []
         def read_count():
-            cursor = integration_db.execute(
-                "SELECT COUNT(*) FROM orders WHERE order_id LIKE 'concurrent_read_%'"
-            )
-            result = cursor.fetchone()
-            return result[0] if result else 0
+            from usmsb_sdk.api.database import get_db
+
+            with get_db() as conn:
+                result = conn.execute(
+                    "SELECT COUNT(*) FROM orders WHERE order_id LIKE 'concurrent_read_%'"
+                ).fetchone()
+                assert result is not None
+                return result[0]
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(read_count) for _ in range(10)]
@@ -155,15 +159,10 @@ class TestConcurrentTransactionSafety:
         integration_db.commit()
 
         # Try inserting same ID again
-        try:
+        with pytest.raises(sqlite3.IntegrityError):
             integration_db.execute(
                 """INSERT INTO orders (order_id, source, demand_agent_id, supply_agent_id, status, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (order_id, "test2", "demand2", "supply2", "created", now, now)
             )
             integration_db.commit()
-            duplicate_inserted = True
-        except Exception:
-            duplicate_inserted = False
-
-        assert not duplicate_inserted, "Duplicate order_id should be rejected"
