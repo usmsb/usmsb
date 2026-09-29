@@ -34,7 +34,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlsplit
+from urllib.request import url2pathname
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -310,6 +311,11 @@ class LLMArtifactSpool:
     passes an explicit absolute directory.  ``enqueue_redacted`` never waits for
     disk I/O.  ``flush``/``close`` are lifecycle operations and may wait; async
     variants move that wait off the caller's event loop.
+
+    On POSIX, directories and files are restricted to modes 0700 and 0600.
+    Windows chmod does not establish equivalent ACL restrictions: callers must
+    provision a spool root with an appropriate Windows ACL. This class does
+    not inspect or manage Windows ACLs.
     """
 
     def __init__(
@@ -1332,12 +1338,48 @@ class LLMArtifactSpool:
         *,
         expected_sha256: str | None,
     ) -> tuple[Path, str]:
-        parsed = urlparse(str(uri))
+        uri_text = str(uri)
+        # URL parsers silently discard some controls, and native path parsers
+        # normalize dot components and duplicate separators. Reject ambiguous
+        # spellings before either parser can hide them.
+        if re.search(r"[\x00-\x20\x7f\\]", uri_text):
+            raise LLMArtifactSpoolError("artifact URI contains unescaped whitespace or controls")
+        try:
+            parsed = urlsplit(uri_text)
+        except ValueError as error:
+            raise LLMArtifactSpoolError("invalid local file artifact URI") from error
         if parsed.scheme != "file" or parsed.netloc not in {"", "localhost"}:
             raise LLMArtifactSpoolError("only local file:// artifact URIs are supported")
-        if parsed.query or parsed.fragment:
+        if "?" in uri_text or "#" in uri_text:
             raise LLMArtifactSpoolError("artifact URI must not contain query or fragment data")
-        supplied_path = Path(unquote(parsed.path))
+        if not parsed.path.startswith("/"):
+            raise LLMArtifactSpoolError("artifact URI path must be absolute")
+        if "//" in parsed.path or parsed.path.endswith("/"):
+            raise LLMArtifactSpoolError("artifact URI path is not canonical")
+        if re.search(r"%(?![0-9a-fA-F]{2})|%2[fF]", parsed.path):
+            raise LLMArtifactSpoolError(
+                "artifact URI contains invalid escapes or encoded separators"
+            )
+        if os.name == "nt":
+            # Only drive-absolute local paths are supported. Never hand UNC,
+            # device namespace, drive-relative or legacy C| paths to Windows.
+            if not re.match(r"^/[a-zA-Z]:/", parsed.path):
+                raise LLMArtifactSpoolError(
+                    "artifact URI must contain an absolute local drive path"
+                )
+            if re.search(r"%5[cC]", parsed.path):
+                raise LLMArtifactSpoolError("artifact URI contains encoded separators")
+        try:
+            # Decode exactly once using the filesystem's encoding and platform
+            # rules: /C:/... becomes C:\\... on Windows, /... stays /... on POSIX.
+            native_path = url2pathname(parsed.path)
+        except (ValueError, OSError) as error:
+            raise LLMArtifactSpoolError("invalid artifact URI path") from error
+        if "\x00" in native_path:
+            raise LLMArtifactSpoolError("artifact URI path contains a NUL byte")
+        if any(part in {".", ".."} for part in native_path.split(os.sep)):
+            raise LLMArtifactSpoolError("artifact URI path must not contain traversal components")
+        supplied_path = Path(native_path)
         if not supplied_path.is_absolute():
             raise LLMArtifactSpoolError("artifact URI path must be absolute")
 
@@ -1386,7 +1428,7 @@ class LLMArtifactSpool:
             ) from error
 
     def _prepare_artifact_parent(self, parent: Path) -> None:
-        """Create every content-address directory with private permissions."""
+        """Create content-address directories, restricting POSIX permission bits."""
 
         try:
             relative_parts = parent.relative_to(self.root).parts
@@ -1410,15 +1452,18 @@ class LLMArtifactSpool:
         except ValueError as error:
             raise LLMArtifactSpoolError("artifact path escapes the spool root") from error
         current = self.root
-        for part in relative_parts:
+        # Include the root in case it was replaced after construction. Windows
+        # directory junctions redirect access just as symbolic links do.
+        for part in ("", *relative_parts):
             current = current / part
-            if current.is_symlink():
+            if current.is_symlink() or current.is_junction():
                 raise LLMArtifactSpoolError(
-                    "symbolic links are not allowed in the artifact spool layout"
+                    "symbolic links or junctions are not allowed in the artifact spool layout"
                 )
 
     @staticmethod
     def _secure_directory(path: Path) -> None:
+        """Set POSIX mode bits; Windows access control requires a caller-set ACL."""
         mode = stat.S_IMODE(path.stat().st_mode)
         if mode != 0o700:
             os.chmod(path, 0o700)

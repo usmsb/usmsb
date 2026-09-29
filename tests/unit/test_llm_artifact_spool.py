@@ -10,7 +10,6 @@ import statistics
 import threading
 import time
 from pathlib import Path
-from urllib.parse import unquote, urlparse
 
 import pytest
 
@@ -98,15 +97,18 @@ async def test_artifacts_survive_restart_and_are_redacted_and_hash_verified(
     assert len({event["event_id"] for event in resolved}) == 2
     assert await recorder.close_artifacts_async(timeout=5)
 
-    request_path = Path(unquote(urlparse(request_artifact["request_uri"]).path))
-    response_path = Path(unquote(urlparse(response_artifact["response_uri"]).path))
-    assert stat.S_IMODE(root.stat().st_mode) == 0o700
-    for directory in request_path.parents:
-        if directory == root.parent:
-            break
-        assert stat.S_IMODE(directory.stat().st_mode) == 0o700
-    assert stat.S_IMODE(request_path.stat().st_mode) == 0o600
-    assert stat.S_IMODE(response_path.stat().st_mode) == 0o600
+    request_path = Path.from_uri(request_artifact["request_uri"])
+    response_path = Path.from_uri(response_artifact["response_uri"])
+    # Windows st_mode/chmod do not represent ACL privacy. Keep the POSIX
+    # contract there, while exercising persistence/hash/read checks on all OSes.
+    if os.name == "posix":
+        assert stat.S_IMODE(root.stat().st_mode) == 0o700
+        for directory in request_path.parents:
+            if directory == root.parent:
+                break
+            assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+        assert stat.S_IMODE(request_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(response_path.stat().st_mode) == 0o600
     assert hashlib.sha256(request_path.read_bytes()).hexdigest() == request_artifact[
         "request_sha256"
     ]
@@ -295,7 +297,7 @@ def test_reader_rejects_uri_outside_root_and_hash_mismatch(tmp_path: Path) -> No
     with pytest.raises(LLMArtifactSpoolError, match="does not match"):
         spool.read(uri=reference.uri, expected_sha256="0" * 64)
 
-    canonical = Path(unquote(urlparse(reference.uri).path))
+    canonical = Path.from_uri(reference.uri)
     real_artifact = canonical.with_name(f"real-{canonical.name}")
     canonical.replace(real_artifact)
     canonical.symlink_to(real_artifact)
@@ -315,7 +317,7 @@ def test_deduplicated_reference_refreshes_retention_mtime(tmp_path: Path) -> Non
     reference = spool.enqueue_redacted({"content": "reused"})
     assert reference.uri is not None
     assert spool.flush(timeout=5)
-    path = Path(unquote(urlparse(reference.uri).path))
+    path = Path.from_uri(reference.uri)
     old_timestamp = time.time() - 86_400
     path.touch()
     path.chmod(0o600)
@@ -409,7 +411,7 @@ def test_pending_recovery_relation_prevents_cas_retention_deletion(
     reference = spool.enqueue_redacted(payload)
     assert spool.flush(timeout=5)
     assert reference.uri is not None
-    cas_path = Path(unquote(urlparse(reference.uri).path))
+    cas_path = Path.from_uri(reference.uri)
     old = time.time() - 1_000
     os.utime(cas_path, (old, old))
     provisional_id = "llm_artifact_" + "c" * 32
@@ -445,7 +447,7 @@ def test_startup_and_periodic_retention_cleanup_are_executed(tmp_path: Path) -> 
     expired = first.enqueue_redacted({"artifact": "startup-expired"})
     assert first.flush(timeout=5)
     assert expired.uri is not None
-    expired_path = Path(unquote(urlparse(expired.uri).path))
+    expired_path = Path.from_uri(expired.uri)
     old = time.time() - 10
     os.utime(expired_path, (old, old))
     assert first.close(timeout=5)
@@ -463,7 +465,7 @@ def test_startup_and_periodic_retention_cleanup_are_executed(tmp_path: Path) -> 
     periodic = restarted.enqueue_redacted({"artifact": "periodic-expired"})
     assert restarted.flush(timeout=5)
     assert periodic.uri is not None
-    periodic_path = Path(unquote(urlparse(periodic.uri).path))
+    periodic_path = Path.from_uri(periodic.uri)
     os.utime(periodic_path, (old, old))
     # Force the next resolved relation through the periodic branch without a
     # wall-clock sleep; production uses cleanup_interval_seconds.
