@@ -58,6 +58,7 @@ bandits costly reward observations missing outcomes
 
 - [Multi-armed Bandits with Missing Outcome, arXiv 2411.05661](https://arxiv.org/abs/2411.05661)：不同缺失机制下的学习问题。
 - [Efficient Multi-objective Prompt Optimization via Pure-exploration Bandits, arXiv 2605.14553](https://arxiv.org/abs/2605.14553)：提示优化与多目标识别的直接交叉。
+- [Few-for-Many Best-Arm Identification in Multi-Objective Bandits, arXiv 2610.16840v1, 2026-10-12](https://arxiv.org/abs/2610.16840v1)：以少量选项满足多个目标、共享观测降低试验代价。本轮仅核验摘要，不视为已完成算法比较。
 
 本轮未完成全部引文追踪、专利检索、开放世界干扰因果推断、机制设计及大规模非平稳学习综述。尤其不能从“本轮没找到完全相同的组合”推导出“从未有人做过”。2026 年新预印本的评审状态不一，摘要不能替代完整比较。
 

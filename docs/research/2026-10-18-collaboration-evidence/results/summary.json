@@ -1,0 +1,456 @@
+{
+  "cases": {
+    "adaptive_null": {
+      "coverage_failures": {
+        "vector_certificate": 0
+      },
+      "enrollments_per_repeat": 12288,
+      "methods": {
+        "baseline_only": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "completed_only": {
+          "baseline": 45,
+          "ever_nonpositive_switches": 399,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": 32,
+          "nonpositive_switch_rate_wilson95": [
+            0.8527764306768796,
+            0.9148515412140404
+          ],
+          "nonpositive_switches": 355,
+          "positive_switches": 0
+        },
+        "frozen_goal": {
+          "baseline": 135,
+          "ever_nonpositive_switches": 385,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": 32,
+          "nonpositive_switch_rate_wilson95": [
+            0.6148101420626579,
+            0.7070983622786957
+          ],
+          "nonpositive_switches": 265,
+          "positive_switches": 0
+        },
+        "vector_certificate": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        }
+      },
+      "repeats": 400
+    },
+    "revised_goal": {
+      "coverage_failures": {
+        "vector_certificate": 0
+      },
+      "enrollments_per_repeat": 12288,
+      "methods": {
+        "baseline_only": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "completed_only": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.4,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        },
+        "frozen_goal": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 400,
+          "harmful_switches": 400,
+          "mean_final_expected_gain": -0.4,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            0.9904877056657034,
+            0.9999999999999999
+          ],
+          "nonpositive_switches": 400,
+          "positive_switches": 0
+        },
+        "vector_certificate": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.4,
+          "median_first_switch_n_conditional_on_switch": 512.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        }
+      },
+      "repeats": 400
+    },
+    "selective_missing": {
+      "coverage_failures": {
+        "vector_certificate": 0
+      },
+      "enrollments_per_repeat": 8192,
+      "methods": {
+        "baseline_only": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "completed_only": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 400,
+          "harmful_switches": 400,
+          "mean_final_expected_gain": -0.25,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            0.9904877056657034,
+            0.9999999999999999
+          ],
+          "nonpositive_switches": 400,
+          "positive_switches": 0
+        },
+        "frozen_goal": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 400,
+          "harmful_switches": 400,
+          "mean_final_expected_gain": -0.25,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            0.9904877056657034,
+            0.9999999999999999
+          ],
+          "nonpositive_switches": 400,
+          "positive_switches": 0
+        },
+        "vector_certificate": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        }
+      },
+      "repeats": 400
+    },
+    "small_gain": {
+      "coverage_failures": {
+        "vector_certificate": 0
+      },
+      "enrollments_per_repeat": 8192,
+      "methods": {
+        "baseline_only": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "completed_only": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.04,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        },
+        "frozen_goal": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.04,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        },
+        "vector_certificate": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        }
+      },
+      "repeats": 400
+    },
+    "stable_gain": {
+      "coverage_failures": {
+        "vector_certificate": 0
+      },
+      "enrollments_per_repeat": 8192,
+      "methods": {
+        "baseline_only": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "completed_only": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.3125,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        },
+        "frozen_goal": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.3125,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        },
+        "vector_certificate": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.3125,
+          "median_first_switch_n_conditional_on_switch": 512.0,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 400
+        }
+      },
+      "repeats": 400
+    },
+    "stale_environment": {
+      "coverage_failures": {
+        "drift_envelope": 0,
+        "vector_certificate": 400
+      },
+      "enrollments_per_repeat": 8192,
+      "methods": {
+        "baseline_only": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "completed_only": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 400,
+          "harmful_switches": 400,
+          "mean_final_expected_gain": -0.25,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            0.9904877056657034,
+            0.9999999999999999
+          ],
+          "nonpositive_switches": 400,
+          "positive_switches": 0
+        },
+        "drift_envelope": {
+          "baseline": 400,
+          "ever_nonpositive_switches": 0,
+          "harmful_switches": 0,
+          "mean_final_expected_gain": 0.0,
+          "median_first_switch_n_conditional_on_switch": null,
+          "nonpositive_switch_rate_wilson95": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ],
+          "nonpositive_switches": 0,
+          "positive_switches": 0
+        },
+        "frozen_goal": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 400,
+          "harmful_switches": 400,
+          "mean_final_expected_gain": -0.25,
+          "median_first_switch_n_conditional_on_switch": 32.0,
+          "nonpositive_switch_rate_wilson95": [
+            0.9904877056657034,
+            0.9999999999999999
+          ],
+          "nonpositive_switches": 400,
+          "positive_switches": 0
+        },
+        "vector_certificate": {
+          "baseline": 0,
+          "ever_nonpositive_switches": 400,
+          "harmful_switches": 400,
+          "mean_final_expected_gain": -0.25,
+          "median_first_switch_n_conditional_on_switch": 512.0,
+          "nonpositive_switch_rate_wilson95": [
+            0.9904877056657034,
+            0.9999999999999999
+          ],
+          "nonpositive_switches": 400,
+          "positive_switches": 0
+        }
+      },
+      "repeats": 400
+    }
+  },
+  "checkpoints": [
+    32,
+    128,
+    512,
+    2048,
+    4096
+  ],
+  "delta_per_repeat": 0.05,
+  "evidence_level": "synthetic-only",
+  "examples": {
+    "audit_assumptions": "Deterministic example, always successful free observation; not an economic value experiment.",
+    "reveal_pending_results": [
+      {
+        "certificate": false,
+        "completion_interval_width": 0.7998046875,
+        "extra_observations": 0,
+        "gain_interval": [
+          -0.550652243680904,
+          0.401109174861808
+        ],
+        "pending_revealed_fraction": 0
+      },
+      {
+        "certificate": false,
+        "completion_interval_width": 0.599853515625,
+        "extra_observations": 819,
+        "gain_interval": [
+          -0.4013533154868081,
+          0.401109174861808
+        ],
+        "pending_revealed_fraction": 0.25
+      },
+      {
+        "certificate": false,
+        "completion_interval_width": 0.39990234375,
+        "extra_observations": 1638,
+        "gain_interval": [
+          -0.20140214361180803,
+          0.401109174861808
+        ],
+        "pending_revealed_fraction": 0.5
+      },
+      {
+        "certificate": true,
+        "completion_interval_width": 0.0,
+        "extra_observations": 3276,
+        "gain_interval": [
+          0.19850020013819192,
+          0.401109174861808
+        ],
+        "pending_revealed_fraction": 1
+      }
+    ],
+    "unmeasured_new_goal": {
+      "new_goal_gain_interval": [
+        -1.0,
+        1.0
+      ],
+      "same_observed_statistics_in_both_worlds": true,
+      "world_negative_gain": -0.4,
+      "world_positive_gain": 0.4
+    }
+  },
+  "protocol_commit": "2ccea6a",
+  "repeats": 400,
+  "seed": 20261018,
+  "source_sha256_lf_normalized": {
+    "evidence_bounds.py": "362469ac92154fd5cf91b189855f9814202b07c4c0ac10020236a4657d2b781e",
+    "run_experiments.py": "32f17d50550bf83d55d9e7ad7778e69b9cd706179b26122049175fde40ca154d"
+  },
+  "study_date": "2026-10-18",
+  "total_enrollments_random_scenarios": 22937600
+}
