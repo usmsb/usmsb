@@ -1,0 +1,8 @@
+# These recorded experiments compare exact bytes, including source SHA-256.
+# Preserve LF on Windows checkouts; do not silently rewrite their snapshots.
+docs/research/2026-10-18-minimal-revalidation/** text eol=lf
+docs/research/2026-10-18-minimal-revalidation/**/*.gz -text
+src/usmsb_sdk/autonomy/revalidation.py text eol=lf
+# The frozen first-run source has one space at end of line 329. Retain it for
+# audit reproducibility instead of regenerating the historical manifest.
+docs/research/2026-10-18-minimal-revalidation/experiment/run_experiments.py whitespace=-blank-at-eol

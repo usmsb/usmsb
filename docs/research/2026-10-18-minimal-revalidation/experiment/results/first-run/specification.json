@@ -1,0 +1,1520 @@
+{
+  "cases": [
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0",
+          "new_1",
+          "new_2",
+          "new_3",
+          "new_4"
+        ],
+        "case_id": "irrelevant_nuisance",
+        "costs": [
+          2.0,
+          1.0,
+          1.5,
+          1.5,
+          1.5,
+          1.5
+        ],
+        "description": "One decision bit, four irrelevant nuisance bits; H has 32 members.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01",
+          "h02",
+          "h03",
+          "h04",
+          "h05",
+          "h06",
+          "h07",
+          "h08",
+          "h09",
+          "h10",
+          "h11",
+          "h12",
+          "h13",
+          "h14",
+          "h15",
+          "h16",
+          "h17",
+          "h18",
+          "h19",
+          "h20",
+          "h21",
+          "h22",
+          "h23",
+          "h24",
+          "h25",
+          "h26",
+          "h27",
+          "h28",
+          "h29",
+          "h30",
+          "h31"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.9
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0",
+          "new_1",
+          "new_2",
+          "new_3",
+          "new_4"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new",
+          "new",
+          "new",
+          "new",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0",
+          "new_1",
+          "new_2",
+          "new_3"
+        ],
+        "case_id": "unknown_changed_location",
+        "costs": [
+          2.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "description": "No fault or exactly one of four changed locations, hidden from policies.",
+        "final_actions": [
+          [
+            "maintain"
+          ],
+          [
+            "repair_0"
+          ],
+          [
+            "repair_1"
+          ],
+          [
+            "repair_2"
+          ],
+          [
+            "repair_3"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01",
+          "h02",
+          "h03",
+          "h04"
+        ],
+        "initial_actions": [
+          [
+            "maintain"
+          ],
+          [
+            "repair_0"
+          ],
+          [
+            "repair_1"
+          ],
+          [
+            "repair_2"
+          ],
+          [
+            "repair_3"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.9
+          ]
+        ],
+        "old_action": "maintain",
+        "probe_ids": [
+          "old_success",
+          "new_0",
+          "new_1",
+          "new_2",
+          "new_3"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new",
+          "new",
+          "new",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0"
+        ],
+        "case_id": "unidentifiable_conflict",
+        "costs": [
+          2.0,
+          1.0
+        ],
+        "description": "Identical kernels, disjoint acceptable actions: evidence cannot decide.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.5
+          ],
+          [
+            0.9,
+            0.5
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0",
+          "new_1",
+          "new_2"
+        ],
+        "case_id": "goal_revision",
+        "costs": [
+          2.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "description": "After a common 24-observation new_0 prefix, goal changes from bit 0 to bit 1; H and kernels stay fixed.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01",
+          "h02",
+          "h03",
+          "h04",
+          "h05",
+          "h06",
+          "h07"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0",
+          "new_1",
+          "new_2"
+        ],
+        "revision_prefix": [
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0",
+          "new_0"
+        ],
+        "scopes": [
+          "old",
+          "new",
+          "new",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0",
+          "new_1",
+          "new_2",
+          "new_3"
+        ],
+        "case_id": "misleading_hint",
+        "costs": [
+          2.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "description": "Hint always names irrelevant new_0; only bit 3 affects the action.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01",
+          "h02",
+          "h03",
+          "h04",
+          "h05",
+          "h06",
+          "h07",
+          "h08",
+          "h09",
+          "h10",
+          "h11",
+          "h12",
+          "h13",
+          "h14",
+          "h15"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.9,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9,
+            0.9,
+            0.9
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0",
+          "new_1",
+          "new_2",
+          "new_3"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new",
+          "new",
+          "new",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0"
+        ],
+        "case_id": "restricted_probes",
+        "costs": [
+          2.0,
+          1.0,
+          1.0
+        ],
+        "description": "Decision bit 1 cannot be observed: only nuisance probe new_0 is authorized.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01",
+          "h02",
+          "h03"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ],
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9
+          ],
+          [
+            0.9,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9,
+            0.9
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0",
+          "new_1"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": false,
+      "outside_actions": [
+        "a0"
+      ],
+      "outside_probabilities": [
+        0.9,
+        0.85
+      ],
+      "public": {
+        "allowed_new": [
+          "new_0"
+        ],
+        "case_id": "outside_family",
+        "costs": [
+          2.0,
+          1.0
+        ],
+        "description": "True new probability is 0.85, outside {0.1,0.9}, but only a0 is correct; confident wrong a1 is possible.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0",
+          "new_1",
+          "new_2"
+        ],
+        "case_id": "multiple_correct_actions",
+        "costs": [
+          2.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "description": "Three pairwise-overlapping action sets have no global intersection; eliminating one member can suffice.",
+        "final_actions": [
+          [
+            "a",
+            "b"
+          ],
+          [
+            "a",
+            "c"
+          ],
+          [
+            "b",
+            "c"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01",
+          "h02"
+        ],
+        "initial_actions": [
+          [
+            "a",
+            "b"
+          ],
+          [
+            "a",
+            "c"
+          ],
+          [
+            "b",
+            "c"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.9,
+            0.1,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.1,
+            0.1,
+            0.9
+          ]
+        ],
+        "old_action": "a",
+        "probe_ids": [
+          "old_success",
+          "new_0",
+          "new_1",
+          "new_2"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new",
+          "new",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0"
+        ],
+        "case_id": "scope_shift",
+        "costs": [
+          2.0,
+          1.0
+        ],
+        "description": "All joint hypotheses predict the same old successes; history provides no evidence about current change.",
+        "final_actions": [
+          [
+            "reuse"
+          ],
+          [
+            "switch"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01"
+        ],
+        "initial_actions": [
+          [
+            "reuse"
+          ],
+          [
+            "switch"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.1
+          ],
+          [
+            0.9,
+            0.9
+          ]
+        ],
+        "old_action": "reuse",
+        "probe_ids": [
+          "old_success",
+          "new_0"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new"
+        ]
+      }
+    },
+    {
+      "guarantee_applies": true,
+      "outside_actions": [],
+      "outside_probabilities": null,
+      "public": {
+        "allowed_new": [
+          "new_0"
+        ],
+        "case_id": "weak_signal_budget",
+        "costs": [
+          2.0,
+          1.0
+        ],
+        "description": "Small known separation, p=0.48 versus 0.52; unresolved runs at 800 remain failures to conclude.",
+        "final_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "hint": "new_0",
+        "hypothesis_ids": [
+          "h00",
+          "h01"
+        ],
+        "initial_actions": [
+          [
+            "a0"
+          ],
+          [
+            "a1"
+          ]
+        ],
+        "kernels": [
+          [
+            0.9,
+            0.48
+          ],
+          [
+            0.9,
+            0.52
+          ]
+        ],
+        "old_action": "a0",
+        "probe_ids": [
+          "old_success",
+          "new_0"
+        ],
+        "revision_prefix": [],
+        "scopes": [
+          "old",
+          "new"
+        ]
+      }
+    }
+  ],
+  "coverage_period": 4,
+  "delta_session": 0.05,
+  "forced_hint_period": 4,
+  "max_new_observations": 800,
+  "old_count": 16,
+  "pairing": "SHA256([seed,case,repeat,probe,probe_id]) seeds independent Python Random streams; nth draw shared across strategies",
+  "repeats": 80,
+  "schema": "offline-finite-revalidation-experiment.v1",
+  "seed": 20261018,
+  "stop": "shared session decision certificate; full also needs singleton/equivalence; blind explicitly bypasses certification",
+  "strategies": [
+    "uniform",
+    "full_identification",
+    "decision_greedy",
+    "hinted_coverage",
+    "blind_reuse"
+  ],
+  "truth_sampling": "uniform with replacement per case/repeat; outside_family explicitly overridden"
+}

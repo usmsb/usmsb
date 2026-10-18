@@ -1,0 +1,37 @@
+{
+  "artifact_sha256": {
+    "paired.csv": "8310e8b59a72f12ee75c42bf01ab90c85505c5355e05732b284b2d393fa66306",
+    "report.md": "4d303d30a5a9ce043d11a96ba179aa57d697126008a70d07fcb18ca2163c7c58",
+    "specification.json": "c145c578134267e9092a439918704646f0d804da8ed6e43cc6736e75eec5952d",
+    "summary.csv": "10c8194cff2fd6f1f750847fb270f617f8ed86edcf70b970c6614738c8f1206d",
+    "summary.json": "8292b2da8d2ab076e913868a505ce5516560fffcf5a13671d62eee8a9d4e3dc9",
+    "trials/goal_revision.jsonl.gz": "24c59ce8bfab76dd1151a002b38603f069ce14f9a886905b6a9003c689c74316",
+    "trials/irrelevant_nuisance.jsonl.gz": "75ebf2aa268faaedf619676bb8f9576bb65cf1cd50389130b5eac7988808a6d1",
+    "trials/misleading_hint.jsonl.gz": "822ae9f8a952f5f7450c0061953cd90f89e46ab1ca06dfdb8b1356a90fe40bc2",
+    "trials/multiple_correct_actions.jsonl.gz": "ba66720894d3bf069d9b2d9f26f999975e206cf3484413e58d4657f6c386349f",
+    "trials/outside_family.jsonl.gz": "cdc52c137cf589f4705c612dd625db1267e07a7f8f6e66d5d1044d1a583a8856",
+    "trials/restricted_probes.jsonl.gz": "d1623e0008c2425c7cd61e387bf9ea5492cd04132cd1492a7a9452fbe676fb9e",
+    "trials/scope_shift.jsonl.gz": "dd87ae882151373737786f0f8a2c0b81331b0a4c5c7f300440c52562e4d390d4",
+    "trials/unidentifiable_conflict.jsonl.gz": "79dd5b251f80acb7362afdb65db08ee9d02f25654560edd3978e7e91635b5bf7",
+    "trials/unknown_changed_location.jsonl.gz": "1d4ab9a2a2eae4106d897818048e57590f070ce68123e21df25b0f0f59171003",
+    "trials/weak_signal_budget.jsonl.gz": "00152f915cf6539b85b2eb6b5b3ea135a1416f0b18f6fc7c1ef4f90cc40ea04a"
+  },
+  "check": "Re-execute --check with the recorded source/runtime; compare every byte including gzip and manifest.",
+  "runtime": {
+    "implementation": "CPython",
+    "python": "3.14.7",
+    "zlib": "1.3.1.zlib-ng",
+    "zlib_runtime": "1.3.1.zlib-ng"
+  },
+  "schema": "offline-finite-revalidation-experiment.v1",
+  "source_sha256": {
+    "docs/research/2026-10-18-minimal-revalidation/01-protocol.md": "000f2aac42bc5489f21790bfb8e93512c665960c1eec4fccccd276b384af2b08",
+    "docs/research/2026-10-18-minimal-revalidation/experiment/README.md": "ac837cdebd71648db55ff3ff36bc20fdd091c7f504bc3a8605e0fd4ae4f12a4d",
+    "docs/research/2026-10-18-minimal-revalidation/experiment/run_experiments.py": "3fe6ceac56d1d75e636c69d47a4a34e6a88344350f5661124914255493f15783",
+    "docs/research/2026-10-18-minimal-revalidation/experiment/scenarios.py": "93cbe2870abe90ece8fef1ed8234890dd617a7fb7f7f2586b25820cf07718359",
+    "docs/research/2026-10-18-minimal-revalidation/experiment/strategies.py": "1cfa9c011c0a7d106d66ba91c7f323d4db8adb3f7013d0048df1260d4ca0699c",
+    "docs/research/2026-10-18-minimal-revalidation/experiment/test_experiment.py": "fada668622d572abd1a4849afeffe32f659b10a07a190e6cde70f0bfce13d0ff",
+    "src/usmsb_sdk/autonomy/revalidation.py": "8b2f48df53f56076087a2b40f129a690747e093f3eab3cf413ca6de46323619e"
+  },
+  "trials": 4000
+}

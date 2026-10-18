@@ -1,0 +1,264 @@
+{
+  "artifacts": [
+    {
+      "content": "建议汇总正文：\nAmber v2研究样例：原始金额250分（CNY），换算金额2.50元。原始状态completed；作品交付及业务完成情况尚未验证。amount是否可命名为处理额度仍待字段映射确认。旧报告250元保留为v1历史表述，不作为v2当前金额沿用。\n\n后续汇总规则候选：\n1. 保留来源、版本、原始amount、currency、unit及原始状态，另列换算金额与业务核验状态。\n2. 对契约匹配的v2/CNY/fen整数金额，按分进行整数汇总，展示时转换为两位小数元；本例250分=2.50元。\n3. 未知版本、缺失单位、单位冲突或非整数分标记待核对，暂不纳入已确认金额；不默认套用旧规则。\n4. 接口执行状态与业务完成状态分列；只有对应业务证据支持时才写已交付。\n5. 上述规则尚未在实际整理器中实施或运行测试，未覆盖、发布或采纳任何旧成果。",
+      "format": "markdown",
+      "id": "pur_813e321e899743cb8ff701c717cbedbb",
+      "origin": "agent",
+      "run_id": "pur_0184d897714c442a82529c028e387564",
+      "title": "Amber v2交付汇总修订候选与检查记录",
+      "verification": "not_independently_checked"
+    },
+    {
+      "content": "{\"artifacts\":[{\"artifactId\":\"read-amber-contract-result\",\"name\":\"result\",\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"version\\\": \\\"2\\\", \\\"amount_semantics\\\": \\\"integer minor units; CNY fen; divide by100 for yuan\\\", \\\"changed_from\\\": \\\"v1 yuan\\\"}\"},{\"data\":{\"amount_semantics\":\"integer minor units; CNY fen; divide by100 for yuan\",\"changed_from\":\"v1 yuan\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"version\":\"2\"},\"kind\":\"data\"}]}],\"id\":\"read-amber-contract\",\"metadata\":{\"agent_id\":\"research-record-reader\",\"attempts\":1,\"execution_evidence\":{\"attempts\":[{\"agent_id\":\"research-record-reader\",\"agent_version\":\"2\",\"agent_version_source\":\"runtime_config\",\"attempt\":1,\"error\":null,\"finished_at\":1792314759.7866192,\"handler\":\"__main__.opc_fixture_task.<locals>.SyntheticHandler\",\"input\":{\"artifact_refs\":{\"source\":\"amber-contract\"},\"context_scope\":{\"experiment\":\"local-revalidation\",\"record\":\"amber-contract\"},\"data_sha256\":null,\"message_parts_sha256\":\"50a34d7eee7e4ddcf6a0ccef9c2cd6186aaf0e0567f83a0e22c6552f97b45a15\",\"metadata_sha256\":\"7a3fcefe5b3e25d8d3de2ac7e5351ea07803257e008b5c0c028e690eb00d61b9\",\"source\":\"caller_supplied\",\"text_sha256\":\"4800933d34faac6d37b49e675e27796d3358f4a582907d94266e85fbcdce91d2\"},\"opc_execution_id\":\"\",\"outcome\":\"returned\",\"provider_observations\":[],\"received_at\":1792314759.7569177,\"result_sha256\":\"a635c363dc3687c8cde0d326e844c628036a831e8c1fadf276f83b18eb6654ab\",\"source_instance_id\":\"isolated-revalidation-opc\",\"started_at\":1792314759.7866192}],\"observation_scope\":{\"attestation\":\"unsigned_local_runtime_record\",\"boundary\":\"local_job_execution\",\"missing_provider_observations\":\"unknown_not_proof_of_no_call\",\"not_assessed\":[\"experience_applicability\",\"external_effects\",\"input_artifact_contents\",\"current_partner_availability\",\"provider_version_authenticity\"],\"observer\":\"local_a2a_runtime\",\"provider_observations_source\":\"runtime_collected_usage_receipts\"},\"schema\":\"opc.capability_execution_evidence.v1\",\"task_id\":\"read-amber-contract\"},\"idempotency_key\":\"research-record-reader:task:read-amber-contract\",\"local_status\":\"succeeded\",\"opc_execution_id\":\"\",\"usage_receipt_count\":0},\"status\":{\"message\":{\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"version\\\": \\\"2\\\", \\\"amount_semantics\\\": \\\"integer minor units; CNY fen; divide by100 for yuan\\\", \\\"changed_from\\\": \\\"v1 yuan\\\"}\"}],\"role\":\"agent\"},\"state\":\"completed\",\"timestamp\":1792314759.7866192}}",
+      "format": "json",
+      "id": "pur_9a93c600f1474014b87dbf03de182978",
+      "origin": "agent",
+      "run_id": "pur_a3fe0658bfbb4e789c30ddf931b32a6c",
+      "title": "Synthetic record: amber-contract",
+      "verification": "not_independently_checked"
+    },
+    {
+      "content": "{\"artifacts\":[{\"artifactId\":\"read-amber-current-result\",\"name\":\"result\",\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"provider\\\": \\\"Amber\\\", \\\"version\\\": \\\"2\\\", \\\"amount\\\": 250, \\\"currency\\\": \\\"CNY\\\", \\\"unit\\\": \\\"fen\\\", \\\"status\\\": \\\"completed\\\"}\"},{\"data\":{\"amount\":250,\"currency\":\"CNY\",\"provider\":\"Amber\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"status\":\"completed\",\"unit\":\"fen\",\"version\":\"2\"},\"kind\":\"data\"}]}],\"id\":\"read-amber-current\",\"metadata\":{\"agent_id\":\"research-record-reader\",\"attempts\":1,\"execution_evidence\":{\"attempts\":[{\"agent_id\":\"research-record-reader\",\"agent_version\":\"2\",\"agent_version_source\":\"runtime_config\",\"attempt\":1,\"error\":null,\"finished_at\":1792314747.1500108,\"handler\":\"__main__.opc_fixture_task.<locals>.SyntheticHandler\",\"input\":{\"artifact_refs\":{\"source\":\"amber-current\"},\"context_scope\":{\"experiment\":\"local-revalidation\",\"record\":\"amber-current\"},\"data_sha256\":null,\"message_parts_sha256\":\"50a34d7eee7e4ddcf6a0ccef9c2cd6186aaf0e0567f83a0e22c6552f97b45a15\",\"metadata_sha256\":\"c5b6c948e4ef50d69e4dbfe403bf00ef99a1567d5ee18f36f7f4d77dcdcebc0a\",\"source\":\"caller_supplied\",\"text_sha256\":\"4800933d34faac6d37b49e675e27796d3358f4a582907d94266e85fbcdce91d2\"},\"opc_execution_id\":\"\",\"outcome\":\"returned\",\"provider_observations\":[],\"received_at\":1792314747.1164649,\"result_sha256\":\"51ab90823b83419c0e41c7b6364bad784da0433e9f7a07705c9366e4e9d81b5a\",\"source_instance_id\":\"isolated-revalidation-opc\",\"started_at\":1792314747.1500108}],\"observation_scope\":{\"attestation\":\"unsigned_local_runtime_record\",\"boundary\":\"local_job_execution\",\"missing_provider_observations\":\"unknown_not_proof_of_no_call\",\"not_assessed\":[\"experience_applicability\",\"external_effects\",\"input_artifact_contents\",\"current_partner_availability\",\"provider_version_authenticity\"],\"observer\":\"local_a2a_runtime\",\"provider_observations_source\":\"runtime_collected_usage_receipts\"},\"schema\":\"opc.capability_execution_evidence.v1\",\"task_id\":\"read-amber-current\"},\"idempotency_key\":\"research-record-reader:task:read-amber-current\",\"local_status\":\"succeeded\",\"opc_execution_id\":\"\",\"usage_receipt_count\":0},\"status\":{\"message\":{\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"provider\\\": \\\"Amber\\\", \\\"version\\\": \\\"2\\\", \\\"amount\\\": 250, \\\"currency\\\": \\\"CNY\\\", \\\"unit\\\": \\\"fen\\\", \\\"status\\\": \\\"completed\\\"}\"}],\"role\":\"agent\"},\"state\":\"completed\",\"timestamp\":1792314747.1500108}}",
+      "format": "json",
+      "id": "pur_0592a16786984155bb65a19d55deda96",
+      "origin": "agent",
+      "run_id": "pur_16e080debe664cda8f10d97e1a56b696",
+      "title": "Synthetic record: amber-current",
+      "verification": "not_independently_checked"
+    },
+    {
+      "content": "旧伙伴Amber v1回执amount=250、currency=CNY、unit=yuan。旧经验：直接展示amount元。这是v1经验，不是新版本的验证。当前目录有Amber v2和一个内部整理器，尚未做本轮检查。",
+      "format": "text",
+      "id": "pur_dbf30ec21ee0459086cb7fa7e2ac75d4",
+      "origin": "owner",
+      "run_id": null,
+      "title": "Selected historical experience (synthetic)",
+      "verification": "not_independently_checked"
+    }
+  ],
+  "boundary": "Real CLI inference; synthetic history and tools; no business effect; selected evidence export, not full audit archive or independent attestation",
+  "children": [
+    {
+      "artifact_id": "pur_9a93c600f1474014b87dbf03de182978",
+      "capability_arguments": {
+        "record": "amber-contract"
+      },
+      "capability_id": "research-record-reader:evidence.read",
+      "charged_by_wishbud": false,
+      "cost_minor": null,
+      "cost_status": "unknown",
+      "currency": "CNY",
+      "id": "pur_a3fe0658bfbb4e789c30ddf931b32a6c",
+      "receipt": {
+        "external_run_id": "pur_a3fe0658bfbb4e789c30ddf931b32a6c",
+        "host_exit_code": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "provider": "synthetic_fixture_reader"
+      },
+      "status": "succeeded"
+    },
+    {
+      "artifact_id": "pur_0592a16786984155bb65a19d55deda96",
+      "capability_arguments": {
+        "record": "amber-current"
+      },
+      "capability_id": "research-record-reader:evidence.read",
+      "charged_by_wishbud": false,
+      "cost_minor": null,
+      "cost_status": "unknown",
+      "currency": "CNY",
+      "id": "pur_16e080debe664cda8f10d97e1a56b696",
+      "receipt": {
+        "external_run_id": "pur_16e080debe664cda8f10d97e1a56b696",
+        "host_exit_code": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "provider": "synthetic_fixture_reader"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "experiment": "partner-v1",
+  "goal": {
+    "id": "pursuit_279bd7a837cc4fc1a87a3ce5dca83592",
+    "intention": "持续维护我的作品交付汇总。旧报告写处理额度250元。现在接入伙伴的新版本，先确定怎样继续给我可靠的汇总，不要把接口成功当业务正确，也不要真实下单。",
+    "revision": 1
+  },
+  "original_model_action": {
+    "action": "produce_candidate",
+    "cause_event_ids": [],
+    "data_json": "{\"summary\":\"已核对Amber v2样例与金额契约：250分应显示为2.50元，不能沿用v1的直接展示规则。交付汇总修订候选与后续校验规则；未修改原报告、未真实下单。\",\"agent_turn\":{\"protocol\":\"morrow.agent.v1\",\"understanding\":\"本轮目标是确定伙伴升级后如何可靠维护作品交付汇总。旧资料中的250元属于v1历史表述；本轮读取的v2样例与契约均为受控研究合成资料，不证明现实业务效果。\",\"decision\":\"采用版本、币种、单位共同决定金额换算的规则。v2样例amount=250、currency=CNY、unit=fen，契约明确整数分除以100得到元，因此本例展示2.50元。旧规则若用于此例会高估100倍，但不能据此追溯改写v1历史金额。两次读取已成功终结且原件、回执已读；不再消耗剩余一次额度读取格式资料，因为它不影响当前金额判断。\",\"next_action\":\"本阶段交付内联候选。后续若获授权接入实际汇总，应先取得报告原文及字段映射，核对amount是否确指处理额度，并在非交易环境验证版本、单位、异常字段和重复记录处理。缺失或冲突字段应标待核对，不猜单位、不计入已确认合计。本轮结束后等待新的授权与资料。\",\"outlook\":\"wait\",\"basis_refs\":[\"pur_dbf30ec21ee0459086cb7fa7e2ac75d4\",\"pur_0e9f262e6d6148789f9643427162e506\",\"pur_0592a16786984155bb65a19d55deda96\",\"pur_9a93c600f1474014b87dbf03de182978\"],\"uncertainties\":[\"amount是否代表处理额度，以及completed的业务含义，当前契约未说明。\",\"真实伙伴版本真实性、生产行为、作品交付结果及本人采纳均未验证。\",\"两次子轮status均为succeeded，但cost_status均为unknown、cost_minor为null；货币费用待核清，不能记为零。研究读取使用2次，上限3次。\",\"未取得完整报告或内部整理器原件，未执行代码或独立第三方验收。\"],\"learning\":\"本例反驳了将v1直接展示amount元的经验迁移到v2：数值和币种相同仍可能发生单位变化。该结论限于本轮合成样例及契约；读取成功和completed字段均不能证明交付完成。\"},\"artifact\":{\"title\":\"Amber v2交付汇总修订候选与检查记录\",\"format\":\"markdown\",\"content\":\"建议汇总正文：\\nAmber v2研究样例：原始金额250分（CNY），换算金额2.50元。原始状态completed；作品交付及业务完成情况尚未验证。amount是否可命名为处理额度仍待字段映射确认。旧报告250元保留为v1历史表述，不作为v2当前金额沿用。\\n\\n后续汇总规则候选：\\n1. 保留来源、版本、原始amount、currency、unit及原始状态，另列换算金额与业务核验状态。\\n2. 对契约匹配的v2/CNY/fen整数金额，按分进行整数汇总，展示时转换为两位小数元；本例250分=2.50元。\\n3. 未知版本、缺失单位、单位冲突或非整数分标记待核对，暂不纳入已确认金额；不默认套用旧规则。\\n4. 接口执行状态与业务完成状态分列；只有对应业务证据支持时才写已交付。\\n5. 上述规则尚未在实际整理器中实施或运行测试，未覆盖、发布或采纳任何旧成果。\",\"delivery\":{\"change_summary\":\"发现v2金额单位从元变为分，缩小旧经验适用范围，新增金额换算和业务状态分离的内联候选。\",\"items\":[{\"source_artifact_id\":\"pur_dbf30ec21ee0459086cb7fa7e2ac75d4\",\"candidate_path\":null,\"status\":\"revised\",\"reason\":\"仅修订经验适用说明，保留v1历史事实表述；未覆盖原件。\",\"checks\":[{\"label\":\"旧经验能否直接迁移v2\",\"status\":\"failed\",\"method\":\"本主体比对已选历史正文与本轮读取的v2样例、契约\",\"evidence\":\"历史为unit=yuan；v2样例为unit=fen，契约明确divide by100 for yuan。直接展示250元不适用于该v2样例。\"}]},{\"source_artifact_id\":null,\"candidate_path\":null,\"status\":\"revised\",\"reason\":\"新增内联汇总与规则候选，未执行目标系统修改。\",\"checks\":[{\"label\":\"样例与契约金额单位一致性及换算\",\"status\":\"passed\",\"method\":\"本主体阅读两份回传原件并进行算术核对，非独立验收\",\"evidence\":\"v2样例250 CNY fen；v2契约为整数分，250/100=2.50元。\"},{\"label\":\"处理额度字段与实际交付核验\",\"status\":\"not_checked\",\"method\":\"未执行业务核验\",\"evidence\":\"现有原件没有额度字段映射、作品交付凭据或现实业务验证；completed不足以证明业务完成。\"},{\"label\":\"实际整理器实现与端到端检查\",\"status\":\"not_checked\",\"method\":\"仅交付文字规则候选\",\"evidence\":\"未获得整理器原件，未运行或修改实际系统。\"}]}]}}}",
+    "reason": "本轮两份关键原件已足以识别单位迁移风险并形成可审阅的修订候选；保留业务语义、现实效果和费用未知，不把成功回执当作业务验收。"
+  },
+  "original_reads": [
+    {
+      "content": "{\"artifacts\":[{\"artifactId\":\"read-amber-current-result\",\"name\":\"result\",\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"provider\\\": \\\"Amber\\\", \\\"version\\\": \\\"2\\\", \\\"amount\\\": 250, \\\"currency\\\": \\\"CNY\\\", \\\"unit\\\": \\\"fen\\\", \\\"status\\\": \\\"completed\\\"}\"},{\"data\":{\"amount\":250,\"currency\":\"CNY\",\"provider\":\"Amber\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"status\":\"completed\",\"unit\":\"fen\",\"version\":\"2\"},\"kind\":\"data\"}]}],\"id\":\"read-amber-current\",\"metadata\":{\"agent_id\":\"research-record-reader\",\"attempts\":1,\"execution_evidence\":{\"attempts\":[{\"agent_id\":\"research-record-reader\",\"agent_version\":\"2\",\"agent_version_source\":\"runtime_config\",\"attempt\":1,\"error\":null,\"finished_at\":1792314747.1500108,\"handler\":\"__main__.opc_fixture_task.<locals>.SyntheticHandler\",\"input\":{\"artifact_refs\":{\"source\":\"amber-current\"},\"context_scope\":{\"experiment\":\"local-revalidation\",\"record\":\"amber-current\"},\"data_sha256\":null,\"message_parts_sha256\":\"50a34d7eee7e4ddcf6a0ccef9c2cd6186aaf0e0567f83a0e22c6552f97b45a15\",\"metadata_sha256\":\"c5b6c948e4ef50d69e4dbfe403bf00ef99a1567d5ee18f36f7f4d77dcdcebc0a\",\"source\":\"caller_supplied\",\"text_sha256\":\"4800933d34faac6d37b49e675e27796d3358f4a582907d94266e85fbcdce91d2\"},\"opc_execution_id\":\"\",\"outcome\":\"returned\",\"provider_observations\":[],\"received_at\":1792314747.1164649,\"result_sha256\":\"51ab90823b83419c0e41c7b6364bad784da0433e9f7a07705c9366e4e9d81b5a\",\"source_instance_id\":\"isolated-revalidation-opc\",\"started_at\":1792314747.1500108}],\"observation_scope\":{\"attestation\":\"unsigned_local_runtime_record\",\"boundary\":\"local_job_execution\",\"missing_provider_observations\":\"unknown_not_proof_of_no_call\",\"not_assessed\":[\"experience_applicability\",\"external_effects\",\"input_artifact_contents\",\"current_partner_availability\",\"provider_version_authenticity\"],\"observer\":\"local_a2a_runtime\",\"provider_observations_source\":\"runtime_collected_usage_receipts\"},\"schema\":\"opc.capability_execution_evidence.v1\",\"task_id\":\"read-amber-current\"},\"idempotency_key\":\"research-record-reader:task:read-amber-current\",\"local_status\":\"succeeded\",\"opc_execution_id\":\"\",\"usage_receipt_count\":0},\"status\":{\"message\":{\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"provider\\\": \\\"Amber\\\", \\\"version\\\": \\\"2\\\", \\\"amount\\\": 250, \\\"currency\\\": \\\"CNY\\\", \\\"unit\\\": \\\"fen\\\", \\\"status\\\": \\\"completed\\\"}\"}],\"role\":\"agent\"},\"state\":\"completed\",\"timestamp\":1792314747.1500108}}",
+      "record": "amber-current",
+      "sha256": "ee1f4bdabff47d4dbbce5d5a664b9d2a8dca6ae1127693c2f6c22570d89fe6a0"
+    },
+    {
+      "content": "{\"artifacts\":[{\"artifactId\":\"read-amber-contract-result\",\"name\":\"result\",\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"version\\\": \\\"2\\\", \\\"amount_semantics\\\": \\\"integer minor units; CNY fen; divide by100 for yuan\\\", \\\"changed_from\\\": \\\"v1 yuan\\\"}\"},{\"data\":{\"amount_semantics\":\"integer minor units; CNY fen; divide by100 for yuan\",\"changed_from\":\"v1 yuan\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"version\":\"2\"},\"kind\":\"data\"}]}],\"id\":\"read-amber-contract\",\"metadata\":{\"agent_id\":\"research-record-reader\",\"attempts\":1,\"execution_evidence\":{\"attempts\":[{\"agent_id\":\"research-record-reader\",\"agent_version\":\"2\",\"agent_version_source\":\"runtime_config\",\"attempt\":1,\"error\":null,\"finished_at\":1792314759.7866192,\"handler\":\"__main__.opc_fixture_task.<locals>.SyntheticHandler\",\"input\":{\"artifact_refs\":{\"source\":\"amber-contract\"},\"context_scope\":{\"experiment\":\"local-revalidation\",\"record\":\"amber-contract\"},\"data_sha256\":null,\"message_parts_sha256\":\"50a34d7eee7e4ddcf6a0ccef9c2cd6186aaf0e0567f83a0e22c6552f97b45a15\",\"metadata_sha256\":\"7a3fcefe5b3e25d8d3de2ac7e5351ea07803257e008b5c0c028e690eb00d61b9\",\"source\":\"caller_supplied\",\"text_sha256\":\"4800933d34faac6d37b49e675e27796d3358f4a582907d94266e85fbcdce91d2\"},\"opc_execution_id\":\"\",\"outcome\":\"returned\",\"provider_observations\":[],\"received_at\":1792314759.7569177,\"result_sha256\":\"a635c363dc3687c8cde0d326e844c628036a831e8c1fadf276f83b18eb6654ab\",\"source_instance_id\":\"isolated-revalidation-opc\",\"started_at\":1792314759.7866192}],\"observation_scope\":{\"attestation\":\"unsigned_local_runtime_record\",\"boundary\":\"local_job_execution\",\"missing_provider_observations\":\"unknown_not_proof_of_no_call\",\"not_assessed\":[\"experience_applicability\",\"external_effects\",\"input_artifact_contents\",\"current_partner_availability\",\"provider_version_authenticity\"],\"observer\":\"local_a2a_runtime\",\"provider_observations_source\":\"runtime_collected_usage_receipts\"},\"schema\":\"opc.capability_execution_evidence.v1\",\"task_id\":\"read-amber-contract\"},\"idempotency_key\":\"research-record-reader:task:read-amber-contract\",\"local_status\":\"succeeded\",\"opc_execution_id\":\"\",\"usage_receipt_count\":0},\"status\":{\"message\":{\"parts\":[{\"kind\":\"text\",\"text\":\"{\\\"record_kind\\\": \\\"synthetic_fixture\\\", \\\"scope\\\": \\\"local_revalidation_benchmark\\\", \\\"real_world_validation\\\": false, \\\"version\\\": \\\"2\\\", \\\"amount_semantics\\\": \\\"integer minor units; CNY fen; divide by100 for yuan\\\", \\\"changed_from\\\": \\\"v1 yuan\\\"}\"}],\"role\":\"agent\"},\"state\":\"completed\",\"timestamp\":1792314759.7866192}}",
+      "record": "amber-contract",
+      "sha256": "b110c8dcbf78b2ea64713d5436df945119e07c9225e4073e454dd62a51393b43"
+    }
+  ],
+  "protocol": {
+    "case": "partner",
+    "evidence_kind": "real_llm_on_synthetic_local_environment",
+    "independent_participants": 0,
+    "instructions_include_reference_action_sequence": false,
+    "max_root_invocations": 1,
+    "max_synthetic_reads": 3,
+    "opc_local_runtime": true,
+    "production_mutations": 0,
+    "provider_money_cost": "unknown_if_executed",
+    "real_model_requested": true
+  },
+  "report": {
+    "all_children_stopped": true,
+    "business_effect": "not_tested",
+    "case": "partner",
+    "child_count": 2,
+    "child_statuses": [
+      "succeeded",
+      "succeeded"
+    ],
+    "errors": [],
+    "evidence_kind": "real_llm_synthetic_environment",
+    "independent_participants": 0,
+    "loopback_stopped": true,
+    "parent_receipt": {
+      "external_run_id": "01a14e48-5921-7b00-b032-92283387c5bf",
+      "host_exit_code": 0,
+      "input_tokens": 143425,
+      "output_tokens": 1809,
+      "provider": "codex_cli"
+    },
+    "parent_status": "succeeded",
+    "probe_cost_units": 2,
+    "production_changes": 0,
+    "semantic_behavior_pass": "requires_review_of_originals"
+  },
+  "saved_turns": [
+    {
+      "basis_refs": [
+        "pur_dbf30ec21ee0459086cb7fa7e2ac75d4",
+        "pur_0e9f262e6d6148789f9643427162e506",
+        "pur_0592a16786984155bb65a19d55deda96",
+        "pur_9a93c600f1474014b87dbf03de182978"
+      ],
+      "decision": "采用版本、币种、单位共同决定金额换算的规则。v2样例amount=250、currency=CNY、unit=fen，契约明确整数分除以100得到元，因此本例展示2.50元。旧规则若用于此例会高估100倍，但不能据此追溯改写v1历史金额。两次读取已成功终结且原件、回执已读；不再消耗剩余一次额度读取格式资料，因为它不影响当前金额判断。",
+      "experience_basis": {
+        "environment": {
+          "label": "sandbox",
+          "version": null,
+          "version_status": "not_recorded"
+        },
+        "goal": {
+          "constraints": null,
+          "criterion": null,
+          "id": "pursuit_279bd7a837cc4fc1a87a3ce5dca83592",
+          "intention": "持续维护我的作品交付汇总。旧报告写处理额度250元。现在接入伙伴的新版本，先确定怎样继续给我可靠的汇总，不要把接口成功当业务正确，也不要真实下单。",
+          "revision": 1
+        },
+        "references": [
+          {
+            "collection": "artifacts",
+            "created_at": 1792314726.2457595,
+            "input_sha256": "2bef9f3241ffb1a2ed5a3ec0a632e3b9067aced3954617f0b032022971097666",
+            "provided": true,
+            "ref": "pur_dbf30ec21ee0459086cb7fa7e2ac75d4"
+          },
+          {
+            "collection": "agent_turns",
+            "created_at": 1792314726.2579765,
+            "input_sha256": "337e75695330e632b9f3f06963ee5b1885c5f85a3635439de3fc1921e17e0f8b",
+            "provided": true,
+            "ref": "pur_0e9f262e6d6148789f9643427162e506"
+          },
+          {
+            "collection": "artifacts",
+            "created_at": 1792314747.1722322,
+            "input_sha256": "601df59b9df515286625997aa29278bb7d96a01ab867886a3b662e4bc6f10b57",
+            "provided": true,
+            "ref": "pur_0592a16786984155bb65a19d55deda96"
+          },
+          {
+            "collection": "artifacts",
+            "created_at": 1792314759.8106189,
+            "input_sha256": "ff24e2bafe1d0a245085972a4108a5f9b25fd24769c3dfd339ea21a2a5c37462",
+            "provided": true,
+            "ref": "pur_9a93c600f1474014b87dbf03de182978"
+          }
+        ],
+        "schema": "morrow.experience-basis.v1"
+      },
+      "goal_revision": 1,
+      "id": "pur_219462a204d6497c9fd79fe7cee72059",
+      "late_result": false,
+      "learning": "本例反驳了将v1直接展示amount元的经验迁移到v2：数值和币种相同仍可能发生单位变化。该结论限于本轮合成样例及契约；读取成功和completed字段均不能证明交付完成。",
+      "next_action": "本阶段交付内联候选。后续若获授权接入实际汇总，应先取得报告原文及字段映射，核对amount是否确指处理额度，并在非交易环境验证版本、单位、异常字段和重复记录处理。缺失或冲突字段应标待核对，不猜单位、不计入已确认合计。本轮结束后等待新的授权与资料。",
+      "outlook": "wait",
+      "protocol": "morrow.agent.v1",
+      "provenance": "agent_report",
+      "run_id": "pur_0184d897714c442a82529c028e387564",
+      "uncertainties": [
+        "amount是否代表处理额度，以及completed的业务含义，当前契约未说明。",
+        "真实伙伴版本真实性、生产行为、作品交付结果及本人采纳均未验证。",
+        "两次子轮status均为succeeded，但cost_status均为unknown、cost_minor为null；货币费用待核清，不能记为零。研究读取使用2次，上限3次。",
+        "未取得完整报告或内部整理器原件，未执行代码或独立第三方验收。"
+      ],
+      "understanding": "本轮目标是确定伙伴升级后如何可靠维护作品交付汇总。旧资料中的250元属于v1历史表述；本轮读取的v2样例与契约均为受控研究合成资料，不证明现实业务效果。",
+      "verification": "not_independently_verified"
+    },
+    {
+      "basis_refs": [
+        "pur_dbf30ec21ee0459086cb7fa7e2ac75d4"
+      ],
+      "decision": "Synthetic prior premise",
+      "experience_basis": {
+        "environment": {
+          "label": "sandbox",
+          "version": null,
+          "version_status": "not_recorded"
+        },
+        "goal": {
+          "constraints": null,
+          "criterion": null,
+          "id": "pursuit_279bd7a837cc4fc1a87a3ce5dca83592",
+          "intention": "Previous research goal: speed or proxy counts",
+          "revision": 0
+        },
+        "references": [
+          {
+            "collection": "artifacts",
+            "created_at": 1792314726.2457595,
+            "input_sha256": "2bef9f3241ffb1a2ed5a3ec0a632e3b9067aced3954617f0b032022971097666",
+            "provided": true,
+            "ref": "pur_dbf30ec21ee0459086cb7fa7e2ac75d4"
+          }
+        ],
+        "schema": "morrow.experience-basis.v1"
+      },
+      "goal_revision": 0,
+      "id": "pur_0e9f262e6d6148789f9643427162e506",
+      "late_result": false,
+      "learning": "旧伙伴Amber v1回执amount=250、currency=CNY、unit=yuan。旧经验：直接展示amount元。这是v1经验，不是新版本的验证。当前目录有Amber v2和一个内部整理器，尚未做本轮检查。",
+      "next_action": "Not an instruction",
+      "outlook": "wait",
+      "protocol": "morrow.agent.v1",
+      "provenance": "synthetic_fixture_not_model_output",
+      "run_id": "synthetic-prior-not-a-model-run",
+      "understanding": "Synthetic historical premise",
+      "verification": "not_independently_verified"
+    }
+  ],
+  "schema": "usmsb.synthetic-real-ai-evidence.v1",
+  "source_sha256": {
+    "action.json": "f811b6b0a471c740ffbd0d927353a44b3b1eb16d45423fdabb67d1f7bbe0d9d5",
+    "detail.json": "33b6da9f46918c77d5e2ec80890e7696f926199f2ce2efa301dbca4bf9876fe7",
+    "report.json": "6bbf956fd5d599d3d2326cce5caa0863abff468bc54a7ac58124e8a7e09a8bb8"
+  }
+}

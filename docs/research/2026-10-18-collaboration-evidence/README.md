@@ -14,6 +14,8 @@
 
 ## 阅读顺序
 
+后续已开展：[目标演化下的协作经验迁移与最小再验证](../2026-10-18-minimal-revalidation/README.md)，包含数学边界、4,000次模拟、可选SDK工具、Wishbud/Morrow与OPC本地接入，以及真实AI工具使用记录。以下保留本阶段历史结果，不回写为后续验证。
+
 1. [近期讨论与科学、技术、商业定位](01-discussion-and-positioning.md)：保留愿景，纠正概念与证明的混淆。
 2. [查新与原创性审计](02-related-work.md)：最接近的已有研究，哪些不能算原创。
 3. [数学定义、命题、证明和反例](03-mathematical-results.md)：可复核的有限结论。
