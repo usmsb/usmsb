@@ -26,6 +26,7 @@ from usmsb_sdk.core.interfaces import (
     IFeedbackService,
     IPerceptionService,
 )
+from usmsb_sdk.core.universal_actions import ActionResult as ServiceActionResult
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,24 @@ class ActionResult:
     timestamp: float = field(default_factory=lambda: datetime.now().timestamp())
     error: str | None = None
     metrics: dict[str, Any] = field(default_factory=dict)
+    # Additive: retain success/outcome and positional compatibility for old callers.
+    status: str | None = None
+
+
+def _execution_status(outcome: Any) -> str:
+    """Read an executor's explicit status, never infer success from a return alone."""
+    if isinstance(outcome, ServiceActionResult):
+        status = outcome.status
+    elif isinstance(outcome, dict):
+        status = outcome.get("status")
+        # Older execution adapters may report only a boolean success field.
+        if status is None and type(outcome.get("success")) is bool:
+            return "success" if outcome["success"] else "failure"
+    else:
+        return "unknown"
+    return status if isinstance(status, str) and status in {
+        "success", "partial", "failure", "pending"
+    } else "unknown"
 
 
 @dataclass
@@ -165,6 +184,12 @@ class GoalActionOutcomeLoop:
                 self.iteration_history.append(iteration_result)
                 self.current_iteration += 1
 
+                # A pending plan is not an asynchronous job. Do not repeatedly
+                # regenerate it or claim completion while awaiting a caller's next decision.
+                if iteration_result.execution_result.status == "pending":
+                    self.status = LoopStatus.PAUSED
+                    break
+
                 # Check if all goals are achieved
                 active_goals = agent.get_active_goals()
                 if not active_goals:
@@ -243,11 +268,15 @@ class GoalActionOutcomeLoop:
                 ),
                 timeout=self.execution_timeout
             )
+            outcome_status = _execution_status(outcome)
             action_result = ActionResult(
                 action_id=selected_action.get("id", "unknown"),
                 action_type=selected_action.get("type", "unknown"),
-                success=True,
+                success=outcome_status == "success",
                 outcome=outcome,
+                error=(outcome.error if isinstance(outcome, ServiceActionResult)
+                       else outcome.get("error") if isinstance(outcome, dict) else None),
+                status=outcome_status,
             )
         except TimeoutError:
             logger.error(f"Execution service timed out after {self.execution_timeout}s")
@@ -257,6 +286,7 @@ class GoalActionOutcomeLoop:
                 success=False,
                 outcome=None,
                 error=f"Execution timed out after {self.execution_timeout}s",
+                status="failure",
             )
         except Exception as e:
             action_result = ActionResult(
@@ -265,6 +295,7 @@ class GoalActionOutcomeLoop:
                 success=False,
                 outcome=None,
                 error=str(e),
+                status="failure",
             )
 
         if self.on_action_executed:
@@ -281,6 +312,18 @@ class GoalActionOutcomeLoop:
         except TimeoutError:
             logger.error(f"Evaluation service timed out after {self.evaluation_timeout}s")
             evaluation = {"goal_achieved": False, "error": "Evaluation timed out"}
+
+        if not action_result.success and evaluation.get("goal_achieved", False):
+            # Guard this evaluate_action_outcome claim, not all sources of goal
+            # achievement: the environment or other agents may achieve a goal.
+            # This interface has no separate attribution for that evidence; a
+            # bare evaluator claim cannot promote an unsuccessful action result.
+            evaluation = {
+                **evaluation,
+                "reported_goal_achieved": evaluation["goal_achieved"],
+                "goal_achieved": False,
+                "completion_blocked_reason": "execution_not_successful",
+            }
 
         if self.on_evaluation_complete:
             self.on_evaluation_complete(evaluation)
@@ -342,7 +385,21 @@ class GoalActionOutcomeLoop:
         successful_actions = sum(
             1 for i in self.iteration_history if i.execution_result.success
         )
-        failed_actions = len(self.iteration_history) - successful_actions
+        failed_actions = sum(
+            1 for i in self.iteration_history
+            if i.execution_result.status == "failure"
+            or (i.execution_result.status is None and not i.execution_result.success)
+        )
+        pending_actions = sum(
+            1 for i in self.iteration_history if i.execution_result.status == "pending"
+        )
+        partial_actions = sum(
+            1 for i in self.iteration_history if i.execution_result.status == "partial"
+        )
+        unknown_actions = (
+            len(self.iteration_history) - successful_actions - failed_actions
+            - pending_actions - partial_actions
+        )
 
         return {
             "status": self.status.value,
@@ -358,6 +415,9 @@ class GoalActionOutcomeLoop:
                 "total": len(self.iteration_history),
                 "successful": successful_actions,
                 "failed": failed_actions,
+                "pending": pending_actions,
+                "partial": partial_actions,
+                "unknown": unknown_actions,
                 "success_rate": successful_actions / max(len(self.iteration_history), 1),
             },
             "completed_goals": [{"id": g.id, "name": g.name} for g in completed_goals],

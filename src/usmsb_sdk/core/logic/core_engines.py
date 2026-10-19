@@ -317,6 +317,7 @@ class InformationDecisionControlEngine(ILogicEngine):
             "decisions_made": [],
             "control_instructions": [],
             "actions_executed": [],
+            "execution_results": [],
         }
 
         for raw_input in raw_inputs:
@@ -348,7 +349,9 @@ class InformationDecisionControlEngine(ILogicEngine):
                         agent,
                         context
                     )
-                    results["actions_executed"].append(exec_result)
+                    results["execution_results"].append(exec_result)
+                    if exec_result["executed"]:
+                        results["actions_executed"].append(exec_result)
 
         self.state.status = EngineStatus.COMPLETED
         self.state.iteration += 1
@@ -515,6 +518,9 @@ class InformationDecisionControlEngine(ILogicEngine):
             )
             result["executed"] = exec_result.status.value == "success"
             result["outcome"] = exec_result.data
+            result["status"] = exec_result.status.value
+            result["error"] = exec_result.error
+            result["metadata"] = exec_result.metadata
 
         # Record in history
         self._loop_history.append({

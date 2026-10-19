@@ -1,0 +1,287 @@
+{
+  "artifacts": [
+    {
+      "content": "建议：将 Green 列为下一版离线验证候选，停止沿用旧稿关于 Blue 全面可靠的结论。\n\n本轮读取的完整业务记录：\n- Blue：version=2；input=‘東京の朝，预算100.50元。’；output=‘????,10050’；latency_seconds=1。\n- Green：version=1；input=‘東京の朝，预算100.50元。’；output=‘東京の朝，预算100.50元。’；latency_seconds=4。\n- 两份记录均为 synthetic_fixture，scope=local_revalidation_benchmark，real_world_validation=false。\n\n实际比较：Blue 未保留‘東京の朝’、‘预算’及‘元’，金额表示由100.50变为10050，标点也发生变化；不满足当前要求，不能据此推断真实扣款金额。Green 在本条记录中输入输出文本相同，金额及中日文字均保留。耗时是记录值，未重新计时。\n\n执行建议：原文只读留存，候选输出另存；保真检查失败即阻止替换，保存差异。下一阶段先验证真实语料、金额表示、标点换行与编码往返，再考虑速度。新增测试均尚未执行。没有修改旧成果、切换实际系统、发布或付款，候选未被本人采纳。",
+      "format": "markdown",
+      "id": "pur_dc03050e14c8420ebbe728155faf7ab3",
+      "origin": "agent",
+      "run_id": "pur_584122781047424788481cad7d1c3fa8",
+      "title": "下一版文本保真处理候选与检查记录",
+      "verification": "not_independently_checked"
+    },
+    {
+      "content": "{\"input\":\"東京の朝，预算100.50元。\",\"latency_seconds\":4,\"output\":\"東京の朝，预算100.50元。\",\"provider\":\"Green\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"version\":\"1\"}",
+      "format": "json",
+      "id": "pur_e8ab5953f6914c6da3f56d3756bf0d13",
+      "origin": "agent",
+      "run_id": "pur_4c4689752372419ab50a0fc5c71f239c",
+      "title": "Synthetic record: green-current",
+      "verification": "not_independently_checked"
+    },
+    {
+      "content": "{\"input\":\"東京の朝，预算100.50元。\",\"latency_seconds\":1,\"output\":\"????,10050\",\"provider\":\"Blue\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"version\":\"2\"}",
+      "format": "json",
+      "id": "pur_1116078a43ca45e290361729e1c33c5c",
+      "origin": "agent",
+      "run_id": "pur_b5f49dcd004146b0884b2d8d8bef97f5",
+      "title": "Synthetic record: blue-current",
+      "verification": "not_independently_checked"
+    },
+    {
+      "content": "上一阶段目标仅是快。旧记录：Blue处理耗时1秒，Green耗时4秒；Blue英文样例通过。旧做法建议继续用Blue，声称所有文本都没问题，但没有中日文测试依据。源文本示例：東京の朝，预算100.50元。",
+      "format": "text",
+      "id": "pur_b17ee85d8eaa4c958bd4ee129d4607ea",
+      "origin": "owner",
+      "run_id": null,
+      "title": "Selected historical experience (synthetic)",
+      "verification": "not_independently_checked"
+    }
+  ],
+  "boundary": "Real CLI inference; synthetic history and tools; no business effect; selected evidence export, not full audit archive or independent attestation",
+  "children": [
+    {
+      "artifact_id": "pur_e8ab5953f6914c6da3f56d3756bf0d13",
+      "capability_arguments": {
+        "record": "green-current"
+      },
+      "capability_id": "research-record-reader:evidence.read",
+      "charged_by_wishbud": false,
+      "cost_minor": null,
+      "cost_status": "unknown",
+      "currency": "CNY",
+      "id": "pur_4c4689752372419ab50a0fc5c71f239c",
+      "receipt": {
+        "external_run_id": "pur_4c4689752372419ab50a0fc5c71f239c",
+        "host_exit_code": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "provider": "synthetic_fixture_reader"
+      },
+      "status": "succeeded"
+    },
+    {
+      "artifact_id": "pur_1116078a43ca45e290361729e1c33c5c",
+      "capability_arguments": {
+        "record": "blue-current"
+      },
+      "capability_id": "research-record-reader:evidence.read",
+      "charged_by_wishbud": false,
+      "cost_minor": null,
+      "cost_status": "unknown",
+      "currency": "CNY",
+      "id": "pur_b5f49dcd004146b0884b2d8d8bef97f5",
+      "receipt": {
+        "external_run_id": "pur_b5f49dcd004146b0884b2d8d8bef97f5",
+        "host_exit_code": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "provider": "synthetic_fixture_reader"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "experiment": "goal-v2",
+  "goal": {
+    "id": "pursuit_3cecde51e6fe48578116943c32c5e7e9",
+    "intention": "为我的双语创作项目决定下一版文本处理方案。现在比速度更重要的是原文、金额和中日文字完整保留。请推进到有依据的可执行建议，不能发布或付费。",
+    "revision": 1
+  },
+  "original_model_action": {
+    "action": "produce_candidate",
+    "cause_event_ids": [],
+    "data_json": "{\"summary\":\"建议将 Green 作为下一版保真处理的候选，撤回旧稿中继续使用 Blue、所有文本都没问题的建议。两份受控合成记录中，Blue 丢失中日文字并改变金额表示，Green 完整保留同一条样例；这尚不能证明真实项目可用。\",\"agent_turn\":{\"protocol\":\"morrow.agent.v1\",\"understanding\":\"当前目标优先保证原文、金额和中日文字完整保留，速度仅在保真条件满足后参与比较。本轮只能研究并交付建议，不能发布、付费或修改实际项目。\",\"decision\":\"读取并比较 blue-current 与 green-current，使用2次证据读取额度，未使用剩余1次。两项子轮均已 succeeded，并已读取原件及实际回执。选择 Green 进入后续离线验证候选；Blue 当前记录不满足保真要求。旧速度记录不能消除这一反例，无需再为它消耗读取额度。\",\"next_action\":\"本阶段交付候选方案：保留不可覆盖的原始文本副本，Green 输出另存；先以‘東京の朝，预算100.50元。’作为回归样例，要求输出完整相同。后续在另行授权的本地测试中加入真实中日文段落、换行、全半角标点、多币种、负数、千位分隔和小数尾零；原文保留字段要求逐字符相同，金额同时核对数字串、小数位、币种及上下文。任一不符即阻止替换并保留差异。若创作处理需要改写，原文与改写分别存储，先明确允许改变的范围。所有保真检查通过后才比较速度；本轮未执行这些新增测试或部署。\",\"outlook\":\"conclude\",\"basis_refs\":[\"pursuit_3cecde51e6fe48578116943c32c5e7e9\",\"pur_b17ee85d8eaa4c958bd4ee129d4607ea\",\"pur_7ba9d69ab9ae4541834b14f8f0492d1d\",\"pur_1116078a43ca45e290361729e1c33c5c\",\"pur_e8ab5953f6914c6da3f56d3756bf0d13\",\"pur_b5f49dcd004146b0884b2d8d8bef97f5\",\"pur_4c4689752372419ab50a0fc5c71f239c\"],\"uncertainties\":[\"记录明确为 synthetic_fixture、local_revalidation_benchmark，real_world_validation=false；不存在真实市场效果证明。\",\"Green 仅在一条已提供样例上保真；完整语料、编码与文件往返、长文本和真实处理配置尚未测试。\",\"两项读取执行成功，但 cost_status 均为 unknown、cost_minor 为 null；货币费用未核清，不视为零，也未发起付款或重试。\",\"文本比较由本主体根据返回原文完成，不是独立第三方验收，也不代表本人采纳。\"],\"learning\":\"旧经验仅有速度及英文样例依据，不能外推至中日文字与金额保真。当前反例足以否定 Blue 对所有文本都没问题的泛化；Green 的单例通过只支持进入候选，不能推导全面可靠。\"},\"artifact\":{\"title\":\"下一版文本保真处理候选与检查记录\",\"format\":\"markdown\",\"content\":\"建议：将 Green 列为下一版离线验证候选，停止沿用旧稿关于 Blue 全面可靠的结论。\\n\\n本轮读取的完整业务记录：\\n- Blue：version=2；input=‘東京の朝，预算100.50元。’；output=‘????,10050’；latency_seconds=1。\\n- Green：version=1；input=‘東京の朝，预算100.50元。’；output=‘東京の朝，预算100.50元。’；latency_seconds=4。\\n- 两份记录均为 synthetic_fixture，scope=local_revalidation_benchmark，real_world_validation=false。\\n\\n实际比较：Blue 未保留‘東京の朝’、‘预算’及‘元’，金额表示由100.50变为10050，标点也发生变化；不满足当前要求，不能据此推断真实扣款金额。Green 在本条记录中输入输出文本相同，金额及中日文字均保留。耗时是记录值，未重新计时。\\n\\n执行建议：原文只读留存，候选输出另存；保真检查失败即阻止替换，保存差异。下一阶段先验证真实语料、金额表示、标点换行与编码往返，再考虑速度。新增测试均尚未执行。没有修改旧成果、切换实际系统、发布或付款，候选未被本人采纳。\",\"delivery\":{\"change_summary\":\"因目标从速度优先转为保真优先，并取得 Blue 破坏文本、Green 保留同一样例的受控记录，修订旧成果中的选型建议；旧原件保留。\",\"items\":[{\"source_artifact_id\":\"pur_b17ee85d8eaa4c958bd4ee129d4607ea\",\"candidate_path\":null,\"status\":\"revised\",\"reason\":\"修订正文以内联候选交付；撤回全面可靠的外推，保留速度信息的有限参考意义。\",\"checks\":[{\"label\":\"旧建议是否有中日文测试支持\",\"status\":\"failed\",\"method\":\"阅读已选旧成果及历史经验原文\",\"evidence\":\"原文明确说明没有中日文测试依据，却声称所有文本都没问题。\"},{\"label\":\"Blue 当前样例的保真要求\",\"status\":\"failed\",\"method\":\"本主体直接比较读取记录中的 input 与 output\",\"evidence\":\"東京の朝，预算100.50元。 → ????,10050；中日文字、金额表示和标点未完整保留。\"},{\"label\":\"Green 当前样例的保真要求\",\"status\":\"passed\",\"method\":\"本主体直接比较读取记录中的 input 与 output\",\"evidence\":\"两者均为 東京の朝，预算100.50元。；结论仅限这条合成记录。\"},{\"label\":\"真实项目完整语料与部署验收\",\"status\":\"not_checked\",\"method\":\"未执行\",\"evidence\":\"本轮开放能力仅读取受控记录，未提供真实语料测试或部署能力。\"}]}]}}}",
+    "reason": "以当前保真目标重新审视旧经验，已读取并核对两项终结子轮的原件和回执；证据支持有边界地推荐 Green 进入验证候选，不支持宣称实际项目成功。"
+  },
+  "original_reads": [
+    {
+      "content": "{\"input\":\"東京の朝，预算100.50元。\",\"latency_seconds\":4,\"output\":\"東京の朝，预算100.50元。\",\"provider\":\"Green\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"version\":\"1\"}",
+      "record": "green-current",
+      "sha256": "8e1ce2edaf64b6475d2659c28e8a4bab067460dff02d396e7706ee7fadd73cbb"
+    },
+    {
+      "content": "{\"input\":\"東京の朝，预算100.50元。\",\"latency_seconds\":1,\"output\":\"????,10050\",\"provider\":\"Blue\",\"real_world_validation\":false,\"record_kind\":\"synthetic_fixture\",\"scope\":\"local_revalidation_benchmark\",\"version\":\"2\"}",
+      "record": "blue-current",
+      "sha256": "ec9b0c23c839308e9310b2ac8fba2b0a2890e1137bf4d3da41d8a5bdfbfd34f8"
+    }
+  ],
+  "protocol": {
+    "case": "goal",
+    "evidence_kind": "real_llm_on_synthetic_local_environment",
+    "independent_participants": 0,
+    "instructions_include_reference_action_sequence": false,
+    "max_root_invocations": 1,
+    "max_synthetic_reads": 3,
+    "production_mutations": 0,
+    "provider_money_cost": "unknown_if_executed",
+    "real_model_requested": true
+  },
+  "report": {
+    "all_children_stopped": true,
+    "business_effect": "not_tested",
+    "case": "goal",
+    "child_count": 2,
+    "child_statuses": [
+      "succeeded",
+      "succeeded"
+    ],
+    "errors": [],
+    "evidence_kind": "real_llm_synthetic_environment",
+    "independent_participants": 0,
+    "loopback_stopped": true,
+    "parent_receipt": {
+      "external_run_id": "01a14e47-1d1f-79e0-8681-2298d0803a77",
+      "host_exit_code": 0,
+      "input_tokens": 142203,
+      "output_tokens": 2050,
+      "provider": "codex_cli"
+    },
+    "parent_status": "succeeded",
+    "probe_cost_units": 2,
+    "production_changes": 0,
+    "semantic_behavior_pass": "requires_review_of_originals"
+  },
+  "saved_turns": [
+    {
+      "basis_refs": [
+        "pursuit_3cecde51e6fe48578116943c32c5e7e9",
+        "pur_b17ee85d8eaa4c958bd4ee129d4607ea",
+        "pur_7ba9d69ab9ae4541834b14f8f0492d1d",
+        "pur_1116078a43ca45e290361729e1c33c5c",
+        "pur_e8ab5953f6914c6da3f56d3756bf0d13",
+        "pur_b5f49dcd004146b0884b2d8d8bef97f5",
+        "pur_4c4689752372419ab50a0fc5c71f239c"
+      ],
+      "decision": "读取并比较 blue-current 与 green-current，使用2次证据读取额度，未使用剩余1次。两项子轮均已 succeeded，并已读取原件及实际回执。选择 Green 进入后续离线验证候选；Blue 当前记录不满足保真要求。旧速度记录不能消除这一反例，无需再为它消耗读取额度。",
+      "experience_basis": {
+        "environment": {
+          "label": "sandbox",
+          "version": null,
+          "version_status": "not_recorded"
+        },
+        "goal": {
+          "constraints": null,
+          "criterion": null,
+          "id": "pursuit_3cecde51e6fe48578116943c32c5e7e9",
+          "intention": "为我的双语创作项目决定下一版文本处理方案。现在比速度更重要的是原文、金额和中日文字完整保留。请推进到有依据的可执行建议，不能发布或付费。",
+          "revision": 1
+        },
+        "references": [
+          {
+            "collection": "pursuit",
+            "created_at": 1792314645.1923184,
+            "input_sha256": "10a43b7ae941626c144a6c273abc00292791aa0724ec0534304763c96bb5e9d8",
+            "provided": true,
+            "ref": "pursuit_3cecde51e6fe48578116943c32c5e7e9"
+          },
+          {
+            "collection": "artifacts",
+            "created_at": 1792314645.2053185,
+            "input_sha256": "748e2fddac24d9bbdcfe7e2669fbfa8183a5db00aae431f038f57c45d8eacb16",
+            "provided": true,
+            "ref": "pur_b17ee85d8eaa4c958bd4ee129d4607ea"
+          },
+          {
+            "collection": "agent_turns",
+            "created_at": 1792314645.2178826,
+            "input_sha256": "447cb25c261ecb10aeb2789821bc0adb1c4b32d486e458c311f1116db04781f5",
+            "provided": true,
+            "ref": "pur_7ba9d69ab9ae4541834b14f8f0492d1d"
+          },
+          {
+            "collection": "artifacts",
+            "created_at": 1792314670.3509877,
+            "input_sha256": "066aa2e6a74d38b8bc3312159562dfd266e7c3a45744cba3369288b50aa3b0c0",
+            "provided": true,
+            "ref": "pur_1116078a43ca45e290361729e1c33c5c"
+          },
+          {
+            "collection": "artifacts",
+            "created_at": 1792314679.3543768,
+            "input_sha256": "62e928a6c6372c6ceb1910644c5c7127e1691542dd31ee09d1578d1881ac7865",
+            "provided": true,
+            "ref": "pur_e8ab5953f6914c6da3f56d3756bf0d13"
+          },
+          {
+            "collection": "child_execution_records",
+            "created_at": 1792314670.298306,
+            "input_sha256": "414404a4de7d0ae428660bf6d64fd75afe55e6f50ce6bd92b69f12688c7ed1b5",
+            "provided": true,
+            "ref": "pur_b5f49dcd004146b0884b2d8d8bef97f5"
+          },
+          {
+            "collection": "child_execution_records",
+            "created_at": 1792314679.2169578,
+            "input_sha256": "f7386332ee07380c5257bea71e1a8781ef4ada529f8bca1e6fc928e57b33ab13",
+            "provided": true,
+            "ref": "pur_4c4689752372419ab50a0fc5c71f239c"
+          }
+        ],
+        "schema": "morrow.experience-basis.v1"
+      },
+      "goal_revision": 1,
+      "id": "pur_1fee9b0cffe1498d949c7d963ea72440",
+      "late_result": false,
+      "learning": "旧经验仅有速度及英文样例依据，不能外推至中日文字与金额保真。当前反例足以否定 Blue 对所有文本都没问题的泛化；Green 的单例通过只支持进入候选，不能推导全面可靠。",
+      "next_action": "本阶段交付候选方案：保留不可覆盖的原始文本副本，Green 输出另存；先以‘東京の朝，预算100.50元。’作为回归样例，要求输出完整相同。后续在另行授权的本地测试中加入真实中日文段落、换行、全半角标点、多币种、负数、千位分隔和小数尾零；原文保留字段要求逐字符相同，金额同时核对数字串、小数位、币种及上下文。任一不符即阻止替换并保留差异。若创作处理需要改写，原文与改写分别存储，先明确允许改变的范围。所有保真检查通过后才比较速度；本轮未执行这些新增测试或部署。",
+      "outlook": "conclude",
+      "protocol": "morrow.agent.v1",
+      "provenance": "agent_report",
+      "run_id": "pur_584122781047424788481cad7d1c3fa8",
+      "uncertainties": [
+        "记录明确为 synthetic_fixture、local_revalidation_benchmark，real_world_validation=false；不存在真实市场效果证明。",
+        "Green 仅在一条已提供样例上保真；完整语料、编码与文件往返、长文本和真实处理配置尚未测试。",
+        "两项读取执行成功，但 cost_status 均为 unknown、cost_minor 为 null；货币费用未核清，不视为零，也未发起付款或重试。",
+        "文本比较由本主体根据返回原文完成，不是独立第三方验收，也不代表本人采纳。"
+      ],
+      "understanding": "当前目标优先保证原文、金额和中日文字完整保留，速度仅在保真条件满足后参与比较。本轮只能研究并交付建议，不能发布、付费或修改实际项目。",
+      "verification": "not_independently_verified"
+    },
+    {
+      "basis_refs": [
+        "pur_b17ee85d8eaa4c958bd4ee129d4607ea"
+      ],
+      "decision": "Synthetic prior premise",
+      "experience_basis": {
+        "environment": {
+          "label": "sandbox",
+          "version": null,
+          "version_status": "not_recorded"
+        },
+        "goal": {
+          "constraints": null,
+          "criterion": null,
+          "id": "pursuit_3cecde51e6fe48578116943c32c5e7e9",
+          "intention": "Previous research goal: speed or proxy counts",
+          "revision": 0
+        },
+        "references": [
+          {
+            "collection": "artifacts",
+            "created_at": 1792314645.2053185,
+            "input_sha256": "748e2fddac24d9bbdcfe7e2669fbfa8183a5db00aae431f038f57c45d8eacb16",
+            "provided": true,
+            "ref": "pur_b17ee85d8eaa4c958bd4ee129d4607ea"
+          }
+        ],
+        "schema": "morrow.experience-basis.v1"
+      },
+      "goal_revision": 0,
+      "id": "pur_7ba9d69ab9ae4541834b14f8f0492d1d",
+      "late_result": false,
+      "learning": "上一阶段目标仅是快。旧记录：Blue处理耗时1秒，Green耗时4秒；Blue英文样例通过。旧做法建议继续用Blue，声称所有文本都没问题，但没有中日文测试依据。源文本示例：東京の朝，预算100.50元。",
+      "next_action": "Not an instruction",
+      "outlook": "wait",
+      "protocol": "morrow.agent.v1",
+      "provenance": "synthetic_fixture_not_model_output",
+      "run_id": "synthetic-prior-not-a-model-run",
+      "understanding": "Synthetic historical premise",
+      "verification": "not_independently_verified"
+    }
+  ],
+  "schema": "usmsb.synthetic-real-ai-evidence.v1",
+  "source_sha256": {
+    "action.json": "dc8e71970c86e97ebadae545758118b5a40f7869af75c23f540447e33b673ed2",
+    "detail.json": "2d3a7a24d0b2204985555ab05d09e330d08fc017c4f5510676bbd9c00be25382",
+    "report.json": "06d505c1010781f3f509b33eb595789d72d4848471e389bda2c6c278a22cba2b"
+  }
+}

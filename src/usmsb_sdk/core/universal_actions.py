@@ -748,7 +748,11 @@ Context: {json.dumps(context) if context else 'None'}
 
 
 class LLMExecutionService(IExecutionService):
-    """LLM驱动的执行服务实现。"""
+    """Explicit code/tool dispatch, or an unexecuted LLM-generated candidate plan.
+
+    A generic action does not acquire execution authority by being described.
+    Its PENDING result is not a queued job and does not schedule execution.
+    """
 
     def __init__(self, llm_adapter, tool_registry=None):
         self.llm = llm_adapter
@@ -760,7 +764,7 @@ class LLMExecutionService(IExecutionService):
         agent: Any,
         context: dict[str, Any] | None = None
     ) -> ActionResult:
-        """执行行动。"""
+        """Dispatch an explicit code/tool action; otherwise return a plan only."""
         start_time = time.time()
         try:
             action_type = action.get("type", "generic")
@@ -778,19 +782,29 @@ class LLMExecutionService(IExecutionService):
                     context
                 )
             else:
-                # 通用执行 - 让LLM生成执行方案
-                prompt = f"""执行以下行动：
+                # This branch has no executor. Model text is a proposal, not a receipt.
+                prompt = f"""为以下行动生成候选方案，不执行行动：
 
 行动：{json.dumps(action, ensure_ascii=False)}
 
-请生成详细的执行步骤和预期结果。
-返回JSON格式：{{"steps_executed": [...], "result": "...", "status": "success/failure"}}"""
+请描述拟议步骤、预期结果以及缺少的能力、信息或授权。
+预期结果不是已发生的事实；本次仅生成方案，不得声称已经执行或获得执行权限。
+返回JSON格式：{{"proposed_steps": [...], "expected_result": "...", "requirements": [...]}}"""
 
                 response = await self.llm.generate_text(prompt, context)
+                if not isinstance(response, str) or not response.strip():
+                    raise ValueError("Plan generation returned no text")
 
                 return ActionResult(
-                    status=ActionResultStatus.SUCCESS,
-                    data={"execution_plan": response},
+                    status=ActionResultStatus.PENDING,
+                    data={
+                        # Preserve the original text for existing plan consumers.
+                        # Never promote claims inside it into execution evidence.
+                        "execution_plan": response,
+                        "execution_result": None,
+                        "steps_executed": [],
+                    },
+                    metadata={"result_kind": "plan", "execution_status": "not_executed"},
                     execution_time=time.time() - start_time
                 )
         except Exception as e:
